@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using WorkspaceEcommerce.Api.Common;
 using WorkspaceEcommerce.Api.Extensions;
 using WorkspaceEcommerce.Application.Modules.Catalog.Categories;
@@ -6,11 +7,13 @@ using WorkspaceEcommerce.Application.Modules.Catalog.Categories;
 namespace WorkspaceEcommerce.Api.Controllers.Admin;
 
 [ApiController]
+[Authorize]
 [Route("api/admin/categories")]
 public sealed class CategoriesController(IAdminCategoryService categoryService) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyCollection<AdminCategoryDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetCategories(CancellationToken cancellationToken)
     {
@@ -22,6 +25,7 @@ public sealed class CategoriesController(IAdminCategoryService categoryService) 
     [HttpPost]
     [ProducesResponseType(typeof(ApiResponse<AdminCategoryDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> CreateCategory(
@@ -36,6 +40,7 @@ public sealed class CategoriesController(IAdminCategoryService categoryService) 
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(ApiResponse<AdminCategoryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]

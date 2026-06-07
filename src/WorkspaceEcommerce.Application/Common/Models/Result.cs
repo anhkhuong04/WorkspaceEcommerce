@@ -48,6 +48,11 @@ public class Result
         return Create(ResultStatus.Conflict, [error]);
     }
 
+    public static Result Unauthorized(string error)
+    {
+        return Create(ResultStatus.Unauthorized, [error]);
+    }
+
     protected static Result Create(ResultStatus status, IEnumerable<string> errors)
     {
         var errorList = NormalizeErrors(errors);

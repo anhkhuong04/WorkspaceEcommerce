@@ -40,6 +40,11 @@ public sealed class Result<T> : Result
         return CreateTyped(ResultStatus.Conflict, [error]);
     }
 
+    public static new Result<T> Unauthorized(string error)
+    {
+        return CreateTyped(ResultStatus.Unauthorized, [error]);
+    }
+
     private static Result<T> CreateTyped(ResultStatus status, IEnumerable<string> errors)
     {
         var errorList = NormalizeErrors(errors);

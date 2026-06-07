@@ -15,7 +15,7 @@ internal static class ConnectionStringValidator
             throw new InvalidOperationException($"Connection string '{DefaultConnectionName}' is required.");
         }
 
-        if (ContainsPlaceholder(connectionString))
+        if (ConfigurationPlaceholders.ContainsPlaceholder(connectionString))
         {
             throw new InvalidOperationException(
                 $"Connection string '{DefaultConnectionName}' contains a placeholder value. Configure it with user secrets, environment variables, or a local untracked settings file.");
@@ -42,13 +42,5 @@ internal static class ConnectionStringValidator
         }
 
         return connectionString;
-    }
-
-    private static bool ContainsPlaceholder(string connectionString)
-    {
-        return connectionString.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase)
-            || connectionString.Contains("YOUR_", StringComparison.OrdinalIgnoreCase)
-            || connectionString.Contains("<", StringComparison.Ordinal)
-            || connectionString.Contains(">", StringComparison.Ordinal);
     }
 }

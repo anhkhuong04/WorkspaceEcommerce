@@ -23,6 +23,7 @@ internal static class ResultExtensions
         var statusCode = result.Status switch
         {
             ResultStatus.Validation => StatusCodes.Status400BadRequest,
+            ResultStatus.Unauthorized => StatusCodes.Status401Unauthorized,
             ResultStatus.NotFound => StatusCodes.Status404NotFound,
             ResultStatus.Conflict => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status500InternalServerError
