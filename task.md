@@ -15,10 +15,10 @@ Cập nhật lần cuối: 2026-06-07
 Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog/Admin:
 
 - `WorkspaceEcommerce.Domain`: Catalog entities và domain invariant cơ bản.
-- `WorkspaceEcommerce.Application`: common contracts/models, DTO, validator và service cho Admin Auth, Category, Product và Variant.
+- `WorkspaceEcommerce.Application`: common contracts/models, DTO, validator và service cho Admin Auth, Admin Catalog và Storefront Catalog.
 - `WorkspaceEcommerce.Infrastructure`: EF Core PostgreSQL persistence, Catalog mappings, migration đầu tiên và configuration validation.
-- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth/Admin Category/Admin Product, JWT authentication, response envelope, global exception handling và OpenAPI trong Development.
-- `WorkspaceEcommerce.Application.Tests`: test cho Catalog Domain, Admin Auth, Admin Category và Admin Product service/validator.
+- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth/Admin Catalog/Storefront Catalog, JWT authentication, response envelope, global exception handling và OpenAPI trong Development.
+- `WorkspaceEcommerce.Application.Tests`: test cho Catalog Domain, Admin Auth, Admin Catalog và Storefront Catalog service/validator.
 - `WorkspaceEcommerce.Infrastructure.Tests`: test cho configuration validation, EF Core Catalog mapping và JWT token generation.
 - PostgreSQL local chạy bằng Docker Compose service `postgres`.
 
@@ -95,6 +95,26 @@ Dependency hiện tại:
 - Chặn duplicate SKU không phân biệt hoa/thường.
 - Không triển khai Product image/specification API trong task này vì request chỉ nêu Product và Variant endpoints.
 
+### Storefront Catalog read APIs
+
+- Thêm API public:
+  - `GET /api/categories`
+  - `GET /api/products`
+  - `GET /api/products/{slug}`
+- Không yêu cầu JWT cho Storefront APIs.
+- `GET /api/categories` chỉ trả active category và build tree parent/child.
+- `GET /api/products` chỉ trả active product thuộc active category.
+- Product listing chỉ dùng active variants để tính giá, compare-at price và trạng thái còn hàng.
+- Product listing hỗ trợ pagination với `pageNumber`, `pageSize`.
+- Product listing hỗ trợ filter MVP:
+  - `categorySlug`
+  - `search`
+  - `minPrice`
+  - `maxPrice`
+  - `inStock`
+- `GET /api/products/{slug}` chỉ trả active product thuộc active category.
+- Product detail chỉ trả active variants; images/specifications không có `IsActive` trong data model nên trả theo product.
+
 ### API foundation
 
 - Thêm global exception middleware.
@@ -134,6 +154,7 @@ Dependency hiện tại:
 - Application tests cho Admin Category validator/service.
 - Application tests cho Admin Auth validator/service.
 - Application tests cho Admin Product validator/service.
+- Application tests cho Storefront Catalog read service.
 - Domain tests cho Category parent rules, Product variant SKU uniqueness, ProductVariant price/stock invariants.
 - Infrastructure tests cho configuration validation.
 - Infrastructure tests cho JWT token generation.
@@ -186,9 +207,9 @@ Kết quả:
 - Failed: 0.
 - Skipped: 0.
 
-Sau Admin Product Management, xác minh mới nhất:
+Sau Storefront Catalog read APIs, xác minh mới nhất:
 
-- `WorkspaceEcommerce.Application.Tests`: 49 passed.
+- `WorkspaceEcommerce.Application.Tests`: 55 passed.
 - `WorkspaceEcommerce.Infrastructure.Tests`: 30 passed.
 
 ## Rủi ro và khoảng trống
@@ -197,32 +218,24 @@ Sau Admin Product Management, xác minh mới nhất:
 - Vì config dùng `AdminAuth:Password=CHANGE_ME` và `Jwt:SigningKey=CHANGE_ME`, app sẽ fail sớm nếu chưa override bằng secret/config local hợp lệ.
 - Chưa có API integration tests cho Admin Category endpoints.
 - Chưa có API integration tests cho Admin Product endpoints.
+- Chưa có API integration tests cho Storefront Catalog endpoints.
 - Chưa có API/Docker Compose setup cho backend container.
 - Runtime check authorized category cần PostgreSQL container reachable; lần kiểm tra gần nhất bị chặn vì Docker Desktop đang ở trạng thái pause.
 
 ## Nhiệm vụ tiếp theo đề xuất
 
-### Ưu tiên 1 - Storefront Catalog
+### Ưu tiên 1 - Module MVP sau Catalog
 
-1. Triển khai Storefront Catalog read APIs.
-   - `GET /api/categories`
-   - `GET /api/products`
-   - `GET /api/products/{slug}`
-   - Chỉ trả active category/product/variant.
-   - Product listing có pagination/filter trong phạm vi MVP.
+1. Triển khai Cart module.
+2. Triển khai Checkout và Ordering với snapshot OrderItem.
+3. Triển khai Admin Order Management và OrderStatusHistory.
+4. Triển khai Banner Management và Dashboard.
 
-### Ưu tiên 2 - Module MVP sau Catalog
+### Ưu tiên 2 - Runtime/DevOps
 
-2. Triển khai Cart module.
-3. Triển khai Checkout và Ordering với snapshot OrderItem.
-4. Triển khai Admin Order Management và OrderStatusHistory.
-5. Triển khai Banner Management và Dashboard.
-
-### Ưu tiên 3 - Runtime/DevOps
-
-6. Thêm Dockerfile cho backend API khi bắt đầu đóng gói app.
-7. Thêm healthcheck/runtime documentation cho API + PostgreSQL.
-8. Thêm API integration tests cho login, admin authorization và Admin Product endpoints.
+5. Thêm Dockerfile cho backend API khi bắt đầu đóng gói app.
+6. Thêm healthcheck/runtime documentation cho API + PostgreSQL.
+7. Thêm API integration tests cho login, admin authorization, Admin Product và Storefront Catalog endpoints.
 
 ## Lệnh nên chạy trước task tiếp theo
 

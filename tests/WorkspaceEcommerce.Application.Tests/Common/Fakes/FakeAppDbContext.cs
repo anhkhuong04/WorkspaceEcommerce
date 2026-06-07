@@ -38,6 +38,16 @@ internal sealed class FakeAppDbContext : IAppDbContext
         _productVariants.AddRange(variants);
     }
 
+    public void Seed(params ProductImage[] images)
+    {
+        _productImages.AddRange(images);
+    }
+
+    public void Seed(params ProductSpecification[] specifications)
+    {
+        _productSpecifications.AddRange(specifications);
+    }
+
     public void Add<TEntity>(TEntity entity)
         where TEntity : class
     {
