@@ -86,6 +86,21 @@ public sealed class ProductVariant : Entity
         StockQuantity = Guard.NotNegative(stockQuantity, nameof(StockQuantity));
     }
 
+    public void DecreaseStock(int quantity)
+    {
+        if (quantity <= 0)
+        {
+            throw new DomainException("Stock decrease quantity must be greater than zero.");
+        }
+
+        if (quantity > StockQuantity)
+        {
+            throw new DomainException("Insufficient stock quantity.");
+        }
+
+        StockQuantity -= quantity;
+    }
+
     public void Activate()
     {
         IsActive = true;

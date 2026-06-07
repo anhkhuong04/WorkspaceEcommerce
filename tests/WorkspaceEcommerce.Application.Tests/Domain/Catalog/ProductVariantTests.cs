@@ -70,6 +70,36 @@ public sealed class ProductVariantTests
         Assert.Equal("StockQuantity cannot be negative.", exception.Message);
     }
 
+    [Fact]
+    public void DecreaseStock_ValidQuantity_DecreasesStockQuantity()
+    {
+        var variant = CreateVariant(stockQuantity: 5);
+
+        variant.DecreaseStock(2);
+
+        Assert.Equal(3, variant.StockQuantity);
+    }
+
+    [Fact]
+    public void DecreaseStock_InsufficientStock_ThrowsDomainException()
+    {
+        var variant = CreateVariant(stockQuantity: 1);
+
+        var exception = Assert.Throws<DomainException>(() => variant.DecreaseStock(2));
+
+        Assert.Equal("Insufficient stock quantity.", exception.Message);
+    }
+
+    [Fact]
+    public void DecreaseStock_NonPositiveQuantity_ThrowsDomainException()
+    {
+        var variant = CreateVariant(stockQuantity: 1);
+
+        var exception = Assert.Throws<DomainException>(() => variant.DecreaseStock(0));
+
+        Assert.Equal("Stock decrease quantity must be greater than zero.", exception.Message);
+    }
+
     private static ProductVariant CreateVariant(
         decimal price = 100m,
         decimal? compareAtPrice = 120m,
