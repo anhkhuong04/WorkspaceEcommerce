@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WorkspaceEcommerce.Api/WorkspaceEcommerce.Api.csproj" />
+    <Project Path="src/WorkspaceEcommerce.Application/WorkspaceEcommerce.Application.csproj" />
+    <Project Path="src/WorkspaceEcommerce.Domain/WorkspaceEcommerce.Domain.csproj" />
+    <Project Path="src/WorkspaceEcommerce.Infrastructure/WorkspaceEcommerce.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WorkspaceEcommerce.Application.Tests/WorkspaceEcommerce.Application.Tests.csproj" />
+    <Project Path="tests/WorkspaceEcommerce.Infrastructure.Tests/WorkspaceEcommerce.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>

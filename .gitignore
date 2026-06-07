@@ -1,0 +1,38 @@
+﻿# Build results
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio / Rider / local IDE files
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test results and coverage
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+coverage*.json
+
+# NuGet
+*.nupkg
+packages/
+
+# ASP.NET local settings
+appsettings.Local.json
+appsettings.*.Local.json
+
+# Environment files
+.env
+.env.*
+!.env.example
