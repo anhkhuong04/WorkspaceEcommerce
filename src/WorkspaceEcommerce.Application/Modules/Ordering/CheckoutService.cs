@@ -29,20 +29,23 @@ internal sealed class CheckoutService(
             return Result<CheckoutResponse>.Validation(["Cart is empty."]);
         }
 
-        var itemSnapshotsResult = await BuildItemSnapshotsAsync(cart, cancellationToken);
-        if (itemSnapshotsResult.IsFailure)
-        {
-            return ToCheckoutFailure(itemSnapshotsResult);
-        }
-
         Order? order = null;
+        Result<CheckoutResponse>? failure = null;
         try
         {
             await checkoutStore.ExecuteInTransactionAsync(async transactionCancellationToken =>
             {
-                order = await CreateOrderAsync(request, itemSnapshotsResult.Value!, transactionCancellationToken);
+                var itemSnapshotsResult = await BuildItemSnapshotsAsync(cart, transactionCancellationToken);
+                if (itemSnapshotsResult.IsFailure)
+                {
+                    failure = ToCheckoutFailure(itemSnapshotsResult);
+                    return;
+                }
 
-                foreach (var snapshot in itemSnapshotsResult.Value!)
+                var snapshots = itemSnapshotsResult.Value!;
+                order = await CreateOrderAsync(request, snapshots, transactionCancellationToken);
+
+                foreach (var snapshot in snapshots)
                 {
                     snapshot.Variant.DecreaseStock(snapshot.Quantity);
                     checkoutStore.Update(snapshot.Variant);
@@ -56,6 +59,11 @@ internal sealed class CheckoutService(
         catch (DomainException exception)
         {
             return Result<CheckoutResponse>.Validation([exception.Message]);
+        }
+
+        if (failure is not null)
+        {
+            return failure;
         }
 
         return Result<CheckoutResponse>.Success(new CheckoutResponse(ToDto(order!)));

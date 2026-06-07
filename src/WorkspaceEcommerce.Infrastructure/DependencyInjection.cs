@@ -25,6 +25,7 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString));
         services.AddScoped<IAppDbContext>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddScoped<ICartStore>(provider => provider.GetRequiredService<AppDbContext>());
+        services.AddScoped<ICheckoutStore>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddSingleton(adminAuthOptions);
         services.AddSingleton(jwtOptions);
         services.AddSingleton<IAdminCredentialValidator, ConfiguredAdminCredentialValidator>();

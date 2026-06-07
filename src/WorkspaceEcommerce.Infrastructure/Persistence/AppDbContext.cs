@@ -2,15 +2,22 @@ using Microsoft.EntityFrameworkCore;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Domain.Modules.Cart;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
+using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Infrastructure.Persistence;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
-    : DbContext(options), IAppDbContext, ICartStore
+    : DbContext(options), IAppDbContext, ICartStore, ICheckoutStore
 {
     public DbSet<Cart> Carts => Set<Cart>();
 
     public DbSet<CartItem> CartItems => Set<CartItem>();
+
+    public DbSet<Order> Orders => Set<Order>();
+
+    public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+
+    public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
 
     public DbSet<Category> Categories => Set<Category>();
 
@@ -65,6 +72,58 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             .FirstOrDefaultAsync(category => category.Id == id, cancellationToken);
     }
 
+    async Task<Cart?> ICheckoutStore.FindCartBySessionIdAsync(
+        string sessionId,
+        CancellationToken cancellationToken)
+    {
+        return await Carts
+            .Include(cart => cart.Items)
+            .FirstOrDefaultAsync(cart => cart.SessionId == sessionId, cancellationToken);
+    }
+
+    async Task<ProductVariant?> ICheckoutStore.FindProductVariantByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        return await ProductVariants
+            .FromSqlInterpolated($"SELECT * FROM catalog.product_variants WHERE id = {id} FOR UPDATE")
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    async Task<Product?> ICheckoutStore.FindProductByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        return await Products
+            .FirstOrDefaultAsync(product => product.Id == id, cancellationToken);
+    }
+
+    async Task<Category?> ICheckoutStore.FindCategoryByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        return await Categories
+            .FirstOrDefaultAsync(category => category.Id == id, cancellationToken);
+    }
+
+    async Task<bool> ICheckoutStore.OrderCodeExistsAsync(
+        string orderCode,
+        CancellationToken cancellationToken)
+    {
+        return await Orders.AnyAsync(order => order.OrderCode == orderCode, cancellationToken);
+    }
+
+    async Task ICheckoutStore.ExecuteInTransactionAsync(
+        Func<CancellationToken, Task> operation,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await Database.BeginTransactionAsync(cancellationToken);
+
+        await operation(cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     void IAppDbContext.Add<TEntity>(TEntity entity)
         where TEntity : class
     {
@@ -96,6 +155,24 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     }
 
     void ICartStore.Remove<TEntity>(TEntity entity)
+        where TEntity : class
+    {
+        Set<TEntity>().Remove(entity);
+    }
+
+    void ICheckoutStore.Add<TEntity>(TEntity entity)
+        where TEntity : class
+    {
+        Set<TEntity>().Add(entity);
+    }
+
+    void ICheckoutStore.Update<TEntity>(TEntity entity)
+        where TEntity : class
+    {
+        Set<TEntity>().Update(entity);
+    }
+
+    void ICheckoutStore.Remove<TEntity>(TEntity entity)
         where TEntity : class
     {
         Set<TEntity>().Remove(entity);
