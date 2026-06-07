@@ -1,5 +1,9 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using WorkspaceEcommerce.Application.Abstractions.Persistence;
+using WorkspaceEcommerce.Infrastructure.Configuration;
+using WorkspaceEcommerce.Infrastructure.Persistence;
 
 namespace WorkspaceEcommerce.Infrastructure;
 
@@ -10,6 +14,12 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
+
+        var connectionString = configuration.GetValidatedDefaultConnectionString();
+
+        services.AddDbContext<AppDbContext>(options =>
+            options.UseNpgsql(connectionString));
+        services.AddScoped<IAppDbContext>(provider => provider.GetRequiredService<AppDbContext>());
 
         return services;
     }
