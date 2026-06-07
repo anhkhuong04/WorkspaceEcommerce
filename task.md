@@ -12,20 +12,20 @@ Cập nhật lần cuối: 2026-06-07
 
 ## Trạng thái hiện tại
 
-Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog/Admin:
+Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog/Admin/Cart:
 
-- `WorkspaceEcommerce.Domain`: Catalog entities và domain invariant cơ bản.
-- `WorkspaceEcommerce.Application`: common contracts/models, DTO, validator và service cho Admin Auth, Admin Catalog và Storefront Catalog.
-- `WorkspaceEcommerce.Infrastructure`: EF Core PostgreSQL persistence, Catalog mappings, migration đầu tiên và configuration validation.
-- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth/Admin Catalog/Storefront Catalog, JWT authentication, response envelope, global exception handling và OpenAPI trong Development.
-- `WorkspaceEcommerce.Application.Tests`: test cho Catalog Domain, Admin Auth, Admin Catalog và Storefront Catalog service/validator.
-- `WorkspaceEcommerce.Infrastructure.Tests`: test cho configuration validation, EF Core Catalog mapping và JWT token generation.
+- `WorkspaceEcommerce.Domain`: Catalog và Cart entities với invariant cơ bản.
+- `WorkspaceEcommerce.Application`: common contracts/models, DTO, validator và service cho Admin Auth, Admin Catalog, Storefront Catalog và Storefront Cart.
+- `WorkspaceEcommerce.Infrastructure`: EF Core PostgreSQL persistence, Catalog/Cart mappings, migrations và configuration validation.
+- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth/Admin Catalog/Storefront Catalog/Storefront Cart, JWT authentication, response envelope, global exception handling và OpenAPI trong Development.
+- `WorkspaceEcommerce.Application.Tests`: test cho Catalog/Cart Domain, Admin Auth, Admin Catalog, Storefront Catalog và Storefront Cart service/validator.
+- `WorkspaceEcommerce.Infrastructure.Tests`: test cho configuration validation, EF Core Catalog/Cart mapping và JWT token generation.
 - PostgreSQL local chạy bằng Docker Compose service `postgres`.
 
 Dependency hiện tại:
 
 - `Domain` không phụ thuộc Application, Infrastructure, API hoặc EF Core.
-- `Application` phụ thuộc `Domain` và định nghĩa abstraction như `IAppDbContext`.
+- `Application` phụ thuộc `Domain` và định nghĩa abstraction như `IAppDbContext`, `ICartStore`.
 - `Infrastructure` phụ thuộc `Application` và `Domain`, triển khai EF Core/PostgreSQL.
 - `Api` phụ thuộc `Application` và `Infrastructure`, không chứa business logic.
 
@@ -115,6 +115,63 @@ Dependency hiện tại:
 - `GET /api/products/{slug}` chỉ trả active product thuộc active category.
 - Product detail chỉ trả active variants; images/specifications không có `IsActive` trong data model nên trả theo product.
 
+### Cart module
+
+- Triển khai Domain entities:
+  - `Cart`
+  - `CartItem`
+- Domain không phụ thuộc EF Core.
+- Cart invariant:
+  - Cart phải thuộc customer hoặc session.
+  - CartItem quantity phải lớn hơn 0.
+  - `UnitPriceSnapshot` không âm.
+  - Tổng tiền tính từ `UnitPriceSnapshot * Quantity`.
+- Application service `IStorefrontCartService` xử lý:
+  - lấy cart theo `SessionId`
+  - thêm item
+  - cập nhật quantity
+  - xóa item
+- Application validators cho:
+  - `GetCartRequest`
+  - `AddCartItemRequest`
+  - `UpdateCartItemRequest`
+  - `RemoveCartItemRequest`
+- Service chỉ cho add/update active variant thuộc active product và active category.
+- Service kiểm tra tồn kho cơ bản trước khi add/update quantity.
+- Cart item lưu `UnitPriceSnapshot` từ giá hiện tại của variant khi thêm item mới.
+- Khi add cùng variant vào cart, service tăng quantity và giữ price snapshot cũ.
+- Chưa triển khai Checkout hoặc Order trong Cart task.
+
+### Cart persistence và Storefront Cart APIs
+
+- Thêm EF Core mappings cho Cart bằng `IEntityTypeConfiguration<T>`.
+- Tạo schema `cart`.
+- Tạo bảng:
+  - `cart.carts`
+  - `cart.cart_items`
+- Mapping PostgreSQL-compatible:
+  - `session_id` max length 128
+  - `unit_price_snapshot numeric(18,2)`
+  - FK `cart_items.cart_id -> cart.carts.id` dùng cascade delete
+  - FK `cart_items.product_variant_id -> catalog.product_variants.id` dùng restrict delete
+- Thêm index:
+  - `ix_carts_session_id`
+  - `ix_carts_customer_id`
+  - `ix_cart_items_cart_id`
+  - `ix_cart_items_product_variant_id`
+  - `ux_cart_items_cart_id_product_variant_id`
+- Tạo migration `AddCartSchema`.
+- `AppDbContext` triển khai `ICartStore`.
+- Đăng ký DI cho `IStorefrontCartService` và `ICartStore`.
+- Thêm API public:
+  - `GET /api/cart`
+  - `POST /api/cart/items`
+  - `PUT /api/cart/items/{id}`
+  - `DELETE /api/cart/items/{id}`
+- Cart APIs không yêu cầu JWT vì thuộc Storefront customer flow.
+- Đã smoke-test đủ 4 endpoints trên PostgreSQL local.
+- Đã fix lỗi EF tracking khi tạo cart mới: cart mới chỉ `Add(cart)`, không `Update(cart)`.
+
 ### API foundation
 
 - Thêm global exception middleware.
@@ -155,7 +212,9 @@ Dependency hiện tại:
 - Application tests cho Admin Auth validator/service.
 - Application tests cho Admin Product validator/service.
 - Application tests cho Storefront Catalog read service.
+- Application tests cho Storefront Cart validator/service.
 - Domain tests cho Category parent rules, Product variant SKU uniqueness, ProductVariant price/stock invariants.
+- Domain tests cho Cart và CartItem invariants.
 - Infrastructure tests cho configuration validation.
 - Infrastructure tests cho JWT token generation.
 - Infrastructure tests cho EF Core Catalog mapping:
@@ -165,6 +224,13 @@ Dependency hiện tại:
   - decimal precision `numeric(18,2)`
   - delete behavior `Restrict`/`Cascade`
   - không dùng EF InMemory
+- Infrastructure tests cho EF Core Cart mapping:
+  - schema `cart`
+  - table names
+  - lookup indexes
+  - unique index `(cart_id, product_variant_id)`
+  - decimal precision `numeric(18,2)`
+  - delete behavior `Cascade`/`Restrict`
 
 ### Database migration local
 
@@ -179,6 +245,29 @@ Dependency hiện tại:
   - `price` và `compare_at_price` là `numeric(18,2)`
   - delete behavior `Restrict`/`Cascade`
   - migration history có `20260607075432_InitialCatalogSchema`
+- Đã apply migration `20260607133308_AddCartSchema`.
+- Đã verify trực tiếp trên PostgreSQL:
+  - schema `cart`
+  - bảng `carts`, `cart_items`
+  - indexes `ix_carts_session_id`, `ix_carts_customer_id`, `ix_cart_items_cart_id`, `ix_cart_items_product_variant_id`, `ux_cart_items_cart_id_product_variant_id`
+  - FK `cart_items.cart_id` cascade
+  - FK `cart_items.product_variant_id` restrict
+  - `unit_price_snapshot` là `numeric(18,2)`
+- Đã seed dữ liệu smoke-test tối thiểu:
+  - category slug `smoke-test-category`
+  - product slug `smoke-test-product`
+  - variant SKU `SMOKE-CART-001`
+- Đã smoke-test Cart APIs trên API local `http://localhost:5080`:
+  - `GET /api/cart?sessionId=...` trả cart rỗng `200`
+  - `POST /api/cart/items` thêm item `200`
+  - `PUT /api/cart/items/{id}` cập nhật quantity `200`
+  - `DELETE /api/cart/items/{id}?sessionId=...` xóa item `200`
+
+### Commit gần nhất
+
+- `a5e49b3 Add cart domain and application service`
+- `661223a Add cart persistence and storefront API`
+- `93f1610 Fix cart creation persistence`
 
 ## Xác minh gần nhất
 
@@ -202,15 +291,17 @@ dotnet test WorkspaceEcommerce.slnx
 
 Kết quả:
 
-- `WorkspaceEcommerce.Application.Tests`: 28 passed.
-- `WorkspaceEcommerce.Infrastructure.Tests`: 23 passed.
+- `WorkspaceEcommerce.Application.Tests`: 74 passed.
+- `WorkspaceEcommerce.Infrastructure.Tests`: 40 passed.
 - Failed: 0.
 - Skipped: 0.
 
-Sau Storefront Catalog read APIs, xác minh mới nhất:
+Sau Cart persistence/API và smoke-test, xác minh mới nhất:
 
-- `WorkspaceEcommerce.Application.Tests`: 55 passed.
-- `WorkspaceEcommerce.Infrastructure.Tests`: 30 passed.
+- `WorkspaceEcommerce.Application.Tests`: 74 passed.
+- `WorkspaceEcommerce.Infrastructure.Tests`: 40 passed.
+- Tổng test suite: 114 passed.
+- Cart smoke-test 4 endpoints: passed.
 
 ## Rủi ro và khoảng trống
 
@@ -219,23 +310,25 @@ Sau Storefront Catalog read APIs, xác minh mới nhất:
 - Chưa có API integration tests cho Admin Category endpoints.
 - Chưa có API integration tests cho Admin Product endpoints.
 - Chưa có API integration tests cho Storefront Catalog endpoints.
+- Chưa có API integration tests tự động cho Storefront Cart endpoints; hiện mới smoke-test thủ công qua API local.
 - Chưa có API/Docker Compose setup cho backend container.
-- Runtime check authorized category cần PostgreSQL container reachable; lần kiểm tra gần nhất bị chặn vì Docker Desktop đang ở trạng thái pause.
+- Dữ liệu smoke-test local đã được insert vào PostgreSQL dev; nếu cần DB sạch cho demo thì cần seed strategy chính thức hoặc cleanup script.
 
 ## Nhiệm vụ tiếp theo đề xuất
 
-### Ưu tiên 1 - Module MVP sau Catalog
+### Ưu tiên 1 - Module MVP sau Catalog/Cart
 
-1. Triển khai Cart module.
-2. Triển khai Checkout và Ordering với snapshot OrderItem.
+1. Triển khai Checkout và Ordering với snapshot OrderItem.
+2. Triển khai trừ tồn kho theo cấu hình MVP khi tạo/xác nhận đơn.
 3. Triển khai Admin Order Management và OrderStatusHistory.
-4. Triển khai Banner Management và Dashboard.
+4. Triển khai Order Lookup cho customer.
+5. Triển khai Banner Management và Dashboard.
 
 ### Ưu tiên 2 - Runtime/DevOps
 
-5. Thêm Dockerfile cho backend API khi bắt đầu đóng gói app.
-6. Thêm healthcheck/runtime documentation cho API + PostgreSQL.
-7. Thêm API integration tests cho login, admin authorization, Admin Product và Storefront Catalog endpoints.
+6. Thêm Dockerfile cho backend API khi bắt đầu đóng gói app.
+7. Thêm healthcheck/runtime documentation cho API + PostgreSQL.
+8. Thêm API integration tests cho login, admin authorization, Admin Product, Storefront Catalog và Storefront Cart endpoints.
 
 ## Lệnh nên chạy trước task tiếp theo
 
