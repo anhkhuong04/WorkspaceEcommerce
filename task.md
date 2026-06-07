@@ -9,24 +9,25 @@ Cập nhật lần cuối: 2026-06-07
 - Không triển khai tính năng ngoài phạm vi `overview.md` nếu chưa được yêu cầu rõ.
 - Trước khi sửa code phải nêu kế hoạch, file bị ảnh hưởng và hướng dependency.
 - Không sửa file không liên quan.
+- Sau khi hoàn thành và test ổn cho mỗi task, commit code ngay với tên commit phù hợp.
 
 ## Trạng thái hiện tại
 
-Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog/Admin/Cart:
+Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, Cart, Checkout và Ordering:
 
-- `WorkspaceEcommerce.Domain`: Catalog và Cart entities với invariant cơ bản.
-- `WorkspaceEcommerce.Application`: common contracts/models, DTO, validator và service cho Admin Auth, Admin Catalog, Storefront Catalog và Storefront Cart.
-- `WorkspaceEcommerce.Infrastructure`: EF Core PostgreSQL persistence, Catalog/Cart mappings, migrations và configuration validation.
-- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth/Admin Catalog/Storefront Catalog/Storefront Cart, JWT authentication, response envelope, global exception handling và OpenAPI trong Development.
-- `WorkspaceEcommerce.Application.Tests`: test cho Catalog/Cart Domain, Admin Auth, Admin Catalog, Storefront Catalog và Storefront Cart service/validator.
-- `WorkspaceEcommerce.Infrastructure.Tests`: test cho configuration validation, EF Core Catalog/Cart mapping và JWT token generation.
+- `WorkspaceEcommerce.Domain`: Catalog, Cart và Ordering entities với invariant/domain method cơ bản.
+- `WorkspaceEcommerce.Application`: common contracts/models, DTO, validators và services cho Admin Auth, Admin Catalog, Admin Product, Storefront Catalog, Storefront Cart và Checkout.
+- `WorkspaceEcommerce.Infrastructure`: EF Core PostgreSQL persistence, Catalog/Cart/Ordering mappings, migrations, JWT/config validation và transaction-backed checkout store.
+- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth, Admin Catalog, Admin Product, Storefront Catalog, Storefront Cart và Checkout; có JWT, response envelope, global exception handling và OpenAPI trong Development.
+- `WorkspaceEcommerce.Application.Tests`: tests cho Domain, validators và Application services thuộc Catalog, Cart, Auth, Product, Storefront Catalog và Checkout.
+- `WorkspaceEcommerce.Infrastructure.Tests`: tests cho configuration validation, JWT token generation và EF Core mappings của Catalog, Cart, Ordering.
 - PostgreSQL local chạy bằng Docker Compose service `postgres`.
 
 Dependency hiện tại:
 
 - `Domain` không phụ thuộc Application, Infrastructure, API hoặc EF Core.
-- `Application` phụ thuộc `Domain` và định nghĩa abstraction như `IAppDbContext`, `ICartStore`.
-- `Infrastructure` phụ thuộc `Application` và `Domain`, triển khai EF Core/PostgreSQL.
+- `Application` phụ thuộc `Domain` và định nghĩa abstraction như `IAppDbContext`, `ICartStore`, `ICheckoutStore`.
+- `Infrastructure` phụ thuộc `Application` và `Domain`, triển khai EF Core/PostgreSQL, JWT và config validation.
 - `Api` phụ thuộc `Application` và `Infrastructure`, không chứa business logic.
 
 ## Đã hoàn thành
@@ -38,30 +39,33 @@ Dependency hiện tại:
 - Thêm `.gitignore` cho `bin/`, `obj/`, `.idea/`, log, coverage và file môi trường local.
 - Commit/push backend foundation ban đầu lên `origin/main`.
 
-### Catalog Domain
+### Catalog module
 
-- Triển khai entity: `Category`, `Product`, `ProductVariant`, `ProductImage`, `ProductSpecification`.
-- Thêm helper: `Entity`, `DomainException`, `Guard`.
+- Triển khai Domain entities: `Category`, `Product`, `ProductVariant`, `ProductImage`, `ProductSpecification`.
 - Domain không có EF attribute hoặc EF package reference.
 - Entity dùng private setter khi phù hợp.
-- Đã có domain method cho activate/deactivate, update, parent category, pricing, stock, image/specification.
-- Chưa triển khai Cart, Order, Checkout, Customer, Content hoặc Inventory aggregate.
-
-### Catalog persistence và migration
-
-- Thêm `AppDbContext` và DbSet cho Catalog.
-- Mapping bằng `IEntityTypeConfiguration<T>` trong Infrastructure.
-- Mapping PostgreSQL-compatible với schema `catalog`.
-- Config required fields, max length, relationship, index, delete behavior và decimal precision.
+- Thêm domain behavior cho activate/deactivate, update, parent category, pricing, stock, image/specification.
+- Thêm EF Core mappings cho schema `catalog` bằng `IEntityTypeConfiguration<T>`.
+- Mapping PostgreSQL-compatible với required fields, max length, relationships, indexes, delete behavior và decimal precision.
 - Unique index cho category slug, product slug và variant SKU.
-- Tạo migration `InitialCatalogSchema` trong Infrastructure migration assembly.
-- Migration chỉ tạo các bảng Catalog: `categories`, `products`, `product_images`, `product_specifications`, `product_variants`.
+- Tạo migration `InitialCatalogSchema`.
 
 ### Application common contracts/models
 
 - Thêm `IAppDbContext`.
 - Thêm `Result`, `Result<T>`, `ResultStatus`, `PagedResult<T>`, `PaginationRequest`.
 - Application không expose EF Core implementation.
+
+### Admin Authentication
+
+- Thêm API `POST /api/admin/auth/login`.
+- Login dùng email/password theo phạm vi MVP.
+- Credential admin đọc từ configuration `AdminAuth`.
+- JWT đọc từ configuration `Jwt`.
+- Không commit password hoặc signing key thật; appsettings chỉ giữ placeholder.
+- Thêm JWT Bearer authentication.
+- Bảo vệ `/api/admin/*` endpoints đã triển khai bằng `[Authorize]`.
+- Invalid login trả `401 Unauthorized`, không expose thông tin nội bộ.
 
 ### Admin Category Management
 
@@ -86,14 +90,10 @@ Dependency hiện tại:
   - `PUT /api/admin/variants/{id}`
 - Controller mỏng, delegate sang Application service.
 - Dùng DTO request/response và FluentValidation.
-- Business logic nằm trong Application service.
 - Dùng `IsActive` cho Product và ProductVariant.
-- Hỗ trợ `IsFeatured`, description và category assignment cho Product.
-- Hỗ trợ SKU, name, color, size, price, compare-at price, stock, requires installation và active flag cho Variant.
-- Chặn category không tồn tại khi tạo/cập nhật Product.
-- Chặn duplicate product slug.
-- Chặn duplicate SKU không phân biệt hoa/thường.
-- Không triển khai Product image/specification API trong task này vì request chỉ nêu Product và Variant endpoints.
+- Hỗ trợ category assignment, featured flag, description, SKU, price, compare-at price, stock và `RequiresInstallation`.
+- Chặn category không tồn tại, duplicate product slug và duplicate SKU không phân biệt hoa/thường.
+- Chưa triển khai Product image/specification API vì task trước chỉ yêu cầu Product và Variant endpoints.
 
 ### Storefront Catalog read APIs
 
@@ -101,76 +101,97 @@ Dependency hiện tại:
   - `GET /api/categories`
   - `GET /api/products`
   - `GET /api/products/{slug}`
-- Không yêu cầu JWT cho Storefront APIs.
-- `GET /api/categories` chỉ trả active category và build tree parent/child.
-- `GET /api/products` chỉ trả active product thuộc active category.
-- Product listing chỉ dùng active variants để tính giá, compare-at price và trạng thái còn hàng.
-- Product listing hỗ trợ pagination với `pageNumber`, `pageSize`.
-- Product listing hỗ trợ filter MVP:
-  - `categorySlug`
-  - `search`
-  - `minPrice`
-  - `maxPrice`
-  - `inStock`
-- `GET /api/products/{slug}` chỉ trả active product thuộc active category.
-- Product detail chỉ trả active variants; images/specifications không có `IsActive` trong data model nên trả theo product.
+- Chỉ trả active category/product/variant.
+- Product listing có pagination và filter MVP: `categorySlug`, `search`, `minPrice`, `maxPrice`, `inStock`.
+- Product detail trả active variants; images/specifications không có `IsActive` trong data model nên trả theo product.
 
 ### Cart module
 
-- Triển khai Domain entities:
-  - `Cart`
-  - `CartItem`
-- Domain không phụ thuộc EF Core.
+- Triển khai Domain entities: `Cart`, `CartItem`.
 - Cart invariant:
   - Cart phải thuộc customer hoặc session.
   - CartItem quantity phải lớn hơn 0.
   - `UnitPriceSnapshot` không âm.
   - Tổng tiền tính từ `UnitPriceSnapshot * Quantity`.
-- Application service `IStorefrontCartService` xử lý:
-  - lấy cart theo `SessionId`
-  - thêm item
-  - cập nhật quantity
-  - xóa item
-- Application validators cho:
-  - `GetCartRequest`
-  - `AddCartItemRequest`
-  - `UpdateCartItemRequest`
-  - `RemoveCartItemRequest`
-- Service chỉ cho add/update active variant thuộc active product và active category.
-- Service kiểm tra tồn kho cơ bản trước khi add/update quantity.
-- Cart item lưu `UnitPriceSnapshot` từ giá hiện tại của variant khi thêm item mới.
+- Application service `IStorefrontCartService` xử lý lấy cart, thêm item, cập nhật quantity, xóa item.
+- Validators cho `GetCartRequest`, `AddCartItemRequest`, `UpdateCartItemRequest`, `RemoveCartItemRequest`.
+- Chỉ cho add/update active variant thuộc active product và active category.
+- Kiểm tra tồn kho cơ bản trước khi add/update quantity.
+- Cart item lưu `UnitPriceSnapshot` khi thêm item mới.
 - Khi add cùng variant vào cart, service tăng quantity và giữ price snapshot cũ.
-- Chưa triển khai Checkout hoặc Order trong Cart task.
 
 ### Cart persistence và Storefront Cart APIs
 
-- Thêm EF Core mappings cho Cart bằng `IEntityTypeConfiguration<T>`.
-- Tạo schema `cart`.
-- Tạo bảng:
-  - `cart.carts`
-  - `cart.cart_items`
+- Thêm EF Core mappings cho schema `cart`.
+- Tạo bảng `cart.carts` và `cart.cart_items`.
 - Mapping PostgreSQL-compatible:
-  - `session_id` max length 128
-  - `unit_price_snapshot numeric(18,2)`
-  - FK `cart_items.cart_id -> cart.carts.id` dùng cascade delete
-  - FK `cart_items.product_variant_id -> catalog.product_variants.id` dùng restrict delete
-- Thêm index:
-  - `ix_carts_session_id`
-  - `ix_carts_customer_id`
-  - `ix_cart_items_cart_id`
-  - `ix_cart_items_product_variant_id`
-  - `ux_cart_items_cart_id_product_variant_id`
+  - `session_id` max length 128.
+  - `unit_price_snapshot numeric(18,2)`.
+  - FK `cart_items.cart_id -> cart.carts.id` dùng cascade delete.
+  - FK `cart_items.product_variant_id -> catalog.product_variants.id` dùng restrict delete.
+- Thêm index lookup và unique index `(cart_id, product_variant_id)`.
 - Tạo migration `AddCartSchema`.
 - `AppDbContext` triển khai `ICartStore`.
-- Đăng ký DI cho `IStorefrontCartService` và `ICartStore`.
 - Thêm API public:
   - `GET /api/cart`
   - `POST /api/cart/items`
   - `PUT /api/cart/items/{id}`
   - `DELETE /api/cart/items/{id}`
-- Cart APIs không yêu cầu JWT vì thuộc Storefront customer flow.
 - Đã smoke-test đủ 4 endpoints trên PostgreSQL local.
 - Đã fix lỗi EF tracking khi tạo cart mới: cart mới chỉ `Add(cart)`, không `Update(cart)`.
+
+### Checkout và Ordering Domain/Application
+
+- Triển khai Ordering Domain entities:
+  - `Order`
+  - `OrderItem`
+  - `OrderStatusHistory`
+- Triển khai enum/value:
+  - `OrderStatus`
+  - `PaymentMethod`
+- Order tạo mặc định trạng thái `Pending`.
+- OrderItem lưu snapshot: product name, SKU, unit price, quantity, requires installation.
+- Order tính `Subtotal`, `ShippingFee`, `DiscountAmount`, `TotalAmount` từ snapshot, không tin client gửi tổng tiền.
+- Chưa triển khai shipping fee và discount thực tế; hiện giữ `0` theo quyết định scope.
+- Trừ tồn kho khi tạo order theo quyết định scope hiện tại.
+- Thêm `ProductVariant.DecreaseStock(int)` để bảo vệ invariant tồn kho.
+- Thêm Application DTO/service/validator:
+  - `CheckoutRequest`
+  - `CheckoutResponse`
+  - `OrderDto`
+  - `OrderItemDto`
+  - `CheckoutRequestValidator`
+  - `ICheckoutService`
+  - `CheckoutService`
+  - `ICheckoutStore`
+- Checkout service xử lý empty cart, invalid contact, inactive category/product/variant, insufficient stock, snapshot và create order.
+
+### Ordering persistence và Checkout API
+
+- `AppDbContext` triển khai `ICheckoutStore`.
+- Thêm DbSet:
+  - `Orders`
+  - `OrderItems`
+  - `OrderStatusHistories`
+- Thêm EF Core mappings cho schema `ordering` bằng `IEntityTypeConfiguration<T>`.
+- Tạo migration `AddOrderingSchema`.
+- Migration tạo bảng:
+  - `ordering.orders`
+  - `ordering.order_items`
+  - `ordering.order_status_history`
+- Mapping PostgreSQL-compatible:
+  - Order money fields và OrderItem unit price dùng `numeric(18,2)`.
+  - `Order.Status` và `PaymentMethod` lưu dạng string max length 50.
+  - Unique index `ux_orders_order_code`.
+  - Index lookup cho customer phone, status, order item FK và status history.
+  - FK `order_items.order_id -> ordering.orders.id` dùng cascade delete.
+  - FK `order_items.product_variant_id -> catalog.product_variants.id` dùng restrict delete.
+  - FK `order_status_history.order_id -> ordering.orders.id` dùng cascade delete.
+- Checkout chạy trong transaction.
+- Khi checkout, variant được query bằng PostgreSQL `FOR UPDATE` trong transaction để giảm rủi ro oversell.
+- Thêm API public:
+  - `POST /api/checkout`
+- Controller checkout mỏng, delegate sang `ICheckoutService` và trả response envelope thống nhất.
 
 ### API foundation
 
@@ -182,29 +203,24 @@ Dependency hiện tại:
 - Thêm OpenAPI bằng `Microsoft.AspNetCore.OpenApi`.
 - Chỉ bật `/openapi/v1.json` trong Development.
 
-### Admin Authentication
-
-- Thêm API `POST /api/admin/auth/login`.
-- Login dùng email/password theo phạm vi MVP trong `overview.md`.
-- Chưa thêm phân quyền phức tạp hoặc bảng Admin vì `overview.md` chưa định nghĩa Admin data model.
-- Credential admin đọc từ configuration `AdminAuth`.
-- JWT đọc từ configuration `Jwt`.
-- Không commit password hoặc signing key thật; appsettings chỉ giữ placeholder.
-- Thêm JWT Bearer authentication.
-- Bảo vệ `GET/POST/PUT /api/admin/categories` bằng `[Authorize]`.
-- Chuẩn hóa response `401`/`403` theo `ApiResponse<T>`.
-- Invalid login trả `401 Unauthorized`, không expose thông tin nội bộ.
-
 ### Configuration validation
 
 - Validate `ConnectionStrings:DefaultConnection` sớm khi app start qua Infrastructure DI.
-- Kiểm tra connection string bị thiếu, sai format, thiếu `Host`, thiếu `Database` hoặc còn placeholder.
 - Validate `AdminAuth` và `Jwt` sớm khi app start.
-- Kiểm tra admin credential, JWT issuer/audience/signing key/token lifetime bị thiếu hoặc còn placeholder.
+- Chặn config thiếu, sai format hoặc còn placeholder.
 - Signing key JWT phải đủ tối thiểu 32 bytes cho HS256.
-- `appsettings.json` và `appsettings.Development.json` chỉ giữ placeholder `Password=CHANGE_ME`, không chứa secret thật.
+- `appsettings.json` và `appsettings.Development.json` chỉ giữ placeholder, không chứa secret thật.
 - Runtime local cần override bằng user-secrets, environment variable hoặc local config không commit.
-- Thêm test cho `ConnectionStringValidator` trong Infrastructure test project.
+
+### Database migration local
+
+- Đã thêm `docker-compose.yml` cho PostgreSQL local.
+- Đã thêm `.env.example`; file `.env` local không commit vì chứa password dev.
+- Đã chạy PostgreSQL container `workspace-ecommerce-postgres`.
+- Đã apply migration `InitialCatalogSchema` và `AddCartSchema` vào PostgreSQL local.
+- Đã verify trực tiếp schema/table/index/precision/delete behavior cho `catalog` và `cart`.
+- Đã seed dữ liệu smoke-test tối thiểu cho Cart API.
+- Chưa apply migration `AddOrderingSchema` vào PostgreSQL local trong task gần nhất.
 
 ### Tests
 
@@ -213,65 +229,15 @@ Dependency hiện tại:
 - Application tests cho Admin Product validator/service.
 - Application tests cho Storefront Catalog read service.
 - Application tests cho Storefront Cart validator/service.
-- Domain tests cho Category parent rules, Product variant SKU uniqueness, ProductVariant price/stock invariants.
-- Domain tests cho Cart và CartItem invariants.
-- Infrastructure tests cho configuration validation.
-- Infrastructure tests cho JWT token generation.
-- Infrastructure tests cho EF Core Catalog mapping:
-  - schema `catalog`
-  - table names
-  - unique indexes slug/SKU
-  - decimal precision `numeric(18,2)`
-  - delete behavior `Restrict`/`Cascade`
-  - không dùng EF InMemory
-- Infrastructure tests cho EF Core Cart mapping:
-  - schema `cart`
-  - table names
-  - lookup indexes
-  - unique index `(cart_id, product_variant_id)`
-  - decimal precision `numeric(18,2)`
-  - delete behavior `Cascade`/`Restrict`
-
-### Database migration local
-
-- Đã thêm `docker-compose.yml` cho PostgreSQL local.
-- Đã thêm `.env.example`; file `.env` local không commit vì chứa password dev.
-- Đã chạy PostgreSQL container `workspace-ecommerce-postgres`.
-- Đã apply migration bằng `dotnet ef database update` với Infrastructure project và API startup project.
-- Đã verify trực tiếp trên PostgreSQL:
-  - schema `catalog`
-  - bảng `categories`, `products`, `product_images`, `product_specifications`, `product_variants`
-  - unique indexes `ux_categories_slug`, `ux_products_slug`, `ux_product_variants_sku`
-  - `price` và `compare_at_price` là `numeric(18,2)`
-  - delete behavior `Restrict`/`Cascade`
-  - migration history có `20260607075432_InitialCatalogSchema`
-- Đã apply migration `20260607133308_AddCartSchema`.
-- Đã verify trực tiếp trên PostgreSQL:
-  - schema `cart`
-  - bảng `carts`, `cart_items`
-  - indexes `ix_carts_session_id`, `ix_carts_customer_id`, `ix_cart_items_cart_id`, `ix_cart_items_product_variant_id`, `ux_cart_items_cart_id_product_variant_id`
-  - FK `cart_items.cart_id` cascade
-  - FK `cart_items.product_variant_id` restrict
-  - `unit_price_snapshot` là `numeric(18,2)`
-- Đã seed dữ liệu smoke-test tối thiểu:
-  - category slug `smoke-test-category`
-  - product slug `smoke-test-product`
-  - variant SKU `SMOKE-CART-001`
-- Đã smoke-test Cart APIs trên API local `http://localhost:5080`:
-  - `GET /api/cart?sessionId=...` trả cart rỗng `200`
-  - `POST /api/cart/items` thêm item `200`
-  - `PUT /api/cart/items/{id}` cập nhật quantity `200`
-  - `DELETE /api/cart/items/{id}?sessionId=...` xóa item `200`
-
-### Commit gần nhất
-
-- `a5e49b3 Add cart domain and application service`
-- `661223a Add cart persistence and storefront API`
-- `93f1610 Fix cart creation persistence`
+- Application tests cho Checkout validator/service.
+- Domain tests cho Catalog, Cart và Ordering invariants.
+- Infrastructure tests cho configuration validation và JWT token generation.
+- Infrastructure tests cho EF Core Catalog/Cart/Ordering mapping.
+- Persistence mapping tests không dùng EF InMemory cho behavior cần đúng với PostgreSQL metadata.
 
 ## Xác minh gần nhất
 
-Đã chạy:
+Đã chạy sau task Ordering persistence và Checkout API:
 
 ```powershell
 dotnet build WorkspaceEcommerce.slnx
@@ -280,55 +246,82 @@ dotnet build WorkspaceEcommerce.slnx
 Kết quả:
 
 - Build succeeded.
-- Warnings: 0
-- Errors: 0
+- Warnings: 0.
+- Errors: 0.
 
 Đã chạy:
 
 ```powershell
-dotnet test WorkspaceEcommerce.slnx
+dotnet test WorkspaceEcommerce.slnx --no-restore
 ```
 
 Kết quả:
 
-- `WorkspaceEcommerce.Application.Tests`: 74 passed.
-- `WorkspaceEcommerce.Infrastructure.Tests`: 40 passed.
+- `WorkspaceEcommerce.Application.Tests`: 95 passed.
+- `WorkspaceEcommerce.Infrastructure.Tests`: 54 passed.
+- Tổng test suite: 149 passed.
 - Failed: 0.
 - Skipped: 0.
 
-Sau Cart persistence/API và smoke-test, xác minh mới nhất:
+Smoke-test đã có trước đó:
 
-- `WorkspaceEcommerce.Application.Tests`: 74 passed.
-- `WorkspaceEcommerce.Infrastructure.Tests`: 40 passed.
-- Tổng test suite: 114 passed.
-- Cart smoke-test 4 endpoints: passed.
+- Cart 4 endpoints trên API local `http://localhost:5080`: passed.
+- Checkout endpoint chưa smoke-test trên PostgreSQL local sau migration Ordering.
+
+## Commit gần nhất
+
+- `e4b284b Add ordering domain model`
+- `37a24b2 Add checkout application service`
+- `f4af79d Add ordering persistence and checkout API`
 
 ## Rủi ro và khoảng trống
 
-- Vì config dùng `Password=CHANGE_ME`, app sẽ fail sớm nếu chưa override `DefaultConnection` bằng secret/config local hợp lệ.
-- Vì config dùng `AdminAuth:Password=CHANGE_ME` và `Jwt:SigningKey=CHANGE_ME`, app sẽ fail sớm nếu chưa override bằng secret/config local hợp lệ.
-- Chưa có API integration tests cho Admin Category endpoints.
-- Chưa có API integration tests cho Admin Product endpoints.
-- Chưa có API integration tests cho Storefront Catalog endpoints.
-- Chưa có API integration tests tự động cho Storefront Cart endpoints; hiện mới smoke-test thủ công qua API local.
-- Chưa có API/Docker Compose setup cho backend container.
+- Vì config dùng placeholder, app sẽ fail sớm nếu chưa override `DefaultConnection`, `AdminAuth` và `Jwt` bằng secret/config local hợp lệ.
+- Migration `AddOrderingSchema` đã tạo và test mapping đã pass, nhưng chưa apply vào PostgreSQL local sau task gần nhất.
+- Chưa smoke-test `POST /api/checkout` trên API local với database thật.
+- Chưa có API integration tests tự động cho Admin Category, Admin Product, Storefront Catalog, Storefront Cart và Checkout endpoints.
+- Chưa có Admin Order Management.
+- Chưa có Order Lookup cho customer.
+- Chưa có Banner Management và Dashboard.
+- Chưa có Dockerfile/backend container; hiện mới có PostgreSQL container.
 - Dữ liệu smoke-test local đã được insert vào PostgreSQL dev; nếu cần DB sạch cho demo thì cần seed strategy chính thức hoặc cleanup script.
 
 ## Nhiệm vụ tiếp theo đề xuất
 
-### Ưu tiên 1 - Module MVP sau Catalog/Cart
+### Ưu tiên 1 - Hoàn tất Checkout runtime
 
-1. Triển khai Checkout và Ordering với snapshot OrderItem.
-2. Triển khai trừ tồn kho theo cấu hình MVP khi tạo/xác nhận đơn.
-3. Triển khai Admin Order Management và OrderStatusHistory.
-4. Triển khai Order Lookup cho customer.
-5. Triển khai Banner Management và Dashboard.
+1. Apply migration `AddOrderingSchema` vào PostgreSQL local.
+2. Seed hoặc dùng dữ liệu Cart hiện có để smoke-test `POST /api/checkout`.
+3. Verify trực tiếp PostgreSQL sau checkout:
+   - order được tạo trong `ordering.orders`.
+   - order items snapshot đúng trong `ordering.order_items`.
+   - status history có record khởi tạo.
+   - stock variant bị trừ đúng.
+   - cart đã checkout được remove hoặc clear đúng theo implementation.
 
-### Ưu tiên 2 - Runtime/DevOps
+### Ưu tiên 2 - Ordering MVP còn thiếu
 
-6. Thêm Dockerfile cho backend API khi bắt đầu đóng gói app.
-7. Thêm healthcheck/runtime documentation cho API + PostgreSQL.
-8. Thêm API integration tests cho login, admin authorization, Admin Product, Storefront Catalog và Storefront Cart endpoints.
+4. Triển khai Storefront Order Lookup:
+   - `GET /api/orders/lookup`.
+   - Tra cứu bằng order code và phone theo `overview.md`.
+5. Triển khai Admin Order Management:
+   - `GET /api/admin/orders`.
+   - `GET /api/admin/orders/{id}`.
+   - `PUT /api/admin/orders/{id}/status`.
+   - Ghi `OrderStatusHistory` mỗi lần đổi trạng thái.
+6. Thêm tests cho status transition và Admin Order Management.
+
+### Ưu tiên 3 - API/integration quality
+
+7. Thêm API integration test infrastructure dùng PostgreSQL thật hoặc Testcontainers.
+8. Thêm API integration tests cho Auth/Admin authorization, Catalog, Cart và Checkout.
+9. Thêm Dockerfile cho backend API và tài liệu chạy API + PostgreSQL bằng Docker Compose.
+
+### Ưu tiên 4 - Phần MVP sau Ordering
+
+10. Triển khai Banner Management.
+11. Triển khai Dashboard cơ bản.
+12. Chuẩn hóa seed data demo cho Catalog/Cart/Checkout/Order.
 
 ## Lệnh nên chạy trước task tiếp theo
 
