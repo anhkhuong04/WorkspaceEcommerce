@@ -69,13 +69,16 @@ internal sealed class StorefrontCartService(
             {
                 cartStore.Add(cart);
             }
-
-            if (!hadExistingItem)
+            else
             {
-                cartStore.Add(item);
+                if (!hadExistingItem)
+                {
+                    cartStore.Add(item);
+                }
+
+                cartStore.Update(cart);
             }
 
-            cartStore.Update(cart);
             await cartStore.SaveChangesAsync(cancellationToken);
 
             return Result<CartDto>.Success(ToDto(cart));
