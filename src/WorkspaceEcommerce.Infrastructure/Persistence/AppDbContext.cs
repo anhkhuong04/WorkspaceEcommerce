@@ -1,12 +1,17 @@
 using Microsoft.EntityFrameworkCore;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
+using WorkspaceEcommerce.Domain.Modules.Cart;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 
 namespace WorkspaceEcommerce.Infrastructure.Persistence;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
-    : DbContext(options), IAppDbContext
+    : DbContext(options), IAppDbContext, ICartStore
 {
+    public DbSet<Cart> Carts => Set<Cart>();
+
+    public DbSet<CartItem> CartItems => Set<CartItem>();
+
     public DbSet<Category> Categories => Set<Category>();
 
     public DbSet<Product> Products => Set<Product>();
@@ -27,6 +32,39 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     IQueryable<ProductSpecification> IAppDbContext.ProductSpecifications => ProductSpecifications;
 
+    async Task<Cart?> ICartStore.FindCartBySessionIdAsync(
+        string sessionId,
+        CancellationToken cancellationToken)
+    {
+        return await Carts
+            .Include(cart => cart.Items)
+            .FirstOrDefaultAsync(cart => cart.SessionId == sessionId, cancellationToken);
+    }
+
+    async Task<ProductVariant?> ICartStore.FindProductVariantByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        return await ProductVariants
+            .FirstOrDefaultAsync(variant => variant.Id == id, cancellationToken);
+    }
+
+    async Task<Product?> ICartStore.FindProductByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        return await Products
+            .FirstOrDefaultAsync(product => product.Id == id, cancellationToken);
+    }
+
+    async Task<Category?> ICartStore.FindCategoryByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        return await Categories
+            .FirstOrDefaultAsync(category => category.Id == id, cancellationToken);
+    }
+
     void IAppDbContext.Add<TEntity>(TEntity entity)
         where TEntity : class
     {
@@ -40,6 +78,24 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     }
 
     void IAppDbContext.Remove<TEntity>(TEntity entity)
+        where TEntity : class
+    {
+        Set<TEntity>().Remove(entity);
+    }
+
+    void ICartStore.Add<TEntity>(TEntity entity)
+        where TEntity : class
+    {
+        Set<TEntity>().Add(entity);
+    }
+
+    void ICartStore.Update<TEntity>(TEntity entity)
+        where TEntity : class
+    {
+        Set<TEntity>().Update(entity);
+    }
+
+    void ICartStore.Remove<TEntity>(TEntity entity)
         where TEntity : class
     {
         Set<TEntity>().Remove(entity);

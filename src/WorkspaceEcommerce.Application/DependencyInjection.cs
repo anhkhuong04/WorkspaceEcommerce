@@ -1,6 +1,7 @@
 ﻿using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using WorkspaceEcommerce.Application.Modules.Admin.Authentication;
+using WorkspaceEcommerce.Application.Modules.Cart;
 using WorkspaceEcommerce.Application.Modules.Catalog.Categories;
 using WorkspaceEcommerce.Application.Modules.Catalog.Products;
 using WorkspaceEcommerce.Application.Modules.Catalog.Storefront;
@@ -16,6 +17,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminCategoryService, AdminCategoryService>();
         services.AddScoped<IAdminProductService, AdminProductService>();
         services.AddScoped<IStorefrontCatalogService, StorefrontCatalogService>();
+        services.AddScoped<IStorefrontCartService, StorefrontCartService>();
 
         return services;
     }
