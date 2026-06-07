@@ -5,6 +5,7 @@ using WorkspaceEcommerce.Application.Modules.Cart;
 using WorkspaceEcommerce.Application.Modules.Catalog.Categories;
 using WorkspaceEcommerce.Application.Modules.Catalog.Products;
 using WorkspaceEcommerce.Application.Modules.Catalog.Storefront;
+using WorkspaceEcommerce.Application.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Application;
 
@@ -18,6 +19,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminProductService, AdminProductService>();
         services.AddScoped<IStorefrontCatalogService, StorefrontCatalogService>();
         services.AddScoped<IStorefrontCartService, StorefrontCartService>();
+        services.AddScoped<ICheckoutService, CheckoutService>();
 
         return services;
     }
