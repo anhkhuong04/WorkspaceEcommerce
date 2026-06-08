@@ -184,10 +184,16 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext) : IDemoDataSeeder
 
         foreach (var image in images)
         {
-            if (!await dbContext.ProductImages.AnyAsync(existing => existing.Id == image.Id, cancellationToken))
+            var existingImage = await dbContext.ProductImages
+                .FirstOrDefaultAsync(existing => existing.Id == image.Id, cancellationToken);
+            if (existingImage is null)
             {
                 dbContext.Add(image);
+                continue;
             }
+
+            existingImage.Update(image.ImageUrl, image.AltText, image.SortOrder);
+            dbContext.Update(existingImage);
         }
     }
 
@@ -229,8 +235,14 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext) : IDemoDataSeeder
         int sortOrder,
         CancellationToken cancellationToken)
     {
-        if (await dbContext.Banners.AnyAsync(banner => banner.Title == title, cancellationToken))
+        var existingBanner = await dbContext.Banners
+            .FirstOrDefaultAsync(banner => banner.Id == id, cancellationToken);
+        if (existingBanner is not null)
         {
+            existingBanner.UpdateDetails(title, imageUrl, linkUrl, sortOrder);
+            existingBanner.Activate();
+            dbContext.Update(existingBanner);
+
             return 0;
         }
 
