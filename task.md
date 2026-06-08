@@ -10,22 +10,24 @@ Cập nhật lần cuối: 2026-06-08
 - Trước khi sửa code phải nêu kế hoạch, file bị ảnh hưởng và hướng dependency.
 - Không sửa file không liên quan.
 - Sau khi hoàn thành và test ổn cho mỗi task, commit code ngay với tên commit phù hợp.
+- Mục `Đã hoàn thành` chỉ giữ 3 task lớn `###` gần nhất để giảm dung lượng; task cũ được tóm tắt ở trạng thái hiện tại, xác minh gần nhất và lịch sử commit.
 
 ## Trạng thái hiện tại
 
 Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, Cart, Checkout, Ordering và Content:
 
 - `WorkspaceEcommerce.Domain`: Catalog, Cart và Ordering entities với invariant/domain method cơ bản.
-- `WorkspaceEcommerce.Application`: common contracts/models, DTO, validators và services cho Admin Auth, Admin Catalog, Admin Product, Admin Banner, Admin Dashboard, Admin Order, Storefront Catalog, Storefront Cart, Checkout và Storefront Order Lookup.
+- `WorkspaceEcommerce.Application`: common contracts/models, DTO, validators và services cho Admin Auth, Admin Catalog, Admin Product, Admin Banner, Admin Dashboard, Admin Order, Storefront Catalog, Storefront Cart, Checkout, Storefront Order Lookup và Storefront Banner.
 - `WorkspaceEcommerce.Infrastructure`: EF Core PostgreSQL persistence, Catalog/Cart/Ordering/Content mappings, migrations, JWT/config validation và transaction-backed checkout store.
-- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth, Admin Catalog, Admin Product, Admin Banner, Admin Dashboard, Admin Order, Storefront Catalog, Storefront Cart, Checkout và Storefront Order Lookup; có JWT, response envelope, global exception handling và OpenAPI trong Development.
+- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth, Admin Catalog, Admin Product, Admin Banner, Admin Dashboard, Admin Order, Storefront Catalog, Storefront Cart, Checkout, Storefront Order Lookup và Storefront Banners; có JWT, response envelope, global exception handling và OpenAPI trong Development.
 - `WorkspaceEcommerce.Application.Tests`: tests cho Domain, validators và Application services thuộc Catalog, Cart, Auth, Product, Storefront Catalog, Checkout, Order Lookup, Admin Order, Admin Banner và Admin Dashboard.
 - `WorkspaceEcommerce.Infrastructure.Tests`: tests cho configuration validation, JWT token generation và EF Core mappings của Catalog, Cart, Ordering, Content.
 - `WorkspaceEcommerce.Api.IntegrationTests`: hạ tầng API integration test dùng `WebApplicationFactory` và Testcontainers PostgreSQL.
-- PostgreSQL local và API backend chạy được bằng Docker Compose service `postgres`, `migrate` và `api`.
-- Demo data chạy được bằng Docker Compose service `seed-demo` sau khi apply migration.
+- PostgreSQL local và API backend chạy được bằng Docker Compose service `postgres`, `migrate`, `api`, `seed-demo`.
 - Frontend stack đã chốt: Storefront dùng React + TypeScript + Tailwind CSS + React Hook Form + Zod; Admin dùng React + TypeScript + Ant Design.
 - Frontend monorepo đã scaffold trong `frontend/` với Storefront app, Admin app và shared packages.
+- Storefront đã tích hợp API thật cho Home, Catalog, Product Detail, Cart, Checkout và Order Lookup.
+- Home demo hiện có đủ dữ liệu thật theo `overview.md`: banners, featured categories và featured products.
 
 Dependency hiện tại:
 
@@ -36,38 +38,35 @@ Dependency hiện tại:
 
 ## Đã hoàn thành
 
-Ghi chú duy trì: để giảm dung lượng và độ phức tạp, mục này chỉ giữ 3 task lớn `###` gần nhất. Các task cũ được tóm tắt trong `Trạng thái hiện tại`, `Xác minh gần nhất` và lịch sử commit.
+### Storefront Banner API
 
-### Frontend scaffold
+- Thêm public `GET /api/banners` cho Storefront, không yêu cầu JWT.
+- Thêm `StorefrontBannerDto`, `IStorefrontBannerService` và `StorefrontBannerService`.
+- Service chỉ trả banner active, sort theo `SortOrder` rồi `Title`, project sang DTO public.
+- Đăng ký DI scoped cho `IStorefrontBannerService`.
+- Cập nhật shared frontend API types và API client với `getBanners()`.
+- Commit riêng: `06ff8ec Add storefront banner API`.
 
-- Thêm frontend workspace tại `frontend/` dùng pnpm qua Corepack.
-- Thêm app Storefront: React + TypeScript + Vite + Tailwind CSS 4, React Router, React Query, React Hook Form và Zod.
-- Thêm app Admin: React + TypeScript + Vite + Ant Design.
-- Thêm shared packages: `@workspace-ecommerce/api-types`, `@workspace-ecommerce/api-client`, `@workspace-ecommerce/shared-utils`.
-- API calls được gom trong shared `api-client` và app service adapter.
-- Cập nhật README, `.gitignore` và `.dockerignore` cho frontend workspace.
+### Demo Image Assets & Seeder Update
 
-### Storefront API integration
+- Thêm demo assets thật cho banners và products vào `frontend/apps/storefront/public/demo` và `frontend/apps/admin/public/demo`.
+- Cập nhật `DemoDataSeeder.cs` dùng URL relative `/demo/...` thay vì URL giả external.
+- Bổ sung logic update existing seeded `ProductImage` và `Banner` records để database cũ cũng chuyển sang URL `/demo/...` khi chạy lại `seed-demo`.
+- Commit riêng assets: `22df442 Add demo image assets`.
+- Commit riêng seed update: `39d1904 Update demo seed image records`.
 
-- Tích hợp Storefront Home với API thật cho categories và featured/live products.
-- Tích hợp Catalog với API thật, URL filters và pagination.
-- Tích hợp Product Detail với API thật, render gallery/variants/specifications và add-to-cart.
-- Tích hợp Cart với API thật cho get/update/remove item.
-- Quản lý cart session bằng localStorage, mặc định `demo-checkout-session` để kiểm tra seed demo.
-- Cập nhật shared API types để khớp contract backend hiện tại của Catalog/Cart.
+### Storefront Home UI/UX Polish
 
-### Checkout và Order Lookup UI integration
-
-- Tích hợp Checkout page với cart session hiện tại và `GET /api/cart` để render order summary trước khi đặt hàng.
-- Thêm form checkout dùng React Hook Form + Zod cho thông tin người nhận, note và payment method.
-- Gọi `POST /api/checkout` bằng API client thật, xử lý loading/error và reset cart session sau khi checkout thành công.
-- Thêm route và page `checkout/success` để hiển thị order code, order items snapshot, totals, receiver info và link tra cứu đơn.
-- Tích hợp Order Lookup page với `GET /api/orders/lookup`, đọc query params `orderCode`/`phone`, validate input và render chi tiết order trả về.
-- Cập nhật shared API client/type cho `OrderLookupResponse` để khớp response envelope hiện tại.
+- Thêm `BannerCarousel.tsx`: auto-slide, arrows, dots, pause on hover, progress bar, skeleton và empty state.
+- Thêm `ProductCard.tsx`: image hover scale, badge nổi bật/hết hàng, compare-at-price, category label và hover lift.
+- Viết lại `HomePage.tsx` để dùng API thật cho banners, categories và featured products.
+- Thêm category pills, responsive skeletons, CTA strip và layout sáng/clean phù hợp demo Full HD.
+- Fix lint phần Home/Banner, gồm lỗi unused variable trong `BannerCarousel.tsx`.
+- Thêm CSS `banner-progress` keyframe và `.scrollbar-hidden` utility trong `globals.css`.
 
 ## Xác minh gần nhất
 
-Đã chạy sau task Checkout và Order Lookup UI integration:
+Đã chạy backend build:
 
 ```powershell
 dotnet build WorkspaceEcommerce.slnx
@@ -79,11 +78,9 @@ Kết quả:
 - Warnings: 0.
 - Errors: 0.
 
-Đã chạy:
+Đã chạy frontend checks trong `frontend/`:
 
 ```powershell
-cd frontend
-corepack pnpm install
 corepack pnpm typecheck
 corepack pnpm build
 corepack pnpm lint
@@ -91,155 +88,108 @@ corepack pnpm lint
 
 Kết quả:
 
-- Frontend dependencies installed bằng pnpm `10.24.0`.
-- Typecheck passed cho shared packages, Storefront và Admin.
-- Storefront production build passed.
-- Admin production build passed.
-- Frontend lint passed.
-- Admin build có warning chunk lớn do Ant Design bundle; chưa code-split ở scaffold.
+- Typecheck passed cho `api-types`, `api-client`, `shared-utils`, `storefront`, `admin`.
+- Production build passed cho Storefront và Admin.
+- Admin build có warning chunk lớn do Ant Design; chưa phải lỗi build.
+- Lint passed cho Storefront và Admin.
 
-Đã chạy:
+Đã chạy Docker/seed/smoke-test Home:
 
 ```powershell
-dotnet test .\tests\WorkspaceEcommerce.Application.Tests\WorkspaceEcommerce.Application.Tests.csproj --no-build
-dotnet test .\tests\WorkspaceEcommerce.Infrastructure.Tests\WorkspaceEcommerce.Infrastructure.Tests.csproj --no-build
-```
-
-Kết quả:
-
-- `WorkspaceEcommerce.Application.Tests`: 119 passed.
-- `WorkspaceEcommerce.Infrastructure.Tests`: 60 passed.
-- Failed: 0.
-- Skipped: 0.
-
-Đã chạy:
-
-```powershell
-docker compose --profile tools config --services
-```
-
-Kết quả:
-
-- Compose profile `tools` có đủ service `postgres`, `api`, `migrate`, `seed-demo`.
-
-Đã chạy nhưng bị chặn bởi môi trường:
-
-```powershell
-dotnet test .\WorkspaceEcommerce.slnx --no-build
-```
-
-Kết quả:
-
-- `WorkspaceEcommerce.Application.Tests`: 119 passed.
-- `WorkspaceEcommerce.Infrastructure.Tests`: 60 passed.
-- `WorkspaceEcommerce.Api.IntegrationTests`: failed trước khi chạy test body vì Docker Desktop đang `manually paused`.
-- Lỗi Testcontainers: không kết nối được Docker endpoint `npipe://./pipe/docker_engine`.
-- Cần chạy lại full suite sau khi unpause Docker Desktop.
-
-Đã chạy:
-
-```powershell
-docker compose --profile tools build migrate
+docker compose --profile tools build api seed-demo migrate
 docker compose --profile tools run --rm migrate
-docker compose build api
+docker compose --profile tools run --rm seed-demo
 docker compose up -d api
 ```
 
 Kết quả:
 
-- Docker image `workspace-ecommerce-api:local` và `workspace-ecommerce-api-migrate:local` build thành công.
-- Migration container chạy thành công; PostgreSQL local đã apply `20260608042918_AddContentBannerSchema`.
-- API container start thành công sau khi PostgreSQL healthcheck healthy.
-- Admin Banner HTTP smoke-test qua API container:
-  - `POST /api/admin/banners`: passed.
-  - `GET /api/admin/banners`: passed.
-  - `PUT /api/admin/banners/{id}`: passed.
-- Admin Dashboard HTTP smoke-test qua API container:
-  - `GET /api/admin/dashboard`: passed.
-- Đã cleanup banner smoke-test khỏi PostgreSQL local.
-- Đã stop/remove API container sau smoke-test; PostgreSQL dev container vẫn giữ nguyên.
+- API, migrate và seed-demo Docker images build thành công.
+- Migration chạy thành công; PostgreSQL local up-to-date.
+- `seed-demo` chạy thành công và cập nhật existing banner/product image records sang `/demo/...`.
+- API container start thành công tại `http://localhost:5080`.
 
-Smoke-test đã có:
+Đã smoke-test public Home APIs:
 
-- Cart 4 endpoints trên API local `http://localhost:5080`: passed.
-- Checkout endpoint `POST /api/checkout` trên API local `http://localhost:5080`: passed.
-- Checkout smoke-test tạo order `ORD-20260608-8A539E82`.
-- Storefront Order Lookup endpoint `GET /api/orders/lookup` trên API local `http://localhost:5080`: passed.
-- Lookup đúng `orderCode=ORD-20260608-8A539E82` và `phone=0900000001` trả order snapshot.
-- Lookup sai phone trả `404` với response envelope và error `Order was not found.`.
-- Admin Order Management endpoints trên API local `http://localhost:5080`: passed.
-- Admin login lấy JWT thành công, sau đó gọi:
-  - `GET /api/admin/orders`: passed.
-  - `GET /api/admin/orders/{id}`: passed.
-  - `PUT /api/admin/orders/{id}/status`: passed.
-- Admin status update đổi order `ORD-20260608-8A539E82` từ `Pending` sang `Confirmed`.
-- API integration infrastructure smoke test dùng Testcontainers PostgreSQL: passed.
-- Integration test `GET /api/categories` xác nhận API host khởi động với migrated PostgreSQL container và trả response envelope thành công.
-- API integration endpoint coverage dùng Testcontainers PostgreSQL: passed.
-- API integration edge case coverage dùng Testcontainers PostgreSQL: passed.
-- Integration tests tự động đã cover:
-  - `POST /api/admin/auth/login`.
-  - Admin endpoint unauthorized response.
-  - `GET /api/categories`.
-  - `GET /api/products`.
-  - `GET /api/products/{slug}`.
-  - `POST /api/cart/items`.
-  - `POST /api/checkout`.
-  - `GET /api/orders/lookup`.
-  - `GET /api/admin/orders`.
-  - `GET /api/admin/orders/{id}`.
-  - `PUT /api/admin/orders/{id}/status`.
-- Integration edge cases tự động đã cover validation errors, duplicate conflicts, inactive catalog/cart/checkout failures và invalid order status transition.
-- PostgreSQL verification sau admin status update:
-  - `ordering.orders`: order status hiện là `Confirmed`.
-  - `ordering.order_status_history`: có record `Pending -> Confirmed`, note `Confirmed by admin smoke test`, changed by `admin@example.com`.
-- PostgreSQL verification sau checkout:
-  - `ordering.orders`: order tồn tại, subtotal `246.90`, total `246.90`, payment method `Cod`.
-  - `ordering.order_items`: snapshot SKU `SMOKE-CART-001`, product name `Smoke Test Product`, unit price `123.45`, quantity `2`, line total `246.90`.
-  - `ordering.order_status_history`: có record khởi tạo `Pending` với note `Created by checkout.`.
-  - `catalog.product_variants`: stock của variant smoke-test còn `8` sau khi trừ quantity `2`.
-  - `cart.carts` và `cart.cart_items`: cart/session đã checkout không còn record.
+```powershell
+GET /api/banners
+GET /api/categories
+GET /api/products?pageNumber=1&pageSize=8
+```
+
+Kết quả:
+
+- `GET /api/banners`: success, 3 banners.
+- `GET /api/categories`: success, 3 categories.
+- `GET /api/products?pageNumber=1&pageSize=8`: success, 4 products.
+- Tất cả banner image URL bắt đầu bằng `/demo/...` và có file tương ứng trong Storefront public assets.
+- Tất cả product image URL bắt đầu bằng `/demo/...` và có file tương ứng trong Storefront public assets.
+
+Smoke-test/API/test coverage đã có từ các task trước:
+
+- Cart, Checkout, Order Lookup, Admin Order Management smoke-test qua API local: passed.
+- PostgreSQL verification sau checkout: order, order items, status history, stock trừ đúng, cart checkout đã clear/remove đúng.
+- API integration infrastructure với Testcontainers PostgreSQL: passed.
+- Integration coverage cho Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup, Admin Order và edge cases chính: passed.
+- Full `dotnet test WorkspaceEcommerce.slnx` gần nhất đã passed khi Docker Desktop hoạt động bình thường.
 
 ## Commit gần nhất
 
-- `e4b284b Add ordering domain model`
-- `37a24b2 Add checkout application service`
-- `f4af79d Add ordering persistence and checkout API`
-- `9968828 Update checkout runtime verification status`
-- `5e1baed Add storefront order lookup`
-- `4c1a706 Add admin order management`
-- `797e1e7 Add API integration test infrastructure`
-- `f795250 Add API integration endpoint coverage`
-- `e3814cb Add API integration edge case coverage`
-- `a0b204a Add backend Docker Compose setup`
-- `07765c2 Document frontend stack decision`
-- `1aa9c06 Add banner management and dashboard`
-- `8dcc39b Add demo data seeding`
+- `123e96f Integrate checkout and order lookup UI`
+- `06ff8ec Add storefront banner API`
+- `22df442 Add demo image assets`
+- `39d1904 Update demo seed image records`
 
 ## Rủi ro và khoảng trống
 
-- Vì config dùng placeholder, app sẽ fail sớm nếu chưa override `DefaultConnection`, `AdminAuth` và `Jwt` bằng secret/config local hợp lệ.
-- API integration tests đã cover luồng chính và một số edge cases quan trọng cho Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order; vẫn chưa cover exhaustively mọi biến thể validation/conflict.
-- Docker Compose đã chạy API/PostgreSQL/migration local; chưa có production image hardening như non-root user, SBOM, image signing hoặc CI publish.
-- Storefront đã tích hợp API thật cho Home/Catalog/Product Detail/Cart/Checkout/Order Lookup; Checkout và Order Lookup đã có UI end-to-end cơ bản, còn có thể polish thêm sau demo flow.
-- Home chưa đủ điều kiện demo UI/UX hoàn thiện vì thiếu public Storefront Banner API và demo asset thật; hiện mới đủ kiểm tra category/product API trên Home.
+- Config dùng placeholder nên app sẽ fail sớm nếu chưa override `DefaultConnection`, `AdminAuth` và `Jwt` bằng secret/config local hợp lệ.
+- API integration tests đã cover luồng chính và một số edge cases quan trọng, nhưng chưa cover exhaustively mọi biến thể validation/conflict.
+- Docker Compose đã chạy API/PostgreSQL/migration/seed local; chưa có production image hardening như non-root user, SBOM, image signing hoặc CI publish.
+- Storefront Home đã đủ điều kiện demo dữ liệu thật, nhưng visual polish cuối vẫn có thể tiếp tục nâng cấp khi chốt branding.
 - Admin frontend mới scaffold foundation; chưa hoàn thiện auth guard, CRUD forms, mutation flows hoặc visual polish cuối.
 - Admin build hiện có warning chunk lớn do Ant Design; nên code-split routes khi triển khai sâu.
-- Docker Desktop đang paused nên chưa smoke-test được `docker compose --profile tools run --rm seed-demo` trong lượt này.
-- Dữ liệu smoke-test local cũ đã được insert vào PostgreSQL dev; seed demo mới là idempotent nhưng chưa thay thế cleanup script.
+- Dữ liệu smoke-test local cũ có thể vẫn còn trong PostgreSQL dev; seed demo idempotent nhưng chưa có cleanup/reset script riêng cho demo.
 
 ## Nhiệm vụ tiếp theo đề xuất
 
-### Ưu tiên 1 - Frontend integration
+### Ưu tiên 1 - Admin auth và route protection
 
-1. Unpause Docker Desktop và chạy lại full API integration tests + `seed-demo` smoke-test.
-2. Bổ sung điều kiện demo Home:
-   - Thêm public Storefront Banner API `GET /api/banners` hoặc endpoint tương đương.
-   - Cập nhật shared API types/client cho banner public.
-   - Cập nhật seed demo để dùng ảnh demo render được hoặc asset nội bộ.
-   - Polish Home UI/UX với hero/banner, featured categories, featured products, loading/error/empty states và responsive Full HD.
-   - Smoke-test Home với backend + PostgreSQL + seed demo.
-3. Tích hợp Admin auth guard và CRUD/list flows cho Dashboard/Categories/Products/Orders/Banners.
+Mục tiêu: Admin portal có luồng đăng nhập/đăng xuất và bảo vệ các màn vận hành.
+
+1. Tích hợp `POST /api/admin/auth/login` vào Admin Login UI.
+2. Lưu JWT ở mức MVP và gắn Authorization header qua shared API client.
+3. Thêm protected route guard cho Dashboard/Categories/Products/Orders/Banners.
+4. Thêm logout và xử lý token hết hạn/unauthorized.
+5. Verify bằng UI smoke-test: chưa login bị redirect, login đúng vào dashboard, logout quay về login.
+
+### Ưu tiên 2 - Admin operational flows
+
+Mục tiêu: Admin xử lý được các nghiệp vụ MVP chính trong `overview.md`.
+
+1. Dashboard: render dữ liệu thật từ `GET /api/admin/dashboard`.
+2. Banners: list/create/update/activate/deactivate/sort order.
+3. Categories: list/create/update/activate/deactivate, parent-child UX.
+4. Products và variants: list/create/update, active toggle, stock/price/compare-at/requires-installation.
+5. Orders: list/detail/status transition, render status history và note.
+
+### Ưu tiên 3 - Backend/API gaps theo overview
+
+Mục tiêu: đóng các khoảng trống khiến Admin Product Management chưa đúng đủ mô tả MVP.
+
+1. Bổ sung Admin Product Image API nếu cần quản lý ảnh sản phẩm từ Admin UI.
+2. Bổ sung Admin Product Specification API nếu cần quản lý thông số kỹ thuật từ Admin UI.
+3. Thêm tests cho image/specification service, validation và API integration.
+4. Tích hợp image/specification flows vào Admin Product UI.
+
+### Ưu tiên 4 - Demo readiness end-to-end
+
+Mục tiêu: có kịch bản demo ổn định từ setup sạch.
+
+1. Chạy Docker Compose từ clean volume: `postgres` -> `migrate` -> `seed-demo` -> `api`.
+2. Smoke-test Storefront: Home -> Catalog -> Product Detail -> Cart -> Checkout -> Success -> Order Lookup.
+3. Smoke-test Admin: Login -> Dashboard -> Products/Banners -> Orders -> Status update.
+4. Chạy full suite: `dotnet test WorkspaceEcommerce.slnx`.
+5. Cập nhật README/demo script với lệnh chạy và dữ liệu demo cần dùng.
 
 ## Lệnh nên chạy trước task tiếp theo
 

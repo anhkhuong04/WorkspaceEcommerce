@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 :root {
   --brand: #0f9f7a;
@@ -17,4 +17,21 @@
 body {
   margin: 0;
   min-width: 320px;
+}
+
+@keyframes banner-progress-anim {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+.banner-progress {
+  animation: banner-progress-anim 5s linear forwards;
+}
+
+/* Hide scrollbar but keep scrollable */
+.scrollbar-hidden {
+  scrollbar-width: none;
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
 }
