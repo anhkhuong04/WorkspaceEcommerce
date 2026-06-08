@@ -6,6 +6,7 @@
     <Project Path="src/WorkspaceEcommerce.Infrastructure/WorkspaceEcommerce.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/WorkspaceEcommerce.Api.IntegrationTests/WorkspaceEcommerce.Api.IntegrationTests.csproj" />
     <Project Path="tests/WorkspaceEcommerce.Application.Tests/WorkspaceEcommerce.Application.Tests.csproj" />
     <Project Path="tests/WorkspaceEcommerce.Infrastructure.Tests/WorkspaceEcommerce.Infrastructure.Tests.csproj" />
   </Folder>

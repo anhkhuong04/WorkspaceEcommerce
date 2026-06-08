@@ -21,6 +21,7 @@ Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, C
 - `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth, Admin Catalog, Admin Product, Admin Order, Storefront Catalog, Storefront Cart, Checkout và Storefront Order Lookup; có JWT, response envelope, global exception handling và OpenAPI trong Development.
 - `WorkspaceEcommerce.Application.Tests`: tests cho Domain, validators và Application services thuộc Catalog, Cart, Auth, Product, Storefront Catalog, Checkout, Order Lookup và Admin Order.
 - `WorkspaceEcommerce.Infrastructure.Tests`: tests cho configuration validation, JWT token generation và EF Core mappings của Catalog, Cart, Ordering.
+- `WorkspaceEcommerce.Api.IntegrationTests`: hạ tầng API integration test dùng `WebApplicationFactory` và Testcontainers PostgreSQL.
 - PostgreSQL local chạy bằng Docker Compose service `postgres`.
 
 Dependency hiện tại:
@@ -233,6 +234,20 @@ Dependency hiện tại:
 - Thêm OpenAPI bằng `Microsoft.AspNetCore.OpenApi`.
 - Chỉ bật `/openapi/v1.json` trong Development.
 
+### API integration test infrastructure
+
+- Thêm project `WorkspaceEcommerce.Api.IntegrationTests`.
+- Thêm project vào `WorkspaceEcommerce.slnx`.
+- Dùng `Microsoft.AspNetCore.Mvc.Testing` với `WebApplicationFactory<Program>`.
+- Dùng `Testcontainers.PostgreSql` để khởi động PostgreSQL thật cho integration tests.
+- Fixture integration test:
+  - Start PostgreSQL container `postgres:17-alpine`.
+  - Override runtime config bằng environment variables test-only trước khi API host khởi động.
+  - Apply EF Core migrations bằng `AppDbContext.Database.MigrateAsync()`.
+  - Restore environment variables cũ khi dispose.
+  - Dispose API factory và PostgreSQL container sau test.
+- Thêm smoke test hạ tầng `GET /api/categories` để xác nhận API host + migrated PostgreSQL container hoạt động.
+
 ### Configuration validation
 
 - Validate `ConnectionStrings:DefaultConnection` sớm khi app start qua Infrastructure DI.
@@ -271,11 +286,12 @@ Dependency hiện tại:
 - Domain tests cho Catalog, Cart và Ordering invariants.
 - Infrastructure tests cho configuration validation và JWT token generation.
 - Infrastructure tests cho EF Core Catalog/Cart/Ordering mapping.
+- API integration test hạ tầng dùng PostgreSQL thật qua Testcontainers.
 - Persistence mapping tests không dùng EF InMemory cho behavior cần đúng với PostgreSQL metadata.
 
 ## Xác minh gần nhất
 
-Đã chạy sau task Admin Order Management:
+Đã chạy sau task API integration test infrastructure:
 
 ```powershell
 dotnet build WorkspaceEcommerce.slnx
@@ -290,14 +306,15 @@ Kết quả:
 Đã chạy:
 
 ```powershell
-dotnet test WorkspaceEcommerce.slnx --no-restore
+dotnet test WorkspaceEcommerce.slnx --no-build
 ```
 
 Kết quả:
 
 - `WorkspaceEcommerce.Application.Tests`: 113 passed.
+- `WorkspaceEcommerce.Api.IntegrationTests`: 1 passed.
 - `WorkspaceEcommerce.Infrastructure.Tests`: 54 passed.
-- Tổng test suite: 167 passed.
+- Tổng test suite: 168 passed.
 - Failed: 0.
 - Skipped: 0.
 
@@ -315,6 +332,8 @@ Smoke-test đã có:
   - `GET /api/admin/orders/{id}`: passed.
   - `PUT /api/admin/orders/{id}/status`: passed.
 - Admin status update đổi order `ORD-20260608-8A539E82` từ `Pending` sang `Confirmed`.
+- API integration infrastructure smoke test dùng Testcontainers PostgreSQL: passed.
+- Integration test `GET /api/categories` xác nhận API host khởi động với migrated PostgreSQL container và trả response envelope thành công.
 - PostgreSQL verification sau admin status update:
   - `ordering.orders`: order status hiện là `Confirmed`.
   - `ordering.order_status_history`: có record `Pending -> Confirmed`, note `Confirmed by admin smoke test`, changed by `admin@example.com`.
@@ -332,11 +351,12 @@ Smoke-test đã có:
 - `f4af79d Add ordering persistence and checkout API`
 - `9968828 Update checkout runtime verification status`
 - `5e1baed Add storefront order lookup`
+- `4c1a706 Add admin order management`
 
 ## Rủi ro và khoảng trống
 
 - Vì config dùng placeholder, app sẽ fail sớm nếu chưa override `DefaultConnection`, `AdminAuth` và `Jwt` bằng secret/config local hợp lệ.
-- Chưa có API integration tests tự động cho Admin Category, Admin Product, Admin Order, Storefront Catalog, Storefront Cart, Checkout và Order Lookup endpoints.
+- Đã có API integration test infrastructure, nhưng endpoint coverage tự động hiện mới là smoke test hạ tầng; chưa cover Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order flows.
 - Chưa có Banner Management và Dashboard.
 - Chưa có Dockerfile/backend container; hiện mới có PostgreSQL container.
 - Dữ liệu smoke-test local đã được insert vào PostgreSQL dev; nếu cần DB sạch cho demo thì cần seed strategy chính thức hoặc cleanup script.
@@ -345,15 +365,14 @@ Smoke-test đã có:
 
 ### Ưu tiên 1 - API/integration quality
 
-1. Thêm API integration test infrastructure dùng PostgreSQL thật hoặc Testcontainers.
-2. Thêm API integration tests cho Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order.
-3. Thêm Dockerfile cho backend API và tài liệu chạy API + PostgreSQL bằng Docker Compose.
+1. Thêm API integration tests cho Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order.
+2. Thêm Dockerfile cho backend API và tài liệu chạy API + PostgreSQL bằng Docker Compose.
 
 ### Ưu tiên 2 - Phần MVP sau Ordering
 
-4. Triển khai Banner Management.
-5. Triển khai Dashboard cơ bản.
-6. Chuẩn hóa seed data demo cho Catalog/Cart/Checkout/Order.
+3. Triển khai Banner Management.
+4. Triển khai Dashboard cơ bản.
+5. Chuẩn hóa seed data demo cho Catalog/Cart/Checkout/Order.
 
 ## Lệnh nên chạy trước task tiếp theo
 
