@@ -15,6 +15,7 @@ import type {
   OrderLookupResponse,
   PagedResult,
   ProductListRequest,
+  StorefrontBannerDto,
   StorefrontCategoryDto,
   StorefrontProductDetailDto,
   StorefrontProductListItemDto,
@@ -40,6 +41,7 @@ function buildQuery(params: object): string {
 
 export function createStorefrontApi(client: ApiClient) {
   return {
+    getBanners: () => client.get<StorefrontBannerDto[]>("/api/banners"),
     getCategories: () => client.get<StorefrontCategoryDto[]>("/api/categories"),
     getProducts: (request: ProductListRequest = {}) =>
       client.get<PagedResult<StorefrontProductListItemDto>>(`/api/products${buildQuery(request)}`),

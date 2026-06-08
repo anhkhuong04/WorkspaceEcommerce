@@ -1,4 +1,4 @@
-﻿export interface StorefrontCategoryDto {
+export interface StorefrontCategoryDto {
   id: string;
   parentId: string | null;
   name: string;
@@ -69,3 +69,12 @@ export interface ProductListRequest {
   pageNumber?: number;
   pageSize?: number;
 }
+
+export interface StorefrontBannerDto {
+  id: string;
+  title: string;
+  imageUrl: string;
+  linkUrl: string | null;
+  sortOrder: number;
+}
+

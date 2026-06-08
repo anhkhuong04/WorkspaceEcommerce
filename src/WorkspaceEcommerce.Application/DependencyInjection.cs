@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using WorkspaceEcommerce.Application.Modules.Admin.Dashboard;
 using WorkspaceEcommerce.Application.Modules.Admin.Authentication;
@@ -22,6 +22,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminProductService, AdminProductService>();
         services.AddScoped<IStorefrontCatalogService, StorefrontCatalogService>();
         services.AddScoped<IAdminBannerService, AdminBannerService>();
+        services.AddScoped<IStorefrontBannerService, StorefrontBannerService>();
         services.AddScoped<IStorefrontCartService, StorefrontCartService>();
         services.AddScoped<ICheckoutService, CheckoutService>();
         services.AddScoped<IStorefrontOrderLookupService, StorefrontOrderLookupService>();
