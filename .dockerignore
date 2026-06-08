@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.idea/
+**/TestResults/
+**/coverage/
+.git/
+.env
+.env.*
+!.env.example
+*.log
+*.user
+*.suo
+*.nupkg
+packages/

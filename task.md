@@ -22,7 +22,7 @@ Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, C
 - `WorkspaceEcommerce.Application.Tests`: tests cho Domain, validators và Application services thuộc Catalog, Cart, Auth, Product, Storefront Catalog, Checkout, Order Lookup và Admin Order.
 - `WorkspaceEcommerce.Infrastructure.Tests`: tests cho configuration validation, JWT token generation và EF Core mappings của Catalog, Cart, Ordering.
 - `WorkspaceEcommerce.Api.IntegrationTests`: hạ tầng API integration test dùng `WebApplicationFactory` và Testcontainers PostgreSQL.
-- PostgreSQL local chạy bằng Docker Compose service `postgres`.
+- PostgreSQL local và API backend chạy được bằng Docker Compose service `postgres`, `migrate` và `api`.
 
 Dependency hiện tại:
 
@@ -265,6 +265,19 @@ Dependency hiện tại:
   - Inactive checkout failure: product bị deactivate sau khi add cart làm checkout trả `404` và không trừ stock.
   - Invalid order status transition: admin update `Pending -> Completed` trả `409`.
 
+### Backend Docker Compose
+
+- Thêm Dockerfile đa stage cho `WorkspaceEcommerce.Api`.
+- Target `final` publish API runtime trên ASP.NET Core 10 Alpine.
+- Target `migrate` cài `dotnet-ef` và chạy `dotnet ef database update` bằng startup project API.
+- Thêm `.dockerignore` để loại `bin/`, `obj/`, IDE files, test output, logs và local env khỏi Docker build context.
+- Mở rộng `docker-compose.yml`:
+  - Service `postgres` giữ vai trò PostgreSQL local với healthcheck.
+  - Service `migrate` chạy migration qua profile `tools`.
+  - Service `api` build backend container, phụ thuộc PostgreSQL healthy và expose `${API_PORT:-5080}:8080`.
+- Thêm biến `API_PORT` và `ASPNETCORE_ENVIRONMENT` vào `.env.example`.
+- Thêm `README.md` hướng dẫn chạy PostgreSQL, migration và API bằng Docker Compose.
+
 ### Configuration validation
 
 - Validate `ConnectionStrings:DefaultConnection` sớm khi app start qua Infrastructure DI.
@@ -308,7 +321,7 @@ Dependency hiện tại:
 
 ## Xác minh gần nhất
 
-Đã chạy sau task API integration endpoint coverage:
+Đã chạy sau task Docker backend API và Docker Compose docs:
 
 ```powershell
 dotnet build WorkspaceEcommerce.slnx
@@ -334,6 +347,27 @@ Kết quả:
 - Tổng test suite: 179 passed.
 - Failed: 0.
 - Skipped: 0.
+
+Đã chạy:
+
+```powershell
+docker compose config --quiet
+docker compose --profile tools config --services
+docker compose --profile tools build api migrate
+docker compose --profile tools run --rm migrate
+docker compose up -d api
+```
+
+Kết quả:
+
+- Compose config hợp lệ.
+- Profile `tools` có đủ service `postgres`, `migrate`, `api`.
+- Docker image `workspace-ecommerce-api:local` và `workspace-ecommerce-api-migrate:local` build thành công.
+- Migration container chạy thành công; PostgreSQL local đã up to date.
+- API container start thành công sau khi PostgreSQL healthcheck healthy.
+- `GET http://localhost:5080/api/categories`: `200 OK`.
+- `GET http://localhost:5080/openapi/v1.json`: `200 OK` trong Development.
+- Đã stop/remove API container sau smoke-test; PostgreSQL dev container vẫn giữ nguyên.
 
 Smoke-test đã có:
 
@@ -385,26 +419,24 @@ Smoke-test đã có:
 - `5e1baed Add storefront order lookup`
 - `4c1a706 Add admin order management`
 - `797e1e7 Add API integration test infrastructure`
+- `f795250 Add API integration endpoint coverage`
+- `e3814cb Add API integration edge case coverage`
 
 ## Rủi ro và khoảng trống
 
 - Vì config dùng placeholder, app sẽ fail sớm nếu chưa override `DefaultConnection`, `AdminAuth` và `Jwt` bằng secret/config local hợp lệ.
 - API integration tests đã cover luồng chính và một số edge cases quan trọng cho Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order; vẫn chưa cover exhaustively mọi biến thể validation/conflict.
+- Docker Compose đã chạy API/PostgreSQL/migration local; chưa có production image hardening như non-root user, SBOM, image signing hoặc CI publish.
 - Chưa có Banner Management và Dashboard.
-- Chưa có Dockerfile/backend container; hiện mới có PostgreSQL container.
 - Dữ liệu smoke-test local đã được insert vào PostgreSQL dev; nếu cần DB sạch cho demo thì cần seed strategy chính thức hoặc cleanup script.
 
 ## Nhiệm vụ tiếp theo đề xuất
 
-### Ưu tiên 1 - API/integration quality
+### Ưu tiên 1 - Phần MVP sau Ordering
 
-1. Thêm Dockerfile cho backend API và tài liệu chạy API + PostgreSQL bằng Docker Compose.
-
-### Ưu tiên 2 - Phần MVP sau Ordering
-
-2. Triển khai Banner Management.
-3. Triển khai Dashboard cơ bản.
-4. Chuẩn hóa seed data demo cho Catalog/Cart/Checkout/Order.
+1. Triển khai Banner Management.
+2. Triển khai Dashboard cơ bản.
+3. Chuẩn hóa seed data demo cho Catalog/Cart/Checkout/Order.
 
 ## Lệnh nên chạy trước task tiếp theo
 
