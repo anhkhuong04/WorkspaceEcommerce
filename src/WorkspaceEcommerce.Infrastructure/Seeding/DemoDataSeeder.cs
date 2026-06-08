@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using WorkspaceEcommerce.Application.Abstractions.Seeding;
 using WorkspaceEcommerce.Domain.Modules.Cart;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
@@ -176,10 +176,10 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext) : IDemoDataSeeder
     {
         var images = new[]
         {
-            new ProductImage(Guid.Parse("40000000-0000-0000-0000-000000000001"), StandingDeskProductId, "https://images.example.test/demo/atlas-standing-desk-1.jpg", "Atlas standing desk", 1),
-            new ProductImage(Guid.Parse("40000000-0000-0000-0000-000000000002"), ChairProductId, "https://images.example.test/demo/forma-chair-1.jpg", "Forma ergonomic chair", 1),
-            new ProductImage(Guid.Parse("40000000-0000-0000-0000-000000000003"), MonitorArmProductId, "https://images.example.test/demo/axis-monitor-arm-1.jpg", "Axis dual monitor arm", 1),
-            new ProductImage(Guid.Parse("40000000-0000-0000-0000-000000000004"), DeskLampProductId, "https://images.example.test/demo/halo-desk-lamp-1.jpg", "Halo desk lamp", 1)
+            new ProductImage(Guid.Parse("40000000-0000-0000-0000-000000000001"), StandingDeskProductId, "/demo/atlas-standing-desk-1.png", "Atlas standing desk", 1),
+            new ProductImage(Guid.Parse("40000000-0000-0000-0000-000000000002"), ChairProductId, "/demo/forma-chair-1.png", "Forma ergonomic chair", 1),
+            new ProductImage(Guid.Parse("40000000-0000-0000-0000-000000000003"), MonitorArmProductId, "/demo/axis-monitor-arm-1.png", "Axis dual monitor arm", 1),
+            new ProductImage(Guid.Parse("40000000-0000-0000-0000-000000000004"), DeskLampProductId, "/demo/halo-desk-lamp-1.png", "Halo desk lamp", 1)
         };
 
         foreach (var image in images)
@@ -214,9 +214,9 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext) : IDemoDataSeeder
     private async Task<int> SeedBannersAsync(CancellationToken cancellationToken)
     {
         var count = 0;
-        count += await EnsureBannerAsync(Guid.Parse("60000000-0000-0000-0000-000000000001"), "Build a calmer workspace", "https://images.example.test/demo/banner-workspace.jpg", "/products?categorySlug=standing-desks", 1, cancellationToken);
-        count += await EnsureBannerAsync(Guid.Parse("60000000-0000-0000-0000-000000000002"), "Ergonomic essentials", "https://images.example.test/demo/banner-ergonomic.jpg", "/products?categorySlug=ergonomic-chairs", 2, cancellationToken);
-        count += await EnsureBannerAsync(Guid.Parse("60000000-0000-0000-0000-000000000003"), "Accessories for focus", "https://images.example.test/demo/banner-accessories.jpg", "/products?categorySlug=desk-accessories", 3, cancellationToken);
+        count += await EnsureBannerAsync(Guid.Parse("60000000-0000-0000-0000-000000000001"), "Build a calmer workspace", "/demo/banner-workspace.svg", "/products?categorySlug=standing-desks", 1, cancellationToken);
+        count += await EnsureBannerAsync(Guid.Parse("60000000-0000-0000-0000-000000000002"), "Ergonomic essentials", "/demo/banner-ergonomic.png", "/products?categorySlug=ergonomic-chairs", 2, cancellationToken);
+        count += await EnsureBannerAsync(Guid.Parse("60000000-0000-0000-0000-000000000003"), "Accessories for focus", "/demo/banner-accessories.png", "/products?categorySlug=desk-accessories", 3, cancellationToken);
 
         return count;
     }
