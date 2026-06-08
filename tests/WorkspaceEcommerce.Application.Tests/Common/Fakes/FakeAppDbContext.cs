@@ -1,5 +1,6 @@
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
+using WorkspaceEcommerce.Domain.Modules.Content;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Application.Tests.Common.Fakes;
@@ -11,6 +12,7 @@ internal sealed class FakeAppDbContext : IAppDbContext
     private readonly List<ProductVariant> _productVariants = [];
     private readonly List<ProductImage> _productImages = [];
     private readonly List<ProductSpecification> _productSpecifications = [];
+    private readonly List<Banner> _banners = [];
     private readonly List<Order> _orders = [];
     private readonly List<OrderItem> _orderItems = [];
     private readonly List<OrderStatusHistory> _orderStatusHistories = [];
@@ -24,6 +26,8 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public IQueryable<ProductImage> ProductImages => _productImages.AsQueryable();
 
     public IQueryable<ProductSpecification> ProductSpecifications => _productSpecifications.AsQueryable();
+
+    public IQueryable<Banner> Banners => _banners.AsQueryable();
 
     public IQueryable<Order> Orders => _orders.AsQueryable();
 
@@ -56,6 +60,11 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public void Seed(params ProductSpecification[] specifications)
     {
         _productSpecifications.AddRange(specifications);
+    }
+
+    public void Seed(params Banner[] banners)
+    {
+        _banners.AddRange(banners);
     }
 
     public void Seed(params Order[] orders)
@@ -131,6 +140,11 @@ internal sealed class FakeAppDbContext : IAppDbContext
         if (typeof(TEntity) == typeof(ProductSpecification))
         {
             return (List<TEntity>)(object)_productSpecifications;
+        }
+
+        if (typeof(TEntity) == typeof(Banner))
+        {
+            return (List<TEntity>)(object)_banners;
         }
 
         if (typeof(TEntity) == typeof(Order))

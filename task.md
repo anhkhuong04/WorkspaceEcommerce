@@ -13,14 +13,14 @@ Cập nhật lần cuối: 2026-06-08
 
 ## Trạng thái hiện tại
 
-Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, Cart, Checkout và Ordering:
+Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, Cart, Checkout, Ordering và Content:
 
 - `WorkspaceEcommerce.Domain`: Catalog, Cart và Ordering entities với invariant/domain method cơ bản.
-- `WorkspaceEcommerce.Application`: common contracts/models, DTO, validators và services cho Admin Auth, Admin Catalog, Admin Product, Admin Order, Storefront Catalog, Storefront Cart, Checkout và Storefront Order Lookup.
-- `WorkspaceEcommerce.Infrastructure`: EF Core PostgreSQL persistence, Catalog/Cart/Ordering mappings, migrations, JWT/config validation và transaction-backed checkout store.
-- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth, Admin Catalog, Admin Product, Admin Order, Storefront Catalog, Storefront Cart, Checkout và Storefront Order Lookup; có JWT, response envelope, global exception handling và OpenAPI trong Development.
-- `WorkspaceEcommerce.Application.Tests`: tests cho Domain, validators và Application services thuộc Catalog, Cart, Auth, Product, Storefront Catalog, Checkout, Order Lookup và Admin Order.
-- `WorkspaceEcommerce.Infrastructure.Tests`: tests cho configuration validation, JWT token generation và EF Core mappings của Catalog, Cart, Ordering.
+- `WorkspaceEcommerce.Application`: common contracts/models, DTO, validators và services cho Admin Auth, Admin Catalog, Admin Product, Admin Banner, Admin Dashboard, Admin Order, Storefront Catalog, Storefront Cart, Checkout và Storefront Order Lookup.
+- `WorkspaceEcommerce.Infrastructure`: EF Core PostgreSQL persistence, Catalog/Cart/Ordering/Content mappings, migrations, JWT/config validation và transaction-backed checkout store.
+- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth, Admin Catalog, Admin Product, Admin Banner, Admin Dashboard, Admin Order, Storefront Catalog, Storefront Cart, Checkout và Storefront Order Lookup; có JWT, response envelope, global exception handling và OpenAPI trong Development.
+- `WorkspaceEcommerce.Application.Tests`: tests cho Domain, validators và Application services thuộc Catalog, Cart, Auth, Product, Storefront Catalog, Checkout, Order Lookup, Admin Order, Admin Banner và Admin Dashboard.
+- `WorkspaceEcommerce.Infrastructure.Tests`: tests cho configuration validation, JWT token generation và EF Core mappings của Catalog, Cart, Ordering, Content.
 - `WorkspaceEcommerce.Api.IntegrationTests`: hạ tầng API integration test dùng `WebApplicationFactory` và Testcontainers PostgreSQL.
 - PostgreSQL local và API backend chạy được bằng Docker Compose service `postgres`, `migrate` và `api`.
 - Frontend stack đã chốt: Storefront dùng React + TypeScript + Tailwind CSS + React Hook Form + Zod; Admin dùng React + TypeScript + Ant Design.
@@ -225,6 +225,41 @@ Dependency hiện tại:
 - `changedBy` lấy từ JWT claim admin hiện tại.
 - Invalid transition trả `409 Conflict`.
 
+### Banner Management
+
+- Triển khai Content Domain entity:
+  - `Banner`
+- Banner fields theo MVP:
+  - `Title`
+  - `ImageUrl`
+  - `LinkUrl`
+  - `SortOrder`
+  - `IsActive`
+  - `CreatedAt`
+  - `UpdatedAt`
+- Thêm API admin:
+  - `GET /api/admin/banners`
+  - `POST /api/admin/banners`
+  - `PUT /api/admin/banners/{id}`
+- Các endpoint được bảo vệ bằng `[Authorize]`.
+- Controller mỏng, delegate sang `IAdminBannerService`.
+- Dùng DTO request/response và FluentValidation.
+- Hỗ trợ tạo, cập nhật, ẩn/hiện và sắp xếp bằng `SortOrder`.
+- Missing banner trả `404`.
+- Invalid request trả `400`.
+
+### Admin Dashboard
+
+- Thêm API admin:
+  - `GET /api/admin/dashboard`
+- Endpoint được bảo vệ bằng `[Authorize]`.
+- Controller mỏng, delegate sang `IAdminDashboardService`.
+- Dashboard cơ bản trả:
+  - Tổng số đơn hàng.
+  - Tổng doanh thu từ đơn `Completed`.
+  - Số đơn mới trạng thái `Pending`.
+  - Danh sách SKU sắp hết hàng với threshold hiện tại `<= 5`, giới hạn 10 item.
+
 ### API foundation
 
 - Thêm global exception middleware.
@@ -265,6 +300,12 @@ Dependency hiện tại:
   - Inactive cart failure: add cart item với inactive variant trả `404`.
   - Inactive checkout failure: product bị deactivate sau khi add cart làm checkout trả `404` và không trừ stock.
   - Invalid order status transition: admin update `Pending -> Completed` trả `409`.
+- Bổ sung integration tests cho:
+  - Admin Banner list/create/update.
+  - Admin Banner unauthorized.
+  - Admin Banner validation và missing banner.
+  - Admin Dashboard authorized aggregate.
+  - Admin Dashboard unauthorized.
 
 ### Backend Docker Compose
 
@@ -305,6 +346,12 @@ Dependency hiện tại:
 - Đã thêm `.env.example`; file `.env` local không commit vì chứa password dev.
 - Đã chạy PostgreSQL container `workspace-ecommerce-postgres`.
 - Đã apply migration `InitialCatalogSchema`, `AddCartSchema` và `AddOrderingSchema` vào PostgreSQL local.
+- Đã tạo và apply migration `AddContentBannerSchema` vào PostgreSQL local.
+- Migration `AddContentBannerSchema` tạo:
+  - schema `content`.
+  - bảng `content.banners`.
+  - index `ix_banners_is_active`.
+  - index `ix_banners_sort_order`.
 - Đã verify trực tiếp schema/table/index/precision/delete behavior cho `catalog`, `cart` và `ordering`.
 - Đã seed dữ liệu smoke-test tối thiểu cho Cart API.
 - Đã seed/dùng dữ liệu Cart hiện có để smoke-test `POST /api/checkout` trên PostgreSQL local.
@@ -325,15 +372,17 @@ Dependency hiện tại:
 - Application tests cho Checkout validator/service.
 - Application tests cho Storefront Order Lookup validator/service.
 - Application tests cho Admin Order validator/service.
+- Application tests cho Admin Banner service.
+- Application tests cho Admin Dashboard service.
 - Domain tests cho Catalog, Cart và Ordering invariants.
 - Infrastructure tests cho configuration validation và JWT token generation.
-- Infrastructure tests cho EF Core Catalog/Cart/Ordering mapping.
+- Infrastructure tests cho EF Core Catalog/Cart/Ordering/Content mapping.
 - API integration tests dùng PostgreSQL thật qua Testcontainers.
 - Persistence mapping tests không dùng EF InMemory cho behavior cần đúng với PostgreSQL metadata.
 
 ## Xác minh gần nhất
 
-Đã chạy sau task Docker backend API và Docker Compose docs:
+Đã chạy sau task Banner Management và Admin Dashboard:
 
 ```powershell
 dotnet build WorkspaceEcommerce.slnx
@@ -353,32 +402,34 @@ dotnet test WorkspaceEcommerce.slnx --no-build
 
 Kết quả:
 
-- `WorkspaceEcommerce.Application.Tests`: 113 passed.
-- `WorkspaceEcommerce.Api.IntegrationTests`: 12 passed.
-- `WorkspaceEcommerce.Infrastructure.Tests`: 54 passed.
-- Tổng test suite: 179 passed.
+- `WorkspaceEcommerce.Application.Tests`: 119 passed.
+- `WorkspaceEcommerce.Api.IntegrationTests`: 18 passed.
+- `WorkspaceEcommerce.Infrastructure.Tests`: 60 passed.
+- Tổng test suite: 197 passed.
 - Failed: 0.
 - Skipped: 0.
 
 Đã chạy:
 
 ```powershell
-docker compose config --quiet
-docker compose --profile tools config --services
-docker compose --profile tools build api migrate
+docker compose --profile tools build migrate
 docker compose --profile tools run --rm migrate
+docker compose build api
 docker compose up -d api
 ```
 
 Kết quả:
 
-- Compose config hợp lệ.
-- Profile `tools` có đủ service `postgres`, `migrate`, `api`.
 - Docker image `workspace-ecommerce-api:local` và `workspace-ecommerce-api-migrate:local` build thành công.
-- Migration container chạy thành công; PostgreSQL local đã up to date.
+- Migration container chạy thành công; PostgreSQL local đã apply `20260608042918_AddContentBannerSchema`.
 - API container start thành công sau khi PostgreSQL healthcheck healthy.
-- `GET http://localhost:5080/api/categories`: `200 OK`.
-- `GET http://localhost:5080/openapi/v1.json`: `200 OK` trong Development.
+- Admin Banner HTTP smoke-test qua API container:
+  - `POST /api/admin/banners`: passed.
+  - `GET /api/admin/banners`: passed.
+  - `PUT /api/admin/banners/{id}`: passed.
+- Admin Dashboard HTTP smoke-test qua API container:
+  - `GET /api/admin/dashboard`: passed.
+- Đã cleanup banner smoke-test khỏi PostgreSQL local.
 - Đã stop/remove API container sau smoke-test; PostgreSQL dev container vẫn giữ nguyên.
 
 Smoke-test đã có:
@@ -434,6 +485,7 @@ Smoke-test đã có:
 - `f795250 Add API integration endpoint coverage`
 - `e3814cb Add API integration edge case coverage`
 - `a0b204a Add backend Docker Compose setup`
+- `07765c2 Document frontend stack decision`
 
 ## Rủi ro và khoảng trống
 
@@ -441,17 +493,14 @@ Smoke-test đã có:
 - API integration tests đã cover luồng chính và một số edge cases quan trọng cho Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order; vẫn chưa cover exhaustively mọi biến thể validation/conflict.
 - Docker Compose đã chạy API/PostgreSQL/migration local; chưa có production image hardening như non-root user, SBOM, image signing hoặc CI publish.
 - Chưa scaffold frontend app cho Storefront/Admin theo stack đã chốt.
-- Chưa có Banner Management và Dashboard.
 - Dữ liệu smoke-test local đã được insert vào PostgreSQL dev; nếu cần DB sạch cho demo thì cần seed strategy chính thức hoặc cleanup script.
 
 ## Nhiệm vụ tiếp theo đề xuất
 
-### Ưu tiên 1 - Phần MVP sau Ordering
+### Ưu tiên 1 - Demo data và frontend foundation
 
-1. Triển khai Banner Management.
-2. Triển khai Dashboard cơ bản.
-3. Chuẩn hóa seed data demo cho Catalog/Cart/Checkout/Order.
-4. Scaffold frontend Storefront/Admin theo stack đã chốt.
+1. Chuẩn hóa seed data demo cho Catalog/Cart/Checkout/Order/Banner.
+2. Scaffold frontend Storefront/Admin theo stack đã chốt.
 
 ## Lệnh nên chạy trước task tiếp theo
 

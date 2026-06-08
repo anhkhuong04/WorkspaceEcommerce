@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Domain.Modules.Cart;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
+using WorkspaceEcommerce.Domain.Modules.Content;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Infrastructure.Persistence;
@@ -29,6 +30,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<ProductSpecification> ProductSpecifications => Set<ProductSpecification>();
 
+    public DbSet<Banner> Banners => Set<Banner>();
+
     IQueryable<Category> IAppDbContext.Categories => Categories;
 
     IQueryable<Product> IAppDbContext.Products => Products;
@@ -38,6 +41,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     IQueryable<ProductImage> IAppDbContext.ProductImages => ProductImages;
 
     IQueryable<ProductSpecification> IAppDbContext.ProductSpecifications => ProductSpecifications;
+
+    IQueryable<Banner> IAppDbContext.Banners => Banners;
 
     IQueryable<Order> IAppDbContext.Orders => Orders;
 
