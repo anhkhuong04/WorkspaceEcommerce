@@ -13,6 +13,7 @@ internal sealed class FakeAppDbContext : IAppDbContext
     private readonly List<ProductSpecification> _productSpecifications = [];
     private readonly List<Order> _orders = [];
     private readonly List<OrderItem> _orderItems = [];
+    private readonly List<OrderStatusHistory> _orderStatusHistories = [];
 
     public IQueryable<Category> Categories => _categories.AsQueryable();
 
@@ -27,6 +28,8 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public IQueryable<Order> Orders => _orders.AsQueryable();
 
     public IQueryable<OrderItem> OrderItems => _orderItems.AsQueryable();
+
+    public IQueryable<OrderStatusHistory> OrderStatusHistories => _orderStatusHistories.AsQueryable();
 
     public int SaveChangesCallCount { get; private set; }
 
@@ -59,11 +62,17 @@ internal sealed class FakeAppDbContext : IAppDbContext
     {
         _orders.AddRange(orders);
         _orderItems.AddRange(orders.SelectMany(order => order.Items));
+        _orderStatusHistories.AddRange(orders.SelectMany(order => order.StatusHistory));
     }
 
     public void Seed(params OrderItem[] orderItems)
     {
         _orderItems.AddRange(orderItems);
+    }
+
+    public void Seed(params OrderStatusHistory[] orderStatusHistories)
+    {
+        _orderStatusHistories.AddRange(orderStatusHistories);
     }
 
     public void Add<TEntity>(TEntity entity)
@@ -132,6 +141,11 @@ internal sealed class FakeAppDbContext : IAppDbContext
         if (typeof(TEntity) == typeof(OrderItem))
         {
             return (List<TEntity>)(object)_orderItems;
+        }
+
+        if (typeof(TEntity) == typeof(OrderStatusHistory))
+        {
+            return (List<TEntity>)(object)_orderStatusHistories;
         }
 
         throw new InvalidOperationException($"Unsupported entity type '{typeof(TEntity).Name}'.");

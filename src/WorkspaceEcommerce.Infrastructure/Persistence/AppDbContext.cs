@@ -43,6 +43,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     IQueryable<OrderItem> IAppDbContext.OrderItems => OrderItems;
 
+    IQueryable<OrderStatusHistory> IAppDbContext.OrderStatusHistories => OrderStatusHistories;
+
     async Task<Cart?> ICartStore.FindCartBySessionIdAsync(
         string sessionId,
         CancellationToken cancellationToken)

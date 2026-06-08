@@ -124,6 +124,32 @@ public sealed class OrderTests
     }
 
     [Fact]
+    public void ChangeStatus_SameStatus_ThrowsDomainException()
+    {
+        var order = CreateOrder();
+
+        var exception = Assert.Throws<DomainException>(() =>
+            order.ChangeStatus(Guid.NewGuid(), OrderStatus.Pending, null, null));
+
+        Assert.Equal("Order status is already set.", exception.Message);
+    }
+
+    [Fact]
+    public void ChangeStatus_CompletedIsTerminal_ThrowsDomainException()
+    {
+        var order = CreateOrder();
+        order.ChangeStatus(Guid.NewGuid(), OrderStatus.Confirmed, null, null);
+        order.ChangeStatus(Guid.NewGuid(), OrderStatus.Processing, null, null);
+        order.ChangeStatus(Guid.NewGuid(), OrderStatus.Shipping, null, null);
+        order.ChangeStatus(Guid.NewGuid(), OrderStatus.Completed, null, null);
+
+        var exception = Assert.Throws<DomainException>(() =>
+            order.ChangeStatus(Guid.NewGuid(), OrderStatus.Cancelled, null, null));
+
+        Assert.Equal("Order status cannot change from Completed to Cancelled.", exception.Message);
+    }
+
+    [Fact]
     public void ChangeStatus_FailedDeliveryCanReturnToShippingOrCancel()
     {
         var order = CreateOrder();

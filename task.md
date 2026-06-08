@@ -16,10 +16,10 @@ Cập nhật lần cuối: 2026-06-08
 Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, Cart, Checkout và Ordering:
 
 - `WorkspaceEcommerce.Domain`: Catalog, Cart và Ordering entities với invariant/domain method cơ bản.
-- `WorkspaceEcommerce.Application`: common contracts/models, DTO, validators và services cho Admin Auth, Admin Catalog, Admin Product, Storefront Catalog, Storefront Cart, Checkout và Storefront Order Lookup.
+- `WorkspaceEcommerce.Application`: common contracts/models, DTO, validators và services cho Admin Auth, Admin Catalog, Admin Product, Admin Order, Storefront Catalog, Storefront Cart, Checkout và Storefront Order Lookup.
 - `WorkspaceEcommerce.Infrastructure`: EF Core PostgreSQL persistence, Catalog/Cart/Ordering mappings, migrations, JWT/config validation và transaction-backed checkout store.
-- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth, Admin Catalog, Admin Product, Storefront Catalog, Storefront Cart, Checkout và Storefront Order Lookup; có JWT, response envelope, global exception handling và OpenAPI trong Development.
-- `WorkspaceEcommerce.Application.Tests`: tests cho Domain, validators và Application services thuộc Catalog, Cart, Auth, Product, Storefront Catalog, Checkout và Order Lookup.
+- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth, Admin Catalog, Admin Product, Admin Order, Storefront Catalog, Storefront Cart, Checkout và Storefront Order Lookup; có JWT, response envelope, global exception handling và OpenAPI trong Development.
+- `WorkspaceEcommerce.Application.Tests`: tests cho Domain, validators và Application services thuộc Catalog, Cart, Auth, Product, Storefront Catalog, Checkout, Order Lookup và Admin Order.
 - `WorkspaceEcommerce.Infrastructure.Tests`: tests cho configuration validation, JWT token generation và EF Core mappings của Catalog, Cart, Ordering.
 - PostgreSQL local chạy bằng Docker Compose service `postgres`.
 
@@ -207,6 +207,22 @@ Dependency hiện tại:
 - Không expose entity trực tiếp ra API; response dùng `OrderDto` và `OrderItemDto`.
 - Order item response dùng snapshot đã lưu trong `ordering.order_items`, không đọc lại dữ liệu product hiện tại.
 
+### Admin Order Management
+
+- Thêm API admin:
+  - `GET /api/admin/orders`
+  - `GET /api/admin/orders/{id}`
+  - `PUT /api/admin/orders/{id}/status`
+- Các endpoint được bảo vệ bằng `[Authorize]`.
+- Controller mỏng, delegate sang `IAdminOrderService`.
+- Dùng DTO request/response và FluentValidation.
+- `GET /api/admin/orders` hỗ trợ pagination MVP và filter cơ bản theo `status`, `search`.
+- `GET /api/admin/orders/{id}` trả chi tiết order, order items snapshot và status history.
+- `PUT /api/admin/orders/{id}/status` dùng `Order.ChangeStatus(...)` để enforce transition rules trong Domain.
+- Mỗi lần đổi trạng thái ghi thêm `OrderStatusHistory`.
+- `changedBy` lấy từ JWT claim admin hiện tại.
+- Invalid transition trả `409 Conflict`.
+
 ### API foundation
 
 - Thêm global exception middleware.
@@ -251,6 +267,7 @@ Dependency hiện tại:
 - Application tests cho Storefront Cart validator/service.
 - Application tests cho Checkout validator/service.
 - Application tests cho Storefront Order Lookup validator/service.
+- Application tests cho Admin Order validator/service.
 - Domain tests cho Catalog, Cart và Ordering invariants.
 - Infrastructure tests cho configuration validation và JWT token generation.
 - Infrastructure tests cho EF Core Catalog/Cart/Ordering mapping.
@@ -258,7 +275,7 @@ Dependency hiện tại:
 
 ## Xác minh gần nhất
 
-Đã chạy sau task Storefront Order Lookup:
+Đã chạy sau task Admin Order Management:
 
 ```powershell
 dotnet build WorkspaceEcommerce.slnx
@@ -278,9 +295,9 @@ dotnet test WorkspaceEcommerce.slnx --no-restore
 
 Kết quả:
 
-- `WorkspaceEcommerce.Application.Tests`: 100 passed.
+- `WorkspaceEcommerce.Application.Tests`: 113 passed.
 - `WorkspaceEcommerce.Infrastructure.Tests`: 54 passed.
-- Tổng test suite: 154 passed.
+- Tổng test suite: 167 passed.
 - Failed: 0.
 - Skipped: 0.
 
@@ -292,8 +309,17 @@ Smoke-test đã có:
 - Storefront Order Lookup endpoint `GET /api/orders/lookup` trên API local `http://localhost:5080`: passed.
 - Lookup đúng `orderCode=ORD-20260608-8A539E82` và `phone=0900000001` trả order snapshot.
 - Lookup sai phone trả `404` với response envelope và error `Order was not found.`.
+- Admin Order Management endpoints trên API local `http://localhost:5080`: passed.
+- Admin login lấy JWT thành công, sau đó gọi:
+  - `GET /api/admin/orders`: passed.
+  - `GET /api/admin/orders/{id}`: passed.
+  - `PUT /api/admin/orders/{id}/status`: passed.
+- Admin status update đổi order `ORD-20260608-8A539E82` từ `Pending` sang `Confirmed`.
+- PostgreSQL verification sau admin status update:
+  - `ordering.orders`: order status hiện là `Confirmed`.
+  - `ordering.order_status_history`: có record `Pending -> Confirmed`, note `Confirmed by admin smoke test`, changed by `admin@example.com`.
 - PostgreSQL verification sau checkout:
-  - `ordering.orders`: order tồn tại, subtotal `246.90`, total `246.90`, status `Pending`, payment method `Cod`.
+  - `ordering.orders`: order tồn tại, subtotal `246.90`, total `246.90`, payment method `Cod`.
   - `ordering.order_items`: snapshot SKU `SMOKE-CART-001`, product name `Smoke Test Product`, unit price `123.45`, quantity `2`, line total `246.90`.
   - `ordering.order_status_history`: có record khởi tạo `Pending` với note `Created by checkout.`.
   - `catalog.product_variants`: stock của variant smoke-test còn `8` sau khi trừ quantity `2`.
@@ -305,38 +331,29 @@ Smoke-test đã có:
 - `37a24b2 Add checkout application service`
 - `f4af79d Add ordering persistence and checkout API`
 - `9968828 Update checkout runtime verification status`
+- `5e1baed Add storefront order lookup`
 
 ## Rủi ro và khoảng trống
 
 - Vì config dùng placeholder, app sẽ fail sớm nếu chưa override `DefaultConnection`, `AdminAuth` và `Jwt` bằng secret/config local hợp lệ.
-- Chưa có API integration tests tự động cho Admin Category, Admin Product, Storefront Catalog, Storefront Cart và Checkout endpoints.
-- Chưa có Admin Order Management.
+- Chưa có API integration tests tự động cho Admin Category, Admin Product, Admin Order, Storefront Catalog, Storefront Cart, Checkout và Order Lookup endpoints.
 - Chưa có Banner Management và Dashboard.
 - Chưa có Dockerfile/backend container; hiện mới có PostgreSQL container.
 - Dữ liệu smoke-test local đã được insert vào PostgreSQL dev; nếu cần DB sạch cho demo thì cần seed strategy chính thức hoặc cleanup script.
 
 ## Nhiệm vụ tiếp theo đề xuất
 
-### Ưu tiên 1 - Ordering MVP còn thiếu
+### Ưu tiên 1 - API/integration quality
 
-1. Triển khai Admin Order Management:
-   - `GET /api/admin/orders`.
-   - `GET /api/admin/orders/{id}`.
-   - `PUT /api/admin/orders/{id}/status`.
-   - Ghi `OrderStatusHistory` mỗi lần đổi trạng thái.
-2. Thêm tests cho status transition và Admin Order Management.
+1. Thêm API integration test infrastructure dùng PostgreSQL thật hoặc Testcontainers.
+2. Thêm API integration tests cho Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order.
+3. Thêm Dockerfile cho backend API và tài liệu chạy API + PostgreSQL bằng Docker Compose.
 
-### Ưu tiên 2 - API/integration quality
+### Ưu tiên 2 - Phần MVP sau Ordering
 
-3. Thêm API integration test infrastructure dùng PostgreSQL thật hoặc Testcontainers.
-4. Thêm API integration tests cho Auth/Admin authorization, Catalog, Cart, Checkout và Order Lookup.
-5. Thêm Dockerfile cho backend API và tài liệu chạy API + PostgreSQL bằng Docker Compose.
-
-### Ưu tiên 3 - Phần MVP sau Ordering
-
-6. Triển khai Banner Management.
-7. Triển khai Dashboard cơ bản.
-8. Chuẩn hóa seed data demo cho Catalog/Cart/Checkout/Order.
+4. Triển khai Banner Management.
+5. Triển khai Dashboard cơ bản.
+6. Chuẩn hóa seed data demo cho Catalog/Cart/Checkout/Order.
 
 ## Lệnh nên chạy trước task tiếp theo
 

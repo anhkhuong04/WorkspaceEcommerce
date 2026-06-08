@@ -19,6 +19,8 @@ public interface IAppDbContext
 
     IQueryable<OrderItem> OrderItems { get; }
 
+    IQueryable<OrderStatusHistory> OrderStatusHistories { get; }
+
     void Add<TEntity>(TEntity entity)
         where TEntity : class;
 
