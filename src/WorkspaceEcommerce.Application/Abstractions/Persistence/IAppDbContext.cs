@@ -1,4 +1,5 @@
 using WorkspaceEcommerce.Domain.Modules.Catalog;
+using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Application.Abstractions.Persistence;
 
@@ -13,6 +14,10 @@ public interface IAppDbContext
     IQueryable<ProductImage> ProductImages { get; }
 
     IQueryable<ProductSpecification> ProductSpecifications { get; }
+
+    IQueryable<Order> Orders { get; }
+
+    IQueryable<OrderItem> OrderItems { get; }
 
     void Add<TEntity>(TEntity entity)
         where TEntity : class;

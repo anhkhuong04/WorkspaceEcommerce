@@ -1,5 +1,6 @@
-﻿using WorkspaceEcommerce.Application.Abstractions.Persistence;
+using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
+using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Application.Tests.Common.Fakes;
 
@@ -10,6 +11,8 @@ internal sealed class FakeAppDbContext : IAppDbContext
     private readonly List<ProductVariant> _productVariants = [];
     private readonly List<ProductImage> _productImages = [];
     private readonly List<ProductSpecification> _productSpecifications = [];
+    private readonly List<Order> _orders = [];
+    private readonly List<OrderItem> _orderItems = [];
 
     public IQueryable<Category> Categories => _categories.AsQueryable();
 
@@ -20,6 +23,10 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public IQueryable<ProductImage> ProductImages => _productImages.AsQueryable();
 
     public IQueryable<ProductSpecification> ProductSpecifications => _productSpecifications.AsQueryable();
+
+    public IQueryable<Order> Orders => _orders.AsQueryable();
+
+    public IQueryable<OrderItem> OrderItems => _orderItems.AsQueryable();
 
     public int SaveChangesCallCount { get; private set; }
 
@@ -46,6 +53,17 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public void Seed(params ProductSpecification[] specifications)
     {
         _productSpecifications.AddRange(specifications);
+    }
+
+    public void Seed(params Order[] orders)
+    {
+        _orders.AddRange(orders);
+        _orderItems.AddRange(orders.SelectMany(order => order.Items));
+    }
+
+    public void Seed(params OrderItem[] orderItems)
+    {
+        _orderItems.AddRange(orderItems);
     }
 
     public void Add<TEntity>(TEntity entity)
@@ -104,6 +122,16 @@ internal sealed class FakeAppDbContext : IAppDbContext
         if (typeof(TEntity) == typeof(ProductSpecification))
         {
             return (List<TEntity>)(object)_productSpecifications;
+        }
+
+        if (typeof(TEntity) == typeof(Order))
+        {
+            return (List<TEntity>)(object)_orders;
+        }
+
+        if (typeof(TEntity) == typeof(OrderItem))
+        {
+            return (List<TEntity>)(object)_orderItems;
         }
 
         throw new InvalidOperationException($"Unsupported entity type '{typeof(TEntity).Name}'.");

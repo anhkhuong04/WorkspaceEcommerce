@@ -20,6 +20,7 @@ public static class DependencyInjection
         services.AddScoped<IStorefrontCatalogService, StorefrontCatalogService>();
         services.AddScoped<IStorefrontCartService, StorefrontCartService>();
         services.AddScoped<ICheckoutService, CheckoutService>();
+        services.AddScoped<IStorefrontOrderLookupService, StorefrontOrderLookupService>();
 
         return services;
     }
