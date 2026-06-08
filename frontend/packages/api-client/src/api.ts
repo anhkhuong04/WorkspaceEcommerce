@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   AddCartItemRequest,
   AdminBannerDto,
   AdminCategoryDto,
@@ -11,8 +11,8 @@
   CartDto,
   CheckoutRequest,
   CheckoutResponse,
-  OrderDto,
   OrderLookupRequest,
+  OrderLookupResponse,
   PagedResult,
   ProductListRequest,
   StorefrontCategoryDto,
@@ -51,7 +51,7 @@ export function createStorefrontApi(client: ApiClient) {
     removeCartItem: (itemId: string, sessionId: string) =>
       client.delete<CartDto>(`/api/cart/items/${itemId}${buildQuery({ sessionId })}`),
     checkout: (request: CheckoutRequest) => client.post<CheckoutResponse, CheckoutRequest>("/api/checkout", request),
-    lookupOrder: (request: OrderLookupRequest) => client.get<OrderDto>(`/api/orders/lookup${buildQuery(request)}`)
+    lookupOrder: (request: OrderLookupRequest) => client.get<OrderLookupResponse>(`/api/orders/lookup${buildQuery(request)}`)
   };
 }
 

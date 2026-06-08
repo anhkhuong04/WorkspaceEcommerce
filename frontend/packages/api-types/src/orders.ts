@@ -1,4 +1,4 @@
-﻿export type PaymentMethod = 0 | 1;
+export type PaymentMethod = 0 | 1;
 export type OrderStatus = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export interface CheckoutRequest {
@@ -47,4 +47,8 @@ export interface OrderDto {
 export interface OrderLookupRequest {
   orderCode: string;
   phone: string;
+}
+
+export interface OrderLookupResponse {
+  order: OrderDto;
 }

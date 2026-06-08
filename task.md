@@ -38,71 +38,36 @@ Dependency hiện tại:
 
 Ghi chú duy trì: để giảm dung lượng và độ phức tạp, mục này chỉ giữ 3 task lớn `###` gần nhất. Các task cũ được tóm tắt trong `Trạng thái hiện tại`, `Xác minh gần nhất` và lịch sử commit.
 
-### Demo data seed
-
-- Thêm `IDemoDataSeeder` và `DemoDataSeeder`.
-- Seeder chạy bằng API process với argument `--seed-demo`.
-- Thêm Docker Compose service `seed-demo` trong profile `tools`.
-- Demo seed idempotent, chạy lại không tạo trùng dữ liệu theo bộ seed cố định.
-- Demo seed bao gồm:
-  - Catalog: 3 categories, 4 products, 5 variants, product images và specifications.
-  - Banner: 3 active homepage banners.
-  - Cart: cart checkout-ready với session id `demo-checkout-session`.
-  - Order: 3 orders demo gồm `Pending`, `Confirmed`, `Completed` và status history tương ứng.
-- Demo data có SKU low-stock để phục vụ Dashboard.
-- Cập nhật README hướng dẫn chạy `docker compose --profile tools run --rm seed-demo`.
-
 ### Frontend scaffold
 
 - Thêm frontend workspace tại `frontend/` dùng pnpm qua Corepack.
-- Thêm app Storefront:
-  - `frontend/apps/storefront`
-  - React + TypeScript + Vite + Tailwind CSS 4.
-  - React Router, React Query, React Hook Form và Zod.
-  - Layout tone sáng, trắng chủ đạo, clean, hiện đại.
-  - Pages scaffold: Home, Product Listing, Product Detail, Cart, Checkout, Order Lookup.
-- Thêm app Admin:
-  - `frontend/apps/admin`
-  - React + TypeScript + Vite + Ant Design.
-  - Layout admin sidebar/topbar tối ưu desktop Full HD.
-  - Pages scaffold: Login, Dashboard, Categories, Products, Orders, Banners.
-- Thêm shared packages:
-  - `@workspace-ecommerce/api-types`
-  - `@workspace-ecommerce/api-client`
-  - `@workspace-ecommerce/shared-utils`
-- API calls được gom trong shared `api-client` và app service adapter, không rải trực tiếp trong UI components.
-- Cập nhật `.gitignore` và `.dockerignore` để loại `node_modules` và `dist`.
-- Cập nhật README hướng dẫn cài dependencies, chạy Storefront/Admin và verify frontend.
+- Thêm app Storefront: React + TypeScript + Vite + Tailwind CSS 4, React Router, React Query, React Hook Form và Zod.
+- Thêm app Admin: React + TypeScript + Vite + Ant Design.
+- Thêm shared packages: `@workspace-ecommerce/api-types`, `@workspace-ecommerce/api-client`, `@workspace-ecommerce/shared-utils`.
+- API calls được gom trong shared `api-client` và app service adapter.
+- Cập nhật README, `.gitignore` và `.dockerignore` cho frontend workspace.
 
 ### Storefront API integration
 
-- Tích hợp Storefront Home với API thật:
-  - `GET /api/categories` để render category links.
-  - `GET /api/products` để render featured/live product cards.
-- Tích hợp Catalog với API thật:
-  - Filter `search`, `categorySlug`, `inStock` lưu trên URL query string.
-  - Gọi `GET /api/products` theo filter và pagination.
-  - Render đúng backend DTO `compareAtPrice`, `isInStock`, `imageUrl`.
-- Tích hợp Product Detail với API thật:
-  - Gọi `GET /api/products/{slug}`.
-  - Render gallery, variants, specifications.
-  - Gọi `POST /api/cart/items` để add selected variant vào cart.
-- Tích hợp Cart với API thật:
-  - Gọi `GET /api/cart`.
-  - Gọi `PUT /api/cart/items/{id}` khi đổi quantity.
-  - Gọi `DELETE /api/cart/items/{id}` khi remove item.
-  - Quản lý cart session bằng localStorage, mặc định `demo-checkout-session` để kiểm tra seed demo.
+- Tích hợp Storefront Home với API thật cho categories và featured/live products.
+- Tích hợp Catalog với API thật, URL filters và pagination.
+- Tích hợp Product Detail với API thật, render gallery/variants/specifications và add-to-cart.
+- Tích hợp Cart với API thật cho get/update/remove item.
+- Quản lý cart session bằng localStorage, mặc định `demo-checkout-session` để kiểm tra seed demo.
 - Cập nhật shared API types để khớp contract backend hiện tại của Catalog/Cart.
-- Phân tích readiness cho Home demo theo `overview.md`:
-  - Home MVP cần banner, danh mục nổi bật và sản phẩm nổi bật.
-  - Danh mục nổi bật và sản phẩm nổi bật đã có API thật và frontend đã consume.
-  - Banner mới có Admin Banner API; chưa có public Storefront Banner API để Home consume.
-  - Seed hiện dùng URL `https://images.example.test/...`, chưa phù hợp demo UI vì ảnh không render thật trong browser.
-  - Kết luận: Home hiện đủ kiểm tra category/product API, chưa đủ điều kiện UI/UX hoàn thiện để demo khách hàng.
+
+### Checkout và Order Lookup UI integration
+
+- Tích hợp Checkout page với cart session hiện tại và `GET /api/cart` để render order summary trước khi đặt hàng.
+- Thêm form checkout dùng React Hook Form + Zod cho thông tin người nhận, note và payment method.
+- Gọi `POST /api/checkout` bằng API client thật, xử lý loading/error và reset cart session sau khi checkout thành công.
+- Thêm route và page `checkout/success` để hiển thị order code, order items snapshot, totals, receiver info và link tra cứu đơn.
+- Tích hợp Order Lookup page với `GET /api/orders/lookup`, đọc query params `orderCode`/`phone`, validate input và render chi tiết order trả về.
+- Cập nhật shared API client/type cho `OrderLookupResponse` để khớp response envelope hiện tại.
 
 ## Xác minh gần nhất
 
-Đã chạy sau task Storefront API integration:
+Đã chạy sau task Checkout và Order Lookup UI integration:
 
 ```powershell
 dotnet build WorkspaceEcommerce.slnx
@@ -256,7 +221,7 @@ Smoke-test đã có:
 - Vì config dùng placeholder, app sẽ fail sớm nếu chưa override `DefaultConnection`, `AdminAuth` và `Jwt` bằng secret/config local hợp lệ.
 - API integration tests đã cover luồng chính và một số edge cases quan trọng cho Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order; vẫn chưa cover exhaustively mọi biến thể validation/conflict.
 - Docker Compose đã chạy API/PostgreSQL/migration local; chưa có production image hardening như non-root user, SBOM, image signing hoặc CI publish.
-- Storefront đã tích hợp API thật cho Home/Catalog/Product Detail/Cart; Checkout và Order Lookup vẫn ở mức scaffold/API foundation, chưa hoàn thiện UX end-to-end.
+- Storefront đã tích hợp API thật cho Home/Catalog/Product Detail/Cart/Checkout/Order Lookup; Checkout và Order Lookup đã có UI end-to-end cơ bản, còn có thể polish thêm sau demo flow.
 - Home chưa đủ điều kiện demo UI/UX hoàn thiện vì thiếu public Storefront Banner API và demo asset thật; hiện mới đủ kiểm tra category/product API trên Home.
 - Admin frontend mới scaffold foundation; chưa hoàn thiện auth guard, CRUD forms, mutation flows hoặc visual polish cuối.
 - Admin build hiện có warning chunk lớn do Ant Design; nên code-split routes khi triển khai sâu.
@@ -274,8 +239,7 @@ Smoke-test đã có:
    - Cập nhật seed demo để dùng ảnh demo render được hoặc asset nội bộ.
    - Polish Home UI/UX với hero/banner, featured categories, featured products, loading/error/empty states và responsive Full HD.
    - Smoke-test Home với backend + PostgreSQL + seed demo.
-3. Tích hợp Checkout và Order Lookup UI với API thật end-to-end.
-4. Tích hợp Admin auth guard và CRUD/list flows cho Dashboard/Categories/Products/Orders/Banners.
+3. Tích hợp Admin auth guard và CRUD/list flows cho Dashboard/Categories/Products/Orders/Banners.
 
 ## Lệnh nên chạy trước task tiếp theo
 
