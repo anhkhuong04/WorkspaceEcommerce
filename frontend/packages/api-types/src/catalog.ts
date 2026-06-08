@@ -10,15 +10,15 @@
 export interface StorefrontProductListItemDto {
   id: string;
   categoryId: string;
-  categoryName: string | null;
+  categoryName: string;
   name: string;
   slug: string;
   description: string | null;
   isFeatured: boolean;
   minPrice: number | null;
-  maxPrice: number | null;
-  primaryImageUrl: string | null;
-  inStock: boolean;
+  compareAtPrice: number | null;
+  isInStock: boolean;
+  imageUrl: string | null;
 }
 
 export interface StorefrontProductVariantDto {
@@ -47,7 +47,14 @@ export interface StorefrontProductSpecificationDto {
   sortOrder: number;
 }
 
-export interface StorefrontProductDetailDto extends StorefrontProductListItemDto {
+export interface StorefrontProductDetailDto {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  isFeatured: boolean;
   variants: StorefrontProductVariantDto[];
   images: StorefrontProductImageDto[];
   specifications: StorefrontProductSpecificationDto[];

@@ -374,6 +374,26 @@ Dependency hiện tại:
 - Cập nhật `.gitignore` và `.dockerignore` để loại `node_modules` và `dist`.
 - Cập nhật README hướng dẫn cài dependencies, chạy Storefront/Admin và verify frontend.
 
+### Storefront API integration
+
+- Tích hợp Storefront Home với API thật:
+  - `GET /api/categories` để render category links.
+  - `GET /api/products` để render featured/live product cards.
+- Tích hợp Catalog với API thật:
+  - Filter `search`, `categorySlug`, `inStock` lưu trên URL query string.
+  - Gọi `GET /api/products` theo filter và pagination.
+  - Render đúng backend DTO `compareAtPrice`, `isInStock`, `imageUrl`.
+- Tích hợp Product Detail với API thật:
+  - Gọi `GET /api/products/{slug}`.
+  - Render gallery, variants, specifications.
+  - Gọi `POST /api/cart/items` để add selected variant vào cart.
+- Tích hợp Cart với API thật:
+  - Gọi `GET /api/cart`.
+  - Gọi `PUT /api/cart/items/{id}` khi đổi quantity.
+  - Gọi `DELETE /api/cart/items/{id}` khi remove item.
+  - Quản lý cart session bằng localStorage, mặc định `demo-checkout-session` để kiểm tra seed demo.
+- Cập nhật shared API types để khớp contract backend hiện tại của Catalog/Cart.
+
 ### Configuration validation
 
 - Validate `ConnectionStrings:DefaultConnection` sớm khi app start qua Infrastructure DI.
@@ -426,7 +446,7 @@ Dependency hiện tại:
 
 ## Xác minh gần nhất
 
-Đã chạy sau task Frontend scaffold:
+Đã chạy sau task Storefront API integration:
 
 ```powershell
 dotnet build WorkspaceEcommerce.slnx
@@ -580,7 +600,8 @@ Smoke-test đã có:
 - Vì config dùng placeholder, app sẽ fail sớm nếu chưa override `DefaultConnection`, `AdminAuth` và `Jwt` bằng secret/config local hợp lệ.
 - API integration tests đã cover luồng chính và một số edge cases quan trọng cho Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order; vẫn chưa cover exhaustively mọi biến thể validation/conflict.
 - Docker Compose đã chạy API/PostgreSQL/migration local; chưa có production image hardening như non-root user, SBOM, image signing hoặc CI publish.
-- Frontend mới scaffold foundation; chưa hoàn thiện CRUD forms, mutation flows, protected route guard đầy đủ, hoặc visual polish cuối.
+- Storefront đã tích hợp API thật cho Home/Catalog/Product Detail/Cart; Checkout và Order Lookup vẫn ở mức scaffold/API foundation, chưa hoàn thiện UX end-to-end.
+- Admin frontend mới scaffold foundation; chưa hoàn thiện auth guard, CRUD forms, mutation flows hoặc visual polish cuối.
 - Admin build hiện có warning chunk lớn do Ant Design; nên code-split routes khi triển khai sâu.
 - Docker Desktop đang paused nên chưa smoke-test được `docker compose --profile tools run --rm seed-demo` trong lượt này.
 - Dữ liệu smoke-test local cũ đã được insert vào PostgreSQL dev; seed demo mới là idempotent nhưng chưa thay thế cleanup script.
@@ -590,7 +611,7 @@ Smoke-test đã có:
 ### Ưu tiên 1 - Frontend integration
 
 1. Unpause Docker Desktop và chạy lại full API integration tests + `seed-demo` smoke-test.
-2. Tích hợp Storefront với API thật cho Home/Catalog/Product Detail/Cart.
+2. Tích hợp Checkout và Order Lookup UI với API thật end-to-end.
 3. Tích hợp Admin auth guard và CRUD/list flows cho Dashboard/Categories/Products/Orders/Banners.
 
 ## Lệnh nên chạy trước task tiếp theo

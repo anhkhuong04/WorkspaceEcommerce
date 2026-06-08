@@ -1,8 +1,6 @@
 ﻿export interface CartItemDto {
   id: string;
   productVariantId: string;
-  productName: string | null;
-  sku: string | null;
   quantity: number;
   unitPriceSnapshot: number;
   lineTotal: number;
