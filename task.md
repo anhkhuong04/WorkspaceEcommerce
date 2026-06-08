@@ -1,6 +1,6 @@
 ﻿# Task - WorkspaceEcommerce
 
-Cập nhật lần cuối: 2026-06-07
+Cập nhật lần cuối: 2026-06-08
 
 ## Nguyên tắc trước khi làm task mới
 
@@ -217,10 +217,16 @@ Dependency hiện tại:
 - Đã thêm `docker-compose.yml` cho PostgreSQL local.
 - Đã thêm `.env.example`; file `.env` local không commit vì chứa password dev.
 - Đã chạy PostgreSQL container `workspace-ecommerce-postgres`.
-- Đã apply migration `InitialCatalogSchema` và `AddCartSchema` vào PostgreSQL local.
-- Đã verify trực tiếp schema/table/index/precision/delete behavior cho `catalog` và `cart`.
+- Đã apply migration `InitialCatalogSchema`, `AddCartSchema` và `AddOrderingSchema` vào PostgreSQL local.
+- Đã verify trực tiếp schema/table/index/precision/delete behavior cho `catalog`, `cart` và `ordering`.
 - Đã seed dữ liệu smoke-test tối thiểu cho Cart API.
-- Chưa apply migration `AddOrderingSchema` vào PostgreSQL local trong task gần nhất.
+- Đã seed/dùng dữ liệu Cart hiện có để smoke-test `POST /api/checkout` trên PostgreSQL local.
+- Đã verify trực tiếp PostgreSQL sau checkout:
+  - order được tạo trong `ordering.orders`.
+  - order items snapshot đúng trong `ordering.order_items`.
+  - status history có record khởi tạo trong `ordering.order_status_history`.
+  - stock variant bị trừ đúng.
+  - cart đã checkout được remove theo implementation hiện tại.
 
 ### Tests
 
@@ -263,10 +269,17 @@ Kết quả:
 - Failed: 0.
 - Skipped: 0.
 
-Smoke-test đã có trước đó:
+Smoke-test đã có:
 
 - Cart 4 endpoints trên API local `http://localhost:5080`: passed.
-- Checkout endpoint chưa smoke-test trên PostgreSQL local sau migration Ordering.
+- Checkout endpoint `POST /api/checkout` trên API local `http://localhost:5080`: passed.
+- Checkout smoke-test tạo order `ORD-20260608-8A539E82`.
+- PostgreSQL verification sau checkout:
+  - `ordering.orders`: order tồn tại, subtotal `246.90`, total `246.90`, status `Pending`, payment method `Cod`.
+  - `ordering.order_items`: snapshot SKU `SMOKE-CART-001`, product name `Smoke Test Product`, unit price `123.45`, quantity `2`, line total `246.90`.
+  - `ordering.order_status_history`: có record khởi tạo `Pending` với note `Created by checkout.`.
+  - `catalog.product_variants`: stock của variant smoke-test còn `8` sau khi trừ quantity `2`.
+  - `cart.carts` và `cart.cart_items`: cart/session đã checkout không còn record.
 
 ## Commit gần nhất
 
@@ -277,8 +290,6 @@ Smoke-test đã có trước đó:
 ## Rủi ro và khoảng trống
 
 - Vì config dùng placeholder, app sẽ fail sớm nếu chưa override `DefaultConnection`, `AdminAuth` và `Jwt` bằng secret/config local hợp lệ.
-- Migration `AddOrderingSchema` đã tạo và test mapping đã pass, nhưng chưa apply vào PostgreSQL local sau task gần nhất.
-- Chưa smoke-test `POST /api/checkout` trên API local với database thật.
 - Chưa có API integration tests tự động cho Admin Category, Admin Product, Storefront Catalog, Storefront Cart và Checkout endpoints.
 - Chưa có Admin Order Management.
 - Chưa có Order Lookup cho customer.
@@ -288,40 +299,29 @@ Smoke-test đã có trước đó:
 
 ## Nhiệm vụ tiếp theo đề xuất
 
-### Ưu tiên 1 - Hoàn tất Checkout runtime
+### Ưu tiên 1 - Ordering MVP còn thiếu
 
-1. Apply migration `AddOrderingSchema` vào PostgreSQL local.
-2. Seed hoặc dùng dữ liệu Cart hiện có để smoke-test `POST /api/checkout`.
-3. Verify trực tiếp PostgreSQL sau checkout:
-   - order được tạo trong `ordering.orders`.
-   - order items snapshot đúng trong `ordering.order_items`.
-   - status history có record khởi tạo.
-   - stock variant bị trừ đúng.
-   - cart đã checkout được remove hoặc clear đúng theo implementation.
-
-### Ưu tiên 2 - Ordering MVP còn thiếu
-
-4. Triển khai Storefront Order Lookup:
+1. Triển khai Storefront Order Lookup:
    - `GET /api/orders/lookup`.
    - Tra cứu bằng order code và phone theo `overview.md`.
-5. Triển khai Admin Order Management:
+2. Triển khai Admin Order Management:
    - `GET /api/admin/orders`.
    - `GET /api/admin/orders/{id}`.
    - `PUT /api/admin/orders/{id}/status`.
    - Ghi `OrderStatusHistory` mỗi lần đổi trạng thái.
-6. Thêm tests cho status transition và Admin Order Management.
+3. Thêm tests cho status transition và Admin Order Management.
 
-### Ưu tiên 3 - API/integration quality
+### Ưu tiên 2 - API/integration quality
 
-7. Thêm API integration test infrastructure dùng PostgreSQL thật hoặc Testcontainers.
-8. Thêm API integration tests cho Auth/Admin authorization, Catalog, Cart và Checkout.
-9. Thêm Dockerfile cho backend API và tài liệu chạy API + PostgreSQL bằng Docker Compose.
+4. Thêm API integration test infrastructure dùng PostgreSQL thật hoặc Testcontainers.
+5. Thêm API integration tests cho Auth/Admin authorization, Catalog, Cart và Checkout.
+6. Thêm Dockerfile cho backend API và tài liệu chạy API + PostgreSQL bằng Docker Compose.
 
-### Ưu tiên 4 - Phần MVP sau Ordering
+### Ưu tiên 3 - Phần MVP sau Ordering
 
-10. Triển khai Banner Management.
-11. Triển khai Dashboard cơ bản.
-12. Chuẩn hóa seed data demo cho Catalog/Cart/Checkout/Order.
+7. Triển khai Banner Management.
+8. Triển khai Dashboard cơ bản.
+9. Chuẩn hóa seed data demo cho Catalog/Cart/Checkout/Order.
 
 ## Lệnh nên chạy trước task tiếp theo
 
