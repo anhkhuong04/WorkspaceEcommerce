@@ -79,6 +79,13 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         return await operation(dbContext);
     }
 
+    public async Task<TResult> ExecuteScopeAsync<TResult>(Func<IServiceProvider, Task<TResult>> operation)
+    {
+        await using var scope = CreateScope();
+
+        return await operation(scope.ServiceProvider);
+    }
+
     private AsyncServiceScope CreateScope()
     {
         if (_factory is null)

@@ -34,6 +34,19 @@ Apply database migrations:
 docker compose --profile tools run --rm migrate
 ```
 
+Seed demo data:
+
+```powershell
+docker compose --profile tools run --rm seed-demo
+```
+
+The demo seed is idempotent and includes Catalog, Banner, a checkout-ready Cart, and sample Orders.
+Use this session id to smoke-test checkout:
+
+```text
+demo-checkout-session
+```
+
 Start the API:
 
 ```powershell

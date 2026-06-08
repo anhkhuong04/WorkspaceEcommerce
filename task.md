@@ -23,6 +23,7 @@ Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, C
 - `WorkspaceEcommerce.Infrastructure.Tests`: tests cho configuration validation, JWT token generation và EF Core mappings của Catalog, Cart, Ordering, Content.
 - `WorkspaceEcommerce.Api.IntegrationTests`: hạ tầng API integration test dùng `WebApplicationFactory` và Testcontainers PostgreSQL.
 - PostgreSQL local và API backend chạy được bằng Docker Compose service `postgres`, `migrate` và `api`.
+- Demo data chạy được bằng Docker Compose service `seed-demo` sau khi apply migration.
 - Frontend stack đã chốt: Storefront dùng React + TypeScript + Tailwind CSS + React Hook Form + Zod; Admin dùng React + TypeScript + Ant Design.
 
 Dependency hiện tại:
@@ -306,6 +307,10 @@ Dependency hiện tại:
   - Admin Banner validation và missing banner.
   - Admin Dashboard authorized aggregate.
   - Admin Dashboard unauthorized.
+- Bổ sung integration test cho demo data seed:
+  - Seeder tạo đúng số lượng dữ liệu demo.
+  - Seeder idempotent khi chạy lại.
+  - Verify cart session `demo-checkout-session`, order code `ORD-DEMO-*` và completed order total.
 
 ### Backend Docker Compose
 
@@ -317,6 +322,7 @@ Dependency hiện tại:
   - Service `postgres` giữ vai trò PostgreSQL local với healthcheck.
   - Service `migrate` chạy migration qua profile `tools`.
   - Service `api` build backend container, phụ thuộc PostgreSQL healthy và expose `${API_PORT:-5080}:8080`.
+  - Service `seed-demo` chạy demo data seeder qua profile `tools`.
 - Thêm biến `API_PORT` và `ASPNETCORE_ENVIRONMENT` vào `.env.example`.
 - Thêm `README.md` hướng dẫn chạy PostgreSQL, migration và API bằng Docker Compose.
 
@@ -330,6 +336,20 @@ Dependency hiện tại:
   - Thiết kế clean, hiện đại, ưu tiên UX chuẩn cho ecommerce/admin workflows.
   - Layout tối ưu cho màn hình Full HD 1920x1080, hạn chế scroll dọc không cần thiết ở màn hình chính.
   - Vẫn đảm bảo responsive cho màn hình nhỏ hơn.
+
+### Demo data seed
+
+- Thêm `IDemoDataSeeder` và `DemoDataSeeder`.
+- Seeder chạy bằng API process với argument `--seed-demo`.
+- Thêm Docker Compose service `seed-demo` trong profile `tools`.
+- Demo seed idempotent, chạy lại không tạo trùng dữ liệu theo bộ seed cố định.
+- Demo seed bao gồm:
+  - Catalog: 3 categories, 4 products, 5 variants, product images và specifications.
+  - Banner: 3 active homepage banners.
+  - Cart: cart checkout-ready với session id `demo-checkout-session`.
+  - Order: 3 orders demo gồm `Pending`, `Confirmed`, `Completed` và status history tương ứng.
+- Demo data có SKU low-stock để phục vụ Dashboard.
+- Cập nhật README hướng dẫn chạy `docker compose --profile tools run --rm seed-demo`.
 
 ### Configuration validation
 
@@ -378,11 +398,12 @@ Dependency hiện tại:
 - Infrastructure tests cho configuration validation và JWT token generation.
 - Infrastructure tests cho EF Core Catalog/Cart/Ordering/Content mapping.
 - API integration tests dùng PostgreSQL thật qua Testcontainers.
+- API integration tests có coverage cho demo data seed.
 - Persistence mapping tests không dùng EF InMemory cho behavior cần đúng với PostgreSQL metadata.
 
 ## Xác minh gần nhất
 
-Đã chạy sau task Banner Management và Admin Dashboard:
+Đã chạy sau task Demo data seed:
 
 ```powershell
 dotnet build WorkspaceEcommerce.slnx
@@ -397,17 +418,40 @@ Kết quả:
 Đã chạy:
 
 ```powershell
-dotnet test WorkspaceEcommerce.slnx --no-build
+dotnet test .\tests\WorkspaceEcommerce.Application.Tests\WorkspaceEcommerce.Application.Tests.csproj --no-build
+dotnet test .\tests\WorkspaceEcommerce.Infrastructure.Tests\WorkspaceEcommerce.Infrastructure.Tests.csproj --no-build
 ```
 
 Kết quả:
 
 - `WorkspaceEcommerce.Application.Tests`: 119 passed.
-- `WorkspaceEcommerce.Api.IntegrationTests`: 18 passed.
 - `WorkspaceEcommerce.Infrastructure.Tests`: 60 passed.
-- Tổng test suite: 197 passed.
 - Failed: 0.
 - Skipped: 0.
+
+Đã chạy:
+
+```powershell
+docker compose --profile tools config --services
+```
+
+Kết quả:
+
+- Compose profile `tools` có đủ service `postgres`, `api`, `migrate`, `seed-demo`.
+
+Đã chạy nhưng bị chặn bởi môi trường:
+
+```powershell
+dotnet test .\WorkspaceEcommerce.slnx --no-build
+```
+
+Kết quả:
+
+- `WorkspaceEcommerce.Application.Tests`: 119 passed.
+- `WorkspaceEcommerce.Infrastructure.Tests`: 60 passed.
+- `WorkspaceEcommerce.Api.IntegrationTests`: failed trước khi chạy test body vì Docker Desktop đang `manually paused`.
+- Lỗi Testcontainers: không kết nối được Docker endpoint `npipe://./pipe/docker_engine`.
+- Cần chạy lại full suite sau khi unpause Docker Desktop.
 
 Đã chạy:
 
@@ -486,6 +530,7 @@ Smoke-test đã có:
 - `e3814cb Add API integration edge case coverage`
 - `a0b204a Add backend Docker Compose setup`
 - `07765c2 Document frontend stack decision`
+- `1aa9c06 Add banner management and dashboard`
 
 ## Rủi ro và khoảng trống
 
@@ -493,13 +538,14 @@ Smoke-test đã có:
 - API integration tests đã cover luồng chính và một số edge cases quan trọng cho Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order; vẫn chưa cover exhaustively mọi biến thể validation/conflict.
 - Docker Compose đã chạy API/PostgreSQL/migration local; chưa có production image hardening như non-root user, SBOM, image signing hoặc CI publish.
 - Chưa scaffold frontend app cho Storefront/Admin theo stack đã chốt.
-- Dữ liệu smoke-test local đã được insert vào PostgreSQL dev; nếu cần DB sạch cho demo thì cần seed strategy chính thức hoặc cleanup script.
+- Docker Desktop đang paused nên chưa smoke-test được `docker compose --profile tools run --rm seed-demo` trong lượt này.
+- Dữ liệu smoke-test local cũ đã được insert vào PostgreSQL dev; seed demo mới là idempotent nhưng chưa thay thế cleanup script.
 
 ## Nhiệm vụ tiếp theo đề xuất
 
-### Ưu tiên 1 - Demo data và frontend foundation
+### Ưu tiên 1 - Frontend foundation
 
-1. Chuẩn hóa seed data demo cho Catalog/Cart/Checkout/Order/Banner.
+1. Unpause Docker Desktop và chạy lại full API integration tests + `seed-demo` smoke-test.
 2. Scaffold frontend Storefront/Admin theo stack đã chốt.
 
 ## Lệnh nên chạy trước task tiếp theo

@@ -3,9 +3,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
+using WorkspaceEcommerce.Application.Abstractions.Seeding;
 using WorkspaceEcommerce.Infrastructure.Authentication;
 using WorkspaceEcommerce.Infrastructure.Configuration;
 using WorkspaceEcommerce.Infrastructure.Persistence;
+using WorkspaceEcommerce.Infrastructure.Seeding;
 
 namespace WorkspaceEcommerce.Infrastructure;
 
@@ -26,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<IAppDbContext>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddScoped<ICartStore>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddScoped<ICheckoutStore>(provider => provider.GetRequiredService<AppDbContext>());
+        services.AddScoped<IDemoDataSeeder, DemoDataSeeder>();
         services.AddSingleton(adminAuthOptions);
         services.AddSingleton(jwtOptions);
         services.AddSingleton<IAdminCredentialValidator, ConfiguredAdminCredentialValidator>();

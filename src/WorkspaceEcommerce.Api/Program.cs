@@ -7,6 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using WorkspaceEcommerce.Api.Common;
 using WorkspaceEcommerce.Api.Middleware;
 using WorkspaceEcommerce.Application;
+using WorkspaceEcommerce.Application.Abstractions.Seeding;
 using WorkspaceEcommerce.Infrastructure;
 using WorkspaceEcommerce.Infrastructure.Configuration;
 
@@ -70,6 +71,17 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
+
+if (args.Any(argument => string.Equals(argument, "--seed-demo", StringComparison.OrdinalIgnoreCase)))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var seeder = scope.ServiceProvider.GetRequiredService<IDemoDataSeeder>();
+    var result = await seeder.SeedAsync();
+    Console.WriteLine(
+        $"Demo data seed completed. Categories={result.Categories}, Products={result.Products}, Variants={result.Variants}, Banners={result.Banners}, Carts={result.Carts}, Orders={result.Orders}.");
+
+    return;
+}
 
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
