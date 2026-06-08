@@ -234,7 +234,7 @@ Dependency hiện tại:
 - Thêm OpenAPI bằng `Microsoft.AspNetCore.OpenApi`.
 - Chỉ bật `/openapi/v1.json` trong Development.
 
-### API integration test infrastructure
+### API integration tests
 
 - Thêm project `WorkspaceEcommerce.Api.IntegrationTests`.
 - Thêm project vào `WorkspaceEcommerce.slnx`.
@@ -247,6 +247,16 @@ Dependency hiện tại:
   - Restore environment variables cũ khi dispose.
   - Dispose API factory và PostgreSQL container sau test.
 - Thêm smoke test hạ tầng `GET /api/categories` để xác nhận API host + migrated PostgreSQL container hoạt động.
+- Thêm reset database helper dùng PostgreSQL `TRUNCATE ... CASCADE` giữa các integration tests.
+- Thêm seed helper dùng `AppDbContext` và Domain entities.
+- Thêm integration tests cho:
+  - Auth login hợp lệ.
+  - Admin authorization khi thiếu bearer token.
+  - Storefront Catalog: categories, products listing và product detail.
+  - Cart add item.
+  - Checkout tạo order, trừ stock và xóa cart.
+  - Storefront Order Lookup đúng phone và sai phone.
+  - Admin Order list, detail và update status.
 
 ### Configuration validation
 
@@ -286,12 +296,12 @@ Dependency hiện tại:
 - Domain tests cho Catalog, Cart và Ordering invariants.
 - Infrastructure tests cho configuration validation và JWT token generation.
 - Infrastructure tests cho EF Core Catalog/Cart/Ordering mapping.
-- API integration test hạ tầng dùng PostgreSQL thật qua Testcontainers.
+- API integration tests dùng PostgreSQL thật qua Testcontainers.
 - Persistence mapping tests không dùng EF InMemory cho behavior cần đúng với PostgreSQL metadata.
 
 ## Xác minh gần nhất
 
-Đã chạy sau task API integration test infrastructure:
+Đã chạy sau task API integration endpoint coverage:
 
 ```powershell
 dotnet build WorkspaceEcommerce.slnx
@@ -312,9 +322,9 @@ dotnet test WorkspaceEcommerce.slnx --no-build
 Kết quả:
 
 - `WorkspaceEcommerce.Application.Tests`: 113 passed.
-- `WorkspaceEcommerce.Api.IntegrationTests`: 1 passed.
+- `WorkspaceEcommerce.Api.IntegrationTests`: 6 passed.
 - `WorkspaceEcommerce.Infrastructure.Tests`: 54 passed.
-- Tổng test suite: 168 passed.
+- Tổng test suite: 173 passed.
 - Failed: 0.
 - Skipped: 0.
 
@@ -334,6 +344,19 @@ Smoke-test đã có:
 - Admin status update đổi order `ORD-20260608-8A539E82` từ `Pending` sang `Confirmed`.
 - API integration infrastructure smoke test dùng Testcontainers PostgreSQL: passed.
 - Integration test `GET /api/categories` xác nhận API host khởi động với migrated PostgreSQL container và trả response envelope thành công.
+- API integration endpoint coverage dùng Testcontainers PostgreSQL: passed.
+- Integration tests tự động đã cover:
+  - `POST /api/admin/auth/login`.
+  - Admin endpoint unauthorized response.
+  - `GET /api/categories`.
+  - `GET /api/products`.
+  - `GET /api/products/{slug}`.
+  - `POST /api/cart/items`.
+  - `POST /api/checkout`.
+  - `GET /api/orders/lookup`.
+  - `GET /api/admin/orders`.
+  - `GET /api/admin/orders/{id}`.
+  - `PUT /api/admin/orders/{id}/status`.
 - PostgreSQL verification sau admin status update:
   - `ordering.orders`: order status hiện là `Confirmed`.
   - `ordering.order_status_history`: có record `Pending -> Confirmed`, note `Confirmed by admin smoke test`, changed by `admin@example.com`.
@@ -352,11 +375,12 @@ Smoke-test đã có:
 - `9968828 Update checkout runtime verification status`
 - `5e1baed Add storefront order lookup`
 - `4c1a706 Add admin order management`
+- `797e1e7 Add API integration test infrastructure`
 
 ## Rủi ro và khoảng trống
 
 - Vì config dùng placeholder, app sẽ fail sớm nếu chưa override `DefaultConnection`, `AdminAuth` và `Jwt` bằng secret/config local hợp lệ.
-- Đã có API integration test infrastructure, nhưng endpoint coverage tự động hiện mới là smoke test hạ tầng; chưa cover Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order flows.
+- API integration tests đã cover luồng chính Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order; vẫn chưa cover đầy đủ mọi edge case API.
 - Chưa có Banner Management và Dashboard.
 - Chưa có Dockerfile/backend container; hiện mới có PostgreSQL container.
 - Dữ liệu smoke-test local đã được insert vào PostgreSQL dev; nếu cần DB sạch cho demo thì cần seed strategy chính thức hoặc cleanup script.
@@ -365,7 +389,7 @@ Smoke-test đã có:
 
 ### Ưu tiên 1 - API/integration quality
 
-1. Thêm API integration tests cho Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order.
+1. Bổ sung API integration tests cho edge cases còn thiếu: validation errors, duplicate conflicts, inactive catalog/cart/checkout failure, invalid order status transition.
 2. Thêm Dockerfile cho backend API và tài liệu chạy API + PostgreSQL bằng Docker Compose.
 
 ### Ưu tiên 2 - Phần MVP sau Ordering

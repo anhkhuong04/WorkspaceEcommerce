@@ -9,6 +9,7 @@ public sealed class ApiHostSmokeTests(ApiIntegrationTestFixture fixture)
     [Fact]
     public async Task GetCategories_WithMigratedPostgreSqlContainer_ReturnsOkEnvelope()
     {
+        await fixture.ResetDatabaseAsync();
         using var client = fixture.CreateClient();
 
         using var response = await client.GetAsync("/api/categories");

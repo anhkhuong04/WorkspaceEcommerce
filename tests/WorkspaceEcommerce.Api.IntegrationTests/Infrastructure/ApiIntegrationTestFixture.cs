@@ -39,6 +39,55 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         return _factory.CreateClient();
     }
 
+    public async Task ResetDatabaseAsync()
+    {
+        await using var scope = CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            TRUNCATE TABLE
+                ordering.order_status_history,
+                ordering.order_items,
+                ordering.orders,
+                cart.cart_items,
+                cart.carts,
+                catalog.product_specifications,
+                catalog.product_images,
+                catalog.product_variants,
+                catalog.products,
+                catalog.categories
+            RESTART IDENTITY CASCADE;
+            """);
+    }
+
+    public async Task SeedAsync(Func<AppDbContext, Task> seed)
+    {
+        await using var scope = CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        await seed(dbContext);
+        await dbContext.SaveChangesAsync();
+    }
+
+    public async Task<TResult> ExecuteDbAsync<TResult>(Func<AppDbContext, Task<TResult>> operation)
+    {
+        await using var scope = CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        return await operation(dbContext);
+    }
+
+    private AsyncServiceScope CreateScope()
+    {
+        if (_factory is null)
+        {
+            throw new InvalidOperationException("The API test factory has not been initialized.");
+        }
+
+        return _factory.Services.CreateAsyncScope();
+    }
+
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
