@@ -79,4 +79,120 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
 
         Assert.Equal(HttpStatusCode.NotFound, wrongPhoneLookupResponse.StatusCode);
     }
+
+    [Fact]
+    public async Task AddCartItem_InvalidRequest_ReturnsValidationEnvelope()
+    {
+        await fixture.ResetDatabaseAsync();
+        using var client = fixture.CreateClient();
+
+        using var response = await client.PostAsJsonAsync(
+            "/api/cart/items",
+            new
+            {
+                sessionId = "",
+                productVariantId = Guid.Empty,
+                quantity = 0
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var json = await response.ReadJsonAsync();
+        Assert.False(json["success"]!.GetValue<bool>());
+        var errors = json["errors"]!.AsArray().Select(error => error!.GetValue<string>()).ToArray();
+        Assert.Contains(errors, error => error.Contains("Session Id", StringComparison.Ordinal));
+        Assert.Contains(errors, error => error.Contains("Product Variant Id", StringComparison.Ordinal));
+        Assert.Contains(errors, error => error.Contains("Quantity", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AddCartItem_InactiveVariant_ReturnsNotFound()
+    {
+        await fixture.ResetDatabaseAsync();
+        var catalog = TestData.CreateVisibleCatalog();
+        catalog.Variant.Deactivate();
+        await fixture.SeedAsync(dbContext =>
+        {
+            dbContext.AddRange(catalog.Category, catalog.Product, catalog.Variant);
+
+            return Task.CompletedTask;
+        });
+        using var client = fixture.CreateClient();
+
+        using var response = await client.PostAsJsonAsync(
+            "/api/cart/items",
+            new
+            {
+                sessionId = "inactive-variant-cart",
+                productVariantId = catalog.Variant.Id,
+                quantity = 1
+            });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var json = await response.ReadJsonAsync();
+        Assert.False(json["success"]!.GetValue<bool>());
+        Assert.Contains(
+            "Product variant was not found.",
+            json["errors"]!.AsArray().Select(error => error!.GetValue<string>()));
+    }
+
+    [Fact]
+    public async Task Checkout_ProductDeactivatedAfterCartAdd_ReturnsNotFoundAndDoesNotDecreaseStock()
+    {
+        await fixture.ResetDatabaseAsync();
+        var catalog = TestData.CreateVisibleCatalog();
+        await fixture.SeedAsync(dbContext =>
+        {
+            dbContext.AddRange(catalog.Category, catalog.Product, catalog.Variant);
+
+            return Task.CompletedTask;
+        });
+        using var client = fixture.CreateClient();
+        var sessionId = $"inactive-checkout-{Guid.NewGuid():N}";
+        using var addCartResponse = await client.PostAsJsonAsync(
+            "/api/cart/items",
+            new
+            {
+                sessionId,
+                productVariantId = catalog.Variant.Id,
+                quantity = 2
+            });
+        addCartResponse.EnsureSuccessStatusCode();
+
+        await fixture.ExecuteDbAsync(async dbContext =>
+        {
+            var product = await dbContext.Products.SingleAsync(existing => existing.Id == catalog.Product.Id);
+            product.Deactivate();
+            await dbContext.SaveChangesAsync();
+
+            return true;
+        });
+
+        using var checkoutResponse = await client.PostAsJsonAsync(
+            "/api/checkout",
+            new
+            {
+                sessionId,
+                customerName = "Nguyen Van A",
+                customerPhone = "0900000000",
+                customerEmail = "customer@example.com",
+                shippingAddress = "123 Shipping Street",
+                note = "Call before delivery",
+                paymentMethod = 0
+            });
+
+        Assert.Equal(HttpStatusCode.NotFound, checkoutResponse.StatusCode);
+        var checkout = await checkoutResponse.ReadJsonAsync();
+        Assert.False(checkout["success"]!.GetValue<bool>());
+        Assert.Contains(
+            "Product variant was not found.",
+            checkout["errors"]!.AsArray().Select(error => error!.GetValue<string>()));
+
+        var stockQuantity = await fixture.ExecuteDbAsync(dbContext =>
+            dbContext.ProductVariants
+                .Where(variant => variant.Id == catalog.Variant.Id)
+                .Select(variant => variant.StockQuantity)
+                .SingleAsync());
+
+        Assert.Equal(10, stockQuantity);
+    }
 }

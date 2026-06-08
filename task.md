@@ -257,6 +257,13 @@ Dependency hiện tại:
   - Checkout tạo order, trừ stock và xóa cart.
   - Storefront Order Lookup đúng phone và sai phone.
   - Admin Order list, detail và update status.
+- Bổ sung integration tests cho edge cases:
+  - Validation errors: cart add item request thiếu/invalid fields trả `400`.
+  - Duplicate conflicts: admin create category trùng slug trả `409`.
+  - Inactive catalog: inactive category ẩn product listing và product detail trả `404`.
+  - Inactive cart failure: add cart item với inactive variant trả `404`.
+  - Inactive checkout failure: product bị deactivate sau khi add cart làm checkout trả `404` và không trừ stock.
+  - Invalid order status transition: admin update `Pending -> Completed` trả `409`.
 
 ### Configuration validation
 
@@ -322,9 +329,9 @@ dotnet test WorkspaceEcommerce.slnx --no-build
 Kết quả:
 
 - `WorkspaceEcommerce.Application.Tests`: 113 passed.
-- `WorkspaceEcommerce.Api.IntegrationTests`: 6 passed.
+- `WorkspaceEcommerce.Api.IntegrationTests`: 12 passed.
 - `WorkspaceEcommerce.Infrastructure.Tests`: 54 passed.
-- Tổng test suite: 173 passed.
+- Tổng test suite: 179 passed.
 - Failed: 0.
 - Skipped: 0.
 
@@ -345,6 +352,7 @@ Smoke-test đã có:
 - API integration infrastructure smoke test dùng Testcontainers PostgreSQL: passed.
 - Integration test `GET /api/categories` xác nhận API host khởi động với migrated PostgreSQL container và trả response envelope thành công.
 - API integration endpoint coverage dùng Testcontainers PostgreSQL: passed.
+- API integration edge case coverage dùng Testcontainers PostgreSQL: passed.
 - Integration tests tự động đã cover:
   - `POST /api/admin/auth/login`.
   - Admin endpoint unauthorized response.
@@ -357,6 +365,7 @@ Smoke-test đã có:
   - `GET /api/admin/orders`.
   - `GET /api/admin/orders/{id}`.
   - `PUT /api/admin/orders/{id}/status`.
+- Integration edge cases tự động đã cover validation errors, duplicate conflicts, inactive catalog/cart/checkout failures và invalid order status transition.
 - PostgreSQL verification sau admin status update:
   - `ordering.orders`: order status hiện là `Confirmed`.
   - `ordering.order_status_history`: có record `Pending -> Confirmed`, note `Confirmed by admin smoke test`, changed by `admin@example.com`.
@@ -380,7 +389,7 @@ Smoke-test đã có:
 ## Rủi ro và khoảng trống
 
 - Vì config dùng placeholder, app sẽ fail sớm nếu chưa override `DefaultConnection`, `AdminAuth` và `Jwt` bằng secret/config local hợp lệ.
-- API integration tests đã cover luồng chính Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order; vẫn chưa cover đầy đủ mọi edge case API.
+- API integration tests đã cover luồng chính và một số edge cases quan trọng cho Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order; vẫn chưa cover exhaustively mọi biến thể validation/conflict.
 - Chưa có Banner Management và Dashboard.
 - Chưa có Dockerfile/backend container; hiện mới có PostgreSQL container.
 - Dữ liệu smoke-test local đã được insert vào PostgreSQL dev; nếu cần DB sạch cho demo thì cần seed strategy chính thức hoặc cleanup script.
@@ -389,14 +398,13 @@ Smoke-test đã có:
 
 ### Ưu tiên 1 - API/integration quality
 
-1. Bổ sung API integration tests cho edge cases còn thiếu: validation errors, duplicate conflicts, inactive catalog/cart/checkout failure, invalid order status transition.
-2. Thêm Dockerfile cho backend API và tài liệu chạy API + PostgreSQL bằng Docker Compose.
+1. Thêm Dockerfile cho backend API và tài liệu chạy API + PostgreSQL bằng Docker Compose.
 
 ### Ưu tiên 2 - Phần MVP sau Ordering
 
-3. Triển khai Banner Management.
-4. Triển khai Dashboard cơ bản.
-5. Chuẩn hóa seed data demo cho Catalog/Cart/Checkout/Order.
+2. Triển khai Banner Management.
+3. Triển khai Dashboard cơ bản.
+4. Chuẩn hóa seed data demo cho Catalog/Cart/Checkout/Order.
 
 ## Lệnh nên chạy trước task tiếp theo
 

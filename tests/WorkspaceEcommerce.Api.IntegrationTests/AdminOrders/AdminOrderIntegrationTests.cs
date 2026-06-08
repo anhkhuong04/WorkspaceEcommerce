@@ -57,4 +57,35 @@ public sealed class AdminOrderIntegrationTests(ApiIntegrationTestFixture fixture
         Assert.Equal("Confirmed by integration test", latestHistory["note"]!.GetValue<string>());
         Assert.Equal("admin@example.com", latestHistory["changedBy"]!.GetValue<string>());
     }
+
+    [Fact]
+    public async Task UpdateOrderStatus_InvalidTransition_ReturnsConflictEnvelope()
+    {
+        await fixture.ResetDatabaseAsync();
+        var catalog = TestData.CreateVisibleCatalog();
+        var order = TestData.CreatePendingOrder(catalog.Variant.Id);
+        await fixture.SeedAsync(dbContext =>
+        {
+            dbContext.AddRange(catalog.Category, catalog.Product, catalog.Variant, order);
+
+            return Task.CompletedTask;
+        });
+        using var client = fixture.CreateClient();
+        client.UseBearerToken(await client.LoginAsAdminAsync());
+
+        using var response = await client.PutAsJsonAsync(
+            $"/api/admin/orders/{order.Id}/status",
+            new
+            {
+                status = 4,
+                note = "Invalid direct completion"
+            });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var json = await response.ReadJsonAsync();
+        Assert.False(json["success"]!.GetValue<bool>());
+        Assert.Contains(
+            "Order status cannot change from Pending to Completed.",
+            json["errors"]!.AsArray().Select(error => error!.GetValue<string>()));
+    }
 }
