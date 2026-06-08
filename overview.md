@@ -442,7 +442,7 @@ IsActive
 
 ---
 
-## 10. Tech Stack đề xuất
+## 10. Tech Stack đã chốt
 
 ### Backend
 
@@ -455,7 +455,7 @@ IsActive
 
 ### Frontend
 
-- Reactjs
+- React
 - TypeScript
 - Tailwind CSS
 - React Hook Form
@@ -463,14 +463,16 @@ IsActive
 
 ### Admin Portal
 
-Một trong hai hướng:
+- React
+- TypeScript
+- Ant Design
 
-- React + Ant Design
-- Blazor Server
+### UI/UX Direction
 
-Khuyến nghị:
-
-- React + Ant Design
+- Tone sáng, trắng chủ đạo kết hợp màu phối có chủ đích.
+- Giao diện clean, hiện đại, ưu tiên UX chuẩn cho ecommerce và admin operation.
+- Layout desktop tối ưu cho màn hình Full HD 1920x1080, hạn chế scroll dọc không cần thiết ở các màn hình chính.
+- Vẫn đảm bảo responsive cho màn hình nhỏ hơn.
 
 ### Database
 

@@ -23,6 +23,7 @@ Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, C
 - `WorkspaceEcommerce.Infrastructure.Tests`: tests cho configuration validation, JWT token generation và EF Core mappings của Catalog, Cart, Ordering.
 - `WorkspaceEcommerce.Api.IntegrationTests`: hạ tầng API integration test dùng `WebApplicationFactory` và Testcontainers PostgreSQL.
 - PostgreSQL local và API backend chạy được bằng Docker Compose service `postgres`, `migrate` và `api`.
+- Frontend stack đã chốt: Storefront dùng React + TypeScript + Tailwind CSS + React Hook Form + Zod; Admin dùng React + TypeScript + Ant Design.
 
 Dependency hiện tại:
 
@@ -278,6 +279,17 @@ Dependency hiện tại:
 - Thêm biến `API_PORT` và `ASPNETCORE_ENVIRONMENT` vào `.env.example`.
 - Thêm `README.md` hướng dẫn chạy PostgreSQL, migration và API bằng Docker Compose.
 
+### Frontend stack và UI/UX direction
+
+- Chốt Storefront stack: React, TypeScript, Tailwind CSS, React Hook Form, Zod.
+- Chốt Admin stack: React, TypeScript, Ant Design.
+- Cập nhật frontend rule để không tự ý đổi UI framework, form library, validation library hoặc styling system.
+- Chốt UI direction:
+  - Tone sáng, trắng chủ đạo kết hợp màu phối có chủ đích.
+  - Thiết kế clean, hiện đại, ưu tiên UX chuẩn cho ecommerce/admin workflows.
+  - Layout tối ưu cho màn hình Full HD 1920x1080, hạn chế scroll dọc không cần thiết ở màn hình chính.
+  - Vẫn đảm bảo responsive cho màn hình nhỏ hơn.
+
 ### Configuration validation
 
 - Validate `ConnectionStrings:DefaultConnection` sớm khi app start qua Infrastructure DI.
@@ -421,12 +433,14 @@ Smoke-test đã có:
 - `797e1e7 Add API integration test infrastructure`
 - `f795250 Add API integration endpoint coverage`
 - `e3814cb Add API integration edge case coverage`
+- `a0b204a Add backend Docker Compose setup`
 
 ## Rủi ro và khoảng trống
 
 - Vì config dùng placeholder, app sẽ fail sớm nếu chưa override `DefaultConnection`, `AdminAuth` và `Jwt` bằng secret/config local hợp lệ.
 - API integration tests đã cover luồng chính và một số edge cases quan trọng cho Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order; vẫn chưa cover exhaustively mọi biến thể validation/conflict.
 - Docker Compose đã chạy API/PostgreSQL/migration local; chưa có production image hardening như non-root user, SBOM, image signing hoặc CI publish.
+- Chưa scaffold frontend app cho Storefront/Admin theo stack đã chốt.
 - Chưa có Banner Management và Dashboard.
 - Dữ liệu smoke-test local đã được insert vào PostgreSQL dev; nếu cần DB sạch cho demo thì cần seed strategy chính thức hoặc cleanup script.
 
@@ -437,6 +451,7 @@ Smoke-test đã có:
 1. Triển khai Banner Management.
 2. Triển khai Dashboard cơ bản.
 3. Chuẩn hóa seed data demo cho Catalog/Cart/Checkout/Order.
+4. Scaffold frontend Storefront/Admin theo stack đã chốt.
 
 ## Lệnh nên chạy trước task tiếp theo
 
