@@ -33,7 +33,7 @@ coverage*.json
 
 # NuGet
 *.nupkg
-packages/
+/packages/
 
 # ASP.NET local settings
 appsettings.Local.json
