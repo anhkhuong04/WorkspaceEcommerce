@@ -17,6 +17,13 @@ Thumbs.db
 # Logs
 *.log
 
+# Frontend
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+*.tsbuildinfo
+
 # Test results and coverage
 TestResults/
 coverage/

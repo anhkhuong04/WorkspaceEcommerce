@@ -4,6 +4,9 @@
 **/.idea/
 **/TestResults/
 **/coverage/
+**/node_modules/
+**/dist/
+*.tsbuildinfo
 .git/
 .env
 .env.*

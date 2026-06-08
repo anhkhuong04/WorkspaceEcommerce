@@ -1,0 +1,20 @@
+﻿@import "tailwindcss";
+
+:root {
+  --brand: #0f9f7a;
+  --brand-soft: #dff8ef;
+  --ink: #172033;
+  --surface-soft: #f5f8f6;
+  font-family: "Plus Jakarta Sans", "Aptos", sans-serif;
+  color: var(--ink);
+  background: var(--surface-soft);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}

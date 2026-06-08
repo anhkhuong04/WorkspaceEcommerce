@@ -91,3 +91,34 @@ Build and test all projects:
 dotnet build WorkspaceEcommerce.slnx
 dotnet test WorkspaceEcommerce.slnx
 ```
+
+## Frontend
+
+The frontend workspace lives in `frontend/` and uses pnpm through Corepack.
+
+Install dependencies:
+
+```powershell
+cd frontend
+corepack pnpm install
+```
+
+Run Storefront:
+
+```powershell
+corepack pnpm dev:storefront
+```
+
+Run Admin:
+
+```powershell
+corepack pnpm dev:admin
+```
+
+Verify frontend:
+
+```powershell
+corepack pnpm typecheck
+corepack pnpm build
+corepack pnpm lint
+```

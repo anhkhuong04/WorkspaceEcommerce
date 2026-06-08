@@ -25,6 +25,7 @@ Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, C
 - PostgreSQL local và API backend chạy được bằng Docker Compose service `postgres`, `migrate` và `api`.
 - Demo data chạy được bằng Docker Compose service `seed-demo` sau khi apply migration.
 - Frontend stack đã chốt: Storefront dùng React + TypeScript + Tailwind CSS + React Hook Form + Zod; Admin dùng React + TypeScript + Ant Design.
+- Frontend monorepo đã scaffold trong `frontend/` với Storefront app, Admin app và shared packages.
 
 Dependency hiện tại:
 
@@ -351,6 +352,28 @@ Dependency hiện tại:
 - Demo data có SKU low-stock để phục vụ Dashboard.
 - Cập nhật README hướng dẫn chạy `docker compose --profile tools run --rm seed-demo`.
 
+### Frontend scaffold
+
+- Thêm frontend workspace tại `frontend/` dùng pnpm qua Corepack.
+- Thêm app Storefront:
+  - `frontend/apps/storefront`
+  - React + TypeScript + Vite + Tailwind CSS 4.
+  - React Router, React Query, React Hook Form và Zod.
+  - Layout tone sáng, trắng chủ đạo, clean, hiện đại.
+  - Pages scaffold: Home, Product Listing, Product Detail, Cart, Checkout, Order Lookup.
+- Thêm app Admin:
+  - `frontend/apps/admin`
+  - React + TypeScript + Vite + Ant Design.
+  - Layout admin sidebar/topbar tối ưu desktop Full HD.
+  - Pages scaffold: Login, Dashboard, Categories, Products, Orders, Banners.
+- Thêm shared packages:
+  - `@workspace-ecommerce/api-types`
+  - `@workspace-ecommerce/api-client`
+  - `@workspace-ecommerce/shared-utils`
+- API calls được gom trong shared `api-client` và app service adapter, không rải trực tiếp trong UI components.
+- Cập nhật `.gitignore` và `.dockerignore` để loại `node_modules` và `dist`.
+- Cập nhật README hướng dẫn cài dependencies, chạy Storefront/Admin và verify frontend.
+
 ### Configuration validation
 
 - Validate `ConnectionStrings:DefaultConnection` sớm khi app start qua Infrastructure DI.
@@ -403,7 +426,7 @@ Dependency hiện tại:
 
 ## Xác minh gần nhất
 
-Đã chạy sau task Demo data seed:
+Đã chạy sau task Frontend scaffold:
 
 ```powershell
 dotnet build WorkspaceEcommerce.slnx
@@ -414,6 +437,25 @@ Kết quả:
 - Build succeeded.
 - Warnings: 0.
 - Errors: 0.
+
+Đã chạy:
+
+```powershell
+cd frontend
+corepack pnpm install
+corepack pnpm typecheck
+corepack pnpm build
+corepack pnpm lint
+```
+
+Kết quả:
+
+- Frontend dependencies installed bằng pnpm `10.24.0`.
+- Typecheck passed cho shared packages, Storefront và Admin.
+- Storefront production build passed.
+- Admin production build passed.
+- Frontend lint passed.
+- Admin build có warning chunk lớn do Ant Design bundle; chưa code-split ở scaffold.
 
 Đã chạy:
 
@@ -531,22 +573,25 @@ Smoke-test đã có:
 - `a0b204a Add backend Docker Compose setup`
 - `07765c2 Document frontend stack decision`
 - `1aa9c06 Add banner management and dashboard`
+- `8dcc39b Add demo data seeding`
 
 ## Rủi ro và khoảng trống
 
 - Vì config dùng placeholder, app sẽ fail sớm nếu chưa override `DefaultConnection`, `AdminAuth` và `Jwt` bằng secret/config local hợp lệ.
 - API integration tests đã cover luồng chính và một số edge cases quan trọng cho Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order; vẫn chưa cover exhaustively mọi biến thể validation/conflict.
 - Docker Compose đã chạy API/PostgreSQL/migration local; chưa có production image hardening như non-root user, SBOM, image signing hoặc CI publish.
-- Chưa scaffold frontend app cho Storefront/Admin theo stack đã chốt.
+- Frontend mới scaffold foundation; chưa hoàn thiện CRUD forms, mutation flows, protected route guard đầy đủ, hoặc visual polish cuối.
+- Admin build hiện có warning chunk lớn do Ant Design; nên code-split routes khi triển khai sâu.
 - Docker Desktop đang paused nên chưa smoke-test được `docker compose --profile tools run --rm seed-demo` trong lượt này.
 - Dữ liệu smoke-test local cũ đã được insert vào PostgreSQL dev; seed demo mới là idempotent nhưng chưa thay thế cleanup script.
 
 ## Nhiệm vụ tiếp theo đề xuất
 
-### Ưu tiên 1 - Frontend foundation
+### Ưu tiên 1 - Frontend integration
 
 1. Unpause Docker Desktop và chạy lại full API integration tests + `seed-demo` smoke-test.
-2. Scaffold frontend Storefront/Admin theo stack đã chốt.
+2. Tích hợp Storefront với API thật cho Home/Catalog/Product Detail/Cart.
+3. Tích hợp Admin auth guard và CRUD/list flows cho Dashboard/Categories/Products/Orders/Banners.
 
 ## Lệnh nên chạy trước task tiếp theo
 

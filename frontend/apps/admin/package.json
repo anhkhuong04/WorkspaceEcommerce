@@ -1,0 +1,32 @@
+{
+  "name": "@workspace-ecommerce/admin",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5174",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@ant-design/icons": "6.2.5",
+    "@tanstack/react-query": "5.101.0",
+    "@workspace-ecommerce/api-client": "workspace:*",
+    "@workspace-ecommerce/api-types": "workspace:*",
+    "@workspace-ecommerce/shared-utils": "workspace:*",
+    "antd": "6.4.3",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "react-hook-form": "7.78.0",
+    "react-router-dom": "7.17.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.2",
+    "typescript": "6.0.3",
+    "vite": "8.0.16"
+  }
+}
