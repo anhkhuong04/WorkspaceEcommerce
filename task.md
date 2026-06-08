@@ -394,6 +394,23 @@ Dependency hiện tại:
   - Quản lý cart session bằng localStorage, mặc định `demo-checkout-session` để kiểm tra seed demo.
 - Cập nhật shared API types để khớp contract backend hiện tại của Catalog/Cart.
 
+### Home demo readiness analysis
+
+- Theo `overview.md`, Home Page MVP cần:
+  - Hiển thị banner.
+  - Hiển thị danh mục nổi bật.
+  - Hiển thị sản phẩm nổi bật.
+- Hiện trạng:
+  - Danh mục nổi bật: đã có `GET /api/categories` và Storefront Home đã consume API thật.
+  - Sản phẩm nổi bật: đã có `GET /api/products` với `isFeatured` trong backend ordering và Storefront Home đã consume API thật.
+  - Banner: backend đã có Admin Banner Management và seed 3 banner, nhưng chưa có public Storefront Banner API để Home consume.
+  - Demo asset: seed hiện dùng URL dạng `https://images.example.test/...`, phù hợp placeholder dữ liệu nhưng không phù hợp demo UI vì ảnh sẽ không render thật trong browser.
+  - UI Home hiện là API-bound scaffold, chưa phải visual polish cuối cho demo.
+- Kết luận:
+  - Chưa nên xem Home là đã đủ điều kiện UI/UX hoàn thiện để demo khách hàng.
+  - Có thể bắt đầu thiết kế Home polish sau khi bổ sung public banner API hoặc thống nhất fallback visual nội bộ.
+  - Điều kiện tối thiểu để demo Home: public banner data, ảnh demo render được, layout Home polished, và smoke-test với backend + seed demo.
+
 ### Configuration validation
 
 - Validate `ConnectionStrings:DefaultConnection` sớm khi app start qua Infrastructure DI.
@@ -601,6 +618,7 @@ Smoke-test đã có:
 - API integration tests đã cover luồng chính và một số edge cases quan trọng cho Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup và Admin Order; vẫn chưa cover exhaustively mọi biến thể validation/conflict.
 - Docker Compose đã chạy API/PostgreSQL/migration local; chưa có production image hardening như non-root user, SBOM, image signing hoặc CI publish.
 - Storefront đã tích hợp API thật cho Home/Catalog/Product Detail/Cart; Checkout và Order Lookup vẫn ở mức scaffold/API foundation, chưa hoàn thiện UX end-to-end.
+- Home chưa đủ điều kiện demo UI/UX hoàn thiện vì thiếu public Storefront Banner API và demo asset thật; hiện mới đủ kiểm tra category/product API trên Home.
 - Admin frontend mới scaffold foundation; chưa hoàn thiện auth guard, CRUD forms, mutation flows hoặc visual polish cuối.
 - Admin build hiện có warning chunk lớn do Ant Design; nên code-split routes khi triển khai sâu.
 - Docker Desktop đang paused nên chưa smoke-test được `docker compose --profile tools run --rm seed-demo` trong lượt này.
@@ -611,8 +629,14 @@ Smoke-test đã có:
 ### Ưu tiên 1 - Frontend integration
 
 1. Unpause Docker Desktop và chạy lại full API integration tests + `seed-demo` smoke-test.
-2. Tích hợp Checkout và Order Lookup UI với API thật end-to-end.
-3. Tích hợp Admin auth guard và CRUD/list flows cho Dashboard/Categories/Products/Orders/Banners.
+2. Bổ sung điều kiện demo Home:
+   - Thêm public Storefront Banner API `GET /api/banners` hoặc endpoint tương đương.
+   - Cập nhật shared API types/client cho banner public.
+   - Cập nhật seed demo để dùng ảnh demo render được hoặc asset nội bộ.
+   - Polish Home UI/UX với hero/banner, featured categories, featured products, loading/error/empty states và responsive Full HD.
+   - Smoke-test Home với backend + PostgreSQL + seed demo.
+3. Tích hợp Checkout và Order Lookup UI với API thật end-to-end.
+4. Tích hợp Admin auth guard và CRUD/list flows cho Dashboard/Categories/Products/Orders/Banners.
 
 ## Lệnh nên chạy trước task tiếp theo
 
