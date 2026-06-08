@@ -19,7 +19,7 @@ Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, C
 - `WorkspaceEcommerce.Domain`: Catalog, Cart và Ordering entities với invariant/domain method cơ bản.
 - `WorkspaceEcommerce.Application`: common contracts/models, DTO, validators và services cho Admin Auth, Admin Catalog, Admin Product, Admin Banner, Admin Dashboard, Admin Order, Storefront Catalog, Storefront Cart, Checkout, Storefront Order Lookup và Storefront Banner.
 - `WorkspaceEcommerce.Infrastructure`: EF Core PostgreSQL persistence, Catalog/Cart/Ordering/Content mappings, migrations, JWT/config validation và transaction-backed checkout store.
-- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth, Admin Catalog, Admin Product, Admin Banner, Admin Dashboard, Admin Order, Storefront Catalog, Storefront Cart, Checkout, Storefront Order Lookup và Storefront Banners; có JWT, response envelope, global exception handling và OpenAPI trong Development.
+- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth, Admin Catalog, Admin Product, Admin Banner, Admin Dashboard, Admin Order, Storefront Catalog, Storefront Cart, Checkout, Storefront Order Lookup và Storefront Banners; có JWT, response envelope, global exception handling, local Development CORS cho frontend dev servers và OpenAPI trong Development.
 - `WorkspaceEcommerce.Application.Tests`: tests cho Domain, validators và Application services thuộc Catalog, Cart, Auth, Product, Storefront Catalog, Checkout, Order Lookup, Admin Order, Admin Banner và Admin Dashboard.
 - `WorkspaceEcommerce.Infrastructure.Tests`: tests cho configuration validation, JWT token generation và EF Core mappings của Catalog, Cart, Ordering, Content.
 - `WorkspaceEcommerce.Api.IntegrationTests`: hạ tầng API integration test dùng `WebApplicationFactory` và Testcontainers PostgreSQL.
@@ -27,6 +27,7 @@ Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, C
 - Frontend stack đã chốt: Storefront dùng React + TypeScript + Tailwind CSS + React Hook Form + Zod; Admin dùng React + TypeScript + Ant Design.
 - Frontend monorepo đã scaffold trong `frontend/` với Storefront app, Admin app và shared packages.
 - Storefront đã tích hợp API thật cho Home, Catalog, Product Detail, Cart, Checkout và Order Lookup.
+- Admin portal đã có login/logout, JWT session persistence, protected routes và xử lý unauthorized/expired session ở mức MVP.
 - Home demo hiện có đủ dữ liệu thật theo `overview.md`: banners, featured categories và featured products.
 
 Dependency hiện tại:
@@ -35,17 +36,9 @@ Dependency hiện tại:
 - `Application` phụ thuộc `Domain` và định nghĩa abstraction như `IAppDbContext`, `ICartStore`, `ICheckoutStore`.
 - `Infrastructure` phụ thuộc `Application` và `Domain`, triển khai EF Core/PostgreSQL, JWT và config validation.
 - `Api` phụ thuộc `Application` và `Infrastructure`, không chứa business logic.
+- Frontend dùng shared `@workspace-ecommerce/api-client` và `@workspace-ecommerce/api-types`; UI pages không gọi `fetch` trực tiếp.
 
 ## Đã hoàn thành
-
-### Storefront Banner API
-
-- Thêm public `GET /api/banners` cho Storefront, không yêu cầu JWT.
-- Thêm `StorefrontBannerDto`, `IStorefrontBannerService` và `StorefrontBannerService`.
-- Service chỉ trả banner active, sort theo `SortOrder` rồi `Title`, project sang DTO public.
-- Đăng ký DI scoped cho `IStorefrontBannerService`.
-- Cập nhật shared frontend API types và API client với `getBanners()`.
-- Commit riêng: `06ff8ec Add storefront banner API`.
 
 ### Demo Image Assets & Seeder Update
 
@@ -63,6 +56,20 @@ Dependency hiện tại:
 - Thêm category pills, responsive skeletons, CTA strip và layout sáng/clean phù hợp demo Full HD.
 - Fix lint phần Home/Banner, gồm lỗi unused variable trong `BannerCarousel.tsx`.
 - Thêm CSS `banner-progress` keyframe và `.scrollbar-hidden` utility trong `globals.css`.
+- Commit riêng: `285c5b6 Polish storefront home demo`.
+
+### Admin Auth & Route Protection
+
+- Cập nhật Admin Login UI dùng React Hook Form + Zod, Ant Design form controls, loading state và API error state.
+- Tích hợp `POST /api/admin/auth/login` qua shared Admin API client.
+- Lưu JWT session vào `localStorage` với `accessToken`, `tokenType`, `expiresAt`, `email`.
+- Gắn Authorization header tự động qua `ApiClient.getAccessToken`.
+- Thêm `AdminAuthProvider`, `useAdminAuth` và `ProtectedRoute`.
+- Bảo vệ Dashboard/Categories/Products/Orders/Banners; truy cập khi chưa login redirect về `/login` và sau login quay lại route ban đầu.
+- Thêm logout trong Admin header, clear session và clear React Query cache.
+- Xử lý token hết hạn/unauthorized: session hết hạn bị clear theo timeout; API `401` gọi callback clear session.
+- Cập nhật API client để hỗ trợ `onUnauthorized` callback.
+- Cập nhật backend Development CORS cho frontend dev origins `5173/5174` để browser gọi API local được.
 
 ## Xác minh gần nhất
 
@@ -93,37 +100,28 @@ Kết quả:
 - Admin build có warning chunk lớn do Ant Design; chưa phải lỗi build.
 - Lint passed cho Storefront và Admin.
 
-Đã chạy Docker/seed/smoke-test Home:
+Đã chạy Docker/API verification cho Admin auth:
 
 ```powershell
-docker compose --profile tools build api seed-demo migrate
-docker compose --profile tools run --rm migrate
-docker compose --profile tools run --rm seed-demo
+docker compose build api
 docker compose up -d api
 ```
 
 Kết quả:
 
-- API, migrate và seed-demo Docker images build thành công.
-- Migration chạy thành công; PostgreSQL local up-to-date.
-- `seed-demo` chạy thành công và cập nhật existing banner/product image records sang `/demo/...`.
-- API container start thành công tại `http://localhost:5080`.
+- API Docker image build thành công.
+- API container restart thành công sau PostgreSQL healthcheck.
+- `POST /api/admin/auth/login`: success, có token, expiry và email.
+- `GET /api/admin/dashboard` không token: `401`.
+- `GET /api/admin/dashboard` với bearer token: success.
 
-Đã smoke-test public Home APIs:
+Đã chạy UI smoke-test bằng Admin dev server + Playwright headless Edge:
 
-```powershell
-GET /api/banners
-GET /api/categories
-GET /api/products?pageNumber=1&pageSize=8
-```
-
-Kết quả:
-
-- `GET /api/banners`: success, 3 banners.
-- `GET /api/categories`: success, 3 categories.
-- `GET /api/products?pageNumber=1&pageSize=8`: success, 4 products.
-- Tất cả banner image URL bắt đầu bằng `/demo/...` và có file tương ứng trong Storefront public assets.
-- Tất cả product image URL bắt đầu bằng `/demo/...` và có file tương ứng trong Storefront public assets.
+- Truy cập `/orders` khi chưa login redirect về `/login`.
+- Login thành công bằng admin credential local và quay lại `/orders`.
+- Session được lưu vào `localStorage` sau login.
+- Logout quay về `/login`.
+- Session bị xóa khỏi `localStorage` sau logout.
 
 Smoke-test/API/test coverage đã có từ các task trước:
 
@@ -135,10 +133,10 @@ Smoke-test/API/test coverage đã có từ các task trước:
 
 ## Commit gần nhất
 
-- `123e96f Integrate checkout and order lookup UI`
 - `06ff8ec Add storefront banner API`
 - `22df442 Add demo image assets`
 - `39d1904 Update demo seed image records`
+- `285c5b6 Polish storefront home demo`
 
 ## Rủi ro và khoảng trống
 
@@ -146,33 +144,24 @@ Smoke-test/API/test coverage đã có từ các task trước:
 - API integration tests đã cover luồng chính và một số edge cases quan trọng, nhưng chưa cover exhaustively mọi biến thể validation/conflict.
 - Docker Compose đã chạy API/PostgreSQL/migration/seed local; chưa có production image hardening như non-root user, SBOM, image signing hoặc CI publish.
 - Storefront Home đã đủ điều kiện demo dữ liệu thật, nhưng visual polish cuối vẫn có thể tiếp tục nâng cấp khi chốt branding.
-- Admin frontend mới scaffold foundation; chưa hoàn thiện auth guard, CRUD forms, mutation flows hoặc visual polish cuối.
+- Admin auth hiện lưu JWT bằng `localStorage` theo MVP; production nên đánh giá lại threat model, token lifetime, refresh/session strategy và cookie/httpOnly nếu cần.
+- Admin frontend đã có auth guard nhưng các màn Categories/Products/Orders/Banners vẫn chủ yếu là scaffold/list foundation; chưa hoàn thiện CRUD/mutation flows.
 - Admin build hiện có warning chunk lớn do Ant Design; nên code-split routes khi triển khai sâu.
 - Dữ liệu smoke-test local cũ có thể vẫn còn trong PostgreSQL dev; seed demo idempotent nhưng chưa có cleanup/reset script riêng cho demo.
 
 ## Nhiệm vụ tiếp theo đề xuất
 
-### Ưu tiên 1 - Admin auth và route protection
+### Ưu tiên 1 - Admin operational flows
 
-Mục tiêu: Admin portal có luồng đăng nhập/đăng xuất và bảo vệ các màn vận hành.
+Mục tiêu: Admin xử lý được các nghiệp vụ MVP chính trong `overview.md` sau khi đã có auth guard.
 
-1. Tích hợp `POST /api/admin/auth/login` vào Admin Login UI.
-2. Lưu JWT ở mức MVP và gắn Authorization header qua shared API client.
-3. Thêm protected route guard cho Dashboard/Categories/Products/Orders/Banners.
-4. Thêm logout và xử lý token hết hạn/unauthorized.
-5. Verify bằng UI smoke-test: chưa login bị redirect, login đúng vào dashboard, logout quay về login.
-
-### Ưu tiên 2 - Admin operational flows
-
-Mục tiêu: Admin xử lý được các nghiệp vụ MVP chính trong `overview.md`.
-
-1. Dashboard: render dữ liệu thật từ `GET /api/admin/dashboard`.
+1. Dashboard: rà lại loading/error/empty states và polish dữ liệu thật từ `GET /api/admin/dashboard`.
 2. Banners: list/create/update/activate/deactivate/sort order.
 3. Categories: list/create/update/activate/deactivate, parent-child UX.
 4. Products và variants: list/create/update, active toggle, stock/price/compare-at/requires-installation.
 5. Orders: list/detail/status transition, render status history và note.
 
-### Ưu tiên 3 - Backend/API gaps theo overview
+### Ưu tiên 2 - Backend/API gaps theo overview
 
 Mục tiêu: đóng các khoảng trống khiến Admin Product Management chưa đúng đủ mô tả MVP.
 
@@ -181,7 +170,7 @@ Mục tiêu: đóng các khoảng trống khiến Admin Product Management chưa
 3. Thêm tests cho image/specification service, validation và API integration.
 4. Tích hợp image/specification flows vào Admin Product UI.
 
-### Ưu tiên 4 - Demo readiness end-to-end
+### Ưu tiên 3 - Demo readiness end-to-end
 
 Mục tiêu: có kịch bản demo ổn định từ setup sạch.
 

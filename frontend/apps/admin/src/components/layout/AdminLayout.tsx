@@ -1,7 +1,17 @@
-﻿import { AppstoreOutlined, DashboardOutlined, OrderedListOutlined, PictureOutlined, ShoppingOutlined, TagsOutlined } from "@ant-design/icons";
-import { Layout, Menu, Typography } from "antd";
+import {
+  AppstoreOutlined,
+  DashboardOutlined,
+  LogoutOutlined,
+  OrderedListOutlined,
+  PictureOutlined,
+  ShoppingOutlined,
+  TagsOutlined
+} from "@ant-design/icons";
+import { Button, Layout, Menu, Space, Typography } from "antd";
 import type { MenuProps } from "antd";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAdminAuth } from "../../features/auth/useAdminAuth";
 
 const { Header, Sider, Content } = Layout;
 
@@ -15,6 +25,15 @@ const menuItems: MenuProps["items"] = [
 
 export function AdminLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { session, signOut } = useAdminAuth();
+
+  function handleLogout() {
+    signOut();
+    queryClient.clear();
+    navigate("/login", { replace: true });
+  }
 
   return (
     <Layout className="admin-shell">
@@ -27,8 +46,18 @@ export function AdminLayout() {
       </Sider>
       <Layout>
         <Header className="admin-header">
-          <Typography.Text strong>Operations console</Typography.Text>
-          <Typography.Text type="secondary">Full HD optimized MVP admin foundation</Typography.Text>
+          <div>
+            <Typography.Text strong>Operations console</Typography.Text>
+            <Typography.Text type="secondary" className="admin-header-caption">
+              Full HD optimized MVP admin foundation
+            </Typography.Text>
+          </div>
+          <Space size={12}>
+            <Typography.Text type="secondary">{session?.email}</Typography.Text>
+            <Button icon={<LogoutOutlined />} onClick={handleLogout}>
+              Logout
+            </Button>
+          </Space>
         </Header>
         <Content className="admin-content">
           <Outlet />

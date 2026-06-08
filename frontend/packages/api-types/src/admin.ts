@@ -7,7 +7,9 @@ export interface AdminLoginRequest {
 
 export interface AdminLoginResponse {
   accessToken: string;
+  tokenType: string;
   expiresAt: string;
+  email: string;
 }
 
 export interface AdminCategoryDto {

@@ -3,6 +3,7 @@
 export interface ApiClientOptions {
   baseUrl: string;
   getAccessToken?: () => string | null;
+  onUnauthorized?: () => void;
 }
 
 export class ApiClientError extends Error {
@@ -62,6 +63,10 @@ export class ApiClient {
 
     const envelope = (await response.json()) as ApiResponse<T>;
     if (!response.ok || !envelope.success) {
+      if (response.status === 401) {
+        this.options.onUnauthorized?.();
+      }
+
       const errors = envelope.errors.length > 0 ? envelope.errors : ["API request failed."];
       throw new ApiClientError(errors[0], response.status, errors, envelope.traceId);
     }
