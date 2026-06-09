@@ -4,6 +4,7 @@ import { CartPage } from "../pages/cart/CartPage";
 import { CheckoutPage } from "../pages/checkout/CheckoutPage";
 import { CheckoutSuccessPage } from "../pages/checkout/CheckoutSuccessPage";
 import { HomePage } from "../pages/home/HomePage";
+import { LoginPage } from "../pages/login/LoginPage";
 import { OrderLookupPage } from "../pages/order-lookup/OrderLookupPage";
 import { ProductDetailPage } from "../pages/product-detail/ProductDetailPage";
 import { ProductListPage } from "../pages/product-list/ProductListPage";
@@ -19,6 +20,7 @@ export const router = createBrowserRouter([
       { path: "cart", element: <CartPage /> },
       { path: "checkout", element: <CheckoutPage /> },
       { path: "checkout/success", element: <CheckoutSuccessPage /> },
+      { path: "login", element: <LoginPage /> },
       { path: "orders/lookup", element: <OrderLookupPage /> }
     ]
   }
