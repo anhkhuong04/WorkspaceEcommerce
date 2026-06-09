@@ -1,56 +1,56 @@
 # Ecommerce MVP Overview
 
-## 1. Mục đích dự án
+## 1. Má»¥c Ä‘Ã­ch dá»± Ã¡n
 
-Xây dựng MVP demo cho hệ thống e-commerce bán sản phẩm setup góc làm việc tương tự HyperWork, tập trung vào các luồng cốt lõi:
+XÃ¢y dá»±ng MVP demo cho há»‡ thá»‘ng e-commerce bÃ¡n sáº£n pháº©m setup gÃ³c lÃ m viá»‡c tÆ°Æ¡ng tá»± HyperWork, táº­p trung vÃ o cÃ¡c luá»“ng cá»‘t lÃµi:
 
-- Khách xem sản phẩm
-- Thêm sản phẩm vào giỏ hàng
-- Đặt hàng
-- Admin quản lý sản phẩm và đơn hàng
+- KhÃ¡ch xem sáº£n pháº©m
+- ThÃªm sáº£n pháº©m vÃ o giá» hÃ ng
+- Äáº·t hÃ ng
+- Admin quáº£n lÃ½ sáº£n pháº©m vÃ  Ä‘Æ¡n hÃ ng
 
-MVP cần đủ đơn giản để triển khai nhanh, nhưng kiến trúc phải rõ ràng để có thể mở rộng về sau như loyalty, bảo hành, B2B, lắp đặt, thanh toán online.
+MVP cáº§n Ä‘á»§ Ä‘Æ¡n giáº£n Ä‘á»ƒ triá»ƒn khai nhanh, nhÆ°ng kiáº¿n trÃºc pháº£i rÃµ rÃ ng Ä‘á»ƒ cÃ³ thá»ƒ má»Ÿ rá»™ng vá» sau nhÆ° loyalty, báº£o hÃ nh, B2B, láº¯p Ä‘áº·t, thanh toÃ¡n online.
 
 ---
 
-## 2. Người dùng chính
+## 2. NgÆ°á»i dÃ¹ng chÃ­nh
 
 ### Customer
 
-Người dùng mua hàng trên website.
+NgÆ°á»i dÃ¹ng mua hÃ ng trÃªn website.
 
-#### Chức năng chính
+#### Chá»©c nÄƒng chÃ­nh
 
-- Xem trang chủ
-- Xem danh mục sản phẩm
-- Xem chi tiết sản phẩm
-- Chọn biến thể sản phẩm
-- Thêm vào giỏ hàng
+- Xem trang chá»§
+- Xem danh má»¥c sáº£n pháº©m
+- Xem chi tiáº¿t sáº£n pháº©m
+- Chá»n biáº¿n thá»ƒ sáº£n pháº©m
+- ThÃªm vÃ o giá» hÃ ng
 - Checkout
-- Tra cứu đơn hàng
+- Tra cá»©u Ä‘Æ¡n hÃ ng
 
 ### Admin
 
-Người vận hành hệ thống.
+NgÆ°á»i váº­n hÃ nh há»‡ thá»‘ng.
 
-#### Chức năng chính
+#### Chá»©c nÄƒng chÃ­nh
 
-- Đăng nhập admin
-- Quản lý danh mục
-- Quản lý sản phẩm
-- Quản lý biến thể/SKU
-- Quản lý tồn kho cơ bản
-- Quản lý đơn hàng
-- Cập nhật trạng thái đơn hàng
-- Quản lý banner trang chủ
+- ÄÄƒng nháº­p admin
+- Quáº£n lÃ½ danh má»¥c
+- Quáº£n lÃ½ sáº£n pháº©m
+- Quáº£n lÃ½ biáº¿n thá»ƒ/SKU
+- Quáº£n lÃ½ tá»“n kho cÆ¡ báº£n
+- Quáº£n lÃ½ Ä‘Æ¡n hÃ ng
+- Cáº­p nháº­t tráº¡ng thÃ¡i Ä‘Æ¡n hÃ ng
+- Quáº£n lÃ½ banner trang chá»§
 
 ---
 
-## 3. Phạm vi MVP
+## 3. Pháº¡m vi MVP
 
-### Có trong MVP
+### CÃ³ trong MVP
 
-- Storefront cho khách hàng
+- Storefront cho khÃ¡ch hÃ ng
 - Admin portal
 - Product catalog
 - Product variant/SKU
@@ -61,129 +61,129 @@ Người vận hành hệ thống.
 - Basic banner/content
 - Basic dashboard
 
-## 4. Chức năng Storefront
+## 4. Chá»©c nÄƒng Storefront
 
 ### Home Page
 
-- Hiển thị banner
-- Hiển thị danh mục nổi bật
-- Hiển thị sản phẩm nổi bật
+- Hiá»ƒn thá»‹ banner
+- Hiá»ƒn thá»‹ danh má»¥c ná»•i báº­t
+- Hiá»ƒn thá»‹ sáº£n pháº©m ná»•i báº­t
 
 ### Product Listing Page
 
-- Danh sách sản phẩm theo danh mục
-- Tìm kiếm cơ bản theo tên sản phẩm
-- Lọc cơ bản theo:
-  - Danh mục
-  - Giá
-  - Trạng thái còn hàng
+- Danh sÃ¡ch sáº£n pháº©m theo danh má»¥c
+- TÃ¬m kiáº¿m cÆ¡ báº£n theo tÃªn sáº£n pháº©m
+- Lá»c cÆ¡ báº£n theo:
+  - Danh má»¥c
+  - GiÃ¡
+  - Tráº¡ng thÃ¡i cÃ²n hÃ ng
 
 ### Product Detail Page
 
-- Tên sản phẩm
-- Hình ảnh
-- Giá bán
-- Giá gốc nếu có
-- Mô tả
-- Thông số kỹ thuật
-- Danh sách biến thể/SKU
-- Tồn kho
-- Cờ yêu cầu lắp đặt `RequiresInstallation`
+- TÃªn sáº£n pháº©m
+- HÃ¬nh áº£nh
+- GiÃ¡ bÃ¡n
+- GiÃ¡ gá»‘c náº¿u cÃ³
+- MÃ´ táº£
+- ThÃ´ng sá»‘ ká»¹ thuáº­t
+- Danh sÃ¡ch biáº¿n thá»ƒ/SKU
+- Tá»“n kho
+- Cá» yÃªu cáº§u láº¯p Ä‘áº·t `RequiresInstallation`
 
 ### Cart
 
-- Thêm sản phẩm vào giỏ
-- Cập nhật số lượng
-- Xóa sản phẩm khỏi giỏ
-- Tính tổng tiền
+- ThÃªm sáº£n pháº©m vÃ o giá»
+- Cáº­p nháº­t sá»‘ lÆ°á»£ng
+- XÃ³a sáº£n pháº©m khá»i giá»
+- TÃ­nh tá»•ng tiá»n
 
 ### Checkout
 
-#### Thông tin người nhận
+#### ThÃ´ng tin ngÆ°á»i nháº­n
 
-- Họ tên
-- Số điện thoại
+- Há» tÃªn
+- Sá»‘ Ä‘iá»‡n thoáº¡i
 - Email
-- Địa chỉ giao hàng
-- Ghi chú
+- Äá»‹a chá»‰ giao hÃ ng
+- Ghi chÃº
 
-#### Phương thức thanh toán
+#### PhÆ°Æ¡ng thá»©c thanh toÃ¡n
 
 - COD
-- Chuyển khoản thủ công
+- Chuyá»ƒn khoáº£n thá»§ cÃ´ng
 
 ### Order Lookup
 
-Tra cứu đơn hàng bằng:
+Tra cá»©u Ä‘Æ¡n hÃ ng báº±ng:
 
-- Mã đơn hàng
-- Số điện thoại
+- MÃ£ Ä‘Æ¡n hÃ ng
+- Sá»‘ Ä‘iá»‡n thoáº¡i
 
 ---
 
-## 5. Chức năng Admin
+## 5. Chá»©c nÄƒng Admin
 
 ### Authentication
 
-- Admin đăng nhập bằng email/password
-- Chưa cần phân quyền phức tạp trong MVP
+- Admin Ä‘Äƒng nháº­p báº±ng email/password
+- ChÆ°a cáº§n phÃ¢n quyá»n phá»©c táº¡p trong MVP
 
 ### Category Management
 
-- Tạo danh mục
-- Cập nhật danh mục
-- Ẩn/hiện danh mục
-- Hỗ trợ danh mục cha/con
+- Táº¡o danh má»¥c
+- Cáº­p nháº­t danh má»¥c
+- áº¨n/hiá»‡n danh má»¥c
+- Há»— trá»£ danh má»¥c cha/con
 
 ### Product Management
 
-- Tạo sản phẩm
-- Cập nhật sản phẩm
-- Ẩn/hiện sản phẩm
-- Gán danh mục
-- Quản lý mô tả
-- Quản lý ảnh
-- Quản lý thông số kỹ thuật
+- Táº¡o sáº£n pháº©m
+- Cáº­p nháº­t sáº£n pháº©m
+- áº¨n/hiá»‡n sáº£n pháº©m
+- GÃ¡n danh má»¥c
+- Quáº£n lÃ½ mÃ´ táº£
+- Quáº£n lÃ½ áº£nh
+- Quáº£n lÃ½ thÃ´ng sá»‘ ká»¹ thuáº­t
 
 ### Product Variant Management
 
-Quản lý:
+Quáº£n lÃ½:
 
 - SKU code
-- Tên biến thể
-- Màu sắc
-- Kích thước
-- Giá bán
-- Giá gốc
-- Tồn kho
-- Trạng thái active
+- TÃªn biáº¿n thá»ƒ
+- MÃ u sáº¯c
+- KÃ­ch thÆ°á»›c
+- GiÃ¡ bÃ¡n
+- GiÃ¡ gá»‘c
+- Tá»“n kho
+- Tráº¡ng thÃ¡i active
 - RequiresInstallation
 
 ### Order Management
 
-- Xem danh sách đơn hàng
-- Xem chi tiết đơn hàng
-- Cập nhật trạng thái đơn hàng
-- Ghi chú nội bộ
-- Xem lịch sử trạng thái đơn
+- Xem danh sÃ¡ch Ä‘Æ¡n hÃ ng
+- Xem chi tiáº¿t Ä‘Æ¡n hÃ ng
+- Cáº­p nháº­t tráº¡ng thÃ¡i Ä‘Æ¡n hÃ ng
+- Ghi chÃº ná»™i bá»™
+- Xem lá»‹ch sá»­ tráº¡ng thÃ¡i Ä‘Æ¡n
 
 ### Banner Management
 
-- Tạo banner
-- Cập nhật banner
-- Ẩn/hiện banner
-- Sắp xếp thứ tự hiển thị
+- Táº¡o banner
+- Cáº­p nháº­t banner
+- áº¨n/hiá»‡n banner
+- Sáº¯p xáº¿p thá»© tá»± hiá»ƒn thá»‹
 
 ### Dashboard
 
-- Tổng số đơn hàng
-- Tổng doanh thu
-- Số đơn mới
-- Sản phẩm sắp hết hàng
+- Tá»•ng sá»‘ Ä‘Æ¡n hÃ ng
+- Tá»•ng doanh thu
+- Sá»‘ Ä‘Æ¡n má»›i
+- Sáº£n pháº©m sáº¯p háº¿t hÃ ng
 
 ---
 
-## 6. Trạng thái đơn hàng MVP
+## 6. Tráº¡ng thÃ¡i Ä‘Æ¡n hÃ ng MVP
 
 ```mermaid
 stateDiagram-v2
@@ -207,23 +207,23 @@ stateDiagram-v2
 
 ### Order Status
 
-| Status         | Mô tả              |
+| Status         | MÃ´ táº£              |
 | -------------- | ------------------ |
-| Pending        | Đơn mới tạo        |
-| Confirmed      | Admin đã xác nhận  |
-| Processing     | Đang chuẩn bị hàng |
-| Shipping       | Đang giao hàng     |
-| Completed      | Hoàn tất           |
-| FailedDelivery | Giao thất bại      |
-| Cancelled      | Đã hủy             |
+| Pending        | ÄÆ¡n má»›i táº¡o        |
+| Confirmed      | Admin Ä‘Ã£ xÃ¡c nháº­n  |
+| Processing     | Äang chuáº©n bá»‹ hÃ ng |
+| Shipping       | Äang giao hÃ ng     |
+| Completed      | HoÃ n táº¥t           |
+| FailedDelivery | Giao tháº¥t báº¡i      |
+| Cancelled      | ÄÃ£ há»§y             |
 
 ---
 
-## 7. Module chính
+## 7. Module chÃ­nh
 
 ### Catalog Module
 
-Quản lý:
+Quáº£n lÃ½:
 
 - Category
 - Product
@@ -233,14 +233,14 @@ Quản lý:
 
 ### Cart Module
 
-Quản lý:
+Quáº£n lÃ½:
 
 - Cart
 - CartItem
 
 ### Ordering Module
 
-Quản lý:
+Quáº£n lÃ½:
 
 - Order
 - OrderItem
@@ -248,7 +248,7 @@ Quản lý:
 
 ### Customer Module
 
-Quản lý:
+Quáº£n lÃ½:
 
 - Customer
 - Customer Contact Info
@@ -260,7 +260,7 @@ MVP:
 
 - ProductVariant.StockQuantity
 
-Mở rộng tương lai:
+Má»Ÿ rá»™ng tÆ°Æ¡ng lai:
 
 - Warehouse
 - InventoryStock
@@ -268,29 +268,29 @@ Mở rộng tương lai:
 
 ### Content Module
 
-Quản lý:
+Quáº£n lÃ½:
 
 - Banner
 - Static Content
 
 ---
 
-## 8. Business Rules quan trọng
+## 8. Business Rules quan trá»ng
 
-- Không xóa cứng sản phẩm đã có đơn hàng.
-- Product, Category, Variant dùng `IsActive` để ẩn/hiện.
-- Mỗi sản phẩm có thể có nhiều Variant/SKU.
-- Tồn kho quản lý theo SKU.
-- Checkout phải snapshot dữ liệu sản phẩm vào OrderItem.
-- Giá đơn hàng không phụ thuộc giá hiện tại của sản phẩm.
-- Trừ tồn kho khi xác nhận hoặc tạo đơn tùy cấu hình.
-- Mỗi lần đổi trạng thái phải ghi vào OrderStatusHistory.
-- Guest checkout lưu trực tiếp thông tin người nhận vào Order.
-- Không đặt business logic trong Controller.
+- KhÃ´ng xÃ³a cá»©ng sáº£n pháº©m Ä‘Ã£ cÃ³ Ä‘Æ¡n hÃ ng.
+- Product, Category, Variant dÃ¹ng `IsActive` Ä‘á»ƒ áº©n/hiá»‡n.
+- Má»—i sáº£n pháº©m cÃ³ thá»ƒ cÃ³ nhiá»u Variant/SKU.
+- Tá»“n kho quáº£n lÃ½ theo SKU.
+- Checkout pháº£i snapshot dá»¯ liá»‡u sáº£n pháº©m vÃ o OrderItem.
+- GiÃ¡ Ä‘Æ¡n hÃ ng khÃ´ng phá»¥ thuá»™c giÃ¡ hiá»‡n táº¡i cá»§a sáº£n pháº©m.
+- Trá»« tá»“n kho khi xÃ¡c nháº­n hoáº·c táº¡o Ä‘Æ¡n tÃ¹y cáº¥u hÃ¬nh.
+- Má»—i láº§n Ä‘á»•i tráº¡ng thÃ¡i pháº£i ghi vÃ o OrderStatusHistory.
+- Guest checkout lÆ°u trá»±c tiáº¿p thÃ´ng tin ngÆ°á»i nháº­n vÃ o Order.
+- KhÃ´ng Ä‘áº·t business logic trong Controller.
 
 ---
 
-## 9. Data Model cốt lõi
+## 9. Data Model cá»‘t lÃµi
 
 ### Customer
 
@@ -442,7 +442,7 @@ IsActive
 
 ---
 
-## 10. Tech Stack đã chốt
+## 10. Tech Stack Ä‘Ã£ chá»‘t
 
 ### Backend
 
@@ -465,18 +465,18 @@ IsActive
 
 - React
 - TypeScript
-- Ant Design
+- Tailwind CSS
 
 ### UI/UX Direction
 
-- Tone sáng, trắng chủ đạo kết hợp màu phối có chủ đích.
-- Giao diện clean, hiện đại, ưu tiên UX chuẩn cho ecommerce và admin operation.
-- Layout desktop tối ưu cho màn hình Full HD 1920x1080, hạn chế scroll dọc không cần thiết ở các màn hình chính.
-- Vẫn đảm bảo responsive cho màn hình nhỏ hơn.
+- Tone sÃ¡ng, tráº¯ng chá»§ Ä‘áº¡o káº¿t há»£p mÃ u phá»‘i cÃ³ chá»§ Ä‘Ã­ch.
+- Giao diá»‡n clean, hiá»‡n Ä‘áº¡i, Æ°u tiÃªn UX chuáº©n cho ecommerce vÃ  admin operation.
+- Layout desktop tá»‘i Æ°u cho mÃ n hÃ¬nh Full HD 1920x1080, háº¡n cháº¿ scroll dá»c khÃ´ng cáº§n thiáº¿t á»Ÿ cÃ¡c mÃ n hÃ¬nh chÃ­nh.
+- Váº«n Ä‘áº£m báº£o responsive cho mÃ n hÃ¬nh nhá» hÆ¡n.
 
 ### Database
 
-- PostgreSQL (ưu tiên)
+- PostgreSQL (Æ°u tiÃªn)
 
 ### Storage
 
@@ -499,13 +499,13 @@ IsActive
 
 ---
 
-## 11. Kiến trúc đề xuất
+## 11. Kiáº¿n trÃºc Ä‘á» xuáº¥t
 
 **Modular Monolith**
 
 ---
 
-## 13. API nhóm chính
+## 13. API nhÃ³m chÃ­nh
 
 ### Storefront APIs
 
@@ -552,24 +552,24 @@ PUT    /api/admin/banners/{id}
 
 ## 14. Coding Guidelines
 
-- Controller chỉ nhận request và trả response.
-- Business logic đặt trong Application Service.
-- Không dùng Fat Controller.
-- Không query database trực tiếp từ Controller.
-- Entity không phụ thuộc EF Core nếu có thể.
-- Validate bằng FluentValidation.
-- API response thống nhất format.
-- DTO riêng cho Request/Response.
-- Không expose Entity trực tiếp ra API.
-- Dùng Migration quản lý Database Schema.
-- Viết test cho:
+- Controller chá»‰ nháº­n request vÃ  tráº£ response.
+- Business logic Ä‘áº·t trong Application Service.
+- KhÃ´ng dÃ¹ng Fat Controller.
+- KhÃ´ng query database trá»±c tiáº¿p tá»« Controller.
+- Entity khÃ´ng phá»¥ thuá»™c EF Core náº¿u cÃ³ thá»ƒ.
+- Validate báº±ng FluentValidation.
+- API response thá»‘ng nháº¥t format.
+- DTO riÃªng cho Request/Response.
+- KhÃ´ng expose Entity trá»±c tiáº¿p ra API.
+- DÃ¹ng Migration quáº£n lÃ½ Database Schema.
+- Viáº¿t test cho:
   - Checkout
   - Order Status
   - Inventory Logic
 
 ---
 
-## 15. Ưu tiên triển khai
+## 15. Æ¯u tiÃªn triá»ƒn khai
 
 ### Phase 1
 
@@ -602,17 +602,17 @@ PUT    /api/admin/banners/{id}
 
 ---
 
-## 16. Tiêu chí hoàn thành MVP
+## 16. TiÃªu chÃ­ hoÃ n thÃ nh MVP
 
-MVP được xem là hoàn thành khi:
+MVP Ä‘Æ°á»£c xem lÃ  hoÃ n thÃ nh khi:
 
-- Admin tạo được danh mục, sản phẩm và SKU.
-- Khách xem được sản phẩm trên storefront.
-- Khách thêm sản phẩm vào giỏ.
-- Khách checkout thành công.
-- Hệ thống tạo đơn hàng có mã đơn.
-- Admin xem và cập nhật trạng thái đơn.
-- Khách tra cứu được đơn hàng.
-- Tồn kho được cập nhật cơ bản.
-- Source code chia module rõ ràng.
-- Có seed data để demo.
+- Admin táº¡o Ä‘Æ°á»£c danh má»¥c, sáº£n pháº©m vÃ  SKU.
+- KhÃ¡ch xem Ä‘Æ°á»£c sáº£n pháº©m trÃªn storefront.
+- KhÃ¡ch thÃªm sáº£n pháº©m vÃ o giá».
+- KhÃ¡ch checkout thÃ nh cÃ´ng.
+- Há»‡ thá»‘ng táº¡o Ä‘Æ¡n hÃ ng cÃ³ mÃ£ Ä‘Æ¡n.
+- Admin xem vÃ  cáº­p nháº­t tráº¡ng thÃ¡i Ä‘Æ¡n.
+- KhÃ¡ch tra cá»©u Ä‘Æ°á»£c Ä‘Æ¡n hÃ ng.
+- Tá»“n kho Ä‘Æ°á»£c cáº­p nháº­t cÆ¡ báº£n.
+- Source code chia module rÃµ rÃ ng.
+- CÃ³ seed data Ä‘á»ƒ demo.

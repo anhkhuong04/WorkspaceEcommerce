@@ -1,11 +1,11 @@
-import { zodResolver } from "@hookform/resolvers/zod";
+﻿import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminBannerDto, AdminBannerUpsertRequest } from "@workspace-ecommerce/api-types";
-import { Alert, Button, Card, Empty, Form, Image, Input, InputNumber, Modal, Space, Switch, Table, Tag, message } from "antd";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
+import { Button, EmptyState, Field, Modal, Notice, Pill, TextInput, Toggle } from "../../components/ui/AdminUi";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
 
@@ -50,14 +50,11 @@ function toRequest(values: BannerFormValues): AdminBannerUpsertRequest {
 export function BannersPage() {
   const queryClient = useQueryClient();
   const bannersQuery = useQuery({ queryKey: ["admin-banners"], queryFn: adminApi.getBanners });
-  const [messageApi, contextHolder] = message.useMessage();
   const [editingBanner, setEditingBanner] = useState<AdminBannerDto | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  const form = useForm<BannerFormValues>({
-    resolver: zodResolver(bannerSchema),
-    defaultValues
-  });
+  const form = useForm<BannerFormValues>({ resolver: zodResolver(bannerSchema), defaultValues });
 
   const saveMutation = useMutation({
     mutationFn: (values: BannerFormValues) => {
@@ -69,18 +66,18 @@ export function BannersPage() {
       setIsModalOpen(false);
       setEditingBanner(null);
       form.reset(defaultValues);
-      messageApi.success("Banner saved.");
+      setNotice({ type: "success", message: "Banner saved." });
     },
-    onError: (error) => messageApi.error(getApiErrorMessage(error))
+    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
   });
 
   const toggleMutation = useMutation({
     mutationFn: (banner: AdminBannerDto) => adminApi.updateBanner(banner.id, { ...toRequest(toFormValues(banner)), isActive: !banner.isActive }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin-banners"] });
-      messageApi.success("Banner status updated.");
+      setNotice({ type: "success", message: "Banner status updated." });
     },
-    onError: (error) => messageApi.error(getApiErrorMessage(error))
+    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
   });
 
   function openCreateModal() {
@@ -97,113 +94,77 @@ export function BannersPage() {
 
   return (
     <div className="admin-page-grid">
-      {contextHolder}
       <AdminPageHeader
         title="Banners"
         description="Create, update, activate, deactivate, and sort homepage banners."
-        actions={<Button type="primary" onClick={openCreateModal}>New banner</Button>}
+        actions={<Button type="button" variant="primary" onClick={openCreateModal}>New banner</Button>}
       />
 
-      {bannersQuery.isError ? (
-        <Alert type="error" showIcon message="Banners could not be loaded" description={getApiErrorMessage(bannersQuery.error)} />
-      ) : null}
+      {notice ? <Notice type={notice.type} title={notice.message} /> : null}
+      {bannersQuery.isError ? <Notice type="error" title="Banners could not be loaded">{getApiErrorMessage(bannersQuery.error)}</Notice> : null}
 
-      <Card>
-        <Table
-          rowKey="id"
-          loading={bannersQuery.isLoading}
-          dataSource={bannersQuery.data ?? []}
-          pagination={false}
-          locale={{ emptyText: <Empty description="No banners yet" /> }}
-          columns={[
-            {
-              title: "Preview",
-              dataIndex: "imageUrl",
-              width: 116,
-              render: (value: string, record) => <Image width={84} height={44} src={value} alt={record.title} className="admin-table-image" />
-            },
-            { title: "Title", dataIndex: "title" },
-            { title: "Image", dataIndex: "imageUrl", ellipsis: true },
-            { title: "Link", dataIndex: "linkUrl", ellipsis: true, render: (value: string | null) => value || "-" },
-            { title: "Sort", dataIndex: "sortOrder", width: 90 },
-            {
-              title: "Status",
-              dataIndex: "isActive",
-              width: 140,
-              render: (value: boolean, record) => (
-                <Space>
-                  <Switch checked={value} loading={toggleMutation.isPending} onChange={() => toggleMutation.mutate(record)} />
-                  <Tag color={value ? "green" : "default"}>{value ? "Active" : "Inactive"}</Tag>
-                </Space>
-              )
-            },
-            {
-              title: "Actions",
-              key: "actions",
-              width: 110,
-              render: (_, record) => <Button onClick={() => openEditModal(record)}>Edit</Button>
-            }
-          ]}
-        />
-      </Card>
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        {bannersQuery.isLoading ? (
+          <div className="grid gap-3">{[0, 1, 2].map((item) => <div key={item} className="h-14 animate-pulse rounded-2xl bg-slate-100" />)}</div>
+        ) : bannersQuery.data?.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-left text-sm">
+              <thead className="text-xs uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-slate-100">
+                  <th className="py-3 pr-4">Preview</th>
+                  <th className="py-3 pr-4">Title</th>
+                  <th className="py-3 pr-4">Image</th>
+                  <th className="py-3 pr-4">Link</th>
+                  <th className="py-3 pr-4">Sort</th>
+                  <th className="py-3 pr-4">Status</th>
+                  <th className="py-3 pr-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bannersQuery.data.map((banner) => (
+                  <tr key={banner.id} className="border-b border-slate-100 last:border-0">
+                    <td className="py-3 pr-4"><img className="h-12 w-24 rounded-xl object-cover" src={banner.imageUrl} alt={banner.title} /></td>
+                    <td className="py-3 pr-4 font-bold text-slate-900">{banner.title}</td>
+                    <td className="max-w-[260px] truncate py-3 pr-4 text-slate-600">{banner.imageUrl}</td>
+                    <td className="max-w-[220px] truncate py-3 pr-4 text-slate-600">{banner.linkUrl || "-"}</td>
+                    <td className="py-3 pr-4 text-slate-600">{banner.sortOrder}</td>
+                    <td className="py-3 pr-4">
+                      <div className="flex items-center gap-3">
+                        <Toggle checked={banner.isActive} disabled={toggleMutation.isPending} onChange={() => toggleMutation.mutate(banner)} />
+                        <Pill tone={banner.isActive ? "green" : "slate"}>{banner.isActive ? "Active" : "Inactive"}</Pill>
+                      </div>
+                    </td>
+                    <td className="py-3 pr-4"><Button type="button" onClick={() => openEditModal(banner)}>Edit</Button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <EmptyState>No banners yet</EmptyState>}
+      </section>
 
       <Modal
         title={editingBanner ? "Edit banner" : "New banner"}
         open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
-        onOk={form.handleSubmit((values) => saveMutation.mutate(values))}
-        confirmLoading={saveMutation.isPending}
-        okText="Save"
+        onClose={() => setIsModalOpen(false)}
+        footer={(
+          <>
+            <Button type="button" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="button" variant="primary" disabled={saveMutation.isPending} onClick={form.handleSubmit((values) => saveMutation.mutate(values))}>
+              {saveMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </>
+        )}
       >
-        <Form layout="vertical" className="admin-form">
-          <Controller
-            control={form.control}
-            name="title"
-            render={({ field, fieldState }) => (
-              <Form.Item label="Title" validateStatus={fieldState.error ? "error" : undefined} help={fieldState.error?.message}>
-                <Input {...field} placeholder="Ergonomic workspace sale" />
-              </Form.Item>
-            )}
-          />
-          <Controller
-            control={form.control}
-            name="imageUrl"
-            render={({ field, fieldState }) => (
-              <Form.Item label="Image URL" validateStatus={fieldState.error ? "error" : undefined} help={fieldState.error?.message}>
-                <Input {...field} placeholder="/demo/banners/workspace-hero.webp" />
-              </Form.Item>
-            )}
-          />
-          <Controller
-            control={form.control}
-            name="linkUrl"
-            render={({ field, fieldState }) => (
-              <Form.Item label="Link URL" validateStatus={fieldState.error ? "error" : undefined} help={fieldState.error?.message}>
-                <Input {...field} placeholder="/products" />
-              </Form.Item>
-            )}
-          />
-          <Space size={16} align="start">
-            <Controller
-              control={form.control}
-              name="sortOrder"
-              render={({ field, fieldState }) => (
-                <Form.Item label="Sort order" validateStatus={fieldState.error ? "error" : undefined} help={fieldState.error?.message}>
-                  <InputNumber min={0} value={field.value} onChange={(value) => field.onChange(value ?? 0)} />
-                </Form.Item>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="isActive"
-              render={({ field }) => (
-                <Form.Item label="Active">
-                  <Switch checked={field.value} onChange={field.onChange} />
-                </Form.Item>
-              )}
-            />
-          </Space>
-        </Form>
+        <form className="grid gap-4" noValidate>
+          <Controller control={form.control} name="title" render={({ field, fieldState }) => <Field label="Title" error={fieldState.error?.message}><TextInput {...field} placeholder="Ergonomic workspace sale" /></Field>} />
+          <Controller control={form.control} name="imageUrl" render={({ field, fieldState }) => <Field label="Image URL" error={fieldState.error?.message}><TextInput {...field} placeholder="/demo/banners/workspace-hero.webp" /></Field>} />
+          <Controller control={form.control} name="linkUrl" render={({ field, fieldState }) => <Field label="Link URL" error={fieldState.error?.message}><TextInput {...field} placeholder="/products" /></Field>} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Controller control={form.control} name="sortOrder" render={({ field, fieldState }) => <Field label="Sort order" error={fieldState.error?.message}><TextInput type="number" min={0} value={field.value} onChange={(event) => field.onChange(Number(event.target.value))} /></Field>} />
+            <Controller control={form.control} name="isActive" render={({ field }) => <Field label="Active"><Toggle checked={field.value} onChange={field.onChange} /></Field>} />
+          </div>
+        </form>
       </Modal>
     </div>
   );

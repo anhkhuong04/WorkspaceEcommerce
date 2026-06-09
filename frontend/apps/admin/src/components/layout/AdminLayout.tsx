@@ -1,30 +1,18 @@
-import {
-  AppstoreOutlined,
-  DashboardOutlined,
-  LogoutOutlined,
-  OrderedListOutlined,
-  PictureOutlined,
-  ShoppingOutlined,
-  TagsOutlined
-} from "@ant-design/icons";
-import { Button, Layout, Menu, Space, Typography } from "antd";
-import type { MenuProps } from "antd";
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAdminAuth } from "../../features/auth/useAdminAuth";
+import { Button } from "../ui/AdminUi";
+import { cx } from "../ui/cx";
 
-const { Header, Sider, Content } = Layout;
-
-const menuItems: MenuProps["items"] = [
-  { key: "/", icon: <DashboardOutlined />, label: <Link to="/">Dashboard</Link> },
-  { key: "/categories", icon: <TagsOutlined />, label: <Link to="/categories">Categories</Link> },
-  { key: "/products", icon: <ShoppingOutlined />, label: <Link to="/products">Products</Link> },
-  { key: "/orders", icon: <OrderedListOutlined />, label: <Link to="/orders">Orders</Link> },
-  { key: "/banners", icon: <PictureOutlined />, label: <Link to="/banners">Banners</Link> }
+const menuItems = [
+  { to: "/", label: "Dashboard", icon: "▦" },
+  { to: "/categories", label: "Categories", icon: "#" },
+  { to: "/products", label: "Products", icon: "□" },
+  { to: "/orders", label: "Orders", icon: "≡" },
+  { to: "/banners", label: "Banners", icon: "◇" }
 ];
 
 export function AdminLayout() {
-  const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { session, signOut } = useAdminAuth();
@@ -36,33 +24,45 @@ export function AdminLayout() {
   }
 
   return (
-    <Layout className="admin-shell">
-      <Sider width={264} className="admin-sider">
-        <div className="admin-brand">
-          <AppstoreOutlined />
-          <span>Workspace Admin</span>
+    <div className="min-h-screen bg-[#f4f7f6] text-slate-900 lg:grid lg:grid-cols-[264px_1fr]">
+      <aside className="border-b border-slate-200 bg-white px-4 py-4 lg:min-h-screen lg:border-b-0 lg:border-r">
+        <div className="flex h-12 items-center gap-3 px-2 text-lg font-black text-slate-950">
+          <span className="grid h-9 w-9 place-items-center rounded-2xl bg-teal-700 text-white">W</span>
+          Workspace Admin
         </div>
-        <Menu mode="inline" selectedKeys={[location.pathname]} items={menuItems} className="admin-menu" />
-      </Sider>
-      <Layout>
-        <Header className="admin-header">
+        <nav className="mt-5 flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
+          {menuItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === "/"}
+              className={({ isActive }) => cx(
+                "flex min-w-fit items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold transition",
+                isActive ? "bg-teal-50 text-teal-800 ring-1 ring-teal-100" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+              )}
+            >
+              <span className="grid h-7 w-7 place-items-center rounded-xl bg-white text-base shadow-sm ring-1 ring-slate-100">{item.icon}</span>
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
+
+      <div className="min-w-0">
+        <header className="flex flex-col gap-3 border-b border-slate-200 bg-white/90 px-6 py-4 backdrop-blur lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:py-0">
           <div>
-            <Typography.Text strong>Operations console</Typography.Text>
-            <Typography.Text type="secondary" className="admin-header-caption">
-              Full HD optimized MVP admin foundation
-            </Typography.Text>
+            <p className="font-black text-slate-900">Operations console</p>
+            <p className="text-xs font-semibold text-slate-500">Tailwind admin portal for MVP operations</p>
           </div>
-          <Space size={12}>
-            <Typography.Text type="secondary">{session?.email}</Typography.Text>
-            <Button icon={<LogoutOutlined />} onClick={handleLogout}>
-              Logout
-            </Button>
-          </Space>
-        </Header>
-        <Content className="admin-content">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-slate-500">{session?.email}</span>
+            <Button onClick={handleLogout}>Logout</Button>
+          </div>
+        </header>
+        <main className="p-4 lg:p-6">
           <Outlet />
-        </Content>
-      </Layout>
-    </Layout>
+        </main>
+      </div>
+    </div>
   );
 }

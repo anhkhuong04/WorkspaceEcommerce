@@ -1,138 +1,32 @@
-﻿:root {
+@import "tailwindcss";
+
+:root {
   --admin-bg: #f4f7f6;
-  --admin-panel: #ffffff;
   --admin-ink: #172033;
-  --admin-accent: #0f766e;
   font-family: "Plus Jakarta Sans", "Aptos", sans-serif;
   color: var(--admin-ink);
   background: var(--admin-bg);
 }
 
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   min-width: 320px;
-}
-
-.admin-shell {
-  min-height: 100vh;
   background: var(--admin-bg);
 }
 
-.admin-sider {
-  border-right: 1px solid #e5ece9;
-  background: #ffffff !important;
-  padding: 18px 12px;
-}
-
-.admin-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 48px;
-  padding: 0 12px;
-  font-weight: 900;
-  color: #0f172a;
-}
-
-.admin-menu {
-  border-inline-end: 0 !important;
-}
-
-.admin-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  height: 64px;
-  border-bottom: 1px solid #e5ece9;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(14px);
-}
-
-.admin-header-caption {
-  display: block;
-  font-size: 12px;
-}
-
-.admin-content {
-  padding: 24px;
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 .admin-page-grid {
   display: grid;
   gap: 16px;
   max-width: 1500px;
-}
-
-.admin-page-header {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 24px;
-  border: 1px solid #e5ece9;
-  border-radius: 24px;
-  background: #ffffff;
-  padding: 24px;
-}
-
-.admin-page-header-side {
-  justify-content: flex-end;
-}
-
-.admin-eyebrow {
-  color: var(--admin-accent);
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.admin-toolbar {
-  margin-bottom: 16px;
-}
-
-.admin-form {
-  padding-top: 8px;
-}
-
-.admin-table-image {
-  border-radius: 10px;
-  object-fit: cover;
-}
-
-.admin-drawer-stack {
-  width: 100%;
-}
-
-.admin-metric-card {
-  height: 100%;
-}
-
-@media (max-width: 900px) {
-  .admin-page-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .admin-page-header-side {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
-
-.login-page {
-  display: grid;
-  min-height: 100vh;
-  place-items: center;
-  background: linear-gradient(135deg, #f7fbf9, #dceee8);
-}
-
-.login-card {
-  width: min(440px, calc(100vw - 32px));
-  border-radius: 28px;
-  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.12);
-}
-
-.login-alert {
-  margin-bottom: 18px;
 }

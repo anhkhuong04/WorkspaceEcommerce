@@ -1,9 +1,9 @@
-﻿# Frontend Rules
+# Frontend Rules
 
 Frontend stack:
 
 - Storefront is React + TypeScript + Tailwind CSS + React Hook Form + Zod.
-- Admin is React + TypeScript + Ant Design.
+- Admin is React + TypeScript + Tailwind CSS.
 - Do not introduce a different UI framework, form library, validation library, or styling system unless the stack decision is explicitly changed.
 
 React and TypeScript:
@@ -31,8 +31,8 @@ State and data loading:
 
 UI rules:
 
-- Use Tailwind CSS consistently for Storefront.
-- Use Ant Design components consistently for Admin; only use custom CSS when Ant Design tokens/components are not enough.
+- Use Tailwind CSS consistently for Storefront and Admin.
+- Do not introduce a component framework for Admin unless the stack decision is explicitly changed.
 - Design with a light visual tone: white as the primary base plus a deliberate supporting color palette.
 - Keep UI clean, modern, and focused on ecommerce/admin workflows; avoid visually noisy sections.
 - Build standard UX patterns for navigation, filtering, forms, tables, carts, checkout, status feedback, confirmation dialogs, and empty states.

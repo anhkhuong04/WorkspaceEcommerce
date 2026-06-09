@@ -10,17 +10,17 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@ant-design/icons": "6.2.5",
     "@hookform/resolvers": "5.4.0",
+    "@tailwindcss/vite": "4.3.0",
     "@tanstack/react-query": "5.101.0",
     "@workspace-ecommerce/api-client": "workspace:*",
     "@workspace-ecommerce/api-types": "workspace:*",
     "@workspace-ecommerce/shared-utils": "workspace:*",
-    "antd": "6.4.3",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "react-hook-form": "7.78.0",
     "react-router-dom": "7.17.0",
+    "tailwindcss": "4.3.0",
     "zod": "4.4.3"
   },
   "devDependencies": {

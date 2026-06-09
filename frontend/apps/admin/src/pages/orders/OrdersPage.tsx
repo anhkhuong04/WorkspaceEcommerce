@@ -2,271 +2,79 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminOrderListRequest, OrderStatus } from "@workspace-ecommerce/api-types";
 import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod } from "@workspace-ecommerce/shared-utils";
-import { Alert, Button, Card, Descriptions, Drawer, Empty, Form, Input, Select, Space, Table, Tag, Timeline, Typography, message } from "antd";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
+import { Button, EmptyState, Field, Notice, Pill, SelectInput, TextArea, TextInput } from "../../components/ui/AdminUi";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
 
 const orderStatuses: OrderStatus[] = [0, 1, 2, 3, 4, 5, 6];
-const nextStatusesByStatus: Record<OrderStatus, OrderStatus[]> = {
-  0: [1, 6],
-  1: [2],
-  2: [3],
-  3: [4, 5],
-  4: [],
-  5: [3, 6],
-  6: []
-};
-
-const statusSchema = z.object({
-  status: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6)]),
-  note: z.string().trim().max(1000, "Note is too long.").optional()
-});
-
+const nextStatusesByStatus: Record<OrderStatus, OrderStatus[]> = { 0: [1, 6], 1: [2], 2: [3], 3: [4, 5], 4: [], 5: [3, 6], 6: [] };
+const statusSchema = z.object({ status: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6)]), note: z.string().trim().max(1000, "Note is too long.").optional() });
 type StatusFormValues = z.infer<typeof statusSchema>;
 
-const statusColors: Record<OrderStatus, string> = {
-  0: "gold",
-  1: "cyan",
-  2: "blue",
-  3: "geekblue",
-  4: "green",
-  5: "orange",
-  6: "red"
-};
-
-function orderStatusTag(status: OrderStatus) {
-  return <Tag color={statusColors[status]}>{formatOrderStatus(status)}</Tag>;
-}
-
-function toStatusRequest(values: StatusFormValues) {
-  return {
-    status: values.status,
-    note: values.note?.trim() ? values.note.trim() : null
-  };
-}
+const statusTones: Record<OrderStatus, "green" | "red" | "blue" | "orange" | "slate" | "teal"> = { 0: "orange", 1: "teal", 2: "blue", 3: "blue", 4: "green", 5: "orange", 6: "red" };
+function orderStatusPill(status: OrderStatus) { return <Pill tone={statusTones[status]}>{formatOrderStatus(status)}</Pill>; }
+function toStatusRequest(values: StatusFormValues) { return { status: values.status, note: values.note?.trim() ? values.note.trim() : null }; }
 
 export function OrdersPage() {
   const queryClient = useQueryClient();
-  const [messageApi, contextHolder] = message.useMessage();
+  const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [request, setRequest] = useState<AdminOrderListRequest>({ pageNumber: 1, pageSize: 8 });
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-
   const ordersQuery = useQuery({ queryKey: ["admin-orders", request], queryFn: () => adminApi.getOrders(request) });
-  const orderQuery = useQuery({
-    queryKey: ["admin-order", selectedOrderId],
-    queryFn: () => adminApi.getOrder(selectedOrderId ?? ""),
-    enabled: selectedOrderId !== null
-  });
+  const orderQuery = useQuery({ queryKey: ["admin-order", selectedOrderId], queryFn: () => adminApi.getOrder(selectedOrderId ?? ""), enabled: selectedOrderId !== null });
   const order = orderQuery.data;
   const nextStatuses = useMemo(() => order ? nextStatusesByStatus[order.status] : [], [order]);
 
-  const statusForm = useForm<StatusFormValues>({
-    resolver: zodResolver(statusSchema),
-    defaultValues: { status: 1, note: "" }
-  });
-
-  useEffect(() => {
-    if (nextStatuses.length > 0) {
-      statusForm.reset({ status: nextStatuses[0], note: "" });
-    }
-  }, [nextStatuses, statusForm]);
+  const statusForm = useForm<StatusFormValues>({ resolver: zodResolver(statusSchema), defaultValues: { status: 1, note: "" } });
+  useEffect(() => { if (nextStatuses.length > 0) statusForm.reset({ status: nextStatuses[0], note: "" }); }, [nextStatuses, statusForm]);
 
   const updateStatusMutation = useMutation({
     mutationFn: (values: StatusFormValues) => {
-      if (!selectedOrderId) {
-        throw new Error("Order is required.");
-      }
-
+      if (!selectedOrderId) throw new Error("Order is required.");
       return adminApi.updateOrderStatus(selectedOrderId, toStatusRequest(values));
     },
     onSuccess: async (updatedOrder) => {
       queryClient.setQueryData(["admin-order", selectedOrderId], updatedOrder);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] })
-      ]);
-      messageApi.success("Order status updated.");
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ["admin-orders"] }), queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] })]);
+      setNotice({ type: "success", message: "Order status updated." });
     },
-    onError: (error) => messageApi.error(getApiErrorMessage(error))
+    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
   });
 
-  function updateFilters(values: Partial<AdminOrderListRequest>) {
-    setRequest((current) => ({ ...current, ...values, pageNumber: 1 }));
-  }
+  function updateFilters(values: Partial<AdminOrderListRequest>) { setRequest((current) => ({ ...current, ...values, pageNumber: 1 })); }
 
   return (
     <div className="admin-page-grid">
-      {contextHolder}
-      <AdminPageHeader
-        title="Orders"
-        description="Review orders, inspect order snapshots, render status history, and move orders through MVP transitions."
-      />
+      <AdminPageHeader title="Orders" description="Review orders, inspect order snapshots, render status history, and move orders through MVP transitions." />
+      {notice ? <Notice type={notice.type} title={notice.message} /> : null}
+      {ordersQuery.isError ? <Notice type="error" title="Orders could not be loaded">{getApiErrorMessage(ordersQuery.error)}</Notice> : null}
 
-      {ordersQuery.isError ? (
-        <Alert type="error" showIcon message="Orders could not be loaded" description={getApiErrorMessage(ordersQuery.error)} />
-      ) : null}
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row">
+          <TextInput placeholder="Search code, customer, phone" onKeyDown={(event) => { if (event.key === "Enter") updateFilters({ search: event.currentTarget.value.trim() || undefined }); }} />
+          <SelectInput value={request.status ?? ""} onChange={(event) => updateFilters({ status: event.target.value === "" ? undefined : Number(event.target.value) as OrderStatus })} className="lg:max-w-xs"><option value="">All statuses</option>{orderStatuses.map((status) => <option key={status} value={status}>{formatOrderStatus(status)}</option>)}</SelectInput>
+        </div>
+        {ordersQuery.isLoading ? <div className="grid gap-3">{[0, 1, 2].map((item) => <div key={item} className="h-14 animate-pulse rounded-2xl bg-slate-100" />)}</div> : ordersQuery.data?.items.length ? (
+          <div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead className="text-xs uppercase tracking-wide text-slate-500"><tr className="border-b border-slate-100"><th className="py-3 pr-4">Code</th><th className="py-3 pr-4">Customer</th><th className="py-3 pr-4">Phone</th><th className="py-3 pr-4">Items</th><th className="py-3 pr-4">Total</th><th className="py-3 pr-4">Status</th><th className="py-3 pr-4">Payment</th><th className="py-3 pr-4">Created</th><th className="py-3 pr-4">Actions</th></tr></thead><tbody>{ordersQuery.data.items.map((item) => <tr key={item.id} className="border-b border-slate-100 last:border-0"><td className="py-3 pr-4 font-bold">{item.orderCode}</td><td className="py-3 pr-4">{item.customerName}</td><td className="py-3 pr-4">{item.customerPhone}</td><td className="py-3 pr-4">{item.itemCount}</td><td className="py-3 pr-4">{formatMoney(item.totalAmount)}</td><td className="py-3 pr-4">{orderStatusPill(item.status)}</td><td className="py-3 pr-4">{formatPaymentMethod(item.paymentMethod)}</td><td className="py-3 pr-4">{formatDate(item.createdAt)}</td><td className="py-3 pr-4"><Button type="button" onClick={() => setSelectedOrderId(item.id)}>View</Button></td></tr>)}</tbody></table></div>
+        ) : <EmptyState>No orders found</EmptyState>}
+        {ordersQuery.data ? <div className="mt-4 flex items-center justify-between text-sm font-semibold text-slate-500"><span>Page {ordersQuery.data.pageNumber} of {ordersQuery.data.totalPages || 1}</span><div className="flex gap-2"><Button type="button" disabled={!ordersQuery.data.hasPreviousPage} onClick={() => setRequest((current) => ({ ...current, pageNumber: Math.max(1, (current.pageNumber ?? 1) - 1) }))}>Previous</Button><Button type="button" disabled={!ordersQuery.data.hasNextPage} onClick={() => setRequest((current) => ({ ...current, pageNumber: (current.pageNumber ?? 1) + 1 }))}>Next</Button></div></div> : null}
+      </section>
 
-      <Card>
-        <Space className="admin-toolbar" wrap>
-          <Input.Search
-            allowClear
-            placeholder="Search code, customer, phone"
-            onSearch={(value) => updateFilters({ search: value.trim() || undefined })}
-            style={{ width: 320 }}
-          />
-          <Select
-            allowClear
-            placeholder="Status"
-            value={request.status}
-            onChange={(value) => updateFilters({ status: value })}
-            style={{ width: 220 }}
-            options={orderStatuses.map((status) => ({ value: status, label: formatOrderStatus(status) }))}
-          />
-        </Space>
-        <Table
-          rowKey="id"
-          loading={ordersQuery.isLoading}
-          dataSource={ordersQuery.data?.items ?? []}
-          locale={{ emptyText: <Empty description="No orders found" /> }}
-          pagination={{
-            current: ordersQuery.data?.pageNumber ?? request.pageNumber,
-            pageSize: ordersQuery.data?.pageSize ?? request.pageSize,
-            total: ordersQuery.data?.totalCount ?? 0,
-            showSizeChanger: true
-          }}
-          onChange={(pagination) => setRequest((current) => ({
-            ...current,
-            pageNumber: pagination.current ?? 1,
-            pageSize: pagination.pageSize ?? current.pageSize
-          }))}
-          columns={[
-            { title: "Code", dataIndex: "orderCode", width: 150 },
-            { title: "Customer", dataIndex: "customerName" },
-            { title: "Phone", dataIndex: "customerPhone", width: 150 },
-            { title: "Items", dataIndex: "itemCount", width: 90 },
-            { title: "Total", dataIndex: "totalAmount", width: 140, render: (value: number) => formatMoney(value) },
-            { title: "Status", dataIndex: "status", width: 150, render: (value: OrderStatus) => orderStatusTag(value) },
-            { title: "Payment", dataIndex: "paymentMethod", width: 180, render: (value: 0 | 1) => formatPaymentMethod(value) },
-            { title: "Created", dataIndex: "createdAt", width: 180, render: (value: string) => formatDate(value) },
-            { title: "Actions", key: "actions", width: 100, render: (_, record) => <Button onClick={() => setSelectedOrderId(record.id)}>View</Button> }
-          ]}
-        />
-      </Card>
-
-      <Drawer
-        title={order ? `Order ${order.orderCode}` : "Order detail"}
-        open={selectedOrderId !== null}
-        onClose={() => setSelectedOrderId(null)}
-        width={760}
-      >
-        {orderQuery.isError ? (
-          <Alert type="error" showIcon message="Order could not be loaded" description={getApiErrorMessage(orderQuery.error)} />
-        ) : null}
-        <Space direction="vertical" size={16} className="admin-drawer-stack">
-          <Card loading={orderQuery.isLoading}>
-            {order ? (
-              <Descriptions column={2} size="small" bordered>
-                <Descriptions.Item label="Status">{orderStatusTag(order.status)}</Descriptions.Item>
-                <Descriptions.Item label="Payment">{formatPaymentMethod(order.paymentMethod)}</Descriptions.Item>
-                <Descriptions.Item label="Customer">{order.customerName}</Descriptions.Item>
-                <Descriptions.Item label="Phone">{order.customerPhone}</Descriptions.Item>
-                <Descriptions.Item label="Email">{order.customerEmail ?? "-"}</Descriptions.Item>
-                <Descriptions.Item label="Created">{formatDate(order.createdAt)}</Descriptions.Item>
-                <Descriptions.Item label="Shipping address" span={2}>{order.shippingAddress}</Descriptions.Item>
-                <Descriptions.Item label="Customer note" span={2}>{order.note ?? "-"}</Descriptions.Item>
-                <Descriptions.Item label="Subtotal">{formatMoney(order.subtotal)}</Descriptions.Item>
-                <Descriptions.Item label="Shipping fee">{formatMoney(order.shippingFee)}</Descriptions.Item>
-                <Descriptions.Item label="Discount">{formatMoney(order.discountAmount)}</Descriptions.Item>
-                <Descriptions.Item label="Total">{formatMoney(order.totalAmount)}</Descriptions.Item>
-              </Descriptions>
-            ) : null}
-          </Card>
-
-          <Card title="Items" loading={orderQuery.isLoading}>
-            <Table
-              rowKey="id"
-              size="small"
-              pagination={false}
-              dataSource={order?.items ?? []}
-              locale={{ emptyText: <Empty description="No order items" /> }}
-              columns={[
-                { title: "Product", dataIndex: "productNameSnapshot" },
-                { title: "SKU", dataIndex: "skuSnapshot", width: 150 },
-                { title: "Price", dataIndex: "unitPrice", width: 120, render: (value: number) => formatMoney(value) },
-                { title: "Qty", dataIndex: "quantity", width: 80 },
-                { title: "Line", dataIndex: "lineTotal", width: 120, render: (value: number) => formatMoney(value) },
-                { title: "Install", dataIndex: "requiresInstallation", width: 120, render: (value: boolean) => value ? <Tag color="blue">Required</Tag> : <Tag>None</Tag> }
-              ]}
-            />
-          </Card>
-
-          <Card title="Status transition" loading={orderQuery.isLoading}>
-            {order && nextStatuses.length === 0 ? (
-              <Empty description="This order is in a terminal status" />
-            ) : (
-              <Form layout="vertical">
-                <Controller
-                  control={statusForm.control}
-                  name="status"
-                  render={({ field, fieldState }) => (
-                    <Form.Item label="Next status" validateStatus={fieldState.error ? "error" : undefined} help={fieldState.error?.message}>
-                      <Select
-                        value={field.value}
-                        onChange={field.onChange}
-                        options={nextStatuses.map((status) => ({ value: status, label: formatOrderStatus(status) }))}
-                      />
-                    </Form.Item>
-                  )}
-                />
-                <Controller
-                  control={statusForm.control}
-                  name="note"
-                  render={({ field, fieldState }) => (
-                    <Form.Item label="Internal note" validateStatus={fieldState.error ? "error" : undefined} help={fieldState.error?.message}>
-                      <Input.TextArea {...field} rows={3} placeholder="Optional note for status history" />
-                    </Form.Item>
-                  )}
-                />
-                <Button
-                  type="primary"
-                  loading={updateStatusMutation.isPending}
-                  disabled={!order || nextStatuses.length === 0}
-                  onClick={statusForm.handleSubmit((values) => updateStatusMutation.mutate(values))}
-                >
-                  Update status
-                </Button>
-              </Form>
-            )}
-          </Card>
-
-          <Card title="Status history" loading={orderQuery.isLoading}>
-            {order && order.statusHistory.length > 0 ? (
-              <Timeline
-                items={order.statusHistory.map((history) => ({
-                  color: statusColors[history.toStatus],
-                  children: (
-                    <Space direction="vertical" size={2}>
-                      <Typography.Text strong>
-                        {history.fromStatus === null ? "Created" : formatOrderStatus(history.fromStatus)} to {formatOrderStatus(history.toStatus)}
-                      </Typography.Text>
-                      <Typography.Text type="secondary">
-                        {formatDate(history.changedAt)} by {history.changedBy ?? "system"}
-                      </Typography.Text>
-                      {history.note ? <Typography.Text>{history.note}</Typography.Text> : null}
-                    </Space>
-                  )
-                }))}
-              />
-            ) : (
-              <Empty description="No status history" />
-            )}
-          </Card>
-        </Space>
-      </Drawer>
+      {selectedOrderId ? <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/45 backdrop-blur-sm"><aside className="h-full w-full max-w-3xl overflow-y-auto bg-white p-6 shadow-2xl"><div className="mb-5 flex items-center justify-between"><h2 className="text-2xl font-black text-slate-950">{order ? `Order ${order.orderCode}` : "Order detail"}</h2><Button type="button" onClick={() => setSelectedOrderId(null)}>Close</Button></div>{orderQuery.isError ? <Notice type="error" title="Order could not be loaded">{getApiErrorMessage(orderQuery.error)}</Notice> : null}{orderQuery.isLoading ? <div className="grid gap-3">{[0, 1, 2].map((item) => <div key={item} className="h-20 animate-pulse rounded-2xl bg-slate-100" />)}</div> : order ? <div className="grid gap-4">
+        <section className="rounded-3xl border border-slate-200 p-5"><div className="grid gap-3 text-sm sm:grid-cols-2"><Info label="Status" value={orderStatusPill(order.status)} /><Info label="Payment" value={formatPaymentMethod(order.paymentMethod)} /><Info label="Customer" value={order.customerName} /><Info label="Phone" value={order.customerPhone} /><Info label="Email" value={order.customerEmail ?? "-"} /><Info label="Created" value={formatDate(order.createdAt)} /><Info wide label="Shipping address" value={order.shippingAddress} /><Info wide label="Customer note" value={order.note ?? "-"} /><Info label="Subtotal" value={formatMoney(order.subtotal)} /><Info label="Shipping fee" value={formatMoney(order.shippingFee)} /><Info label="Discount" value={formatMoney(order.discountAmount)} /><Info label="Total" value={formatMoney(order.totalAmount)} /></div></section>
+        <section className="rounded-3xl border border-slate-200 p-5"><h3 className="mb-3 text-lg font-black">Items</h3><div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="text-xs uppercase tracking-wide text-slate-500"><tr><th className="py-2 pr-3">Product</th><th className="py-2 pr-3">SKU</th><th className="py-2 pr-3">Price</th><th className="py-2 pr-3">Qty</th><th className="py-2 pr-3">Line</th><th className="py-2 pr-3">Install</th></tr></thead><tbody>{order.items.map((item) => <tr key={item.id} className="border-t border-slate-100"><td className="py-2 pr-3">{item.productNameSnapshot}</td><td className="py-2 pr-3">{item.skuSnapshot}</td><td className="py-2 pr-3">{formatMoney(item.unitPrice)}</td><td className="py-2 pr-3">{item.quantity}</td><td className="py-2 pr-3">{formatMoney(item.lineTotal)}</td><td className="py-2 pr-3"><Pill tone={item.requiresInstallation ? "blue" : "slate"}>{item.requiresInstallation ? "Required" : "None"}</Pill></td></tr>)}</tbody></table></div></section>
+        <section className="rounded-3xl border border-slate-200 p-5"><h3 className="mb-3 text-lg font-black">Status transition</h3>{nextStatuses.length === 0 ? <EmptyState>This order is in a terminal status</EmptyState> : <form className="grid gap-4"><Controller control={statusForm.control} name="status" render={({ field, fieldState }) => <Field label="Next status" error={fieldState.error?.message}><SelectInput value={field.value} onChange={(event) => field.onChange(Number(event.target.value) as OrderStatus)}>{nextStatuses.map((status) => <option key={status} value={status}>{formatOrderStatus(status)}</option>)}</SelectInput></Field>} /><Controller control={statusForm.control} name="note" render={({ field, fieldState }) => <Field label="Internal note" error={fieldState.error?.message}><TextArea {...field} rows={3} placeholder="Optional note for status history" /></Field>} /><Button type="button" variant="primary" disabled={updateStatusMutation.isPending} onClick={statusForm.handleSubmit((values) => updateStatusMutation.mutate(values))}>{updateStatusMutation.isPending ? "Updating..." : "Update status"}</Button></form>}</section>
+        <section className="rounded-3xl border border-slate-200 p-5"><h3 className="mb-3 text-lg font-black">Status history</h3>{order.statusHistory.length ? <div className="grid gap-3">{order.statusHistory.map((history) => <div key={history.id} className="border-l-4 border-teal-600 pl-4"><p className="font-bold">{history.fromStatus === null ? "Created" : formatOrderStatus(history.fromStatus)} to {formatOrderStatus(history.toStatus)}</p><p className="text-sm text-slate-500">{formatDate(history.changedAt)} by {history.changedBy ?? "system"}</p>{history.note ? <p className="mt-1 text-sm text-slate-700">{history.note}</p> : null}</div>)}</div> : <EmptyState>No status history</EmptyState>}</section>
+      </div> : null}</aside></div> : null}
     </div>
   );
+}
+
+function Info({ label, value, wide = false }: { label: string; value: ReactNode; wide?: boolean }) {
+  return <div className={wide ? "sm:col-span-2" : undefined}><p className="text-xs font-black uppercase tracking-wide text-slate-400">{label}</p><div className="mt-1 font-semibold text-slate-800">{value}</div></div>;
 }

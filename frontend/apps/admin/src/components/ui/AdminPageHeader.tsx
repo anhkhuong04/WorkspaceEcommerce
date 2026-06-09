@@ -1,5 +1,4 @@
 ﻿import type { ReactNode } from "react";
-import { Space, Typography } from "antd";
 
 interface AdminPageHeaderProps {
   title: string;
@@ -9,15 +8,15 @@ interface AdminPageHeaderProps {
 
 export function AdminPageHeader({ title, description, actions }: AdminPageHeaderProps) {
   return (
-    <div className="admin-page-header">
+    <div className="flex flex-col gap-5 rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <Typography.Text className="admin-eyebrow">Admin</Typography.Text>
-        <Typography.Title level={2} style={{ margin: 0 }}>{title}</Typography.Title>
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-teal-700">Admin</p>
+        <h1 className="mt-1 text-3xl font-black text-slate-950">{title}</h1>
       </div>
-      <Space size={18} align="center" className="admin-page-header-side">
-        <Typography.Paragraph type="secondary" style={{ maxWidth: 520, margin: 0 }}>{description}</Typography.Paragraph>
+      <div className="flex flex-col gap-4 lg:items-end">
+        <p className="max-w-xl text-sm leading-6 text-slate-500">{description}</p>
         {actions}
-      </Space>
+      </div>
     </div>
   );
 }

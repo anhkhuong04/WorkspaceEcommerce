@@ -1,8 +1,8 @@
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Alert, Button, Card, Form, Input, Typography } from "antd";
+﻿import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
+import { Button, Field, Notice, TextInput } from "../../components/ui/AdminUi";
 import { useAdminAuth } from "../../features/auth/useAdminAuth";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
@@ -55,63 +55,44 @@ export function LoginPage() {
   }
 
   return (
-    <main className="login-page">
-      <Card className="login-card">
-        <Typography.Text className="admin-eyebrow">Workspace Admin</Typography.Text>
-        <Typography.Title level={2}>Sign in</Typography.Title>
-        <Typography.Paragraph type="secondary">
-          Use your admin credentials to access operations screens.
-        </Typography.Paragraph>
+    <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top_left,#dff8ef,transparent_34%),linear-gradient(135deg,#f7fbf9,#dceee8)] p-4">
+      <section className="w-full max-w-md rounded-[2rem] border border-white/70 bg-white p-8 shadow-2xl shadow-slate-900/10">
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-teal-700">Workspace Admin</p>
+        <h1 className="mt-3 text-3xl font-black text-slate-950">Sign in</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-500">Use your admin credentials to access operations screens.</p>
 
-        {errors.root?.message && (
-          <Alert className="login-alert" type="error" showIcon title={errors.root.message} />
-        )}
+        {errors.root?.message ? (
+          <div className="mt-5">
+            <Notice type="error" title={errors.root.message} />
+          </div>
+        ) : null}
 
-        <Form layout="vertical" onFinish={handleSubmit(handleLogin)} noValidate>
-          <Form.Item
-            label="Email"
-            validateStatus={errors.email ? "error" : undefined}
-            help={errors.email?.message}
-          >
-            <Controller
-              name="email"
-              control={control}
-              render={({ field }) => (
-                <Input
-                  {...field}
-                  size="large"
-                  autoComplete="email"
-                  inputMode="email"
-                  disabled={isSubmitting}
-                />
-              )}
-            />
-          </Form.Item>
+        <form className="mt-6 grid gap-4" onSubmit={handleSubmit(handleLogin)} noValidate>
+          <Controller
+            name="email"
+            control={control}
+            render={({ field }) => (
+              <Field label="Email" error={errors.email?.message}>
+                <TextInput {...field} autoComplete="email" inputMode="email" disabled={isSubmitting} />
+              </Field>
+            )}
+          />
 
-          <Form.Item
-            label="Password"
-            validateStatus={errors.password ? "error" : undefined}
-            help={errors.password?.message}
-          >
-            <Controller
-              name="password"
-              control={control}
-              render={({ field }) => (
-                <Input.Password
-                  {...field}
-                  size="large"
-                  autoComplete="current-password"
-                  disabled={isSubmitting}
-                />
-              )}
-            />
-          </Form.Item>
+          <Controller
+            name="password"
+            control={control}
+            render={({ field }) => (
+              <Field label="Password" error={errors.password?.message}>
+                <TextInput {...field} type="password" autoComplete="current-password" disabled={isSubmitting} />
+              </Field>
+            )}
+          />
 
-          <Button type="primary" htmlType="submit" size="large" block loading={isSubmitting}>
-            Login
+          <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
+            {isSubmitting ? "Signing in..." : "Login"}
           </Button>
-        </Form>
-      </Card>
+        </form>
+      </section>
     </main>
   );
 }
