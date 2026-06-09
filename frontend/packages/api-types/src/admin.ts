@@ -1,4 +1,5 @@
-﻿import type { OrderStatus, PaymentMethod, OrderItemDto } from "./orders";
+﻿import type { PaginationRequest } from "./common";
+import type { OrderStatus, PaymentMethod, OrderItemDto } from "./orders";
 
 export interface AdminLoginRequest {
   email: string;
@@ -22,6 +23,14 @@ export interface AdminCategoryDto {
   children: AdminCategoryDto[];
 }
 
+export interface AdminCategoryUpsertRequest {
+  parentId?: string | null;
+  name: string;
+  slug: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
 export interface AdminProductVariantDto {
   id: string;
   productId: string;
@@ -31,6 +40,18 @@ export interface AdminProductVariantDto {
   size: string | null;
   price: number;
   compareAtPrice: number | null;
+  stockQuantity: number;
+  requiresInstallation: boolean;
+  isActive: boolean;
+}
+
+export interface AdminProductVariantUpsertRequest {
+  sku: string;
+  name: string;
+  color?: string | null;
+  size?: string | null;
+  price: number;
+  compareAtPrice?: number | null;
   stockQuantity: number;
   requiresInstallation: boolean;
   isActive: boolean;
@@ -48,6 +69,20 @@ export interface AdminProductDto {
   createdAt: string;
   updatedAt: string;
   variants: AdminProductVariantDto[];
+}
+
+export interface AdminProductUpsertRequest {
+  categoryId: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  isFeatured: boolean;
+  isActive: boolean;
+}
+
+export interface AdminOrderListRequest extends PaginationRequest {
+  status?: OrderStatus;
+  search?: string;
 }
 
 export interface AdminOrderListItemDto {
@@ -84,6 +119,11 @@ export interface AdminOrderDto extends AdminOrderListItemDto {
   statusHistory: AdminOrderStatusHistoryDto[];
 }
 
+export interface UpdateOrderStatusRequest {
+  status: OrderStatus;
+  note?: string | null;
+}
+
 export interface AdminBannerDto {
   id: string;
   title: string;
@@ -93,6 +133,14 @@ export interface AdminBannerDto {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AdminBannerUpsertRequest {
+  title: string;
+  imageUrl: string;
+  linkUrl?: string | null;
+  sortOrder: number;
+  isActive: boolean;
 }
 
 export interface LowStockProductVariantDto {

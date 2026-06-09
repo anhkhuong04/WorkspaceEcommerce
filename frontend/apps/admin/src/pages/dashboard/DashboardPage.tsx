@@ -1,8 +1,9 @@
 ﻿import { useQuery } from "@tanstack/react-query";
 import { formatMoney } from "@workspace-ecommerce/shared-utils";
-import { Card, Col, Row, Table, Tag, Typography } from "antd";
+import { Alert, Card, Col, Empty, Row, Skeleton, Statistic, Table, Tag, Typography } from "antd";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
 import { adminApi } from "../../services/api/adminApi";
+import { getApiErrorMessage } from "../../services/api/errors";
 
 export function DashboardPage() {
   const dashboardQuery = useQuery({
@@ -13,22 +14,70 @@ export function DashboardPage() {
 
   return (
     <div className="admin-page-grid">
-      <AdminPageHeader title="Dashboard" description="Basic operating metrics for orders, revenue, new orders, and low stock variants." />
+      <AdminPageHeader
+        title="Dashboard"
+        description="Operating metrics from live orders, completed revenue, pending orders, and low stock variants."
+      />
+
+      {dashboardQuery.isError ? (
+        <Alert
+          type="error"
+          showIcon
+          message="Dashboard could not be loaded"
+          description={getApiErrorMessage(dashboardQuery.error)}
+        />
+      ) : null}
+
       <Row gutter={[16, 16]}>
-        <Col span={8}><Card title="Total orders"> <Typography.Title level={2}>{dashboard?.totalOrders ?? "-"}</Typography.Title></Card></Col>
-        <Col span={8}><Card title="Completed revenue"> <Typography.Title level={2}>{dashboard ? formatMoney(dashboard.totalRevenue) : "-"}</Typography.Title></Card></Col>
-        <Col span={8}><Card title="New orders"> <Typography.Title level={2}>{dashboard?.newOrders ?? "-"}</Typography.Title></Card></Col>
+        <Col xs={24} md={8}>
+          <Card className="admin-metric-card">
+            <Skeleton active paragraph={false} loading={dashboardQuery.isLoading}>
+              <Statistic title="Total orders" value={dashboard?.totalOrders ?? 0} />
+            </Skeleton>
+          </Card>
+        </Col>
+        <Col xs={24} md={8}>
+          <Card className="admin-metric-card">
+            <Skeleton active paragraph={false} loading={dashboardQuery.isLoading}>
+              <Statistic title="Completed revenue" value={dashboard ? formatMoney(dashboard.totalRevenue) : formatMoney(0)} />
+            </Skeleton>
+          </Card>
+        </Col>
+        <Col xs={24} md={8}>
+          <Card className="admin-metric-card">
+            <Skeleton active paragraph={false} loading={dashboardQuery.isLoading}>
+              <Statistic title="New orders" value={dashboard?.newOrders ?? 0} valueStyle={{ color: "#0f766e" }} />
+            </Skeleton>
+          </Card>
+        </Col>
       </Row>
-      <Card title="Low stock variants" loading={dashboardQuery.isLoading}>
+
+      <Card
+        title="Low stock variants"
+        extra={<Typography.Text type="secondary">Threshold: 10 units</Typography.Text>}
+      >
         <Table
           rowKey="variantId"
+          loading={dashboardQuery.isLoading}
           dataSource={dashboard?.lowStockVariants ?? []}
           pagination={false}
+          locale={{ emptyText: <Empty description="No low stock variants" /> }}
           columns={[
             { title: "Product", dataIndex: "productName" },
-            { title: "SKU", dataIndex: "sku" },
+            { title: "SKU", dataIndex: "sku", width: 160 },
             { title: "Variant", dataIndex: "variantName" },
-            { title: "Stock", dataIndex: "stockQuantity", render: (value: number) => <Tag color={value <= 5 ? "red" : "green"}>{value}</Tag> }
+            {
+              title: "Stock",
+              dataIndex: "stockQuantity",
+              width: 120,
+              render: (value: number) => <Tag color={value <= 5 ? "red" : "orange"}>{value}</Tag>
+            },
+            {
+              title: "Status",
+              dataIndex: "isActive",
+              width: 120,
+              render: (value: boolean) => <Tag color={value ? "green" : "default"}>{value ? "Active" : "Inactive"}</Tag>
+            }
           ]}
         />
       </Card>

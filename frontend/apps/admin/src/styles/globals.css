@@ -75,12 +75,49 @@ body {
   padding: 24px;
 }
 
+.admin-page-header-side {
+  justify-content: flex-end;
+}
+
 .admin-eyebrow {
   color: var(--admin-accent);
   font-size: 12px;
   font-weight: 900;
   letter-spacing: 0.16em;
   text-transform: uppercase;
+}
+
+.admin-toolbar {
+  margin-bottom: 16px;
+}
+
+.admin-form {
+  padding-top: 8px;
+}
+
+.admin-table-image {
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.admin-drawer-stack {
+  width: 100%;
+}
+
+.admin-metric-card {
+  height: 100%;
+}
+
+@media (max-width: 900px) {
+  .admin-page-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-page-header-side {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 .login-page {

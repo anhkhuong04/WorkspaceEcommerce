@@ -1,13 +1,19 @@
-import type {
+﻿import type {
   AddCartItemRequest,
   AdminBannerDto,
+  AdminBannerUpsertRequest,
   AdminCategoryDto,
+  AdminCategoryUpsertRequest,
   AdminDashboardDto,
   AdminLoginRequest,
   AdminLoginResponse,
   AdminOrderDto,
   AdminOrderListItemDto,
+  AdminOrderListRequest,
   AdminProductDto,
+  AdminProductUpsertRequest,
+  AdminProductVariantDto,
+  AdminProductVariantUpsertRequest,
   CartDto,
   CheckoutRequest,
   CheckoutResponse,
@@ -19,14 +25,15 @@ import type {
   StorefrontCategoryDto,
   StorefrontProductDetailDto,
   StorefrontProductListItemDto,
-  UpdateCartItemRequest
+  UpdateCartItemRequest,
+  UpdateOrderStatusRequest
 } from "@workspace-ecommerce/api-types";
 import { ApiClient } from "./httpClient";
 
 function buildQuery(params: object): string {
-    const query = new URLSearchParams();
+  const query = new URLSearchParams();
 
-    for (const [key, value] of Object.entries(params)) {
+  for (const [key, value] of Object.entries(params)) {
     if (
       (typeof value === "string" || typeof value === "number" || typeof value === "boolean") &&
       value !== ""
@@ -61,10 +68,29 @@ export function createAdminApi(client: ApiClient) {
   return {
     login: (request: AdminLoginRequest) => client.post<AdminLoginResponse, AdminLoginRequest>("/api/admin/auth/login", request),
     getCategories: () => client.get<AdminCategoryDto[]>("/api/admin/categories"),
+    createCategory: (request: AdminCategoryUpsertRequest) =>
+      client.post<AdminCategoryDto, AdminCategoryUpsertRequest>("/api/admin/categories", request),
+    updateCategory: (id: string, request: AdminCategoryUpsertRequest) =>
+      client.put<AdminCategoryDto, AdminCategoryUpsertRequest>(`/api/admin/categories/${id}`, request),
     getProducts: () => client.get<AdminProductDto[]>("/api/admin/products"),
-    getOrders: () => client.get<PagedResult<AdminOrderListItemDto>>("/api/admin/orders"),
+    createProduct: (request: AdminProductUpsertRequest) =>
+      client.post<AdminProductDto, AdminProductUpsertRequest>("/api/admin/products", request),
+    updateProduct: (id: string, request: AdminProductUpsertRequest) =>
+      client.put<AdminProductDto, AdminProductUpsertRequest>(`/api/admin/products/${id}`, request),
+    createProductVariant: (productId: string, request: AdminProductVariantUpsertRequest) =>
+      client.post<AdminProductVariantDto, AdminProductVariantUpsertRequest>(`/api/admin/products/${productId}/variants`, request),
+    updateProductVariant: (id: string, request: AdminProductVariantUpsertRequest) =>
+      client.put<AdminProductVariantDto, AdminProductVariantUpsertRequest>(`/api/admin/variants/${id}`, request),
+    getOrders: (request: AdminOrderListRequest = {}) =>
+      client.get<PagedResult<AdminOrderListItemDto>>(`/api/admin/orders${buildQuery(request)}`),
     getOrder: (id: string) => client.get<AdminOrderDto>(`/api/admin/orders/${id}`),
+    updateOrderStatus: (id: string, request: UpdateOrderStatusRequest) =>
+      client.put<AdminOrderDto, UpdateOrderStatusRequest>(`/api/admin/orders/${id}/status`, request),
     getBanners: () => client.get<AdminBannerDto[]>("/api/admin/banners"),
+    createBanner: (request: AdminBannerUpsertRequest) =>
+      client.post<AdminBannerDto, AdminBannerUpsertRequest>("/api/admin/banners", request),
+    updateBanner: (id: string, request: AdminBannerUpsertRequest) =>
+      client.put<AdminBannerDto, AdminBannerUpsertRequest>(`/api/admin/banners/${id}`, request),
     getDashboard: () => client.get<AdminDashboardDto>("/api/admin/dashboard")
   };
 }
