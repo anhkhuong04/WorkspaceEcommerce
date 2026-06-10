@@ -1,9 +1,7 @@
-﻿import heroImage from "../../assets/banner 2.png";
-
 const benefits = [
-  { title: "Quality products", description: "Authentic workspace gear with reliable warranty coverage.", icon: "✓" },
-  { title: "Fast delivery", description: "Safe nationwide shipping for your setup essentials.", icon: "→" },
-  { title: "Dedicated support", description: "Workspace advice and after-sales support when you need it.", icon: "◎" }
+  { title: "Quality products", description: "Authentic workspace gear with reliable warranty coverage.", icon: "+" },
+  { title: "Fast delivery", description: "Safe nationwide shipping for your setup essentials.", icon: ">" },
+  { title: "Dedicated support", description: "Workspace advice and after-sales support when you need it.", icon: "o" }
 ];
 
 const trustBadges = ["Information security", "Secure checkout", "24/7 support"];
@@ -45,7 +43,13 @@ export function LoginPage() {
 
           <div className="pointer-events-none absolute bottom-0 left-1/2 hidden w-[760px] -translate-x-[38%] lg:block">
             <div className="absolute -left-14 bottom-16 h-44 w-44 rounded-full bg-emerald-200/55 blur-2xl" />
-            <img src={heroImage} alt="Workspace desk setup" className="relative h-[430px] w-full rounded-t-[3rem] object-cover object-center shadow-2xl shadow-slate-900/10" />
+            <div className="relative h-[430px] w-full rounded-t-[3rem] bg-gradient-to-br from-emerald-100 via-white to-slate-200 p-10 shadow-2xl shadow-slate-900/10">
+              <div className="absolute bottom-14 left-14 right-14 h-20 rounded-3xl bg-slate-900/85" />
+              <div className="absolute bottom-32 left-24 h-36 w-64 rounded-3xl border border-white/80 bg-white/80 shadow-xl" />
+              <div className="absolute bottom-32 right-32 h-48 w-24 rounded-full bg-emerald-300/80" />
+              <div className="absolute bottom-8 left-28 h-28 w-8 rounded-full bg-slate-700" />
+              <div className="absolute bottom-8 right-28 h-28 w-8 rounded-full bg-slate-700" />
+            </div>
           </div>
         </div>
 
@@ -53,11 +57,11 @@ export function LoginPage() {
           <div className="w-full max-w-[620px] rounded-[2rem] bg-white/88 p-6 shadow-2xl shadow-slate-900/10 ring-1 ring-white/80 backdrop-blur-xl sm:rounded-[2.4rem] sm:p-10">
             <div className="grid grid-cols-2 border-b border-slate-200 text-lg font-black text-slate-500">
               <button type="button" className="flex items-center justify-center gap-3 border-b-2 border-[var(--brand)] pb-5 text-[var(--brand)]">
-                <span className="text-2xl">↪</span>
+                <span className="text-2xl">&gt;</span>
                 Login
               </button>
               <button type="button" className="flex cursor-default items-center justify-center gap-3 pb-5" aria-disabled="true">
-                <span className="text-2xl">♙</span>
+                <span className="text-2xl">+</span>
                 Register
               </button>
             </div>
@@ -76,7 +80,7 @@ export function LoginPage() {
                 <label className="block">
                   <span className="mb-2 block font-black text-slate-900">Email</span>
                   <span className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition focus-within:border-[var(--brand)] focus-within:ring-4 focus-within:ring-emerald-100">
-                    <span className="text-xl text-slate-400">✉</span>
+                    <span className="text-xl text-slate-400">@</span>
                     <input className="w-full bg-transparent text-base font-semibold outline-none placeholder:text-slate-400" type="email" placeholder="Enter your email" autoComplete="email" />
                   </span>
                 </label>
@@ -84,9 +88,9 @@ export function LoginPage() {
                 <label className="block">
                   <span className="mb-2 block font-black text-slate-900">Password</span>
                   <span className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition focus-within:border-[var(--brand)] focus-within:ring-4 focus-within:ring-emerald-100">
-                    <span className="text-xl text-slate-400">▣</span>
+                    <span className="text-xl text-slate-400">#</span>
                     <input className="w-full bg-transparent text-base font-semibold outline-none placeholder:text-slate-400" type="password" placeholder="Enter your password" autoComplete="current-password" />
-                    <span className="text-lg text-slate-400">◉</span>
+                    <span className="text-lg text-slate-400">o</span>
                   </span>
                 </label>
               </div>
@@ -117,7 +121,7 @@ export function LoginPage() {
             <div className="mt-10 grid gap-4 border-t border-slate-100 pt-6 text-xs font-black text-slate-500 sm:grid-cols-3">
               {trustBadges.map((badge) => (
                 <div key={badge} className="flex items-center justify-center gap-2">
-                  <span className="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-500">✓</span>
+                  <span className="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-500">+</span>
                   {badge}
                 </div>
               ))}

@@ -1,7 +1,4 @@
-﻿import { NavLink, Outlet } from "react-router-dom";
-import searchIcon from "../../assets/search.svg";
-import cartIcon from "../../assets/shoping-cart.png";
-import userIcon from "../../assets/user.png";
+import { NavLink, Outlet } from "react-router-dom";
 
 const navItems = [
   { to: "/products", label: "Products", hasDropdown: true },
@@ -33,7 +30,7 @@ export function StorefrontLayout() {
                     }
                   >
                     {item.label}
-                    {item.hasDropdown ? <span className="mt-0.5 text-sm leading-none text-slate-900" aria-hidden="true">˅</span> : null}
+                    {item.hasDropdown ? <span className="mt-0.5 text-sm leading-none text-slate-900" aria-hidden="true">v</span> : null}
                   </NavLink>
                 ) : (
                   <button
@@ -43,7 +40,7 @@ export function StorefrontLayout() {
                     aria-disabled="true"
                   >
                     {item.label}
-                    {item.hasDropdown ? <span className="mt-0.5 text-sm leading-none text-slate-900" aria-hidden="true">˅</span> : null}
+                    {item.hasDropdown ? <span className="mt-0.5 text-sm leading-none text-slate-900" aria-hidden="true">v</span> : null}
                   </button>
                 )
               )}
@@ -57,7 +54,7 @@ export function StorefrontLayout() {
               aria-disabled="true"
             >
               English
-              <span className="mt-0.5 text-sm leading-none" aria-hidden="true">˅</span>
+              <span className="mt-0.5 text-sm leading-none" aria-hidden="true">v</span>
             </button>
 
             <NavLink
@@ -65,7 +62,7 @@ export function StorefrontLayout() {
               className="grid h-10 w-10 place-items-center rounded-full transition hover:bg-slate-100"
               aria-label="Search"
             >
-              <img src={searchIcon} alt="" className="h-7 w-7 object-contain" />
+              <span className="text-lg font-black text-slate-900" aria-hidden="true">S</span>
             </NavLink>
 
             <NavLink
@@ -73,7 +70,7 @@ export function StorefrontLayout() {
               className="grid h-10 w-10 place-items-center rounded-full transition hover:bg-slate-100"
               aria-label="Login"
             >
-              <img src={userIcon} alt="" className="h-7 w-7 object-contain" />
+              <span className="text-lg font-black text-slate-900" aria-hidden="true">U</span>
             </NavLink>
 
             <NavLink
@@ -81,7 +78,7 @@ export function StorefrontLayout() {
               className="grid h-10 w-10 place-items-center rounded-full transition hover:bg-slate-100"
               aria-label="Cart"
             >
-              <img src={cartIcon} alt="" className="h-7 w-7 object-contain" />
+              <span className="text-lg font-black text-slate-900" aria-hidden="true">C</span>
             </NavLink>
           </div>
         </div>

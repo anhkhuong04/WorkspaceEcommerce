@@ -1,8 +1,18 @@
 ﻿import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AdminCategoryDto, AdminProductDto, AdminProductUpsertRequest, AdminProductVariantDto, AdminProductVariantUpsertRequest } from "@workspace-ecommerce/api-types";
+import type {
+  AdminCategoryDto,
+  AdminProductDto,
+  AdminProductImageDto,
+  AdminProductImageUpsertRequest,
+  AdminProductSpecificationDto,
+  AdminProductSpecificationUpsertRequest,
+  AdminProductUpsertRequest,
+  AdminProductVariantDto,
+  AdminProductVariantUpsertRequest
+} from "@workspace-ecommerce/api-types";
 import { formatMoney } from "@workspace-ecommerce/shared-utils";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
@@ -31,12 +41,28 @@ const variantSchema = z.object({
   isActive: z.boolean()
 }).refine((values) => values.compareAtPrice === null || values.compareAtPrice >= values.price, { path: ["compareAtPrice"], message: "Compare-at price cannot be lower than price." });
 
+const imageSchema = z.object({
+  imageUrl: z.string().trim().min(1, "Image URL is required.").max(1000, "Image URL is too long."),
+  altText: z.string().trim().max(250, "Alt text is too long.").optional(),
+  sortOrder: z.number().int("Sort order must be an integer.")
+});
+
+const specificationSchema = z.object({
+  name: z.string().trim().min(1, "Name is required.").max(200, "Name is too long."),
+  value: z.string().trim().min(1, "Value is required.").max(1000, "Value is too long."),
+  sortOrder: z.number().int("Sort order must be an integer.")
+});
+
 type ProductFormValues = z.infer<typeof productSchema>;
 type VariantFormValues = z.infer<typeof variantSchema>;
+type ImageFormValues = z.infer<typeof imageSchema>;
+type SpecificationFormValues = z.infer<typeof specificationSchema>;
 type CategoryOption = { id: string; label: string; level: number };
 
 const productDefaultValues: ProductFormValues = { categoryId: "", name: "", slug: "", description: "", isFeatured: false, isActive: true };
 const variantDefaultValues: VariantFormValues = { sku: "", name: "", color: "", size: "", price: 0, compareAtPrice: null, stockQuantity: 0, requiresInstallation: false, isActive: true };
+const imageDefaultValues: ImageFormValues = { imageUrl: "", altText: "", sortOrder: 1 };
+const specificationDefaultValues: SpecificationFormValues = { name: "", value: "", sortOrder: 1 };
 
 function flattenCategories(categories: AdminCategoryDto[], level = 0): CategoryOption[] {
   return categories.flatMap((category) => [{ id: category.id, label: category.name, level }, ...flattenCategories(category.children, level + 1)]);
@@ -58,6 +84,22 @@ function toVariantRequest(values: VariantFormValues): AdminProductVariantUpsertR
   return { sku: values.sku.trim(), name: values.name.trim(), color: values.color?.trim() ? values.color.trim() : null, size: values.size?.trim() ? values.size.trim() : null, price: values.price, compareAtPrice: values.compareAtPrice, stockQuantity: values.stockQuantity, requiresInstallation: values.requiresInstallation, isActive: values.isActive };
 }
 
+function toImageFormValues(image: AdminProductImageDto): ImageFormValues {
+  return { imageUrl: image.imageUrl, altText: image.altText ?? "", sortOrder: image.sortOrder };
+}
+
+function toImageRequest(values: ImageFormValues): AdminProductImageUpsertRequest {
+  return { imageUrl: values.imageUrl.trim(), altText: values.altText?.trim() ? values.altText.trim() : null, sortOrder: values.sortOrder };
+}
+
+function toSpecificationFormValues(specification: AdminProductSpecificationDto): SpecificationFormValues {
+  return { name: specification.name, value: specification.value, sortOrder: specification.sortOrder };
+}
+
+function toSpecificationRequest(values: SpecificationFormValues): AdminProductSpecificationUpsertRequest {
+  return { name: values.name.trim(), value: values.value.trim(), sortOrder: values.sortOrder };
+}
+
 export function ProductsPage() {
   const queryClient = useQueryClient();
   const productsQuery = useQuery({ queryKey: ["admin-products"], queryFn: adminApi.getProducts });
@@ -66,13 +108,25 @@ export function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<AdminProductDto | null>(null);
   const [variantProduct, setVariantProduct] = useState<AdminProductDto | null>(null);
   const [editingVariant, setEditingVariant] = useState<AdminProductVariantDto | null>(null);
+  const [imageProduct, setImageProduct] = useState<AdminProductDto | null>(null);
+  const [editingImage, setEditingImage] = useState<AdminProductImageDto | null>(null);
+  const [specificationProduct, setSpecificationProduct] = useState<AdminProductDto | null>(null);
+  const [editingSpecification, setEditingSpecification] = useState<AdminProductSpecificationDto | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [isSpecificationModalOpen, setIsSpecificationModalOpen] = useState(false);
   const [expandedProductIds, setExpandedProductIds] = useState<Set<string>>(new Set());
 
   const productForm = useForm<ProductFormValues>({ resolver: zodResolver(productSchema), defaultValues: productDefaultValues });
   const variantForm = useForm<VariantFormValues>({ resolver: zodResolver(variantSchema), defaultValues: variantDefaultValues });
+  const imageForm = useForm<ImageFormValues>({ resolver: zodResolver(imageSchema), defaultValues: imageDefaultValues });
+  const specificationForm = useForm<SpecificationFormValues>({ resolver: zodResolver(specificationSchema), defaultValues: specificationDefaultValues });
   const categoryOptions = useMemo(() => flattenCategories(categoriesQuery.data ?? []), [categoriesQuery.data]);
+
+  async function refreshProducts() {
+    await queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+  }
 
   const productSaveMutation = useMutation({
     mutationFn: (values: ProductFormValues) => {
@@ -91,7 +145,7 @@ export function ProductsPage() {
 
   const productToggleMutation = useMutation({
     mutationFn: (product: AdminProductDto) => adminApi.updateProduct(product.id, { ...toProductRequest(toProductFormValues(product)), isActive: !product.isActive }),
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["admin-products"] }); setNotice({ type: "success", message: "Product status updated." }); },
+    onSuccess: async () => { await refreshProducts(); setNotice({ type: "success", message: "Product status updated." }); },
     onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
   });
 
@@ -115,7 +169,55 @@ export function ProductsPage() {
 
   const variantToggleMutation = useMutation({
     mutationFn: (variant: AdminProductVariantDto) => adminApi.updateProductVariant(variant.id, { ...toVariantRequest(toVariantFormValues(variant)), isActive: !variant.isActive }),
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["admin-products"] }); setNotice({ type: "success", message: "Variant status updated." }); },
+    onSuccess: async () => { await refreshProducts(); setNotice({ type: "success", message: "Variant status updated." }); },
+    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
+  });
+
+  const imageSaveMutation = useMutation({
+    mutationFn: (values: ImageFormValues) => {
+      const request = toImageRequest(values);
+      if (editingImage) return adminApi.updateProductImage(editingImage.id, request);
+      if (!imageProduct) throw new Error("Product is required for a new image.");
+      return adminApi.createProductImage(imageProduct.id, request);
+    },
+    onSuccess: async () => {
+      await refreshProducts();
+      setIsImageModalOpen(false);
+      setImageProduct(null);
+      setEditingImage(null);
+      imageForm.reset(imageDefaultValues);
+      setNotice({ type: "success", message: "Product image saved." });
+    },
+    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
+  });
+
+  const imageDeleteMutation = useMutation({
+    mutationFn: (image: AdminProductImageDto) => adminApi.deleteProductImage(image.id),
+    onSuccess: async () => { await refreshProducts(); setNotice({ type: "success", message: "Product image deleted." }); },
+    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
+  });
+
+  const specificationSaveMutation = useMutation({
+    mutationFn: (values: SpecificationFormValues) => {
+      const request = toSpecificationRequest(values);
+      if (editingSpecification) return adminApi.updateProductSpecification(editingSpecification.id, request);
+      if (!specificationProduct) throw new Error("Product is required for a new specification.");
+      return adminApi.createProductSpecification(specificationProduct.id, request);
+    },
+    onSuccess: async () => {
+      await refreshProducts();
+      setIsSpecificationModalOpen(false);
+      setSpecificationProduct(null);
+      setEditingSpecification(null);
+      specificationForm.reset(specificationDefaultValues);
+      setNotice({ type: "success", message: "Product specification saved." });
+    },
+    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
+  });
+
+  const specificationDeleteMutation = useMutation({
+    mutationFn: (specification: AdminProductSpecificationDto) => adminApi.deleteProductSpecification(specification.id),
+    onSuccess: async () => { await refreshProducts(); setNotice({ type: "success", message: "Product specification deleted." }); },
     onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
   });
 
@@ -123,11 +225,27 @@ export function ProductsPage() {
   function openEditProductModal(product: AdminProductDto) { setEditingProduct(product); productForm.reset(toProductFormValues(product)); setIsProductModalOpen(true); }
   function openCreateVariantModal(product: AdminProductDto) { setVariantProduct(product); setEditingVariant(null); variantForm.reset(variantDefaultValues); setIsVariantModalOpen(true); }
   function openEditVariantModal(product: AdminProductDto, variant: AdminProductVariantDto) { setVariantProduct(product); setEditingVariant(variant); variantForm.reset(toVariantFormValues(variant)); setIsVariantModalOpen(true); }
+  function openCreateImageModal(product: AdminProductDto) { setImageProduct(product); setEditingImage(null); imageForm.reset({ ...imageDefaultValues, sortOrder: product.images.length + 1 }); setIsImageModalOpen(true); }
+  function openEditImageModal(product: AdminProductDto, image: AdminProductImageDto) { setImageProduct(product); setEditingImage(image); imageForm.reset(toImageFormValues(image)); setIsImageModalOpen(true); }
+  function openCreateSpecificationModal(product: AdminProductDto) { setSpecificationProduct(product); setEditingSpecification(null); specificationForm.reset({ ...specificationDefaultValues, sortOrder: product.specifications.length + 1 }); setIsSpecificationModalOpen(true); }
+  function openEditSpecificationModal(product: AdminProductDto, specification: AdminProductSpecificationDto) { setSpecificationProduct(product); setEditingSpecification(specification); specificationForm.reset(toSpecificationFormValues(specification)); setIsSpecificationModalOpen(true); }
   function toggleExpanded(productId: string) { setExpandedProductIds((current) => { const next = new Set(current); if (next.has(productId)) next.delete(productId); else next.add(productId); return next; }); }
+
+  function deleteImage(image: AdminProductImageDto) {
+    if (window.confirm("Delete this product image?")) {
+      imageDeleteMutation.mutate(image);
+    }
+  }
+
+  function deleteSpecification(specification: AdminProductSpecificationDto) {
+    if (window.confirm("Delete this product specification?")) {
+      specificationDeleteMutation.mutate(specification);
+    }
+  }
 
   return (
     <div className="admin-page-grid">
-      <AdminPageHeader title="Products" description="Manage products, visibility, featured state, variants, pricing, stock, and installation flags." actions={<Button type="button" variant="primary" disabled={categoryOptions.length === 0} onClick={openCreateProductModal}>New product</Button>} />
+      <AdminPageHeader title="Products" description="Manage products, visibility, featured state, variants, images, specifications, pricing, stock, and installation flags." actions={<Button type="button" variant="primary" disabled={categoryOptions.length === 0} onClick={openCreateProductModal}>New product</Button>} />
       {notice ? <Notice type={notice.type} title={notice.message} /> : null}
       {productsQuery.isError ? <Notice type="error" title="Products could not be loaded">{getApiErrorMessage(productsQuery.error)}</Notice> : null}
       {categoriesQuery.isError ? <Notice type="warning" title="Categories could not be loaded">Product forms need categories before creating or editing products.</Notice> : null}
@@ -135,25 +253,50 @@ export function ProductsPage() {
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         {productsQuery.isLoading ? <div className="grid gap-3">{[0, 1, 2].map((item) => <div key={item} className="h-16 animate-pulse rounded-2xl bg-slate-100" />)}</div> : productsQuery.data?.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-slate-500"><tr className="border-b border-slate-100"><th className="py-3 pr-4">Product</th><th className="py-3 pr-4">Category</th><th className="py-3 pr-4">Variants</th><th className="py-3 pr-4">Featured</th><th className="py-3 pr-4">Status</th><th className="py-3 pr-4">Actions</th></tr></thead>
+            <table className="w-full min-w-[1120px] text-left text-sm">
+              <thead className="text-xs uppercase tracking-wide text-slate-500"><tr className="border-b border-slate-100"><th className="py-3 pr-4">Product</th><th className="py-3 pr-4">Category</th><th className="py-3 pr-4">Variants</th><th className="py-3 pr-4">Assets</th><th className="py-3 pr-4">Featured</th><th className="py-3 pr-4">Status</th><th className="py-3 pr-4">Actions</th></tr></thead>
               <tbody>
                 {productsQuery.data.map((product) => (
-                  <>
+                  <Fragment key={product.id}>
                     <tr key={product.id} className="border-b border-slate-100">
                       <td className="py-3 pr-4"><button type="button" className="mr-2 font-black text-teal-700" onClick={() => toggleExpanded(product.id)}>{expandedProductIds.has(product.id) ? "-" : "+"}</button><span className="font-bold text-slate-900">{product.name}</span><p className="mt-0.5 text-xs text-slate-500">{product.slug}</p></td>
                       <td className="py-3 pr-4 text-slate-600">{product.categoryName ?? "-"}</td>
                       <td className="py-3 pr-4 text-slate-600">{product.variants.length}</td>
+                      <td className="py-3 pr-4 text-slate-600">{product.images.length} images / {product.specifications.length} specs</td>
                       <td className="py-3 pr-4"><Pill tone={product.isFeatured ? "blue" : "slate"}>{product.isFeatured ? "Featured" : "Standard"}</Pill></td>
                       <td className="py-3 pr-4"><div className="flex items-center gap-3"><Toggle checked={product.isActive} disabled={productToggleMutation.isPending} onChange={() => productToggleMutation.mutate(product)} /><Pill tone={product.isActive ? "green" : "slate"}>{product.isActive ? "Active" : "Inactive"}</Pill></div></td>
-                      <td className="py-3 pr-4"><div className="flex gap-2"><Button type="button" onClick={() => openEditProductModal(product)}>Edit</Button><Button type="button" onClick={() => openCreateVariantModal(product)}>Add SKU</Button></div></td>
+                      <td className="py-3 pr-4"><div className="flex flex-wrap gap-2"><Button type="button" onClick={() => openEditProductModal(product)}>Edit</Button><Button type="button" onClick={() => openCreateVariantModal(product)}>Add SKU</Button><Button type="button" onClick={() => openCreateImageModal(product)}>Add image</Button><Button type="button" onClick={() => openCreateSpecificationModal(product)}>Add spec</Button></div></td>
                     </tr>
                     {expandedProductIds.has(product.id) ? (
-                      <tr key={`${product.id}-variants`} className="border-b border-slate-100 bg-slate-50/70"><td colSpan={6} className="p-4">
-                        {product.variants.length ? <div className="overflow-x-auto"><table className="w-full min-w-[920px] text-left text-xs"><thead className="uppercase tracking-wide text-slate-500"><tr><th className="py-2 pr-3">SKU</th><th className="py-2 pr-3">Variant</th><th className="py-2 pr-3">Color</th><th className="py-2 pr-3">Size</th><th className="py-2 pr-3">Price</th><th className="py-2 pr-3">Compare at</th><th className="py-2 pr-3">Stock</th><th className="py-2 pr-3">Install</th><th className="py-2 pr-3">Active</th><th className="py-2 pr-3">Actions</th></tr></thead><tbody>{product.variants.map((variant) => <tr key={variant.id} className="border-t border-slate-200"><td className="py-2 pr-3 font-bold">{variant.sku}</td><td className="py-2 pr-3">{variant.name}</td><td className="py-2 pr-3">{variant.color || "-"}</td><td className="py-2 pr-3">{variant.size || "-"}</td><td className="py-2 pr-3">{formatMoney(variant.price)}</td><td className="py-2 pr-3">{variant.compareAtPrice === null ? "-" : formatMoney(variant.compareAtPrice)}</td><td className="py-2 pr-3"><Pill tone={variant.stockQuantity <= 5 ? "red" : variant.stockQuantity <= 10 ? "orange" : "green"}>{variant.stockQuantity}</Pill></td><td className="py-2 pr-3"><Pill tone={variant.requiresInstallation ? "blue" : "slate"}>{variant.requiresInstallation ? "Required" : "None"}</Pill></td><td className="py-2 pr-3"><Toggle checked={variant.isActive} disabled={variantToggleMutation.isPending} onChange={() => variantToggleMutation.mutate(variant)} /></td><td className="py-2 pr-3"><Button type="button" onClick={() => openEditVariantModal(product, variant)}>Edit</Button></td></tr>)}</tbody></table></div> : <EmptyState>No variants for this product</EmptyState>}
+                      <tr key={`${product.id}-assets`} className="border-b border-slate-100 bg-slate-50/70"><td colSpan={7} className="p-4">
+                        <div className="grid gap-5">
+                          <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                              <h3 className="text-sm font-black text-slate-900">Variants</h3>
+                              <Button type="button" onClick={() => openCreateVariantModal(product)}>Add SKU</Button>
+                            </div>
+                            {product.variants.length ? <div className="overflow-x-auto"><table className="w-full min-w-[920px] text-left text-xs"><thead className="uppercase tracking-wide text-slate-500"><tr><th className="py-2 pr-3">SKU</th><th className="py-2 pr-3">Variant</th><th className="py-2 pr-3">Color</th><th className="py-2 pr-3">Size</th><th className="py-2 pr-3">Price</th><th className="py-2 pr-3">Compare at</th><th className="py-2 pr-3">Stock</th><th className="py-2 pr-3">Install</th><th className="py-2 pr-3">Active</th><th className="py-2 pr-3">Actions</th></tr></thead><tbody>{product.variants.map((variant) => <tr key={variant.id} className="border-t border-slate-200"><td className="py-2 pr-3 font-bold">{variant.sku}</td><td className="py-2 pr-3">{variant.name}</td><td className="py-2 pr-3">{variant.color || "-"}</td><td className="py-2 pr-3">{variant.size || "-"}</td><td className="py-2 pr-3">{formatMoney(variant.price)}</td><td className="py-2 pr-3">{variant.compareAtPrice === null ? "-" : formatMoney(variant.compareAtPrice)}</td><td className="py-2 pr-3"><Pill tone={variant.stockQuantity <= 5 ? "red" : variant.stockQuantity <= 10 ? "orange" : "green"}>{variant.stockQuantity}</Pill></td><td className="py-2 pr-3"><Pill tone={variant.requiresInstallation ? "blue" : "slate"}>{variant.requiresInstallation ? "Required" : "None"}</Pill></td><td className="py-2 pr-3"><Toggle checked={variant.isActive} disabled={variantToggleMutation.isPending} onChange={() => variantToggleMutation.mutate(variant)} /></td><td className="py-2 pr-3"><Button type="button" onClick={() => openEditVariantModal(product, variant)}>Edit</Button></td></tr>)}</tbody></table></div> : <EmptyState>No variants for this product</EmptyState>}
+                          </section>
+
+                          <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                              <h3 className="text-sm font-black text-slate-900">Product images</h3>
+                              <Button type="button" onClick={() => openCreateImageModal(product)}>Add image</Button>
+                            </div>
+                            {product.images.length ? <div className="grid gap-3 md:grid-cols-2">{product.images.map((image) => <div key={image.id} className="rounded-2xl border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-black text-slate-900">{image.imageUrl}</p><p className="mt-1 text-xs text-slate-500">Alt: {image.altText || "-"}</p><p className="mt-1 text-xs text-slate-500">Sort order: {image.sortOrder}</p></div><Pill tone="teal">Image</Pill></div><div className="mt-3 flex gap-2"><Button type="button" onClick={() => openEditImageModal(product, image)}>Edit</Button><Button type="button" variant="danger" disabled={imageDeleteMutation.isPending} onClick={() => deleteImage(image)}>Delete</Button></div></div>)}</div> : <EmptyState>No images for this product</EmptyState>}
+                          </section>
+
+                          <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                              <h3 className="text-sm font-black text-slate-900">Specifications</h3>
+                              <Button type="button" onClick={() => openCreateSpecificationModal(product)}>Add spec</Button>
+                            </div>
+                            {product.specifications.length ? <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-xs"><thead className="uppercase tracking-wide text-slate-500"><tr><th className="py-2 pr-3">Name</th><th className="py-2 pr-3">Value</th><th className="py-2 pr-3">Sort</th><th className="py-2 pr-3">Actions</th></tr></thead><tbody>{product.specifications.map((specification) => <tr key={specification.id} className="border-t border-slate-200"><td className="py-2 pr-3 font-bold text-slate-900">{specification.name}</td><td className="py-2 pr-3 text-slate-600">{specification.value}</td><td className="py-2 pr-3 text-slate-600">{specification.sortOrder}</td><td className="py-2 pr-3"><div className="flex gap-2"><Button type="button" onClick={() => openEditSpecificationModal(product, specification)}>Edit</Button><Button type="button" variant="danger" disabled={specificationDeleteMutation.isPending} onClick={() => deleteSpecification(specification)}>Delete</Button></div></td></tr>)}</tbody></table></div> : <EmptyState>No specifications for this product</EmptyState>}
+                          </section>
+                        </div>
                       </td></tr>
                     ) : null}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -178,6 +321,22 @@ export function ProductsPage() {
           <div className="grid gap-4 md:grid-cols-3"><Controller control={variantForm.control} name="color" render={({ field, fieldState }) => <Field label="Color" error={fieldState.error?.message}><TextInput {...field} placeholder="Black" /></Field>} /><Controller control={variantForm.control} name="size" render={({ field, fieldState }) => <Field label="Size" error={fieldState.error?.message}><TextInput {...field} placeholder="140cm" /></Field>} /><Controller control={variantForm.control} name="stockQuantity" render={({ field, fieldState }) => <Field label="Stock" error={fieldState.error?.message}><TextInput type="number" min={0} value={field.value} onChange={(event) => field.onChange(Number(event.target.value))} /></Field>} /></div>
           <div className="grid gap-4 md:grid-cols-2"><Controller control={variantForm.control} name="price" render={({ field, fieldState }) => <Field label="Price" error={fieldState.error?.message}><TextInput type="number" min={0} value={field.value} onChange={(event) => field.onChange(Number(event.target.value))} /></Field>} /><Controller control={variantForm.control} name="compareAtPrice" render={({ field, fieldState }) => <Field label="Compare at" error={fieldState.error?.message}><TextInput type="number" min={0} value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value === "" ? null : Number(event.target.value))} /></Field>} /></div>
           <div className="grid gap-4 sm:grid-cols-2"><Controller control={variantForm.control} name="requiresInstallation" render={({ field }) => <Field label="Requires installation"><Toggle checked={field.value} onChange={field.onChange} /></Field>} /><Controller control={variantForm.control} name="isActive" render={({ field }) => <Field label="Active"><Toggle checked={field.value} onChange={field.onChange} /></Field>} /></div>
+        </form>
+      </Modal>
+
+      <Modal title={editingImage ? "Edit product image" : `New image${imageProduct ? ` for ${imageProduct.name}` : ""}`} open={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} widthClass="max-w-2xl" footer={<><Button type="button" onClick={() => setIsImageModalOpen(false)}>Cancel</Button><Button type="button" variant="primary" disabled={imageSaveMutation.isPending} onClick={imageForm.handleSubmit((values) => imageSaveMutation.mutate(values))}>{imageSaveMutation.isPending ? "Saving..." : "Save"}</Button></>}>
+        <form className="grid gap-4" noValidate>
+          <Controller control={imageForm.control} name="imageUrl" render={({ field, fieldState }) => <Field label="Image URL" error={fieldState.error?.message}><TextInput {...field} placeholder="https://example.test/product.jpg" /></Field>} />
+          <Controller control={imageForm.control} name="altText" render={({ field, fieldState }) => <Field label="Alt text" error={fieldState.error?.message}><TextInput {...field} placeholder="Standing desk front view" /></Field>} />
+          <Controller control={imageForm.control} name="sortOrder" render={({ field, fieldState }) => <Field label="Sort order" error={fieldState.error?.message}><TextInput type="number" value={field.value} onChange={(event) => field.onChange(Number(event.target.value))} /></Field>} />
+        </form>
+      </Modal>
+
+      <Modal title={editingSpecification ? "Edit specification" : `New specification${specificationProduct ? ` for ${specificationProduct.name}` : ""}`} open={isSpecificationModalOpen} onClose={() => setIsSpecificationModalOpen(false)} widthClass="max-w-2xl" footer={<><Button type="button" onClick={() => setIsSpecificationModalOpen(false)}>Cancel</Button><Button type="button" variant="primary" disabled={specificationSaveMutation.isPending} onClick={specificationForm.handleSubmit((values) => specificationSaveMutation.mutate(values))}>{specificationSaveMutation.isPending ? "Saving..." : "Save"}</Button></>}>
+        <form className="grid gap-4" noValidate>
+          <Controller control={specificationForm.control} name="name" render={({ field, fieldState }) => <Field label="Name" error={fieldState.error?.message}><TextInput {...field} placeholder="Material" /></Field>} />
+          <Controller control={specificationForm.control} name="value" render={({ field, fieldState }) => <Field label="Value" error={fieldState.error?.message}><TextInput {...field} placeholder="Solid wood" /></Field>} />
+          <Controller control={specificationForm.control} name="sortOrder" render={({ field, fieldState }) => <Field label="Sort order" error={fieldState.error?.message}><TextInput type="number" value={field.value} onChange={(event) => field.onChange(Number(event.target.value))} /></Field>} />
         </form>
       </Modal>
     </div>
