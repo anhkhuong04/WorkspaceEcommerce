@@ -17,10 +17,10 @@ Cập nhật lần cuối: 2026-06-10
 Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, Cart, Checkout, Ordering và Content:
 
 - `WorkspaceEcommerce.Domain`: Catalog, Cart và Ordering entities với invariant/domain method cơ bản.
-- `WorkspaceEcommerce.Application`: common contracts/models, DTO, validators và services cho Admin Auth, Admin Catalog, Admin Product, Admin Banner, Admin Dashboard, Admin Order, Storefront Catalog, Storefront Cart, Checkout, Storefront Order Lookup và Storefront Banner.
+- `WorkspaceEcommerce.Application`: common contracts/models, DTO, validators và services cho Admin Auth, Admin Catalog, Admin Product, Admin Product Image/Specification, Admin Banner, Admin Dashboard, Admin Order, Storefront Catalog, Storefront Cart, Checkout, Storefront Order Lookup và Storefront Banner.
 - `WorkspaceEcommerce.Infrastructure`: EF Core PostgreSQL persistence, Catalog/Cart/Ordering/Content mappings, migrations, JWT/config validation và transaction-backed checkout store.
-- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth, Admin Catalog, Admin Product, Admin Banner, Admin Dashboard, Admin Order, Storefront Catalog, Storefront Cart, Checkout, Storefront Order Lookup và Storefront Banners; có JWT, response envelope, global exception handling, local Development CORS cho frontend dev servers và OpenAPI trong Development.
-- `WorkspaceEcommerce.Application.Tests`: tests cho Domain, validators và Application services thuộc Catalog, Cart, Auth, Product, Storefront Catalog, Checkout, Order Lookup, Admin Order, Admin Banner và Admin Dashboard.
+- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth, Admin Catalog, Admin Product, Admin Product Image/Specification, Admin Banner, Admin Dashboard, Admin Order, Storefront Catalog, Storefront Cart, Checkout, Storefront Order Lookup và Storefront Banners; có JWT, response envelope, global exception handling, local Development CORS cho frontend dev servers và OpenAPI trong Development.
+- `WorkspaceEcommerce.Application.Tests`: tests cho Domain, validators và Application services thuộc Catalog, Cart, Auth, Product, Product Image/Specification, Storefront Catalog, Checkout, Order Lookup, Admin Order, Admin Banner và Admin Dashboard.
 - `WorkspaceEcommerce.Infrastructure.Tests`: tests cho configuration validation, JWT token generation và EF Core mappings của Catalog, Cart, Ordering, Content.
 - `WorkspaceEcommerce.Api.IntegrationTests`: hạ tầng API integration test dùng `WebApplicationFactory` và Testcontainers PostgreSQL.
 - PostgreSQL local và API backend chạy được bằng Docker Compose service `postgres`, `migrate`, `api`, `seed-demo`.
@@ -29,6 +29,7 @@ Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, C
 - Storefront đã tích hợp API thật cho Home, Catalog, Product Detail, Cart, Checkout và Order Lookup.
 - Admin portal đã có login/logout, JWT session persistence, protected routes và xử lý unauthorized/expired session ở mức MVP.
 - Admin operational flows đã có UI thao tác MVP chính: Dashboard, Banners, Categories, Products/Variants và Orders.
+- Admin Product backend/API đã hỗ trợ CRUD ảnh sản phẩm và thông số kỹ thuật; shared frontend API types/client đã có contract tương ứng.
 - Home demo hiện có đủ dữ liệu thật theo `overview.md`: banners, featured categories và featured products.
 - Storefront header navigation và login page đã được polish ở mức UI hiện tại; social login placeholder đã được gỡ khỏi login page.
 
@@ -42,6 +43,23 @@ Dependency hiện tại:
 - Admin frontend không còn phụ thuộc Ant Design; dùng Tailwind/native controls và local UI primitives.
 
 ## Đã hoàn thành
+
+### Admin Product Asset APIs
+
+- Bổ sung Admin Product Image DTO/request/validator và service methods cho create/update/delete.
+- Bổ sung Admin Product Specification DTO/request/validator và service methods cho create/update/delete.
+- Mở rộng `AdminProductDto` trả `images` và `specifications` để Admin UI có dữ liệu quản trị.
+- Thêm Admin API endpoints:
+  - `POST /api/admin/products/{id}/images`
+  - `PUT /api/admin/product-images/{id}`
+  - `DELETE /api/admin/product-images/{id}`
+  - `POST /api/admin/products/{id}/specifications`
+  - `PUT /api/admin/product-specifications/{id}`
+  - `DELETE /api/admin/product-specifications/{id}`
+- Cập nhật shared `api-types` và `api-client` cho image/specification endpoints.
+- Thêm Application service tests, validator tests và API integration test coverage cho product image/specification endpoints.
+- Không cần migration mới vì schema `catalog.product_images` và `catalog.product_specifications` đã có từ migration Catalog ban đầu.
+- Commit riêng: `2cc7cc6 Add admin product asset APIs`.
 
 ### Storefront Header/Login Polish
 
@@ -66,18 +84,38 @@ Dependency hiện tại:
 - Admin production JS bundle giảm từ khoảng `1.3 MB` xuống khoảng `470 KB`; không còn warning chunk lớn do Ant Design.
 - Commit riêng: `aca1d7d Replace admin Ant Design with Tailwind`.
 
-### Admin Operational Flows
-
-- Bổ sung Admin request types và mutation methods trong shared `api-types`/`api-client` cho banners, categories, products, variants và order status.
-- Dashboard: polish loading/error/empty states, metric cards và low-stock variants từ `GET /api/admin/dashboard`.
-- Banners: list/create/update/activate/deactivate/sort order qua `GET/POST/PUT /api/admin/banners`.
-- Categories: tree table, create/update/activate/deactivate và parent-child UX qua `GET/POST/PUT /api/admin/categories`.
-- Products và variants: create/update, active toggle, featured state, SKU pricing, compare-at price, stock và requires-installation qua Admin Product/Variant APIs.
-- Orders: list filter/search/pagination, detail drawer, items snapshot, status transition, status history và note qua Admin Order APIs.
-- Mở rộng `AdminPageHeader` hỗ trợ action slot cho các màn CRUD.
-- Commit riêng: `2c6da04 Implement admin operational flows`.
-
 ## Xác minh gần nhất
+
+Đã chạy cho Admin Product Asset API:
+
+```powershell
+dotnet build WorkspaceEcommerce.slnx
+dotnet test .\tests\WorkspaceEcommerce.Application.Tests\WorkspaceEcommerce.Application.Tests.csproj
+dotnet test .\tests\WorkspaceEcommerce.Infrastructure.Tests\WorkspaceEcommerce.Infrastructure.Tests.csproj
+corepack pnpm typecheck
+corepack pnpm lint
+corepack pnpm build
+```
+
+Kết quả:
+
+- Backend build passed, warnings 0, errors 0.
+- Application tests passed: 130 tests.
+- Infrastructure tests passed: 60 tests.
+- Frontend typecheck/lint/build passed cho shared packages, Storefront và Admin.
+- Admin build output gần nhất: CSS khoảng `23.91 kB`, JS khoảng `470.77 kB`, gzip JS khoảng `140.02 kB`.
+- Storefront build output gần nhất: CSS khoảng `48.53 kB`, JS khoảng `471.14 kB`, gzip JS khoảng `141.33 kB`.
+
+Đã thử chạy API integration tests:
+
+```powershell
+dotnet test .\tests\WorkspaceEcommerce.Api.IntegrationTests\WorkspaceEcommerce.Api.IntegrationTests.csproj
+```
+
+Kết quả:
+
+- Không chạy được do Docker/Testcontainers không kết nối được Docker endpoint `npipe://./pipe/docker_engine`.
+- Lỗi môi trường: Docker unavailable/misconfigured; cần bật Docker Desktop rồi chạy lại.
 
 Đã chạy frontend dependency update:
 
@@ -139,12 +177,14 @@ Smoke-test/API/test coverage đã có từ các task trước:
 
 ## Commit gần nhất
 
+- `2cc7cc6 Add admin product asset APIs`
+- `03fee0c Update task progress and clean storefront login`
 - `cfd9753 Polish storefront login page`
-- `b5d4901 Refine storefront header navigation`
-- `513597d Update storefront header navigation`
 
 Commit lịch sử liên quan:
 
+- `b5d4901 Refine storefront header navigation`
+- `513597d Update storefront header navigation`
 - `5782d3a Update task progress`
 - `aca1d7d Replace admin Ant Design with Tailwind`
 - `2c6da04 Implement admin operational flows`
@@ -154,44 +194,6 @@ Commit lịch sử liên quan:
 - `39d1904 Update demo seed image records`
 - `285c5b6 Polish storefront home demo`
 
-## Phân tích chuẩn bị triển khai
-
-### Admin Product Image/Specification API
-
-Kết luận phân tích ngày 2026-06-10:
-
-- Task nằm đúng phạm vi `overview.md`: Catalog module gồm `ProductImage` và `ProductSpecification`; Admin Product Management có quản lý ảnh và thông số kỹ thuật.
-- `Domain` đã có `ProductImage`, `ProductSpecification`, `Product.AddImage(...)` và `Product.AddSpecification(...)`.
-- `Infrastructure` đã có `DbSet`, EF Core mapping, index, max length và migration ban đầu cho `catalog.product_images` và `catalog.product_specifications`.
-- `StorefrontCatalogService` đã đọc images/specifications cho Product Detail và Product Listing dùng primary image theo `SortOrder`.
-- Gap hiện tại nằm ở Admin side: `AdminProductDto`, `IAdminProductService`, `AdminProductService`, `ProductsController`, tests, frontend shared API types/client và Admin UI chưa có flow quản lý ảnh/thông số.
-- Không cần migration mới nếu chỉ bổ sung Admin API CRUD cho dữ liệu đã có schema.
-- MVP nên quản lý `ImageUrl` dạng string trước, tương tự Banner; chưa triển khai upload/local storage trong task này.
-
-Hướng API dự kiến:
-
-```http
-POST   /api/admin/products/{id}/images
-PUT    /api/admin/product-images/{id}
-DELETE /api/admin/product-images/{id}
-
-POST   /api/admin/products/{id}/specifications
-PUT    /api/admin/product-specifications/{id}
-DELETE /api/admin/product-specifications/{id}
-```
-
-File dự kiến ảnh hưởng khi implement:
-
-- `src/WorkspaceEcommerce.Application/Modules/Catalog/Products/AdminProductDto.cs`
-- `src/WorkspaceEcommerce.Application/Modules/Catalog/Products/IAdminProductService.cs`
-- `src/WorkspaceEcommerce.Application/Modules/Catalog/Products/AdminProductService.cs`
-- `src/WorkspaceEcommerce.Application/Modules/Catalog/Products/*Image*.cs`
-- `src/WorkspaceEcommerce.Application/Modules/Catalog/Products/*Specification*.cs`
-- `src/WorkspaceEcommerce.Api/Controllers/Admin/ProductsController.cs`
-- `tests/WorkspaceEcommerce.Application.Tests/Modules/Catalog/Products/AdminProductServiceTests.cs`
-- `tests/WorkspaceEcommerce.Application.Tests/Modules/Catalog/Products/ProductRequestValidatorTests.cs`
-- `tests/WorkspaceEcommerce.Api.IntegrationTests/Catalog` hoặc một folder Admin Products riêng.
-
 ## Rủi ro và khoảng trống
 
 - Config dùng placeholder nên app sẽ fail sớm nếu chưa override `DefaultConnection`, `AdminAuth` và `Jwt` bằng secret/config local hợp lệ.
@@ -200,21 +202,21 @@ File dự kiến ảnh hưởng khi implement:
 - Storefront Home đã đủ điều kiện demo dữ liệu thật, nhưng visual polish cuối vẫn có thể tiếp tục nâng cấp khi chốt branding.
 - Admin auth hiện lưu JWT bằng `localStorage` theo MVP; production nên đánh giá lại threat model, token lifetime, refresh/session strategy và cookie/httpOnly nếu cần.
 - Admin Product UI hiện quản lý product và variant/SKU nhưng chưa có image/specification management flows.
-- Admin Product Image/Specification backend API chưa triển khai; phân tích scope đã hoàn tất ngày 2026-06-10.
+- Admin Product Image/Specification backend API đã triển khai nhưng API integration tests chưa xác minh được trong lượt gần nhất do Docker Desktop không chạy.
 - Dữ liệu smoke-test local cũ có thể vẫn còn trong PostgreSQL dev; seed demo idempotent nhưng chưa có cleanup/reset script riêng cho demo.
 - Admin UI đã chuyển sang Tailwind/native controls; cần smoke-test trình duyệt sâu thêm cho mọi modal/form sau refactor Ant Design.
 
 ## Nhiệm vụ tiếp theo đề xuất
 
-### Ưu tiên 1 - Backend/API gaps theo overview
+### Ưu tiên 1 - Admin Product Asset UI
 
-Mục tiêu: đóng các khoảng trống khiến Admin Product Management chưa đúng đủ mô tả MVP.
+Mục tiêu: hoàn tất flow quản lý ảnh và thông số kỹ thuật từ Admin UI sau khi backend/API contract đã có.
 
-1. Bổ sung Admin Product Image API để quản lý ảnh sản phẩm từ Admin UI.
-2. Bổ sung Admin Product Specification API để quản lý thông số kỹ thuật từ Admin UI.
-3. Thêm tests cho image/specification service, validation và API integration.
-4. Cập nhật shared `api-types`/`api-client` sau khi backend contract ổn định.
-5. Tích hợp image/specification flows vào Admin Product UI ở bước tiếp theo hoặc commit riêng.
+1. Tích hợp product image list/create/update/delete vào Admin Products page.
+2. Tích hợp product specification list/create/update/delete vào Admin Products page.
+3. Thêm Zod schemas và React Hook Form cho image/specification forms.
+4. Chạy lại `corepack pnpm typecheck`, `corepack pnpm lint`, `corepack pnpm build`.
+5. Khi Docker Desktop hoạt động, chạy lại API integration tests để xác minh endpoints mới với PostgreSQL/Testcontainers.
 
 ### Ưu tiên 2 - Demo readiness end-to-end
 
