@@ -1,6 +1,6 @@
 ﻿# Task - WorkspaceEcommerce
 
-Cập nhật lần cuối: 2026-06-09
+Cập nhật lần cuối: 2026-06-10
 
 ## Nguyên tắc trước khi làm task mới
 
@@ -30,6 +30,7 @@ Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, C
 - Admin portal đã có login/logout, JWT session persistence, protected routes và xử lý unauthorized/expired session ở mức MVP.
 - Admin operational flows đã có UI thao tác MVP chính: Dashboard, Banners, Categories, Products/Variants và Orders.
 - Home demo hiện có đủ dữ liệu thật theo `overview.md`: banners, featured categories và featured products.
+- Storefront header navigation và login page đã được polish ở mức UI hiện tại; social login placeholder đã được gỡ khỏi login page.
 
 Dependency hiện tại:
 
@@ -41,6 +42,16 @@ Dependency hiện tại:
 - Admin frontend không còn phụ thuộc Ant Design; dùng Tailwind/native controls và local UI primitives.
 
 ## Đã hoàn thành
+
+### Storefront Header/Login Polish
+
+- Cập nhật Storefront header navigation, assets icon và route login.
+- Polish Storefront login page theo visual direction hiện tại.
+- Gỡ placeholder social login Google/Facebook khỏi Storefront login page để tránh tạo kỳ vọng tính năng ngoài MVP.
+- Commit liên quan:
+  - `513597d Update storefront header navigation`
+  - `b5d4901 Refine storefront header navigation`
+  - `cfd9753 Polish storefront login page`
 
 ### Replace Admin Ant Design With Tailwind
 
@@ -65,19 +76,6 @@ Dependency hiện tại:
 - Orders: list filter/search/pagination, detail drawer, items snapshot, status transition, status history và note qua Admin Order APIs.
 - Mở rộng `AdminPageHeader` hỗ trợ action slot cho các màn CRUD.
 - Commit riêng: `2c6da04 Implement admin operational flows`.
-
-### Admin Auth & Route Protection
-
-- Cập nhật Admin Login UI dùng React Hook Form + Zod, loading state và API error state.
-- Tích hợp `POST /api/admin/auth/login` qua shared Admin API client.
-- Lưu JWT session vào `localStorage` với `accessToken`, `tokenType`, `expiresAt`, `email`.
-- Gắn Authorization header tự động qua `ApiClient.getAccessToken`.
-- Thêm `AdminAuthProvider`, `useAdminAuth` và `ProtectedRoute`.
-- Bảo vệ Dashboard/Categories/Products/Orders/Banners; truy cập khi chưa login redirect về `/login` và sau login quay lại route ban đầu.
-- Thêm logout trong Admin header, clear session và clear React Query cache.
-- Xử lý token hết hạn/unauthorized: session hết hạn bị clear theo timeout; API `401` gọi callback clear session.
-- Cập nhật API client để hỗ trợ `onUnauthorized` callback.
-- Cập nhật backend Development CORS cho frontend dev origins `5173/5174` để browser gọi API local được.
 
 ## Xác minh gần nhất
 
@@ -141,15 +139,58 @@ Smoke-test/API/test coverage đã có từ các task trước:
 
 ## Commit gần nhất
 
-- `2c6da04 Implement admin operational flows`
-- `aca1d7d Replace admin Ant Design with Tailwind`
+- `cfd9753 Polish storefront login page`
+- `b5d4901 Refine storefront header navigation`
+- `513597d Update storefront header navigation`
 
 Commit lịch sử liên quan:
 
+- `5782d3a Update task progress`
+- `aca1d7d Replace admin Ant Design with Tailwind`
+- `2c6da04 Implement admin operational flows`
+- `0d03a3a Add admin auth route protection`
 - `06ff8ec Add storefront banner API`
 - `22df442 Add demo image assets`
 - `39d1904 Update demo seed image records`
 - `285c5b6 Polish storefront home demo`
+
+## Phân tích chuẩn bị triển khai
+
+### Admin Product Image/Specification API
+
+Kết luận phân tích ngày 2026-06-10:
+
+- Task nằm đúng phạm vi `overview.md`: Catalog module gồm `ProductImage` và `ProductSpecification`; Admin Product Management có quản lý ảnh và thông số kỹ thuật.
+- `Domain` đã có `ProductImage`, `ProductSpecification`, `Product.AddImage(...)` và `Product.AddSpecification(...)`.
+- `Infrastructure` đã có `DbSet`, EF Core mapping, index, max length và migration ban đầu cho `catalog.product_images` và `catalog.product_specifications`.
+- `StorefrontCatalogService` đã đọc images/specifications cho Product Detail và Product Listing dùng primary image theo `SortOrder`.
+- Gap hiện tại nằm ở Admin side: `AdminProductDto`, `IAdminProductService`, `AdminProductService`, `ProductsController`, tests, frontend shared API types/client và Admin UI chưa có flow quản lý ảnh/thông số.
+- Không cần migration mới nếu chỉ bổ sung Admin API CRUD cho dữ liệu đã có schema.
+- MVP nên quản lý `ImageUrl` dạng string trước, tương tự Banner; chưa triển khai upload/local storage trong task này.
+
+Hướng API dự kiến:
+
+```http
+POST   /api/admin/products/{id}/images
+PUT    /api/admin/product-images/{id}
+DELETE /api/admin/product-images/{id}
+
+POST   /api/admin/products/{id}/specifications
+PUT    /api/admin/product-specifications/{id}
+DELETE /api/admin/product-specifications/{id}
+```
+
+File dự kiến ảnh hưởng khi implement:
+
+- `src/WorkspaceEcommerce.Application/Modules/Catalog/Products/AdminProductDto.cs`
+- `src/WorkspaceEcommerce.Application/Modules/Catalog/Products/IAdminProductService.cs`
+- `src/WorkspaceEcommerce.Application/Modules/Catalog/Products/AdminProductService.cs`
+- `src/WorkspaceEcommerce.Application/Modules/Catalog/Products/*Image*.cs`
+- `src/WorkspaceEcommerce.Application/Modules/Catalog/Products/*Specification*.cs`
+- `src/WorkspaceEcommerce.Api/Controllers/Admin/ProductsController.cs`
+- `tests/WorkspaceEcommerce.Application.Tests/Modules/Catalog/Products/AdminProductServiceTests.cs`
+- `tests/WorkspaceEcommerce.Application.Tests/Modules/Catalog/Products/ProductRequestValidatorTests.cs`
+- `tests/WorkspaceEcommerce.Api.IntegrationTests/Catalog` hoặc một folder Admin Products riêng.
 
 ## Rủi ro và khoảng trống
 
@@ -159,6 +200,7 @@ Commit lịch sử liên quan:
 - Storefront Home đã đủ điều kiện demo dữ liệu thật, nhưng visual polish cuối vẫn có thể tiếp tục nâng cấp khi chốt branding.
 - Admin auth hiện lưu JWT bằng `localStorage` theo MVP; production nên đánh giá lại threat model, token lifetime, refresh/session strategy và cookie/httpOnly nếu cần.
 - Admin Product UI hiện quản lý product và variant/SKU nhưng chưa có image/specification management flows.
+- Admin Product Image/Specification backend API chưa triển khai; phân tích scope đã hoàn tất ngày 2026-06-10.
 - Dữ liệu smoke-test local cũ có thể vẫn còn trong PostgreSQL dev; seed demo idempotent nhưng chưa có cleanup/reset script riêng cho demo.
 - Admin UI đã chuyển sang Tailwind/native controls; cần smoke-test trình duyệt sâu thêm cho mọi modal/form sau refactor Ant Design.
 
@@ -168,10 +210,11 @@ Commit lịch sử liên quan:
 
 Mục tiêu: đóng các khoảng trống khiến Admin Product Management chưa đúng đủ mô tả MVP.
 
-1. Bổ sung Admin Product Image API nếu cần quản lý ảnh sản phẩm từ Admin UI.
-2. Bổ sung Admin Product Specification API nếu cần quản lý thông số kỹ thuật từ Admin UI.
+1. Bổ sung Admin Product Image API để quản lý ảnh sản phẩm từ Admin UI.
+2. Bổ sung Admin Product Specification API để quản lý thông số kỹ thuật từ Admin UI.
 3. Thêm tests cho image/specification service, validation và API integration.
-4. Tích hợp image/specification flows vào Admin Product UI.
+4. Cập nhật shared `api-types`/`api-client` sau khi backend contract ổn định.
+5. Tích hợp image/specification flows vào Admin Product UI ở bước tiếp theo hoặc commit riêng.
 
 ### Ưu tiên 2 - Demo readiness end-to-end
 

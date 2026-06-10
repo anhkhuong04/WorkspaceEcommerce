@@ -109,18 +109,6 @@ export function LoginPage() {
                 or
                 <span className="h-px bg-slate-200" />
               </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <button type="button" className="flex cursor-default items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-4 font-black text-slate-700 shadow-sm" aria-disabled="true">
-                  <span className="text-xl text-red-500">G</span>
-                  Google
-                </button>
-                <button type="button" className="flex cursor-default items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-4 font-black text-slate-700 shadow-sm" aria-disabled="true">
-                  <span className="text-xl text-blue-600">f</span>
-                  Facebook
-                </button>
-              </div>
-
               <p className="mt-8 text-center text-sm font-semibold text-slate-500">
                 Do not have an account? <button type="button" className="cursor-default font-black text-[var(--brand)]" aria-disabled="true">Register later</button>
               </p>
