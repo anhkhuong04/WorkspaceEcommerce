@@ -30,8 +30,9 @@ Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, C
 - Admin portal đã có login/logout, JWT session persistence, protected routes và xử lý unauthorized/expired session ở mức MVP.
 - Admin operational flows đã có UI thao tác MVP chính: Dashboard, Banners, Categories, Products/Variants và Orders.
 - Admin Product backend/API đã hỗ trợ CRUD ảnh sản phẩm và thông số kỹ thuật; shared frontend API types/client đã có contract tương ứng.
+- Admin Product UI đã tích hợp list/create/update/delete cho ảnh sản phẩm và thông số kỹ thuật.
 - Home demo hiện có đủ dữ liệu thật theo `overview.md`: banners, featured categories và featured products.
-- Storefront header navigation và login page đã được polish ở mức UI hiện tại; social login placeholder đã được gỡ khỏi login page.
+- Storefront header navigation và login page đã được polish ở mức UI hiện tại; social login placeholder và asset imports cũ đã được gỡ để phù hợp asset cleanup.
 
 Dependency hiện tại:
 
@@ -43,6 +44,16 @@ Dependency hiện tại:
 - Admin frontend không còn phụ thuộc Ant Design; dùng Tailwind/native controls và local UI primitives.
 
 ## Đã hoàn thành
+
+### Admin Product Asset UI
+
+- Tích hợp product image list/create/update/delete vào Admin Products expanded row.
+- Tích hợp product specification list/create/update/delete vào Admin Products expanded row.
+- Thêm Zod schemas và React Hook Form forms cho image/specification modals.
+- Thêm mutations dùng shared `api-client`: create/update/delete image và specification.
+- Admin Products table hiển thị tổng số variants, images và specs; action nhanh có `Add image` và `Add spec`.
+- Sửa Storefront header/login để không còn import các asset đã xóa ở commit trước; dùng fallback text/CSS để frontend build sạch.
+- Commit riêng: `9b72a4a Add admin product asset UI`.
 
 ### Admin Product Asset APIs
 
@@ -71,20 +82,23 @@ Dependency hiện tại:
   - `b5d4901 Refine storefront header navigation`
   - `cfd9753 Polish storefront login page`
 
-### Replace Admin Ant Design With Tailwind
-
-- Gỡ `antd` và `@ant-design/icons` khỏi Admin app.
-- Thêm Tailwind CSS cho Admin qua `@tailwindcss/vite` và `tailwindcss`.
-- Loại bỏ `ConfigProvider`, `antd/dist/reset.css` và toàn bộ Ant Design component imports khỏi Admin source.
-- Thay Admin layout/sidebar/header bằng React + Tailwind.
-- Thêm local UI primitives `AdminUi.tsx` và helper `cx.ts` cho Button, Notice, Modal, Field, inputs, Toggle, Pill và EmptyState.
-- Refactor các màn Admin Login, Dashboard, Banners, Categories, Products và Orders sang Tailwind/native HTML controls.
-- Cập nhật `overview.md` và `.agent/frontend-rules.md` để Admin stack là React + TypeScript + Tailwind CSS.
-- Cập nhật `frontend/pnpm-lock.yaml` sau khi gỡ Ant Design dependencies.
-- Admin production JS bundle giảm từ khoảng `1.3 MB` xuống khoảng `470 KB`; không còn warning chunk lớn do Ant Design.
-- Commit riêng: `aca1d7d Replace admin Ant Design with Tailwind`.
-
 ## Xác minh gần nhất
+
+Đã chạy cho Admin Product Asset UI:
+
+```powershell
+corepack pnpm typecheck
+corepack pnpm lint
+corepack pnpm build
+```
+
+Kết quả:
+
+- Typecheck passed cho `api-types`, `api-client`, `shared-utils`, `storefront`, `admin`.
+- Lint passed cho Storefront và Admin.
+- Production build passed cho Storefront và Admin.
+- Admin build output gần nhất: CSS khoảng `24.01 kB`, JS khoảng `479.14 kB`, gzip JS khoảng `141.11 kB`.
+- Storefront build output gần nhất: CSS khoảng `50.50 kB`, JS khoảng `471.03 kB`, gzip JS khoảng `140.95 kB`.
 
 Đã chạy cho Admin Product Asset API:
 
@@ -102,9 +116,7 @@ Kết quả:
 - Backend build passed, warnings 0, errors 0.
 - Application tests passed: 130 tests.
 - Infrastructure tests passed: 60 tests.
-- Frontend typecheck/lint/build passed cho shared packages, Storefront và Admin.
-- Admin build output gần nhất: CSS khoảng `23.91 kB`, JS khoảng `470.77 kB`, gzip JS khoảng `140.02 kB`.
-- Storefront build output gần nhất: CSS khoảng `48.53 kB`, JS khoảng `471.14 kB`, gzip JS khoảng `141.33 kB`.
+- Frontend typecheck/lint/build passed cho shared packages, Storefront và Admin ở thời điểm backend contract mới được thêm.
 
 Đã thử chạy API integration tests:
 
@@ -177,12 +189,13 @@ Smoke-test/API/test coverage đã có từ các task trước:
 
 ## Commit gần nhất
 
+- `9b72a4a Add admin product asset UI`
 - `2cc7cc6 Add admin product asset APIs`
 - `03fee0c Update task progress and clean storefront login`
-- `cfd9753 Polish storefront login page`
 
 Commit lịch sử liên quan:
 
+- `cfd9753 Polish storefront login page`
 - `b5d4901 Refine storefront header navigation`
 - `513597d Update storefront header navigation`
 - `5782d3a Update task progress`
@@ -201,22 +214,22 @@ Commit lịch sử liên quan:
 - Docker Compose đã chạy API/PostgreSQL/migration/seed local; chưa có production image hardening như non-root user, SBOM, image signing hoặc CI publish.
 - Storefront Home đã đủ điều kiện demo dữ liệu thật, nhưng visual polish cuối vẫn có thể tiếp tục nâng cấp khi chốt branding.
 - Admin auth hiện lưu JWT bằng `localStorage` theo MVP; production nên đánh giá lại threat model, token lifetime, refresh/session strategy và cookie/httpOnly nếu cần.
-- Admin Product UI hiện quản lý product và variant/SKU nhưng chưa có image/specification management flows.
 - Admin Product Image/Specification backend API đã triển khai nhưng API integration tests chưa xác minh được trong lượt gần nhất do Docker Desktop không chạy.
+- Admin Product Asset UI đã build/typecheck/lint sạch nhưng chưa smoke-test thủ công trên browser với API local.
 - Dữ liệu smoke-test local cũ có thể vẫn còn trong PostgreSQL dev; seed demo idempotent nhưng chưa có cleanup/reset script riêng cho demo.
 - Admin UI đã chuyển sang Tailwind/native controls; cần smoke-test trình duyệt sâu thêm cho mọi modal/form sau refactor Ant Design.
 
 ## Nhiệm vụ tiếp theo đề xuất
 
-### Ưu tiên 1 - Admin Product Asset UI
+### Ưu tiên 1 - Verify Admin Product Assets End-to-End
 
-Mục tiêu: hoàn tất flow quản lý ảnh và thông số kỹ thuật từ Admin UI sau khi backend/API contract đã có.
+Mục tiêu: xác minh backend/API/UI image/specification flows với PostgreSQL và browser.
 
-1. Tích hợp product image list/create/update/delete vào Admin Products page.
-2. Tích hợp product specification list/create/update/delete vào Admin Products page.
-3. Thêm Zod schemas và React Hook Form cho image/specification forms.
-4. Chạy lại `corepack pnpm typecheck`, `corepack pnpm lint`, `corepack pnpm build`.
-5. Khi Docker Desktop hoạt động, chạy lại API integration tests để xác minh endpoints mới với PostgreSQL/Testcontainers.
+1. Bật Docker Desktop và chạy lại `dotnet test .\tests\WorkspaceEcommerce.Api.IntegrationTests\WorkspaceEcommerce.Api.IntegrationTests.csproj`.
+2. Chạy API local với PostgreSQL/migration/seed.
+3. Smoke-test Admin Products browser: create/update/delete image.
+4. Smoke-test Admin Products browser: create/update/delete specification.
+5. Smoke-test Storefront Product Detail xác nhận image/spec mới hiển thị từ dữ liệu Admin.
 
 ### Ưu tiên 2 - Demo readiness end-to-end
 
