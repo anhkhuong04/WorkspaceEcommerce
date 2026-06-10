@@ -11,4 +11,6 @@ public sealed record AdminProductDto(
     bool IsActive,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    IReadOnlyCollection<AdminProductVariantDto> Variants);
+    IReadOnlyCollection<AdminProductVariantDto> Variants,
+    IReadOnlyCollection<AdminProductImageDto> Images,
+    IReadOnlyCollection<AdminProductSpecificationDto> Specifications);

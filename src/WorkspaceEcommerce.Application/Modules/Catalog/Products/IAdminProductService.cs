@@ -24,4 +24,32 @@ public interface IAdminProductService
         Guid id,
         UpdateProductVariantRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<Result<AdminProductImageDto>> CreateImageAsync(
+        Guid productId,
+        CreateProductImageRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<AdminProductImageDto>> UpdateImageAsync(
+        Guid id,
+        UpdateProductImageRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<AdminProductImageDto>> DeleteImageAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<AdminProductSpecificationDto>> CreateSpecificationAsync(
+        Guid productId,
+        CreateProductSpecificationRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<AdminProductSpecificationDto>> UpdateSpecificationAsync(
+        Guid id,
+        UpdateProductSpecificationRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<AdminProductSpecificationDto>> DeleteSpecificationAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
 }

@@ -11,6 +11,10 @@
   AdminOrderListItemDto,
   AdminOrderListRequest,
   AdminProductDto,
+  AdminProductImageDto,
+  AdminProductImageUpsertRequest,
+  AdminProductSpecificationDto,
+  AdminProductSpecificationUpsertRequest,
   AdminProductUpsertRequest,
   AdminProductVariantDto,
   AdminProductVariantUpsertRequest,
@@ -81,6 +85,16 @@ export function createAdminApi(client: ApiClient) {
       client.post<AdminProductVariantDto, AdminProductVariantUpsertRequest>(`/api/admin/products/${productId}/variants`, request),
     updateProductVariant: (id: string, request: AdminProductVariantUpsertRequest) =>
       client.put<AdminProductVariantDto, AdminProductVariantUpsertRequest>(`/api/admin/variants/${id}`, request),
+    createProductImage: (productId: string, request: AdminProductImageUpsertRequest) =>
+      client.post<AdminProductImageDto, AdminProductImageUpsertRequest>(`/api/admin/products/${productId}/images`, request),
+    updateProductImage: (id: string, request: AdminProductImageUpsertRequest) =>
+      client.put<AdminProductImageDto, AdminProductImageUpsertRequest>(`/api/admin/product-images/${id}`, request),
+    deleteProductImage: (id: string) => client.delete<AdminProductImageDto>(`/api/admin/product-images/${id}`),
+    createProductSpecification: (productId: string, request: AdminProductSpecificationUpsertRequest) =>
+      client.post<AdminProductSpecificationDto, AdminProductSpecificationUpsertRequest>(`/api/admin/products/${productId}/specifications`, request),
+    updateProductSpecification: (id: string, request: AdminProductSpecificationUpsertRequest) =>
+      client.put<AdminProductSpecificationDto, AdminProductSpecificationUpsertRequest>(`/api/admin/product-specifications/${id}`, request),
+    deleteProductSpecification: (id: string) => client.delete<AdminProductSpecificationDto>(`/api/admin/product-specifications/${id}`),
     getOrders: (request: AdminOrderListRequest = {}) =>
       client.get<PagedResult<AdminOrderListItemDto>>(`/api/admin/orders${buildQuery(request)}`),
     getOrder: (id: string) => client.get<AdminOrderDto>(`/api/admin/orders/${id}`),

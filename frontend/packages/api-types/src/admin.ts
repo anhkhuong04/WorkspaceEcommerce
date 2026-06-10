@@ -57,6 +57,34 @@ export interface AdminProductVariantUpsertRequest {
   isActive: boolean;
 }
 
+export interface AdminProductImageDto {
+  id: string;
+  productId: string;
+  imageUrl: string;
+  altText: string | null;
+  sortOrder: number;
+}
+
+export interface AdminProductImageUpsertRequest {
+  imageUrl: string;
+  altText?: string | null;
+  sortOrder: number;
+}
+
+export interface AdminProductSpecificationDto {
+  id: string;
+  productId: string;
+  name: string;
+  value: string;
+  sortOrder: number;
+}
+
+export interface AdminProductSpecificationUpsertRequest {
+  name: string;
+  value: string;
+  sortOrder: number;
+}
+
 export interface AdminProductDto {
   id: string;
   categoryId: string;
@@ -69,6 +97,8 @@ export interface AdminProductDto {
   createdAt: string;
   updatedAt: string;
   variants: AdminProductVariantDto[];
+  images: AdminProductImageDto[];
+  specifications: AdminProductSpecificationDto[];
 }
 
 export interface AdminProductUpsertRequest {

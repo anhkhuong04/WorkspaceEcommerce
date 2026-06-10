@@ -246,6 +246,171 @@ public sealed class AdminProductServiceTests
         var dto = Assert.Single(result.Value);
         Assert.Equal("Desks", dto.CategoryName);
         Assert.Single(dto.Variants);
+        Assert.Empty(dto.Images);
+        Assert.Empty(dto.Specifications);
+    }
+
+    [Fact]
+    public async Task GetProductsAsync_ExistingImagesAndSpecifications_ReturnsProductAssets()
+    {
+        var category = CreateCategory(name: "Desks");
+        var product = CreateProduct(category.Id, name: "Standing Desk", slug: "standing-desk");
+        var image = CreateImage(product.Id, sortOrder: 2);
+        var specification = CreateSpecification(product.Id, sortOrder: 1);
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(category);
+        dbContext.Seed(product);
+        dbContext.Seed(image);
+        dbContext.Seed(specification);
+        var service = CreateService(dbContext);
+
+        var result = await service.GetProductsAsync();
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        var dto = Assert.Single(result.Value);
+        Assert.Equal("https://example.test/desk.jpg", Assert.Single(dto.Images).ImageUrl);
+        Assert.Equal("Material", Assert.Single(dto.Specifications).Name);
+    }
+
+    [Fact]
+    public async Task CreateImageAsync_ValidRequest_CreatesImage()
+    {
+        var category = CreateCategory();
+        var product = CreateProduct(category.Id);
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(category);
+        dbContext.Seed(product);
+        var service = CreateService(dbContext);
+
+        var result = await service.CreateImageAsync(product.Id, CreateImageRequest());
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal(product.Id, result.Value.ProductId);
+        Assert.Equal("https://example.test/desk.jpg", result.Value.ImageUrl);
+        Assert.Single(dbContext.ProductImages);
+        Assert.Equal(1, dbContext.SaveChangesCallCount);
+    }
+
+    [Fact]
+    public async Task CreateImageAsync_MissingProduct_ReturnsNotFound()
+    {
+        var dbContext = new FakeAppDbContext();
+        var service = CreateService(dbContext);
+
+        var result = await service.CreateImageAsync(Guid.NewGuid(), CreateImageRequest());
+
+        Assert.Equal(ResultStatus.NotFound, result.Status);
+        Assert.Equal(0, dbContext.SaveChangesCallCount);
+    }
+
+    [Fact]
+    public async Task UpdateImageAsync_ValidRequest_UpdatesImage()
+    {
+        var image = CreateImage(Guid.NewGuid());
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(image);
+        var service = CreateService(dbContext);
+
+        var result = await service.UpdateImageAsync(image.Id, new UpdateProductImageRequest
+        {
+            ImageUrl = "https://example.test/updated.jpg",
+            AltText = "Updated",
+            SortOrder = 5
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal("https://example.test/updated.jpg", result.Value.ImageUrl);
+        Assert.Equal("Updated", result.Value.AltText);
+        Assert.Equal(5, result.Value.SortOrder);
+        Assert.Equal(1, dbContext.SaveChangesCallCount);
+    }
+
+    [Fact]
+    public async Task DeleteImageAsync_ExistingImage_RemovesImage()
+    {
+        var image = CreateImage(Guid.NewGuid());
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(image);
+        var service = CreateService(dbContext);
+
+        var result = await service.DeleteImageAsync(image.Id);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(dbContext.ProductImages);
+        Assert.Equal(1, dbContext.SaveChangesCallCount);
+    }
+
+    [Fact]
+    public async Task CreateSpecificationAsync_ValidRequest_CreatesSpecification()
+    {
+        var category = CreateCategory();
+        var product = CreateProduct(category.Id);
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(category);
+        dbContext.Seed(product);
+        var service = CreateService(dbContext);
+
+        var result = await service.CreateSpecificationAsync(product.Id, CreateSpecificationRequest());
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal(product.Id, result.Value.ProductId);
+        Assert.Equal("Material", result.Value.Name);
+        Assert.Single(dbContext.ProductSpecifications);
+        Assert.Equal(1, dbContext.SaveChangesCallCount);
+    }
+
+    [Fact]
+    public async Task CreateSpecificationAsync_MissingProduct_ReturnsNotFound()
+    {
+        var dbContext = new FakeAppDbContext();
+        var service = CreateService(dbContext);
+
+        var result = await service.CreateSpecificationAsync(Guid.NewGuid(), CreateSpecificationRequest());
+
+        Assert.Equal(ResultStatus.NotFound, result.Status);
+        Assert.Equal(0, dbContext.SaveChangesCallCount);
+    }
+
+    [Fact]
+    public async Task UpdateSpecificationAsync_ValidRequest_UpdatesSpecification()
+    {
+        var specification = CreateSpecification(Guid.NewGuid());
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(specification);
+        var service = CreateService(dbContext);
+
+        var result = await service.UpdateSpecificationAsync(specification.Id, new UpdateProductSpecificationRequest
+        {
+            Name = "Frame",
+            Value = "Steel",
+            SortOrder = 4
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal("Frame", result.Value.Name);
+        Assert.Equal("Steel", result.Value.Value);
+        Assert.Equal(4, result.Value.SortOrder);
+        Assert.Equal(1, dbContext.SaveChangesCallCount);
+    }
+
+    [Fact]
+    public async Task DeleteSpecificationAsync_ExistingSpecification_RemovesSpecification()
+    {
+        var specification = CreateSpecification(Guid.NewGuid());
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(specification);
+        var service = CreateService(dbContext);
+
+        var result = await service.DeleteSpecificationAsync(specification.Id);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(dbContext.ProductSpecifications);
+        Assert.Equal(1, dbContext.SaveChangesCallCount);
     }
 
     private static AdminProductService CreateService(FakeAppDbContext dbContext)
@@ -255,7 +420,11 @@ public sealed class AdminProductServiceTests
             new CreateProductRequestValidator(),
             new UpdateProductRequestValidator(),
             new CreateProductVariantRequestValidator(),
-            new UpdateProductVariantRequestValidator());
+            new UpdateProductVariantRequestValidator(),
+            new CreateProductImageRequestValidator(),
+            new UpdateProductImageRequestValidator(),
+            new CreateProductSpecificationRequestValidator(),
+            new UpdateProductSpecificationRequestValidator());
     }
 
     private static Category CreateCategory(string name = "Desks")
@@ -290,6 +459,26 @@ public sealed class AdminProductServiceTests
             10,
             requiresInstallation: true,
             isActive);
+    }
+
+    private static ProductImage CreateImage(Guid productId, int sortOrder = 1)
+    {
+        return new ProductImage(
+            Guid.NewGuid(),
+            productId,
+            "https://example.test/desk.jpg",
+            "Desk",
+            sortOrder);
+    }
+
+    private static ProductSpecification CreateSpecification(Guid productId, int sortOrder = 1)
+    {
+        return new ProductSpecification(
+            Guid.NewGuid(),
+            productId,
+            "Material",
+            "Wood",
+            sortOrder);
     }
 
     private static CreateProductRequest CreateProductRequest(Guid categoryId, string slug = "standing-desk")
@@ -347,6 +536,26 @@ public sealed class AdminProductServiceTests
             StockQuantity = 10,
             RequiresInstallation = true,
             IsActive = true
+        };
+    }
+
+    private static CreateProductImageRequest CreateImageRequest()
+    {
+        return new CreateProductImageRequest
+        {
+            ImageUrl = "https://example.test/desk.jpg",
+            AltText = "Desk",
+            SortOrder = 1
+        };
+    }
+
+    private static CreateProductSpecificationRequest CreateSpecificationRequest()
+    {
+        return new CreateProductSpecificationRequest
+        {
+            Name = "Material",
+            Value = "Wood",
+            SortOrder = 1
         };
     }
 }

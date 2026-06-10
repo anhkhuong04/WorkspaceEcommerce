@@ -11,7 +11,11 @@ internal sealed class AdminProductService(
     IValidator<CreateProductRequest> createProductValidator,
     IValidator<UpdateProductRequest> updateProductValidator,
     IValidator<CreateProductVariantRequest> createVariantValidator,
-    IValidator<UpdateProductVariantRequest> updateVariantValidator) : IAdminProductService
+    IValidator<UpdateProductVariantRequest> updateVariantValidator,
+    IValidator<CreateProductImageRequest> createImageValidator,
+    IValidator<UpdateProductImageRequest> updateImageValidator,
+    IValidator<CreateProductSpecificationRequest> createSpecificationValidator,
+    IValidator<UpdateProductSpecificationRequest> updateSpecificationValidator) : IAdminProductService
 {
     public Task<Result<IReadOnlyCollection<AdminProductDto>>> GetProductsAsync(
         CancellationToken cancellationToken = default)
@@ -22,11 +26,24 @@ internal sealed class AdminProductService(
         var variantsByProductId = dbContext.ProductVariants
             .OrderBy(variant => variant.Sku)
             .ToLookup(variant => variant.ProductId);
+        var imagesByProductId = dbContext.ProductImages
+            .OrderBy(image => image.SortOrder)
+            .ThenBy(image => image.ImageUrl)
+            .ToLookup(image => image.ProductId);
+        var specificationsByProductId = dbContext.ProductSpecifications
+            .OrderBy(specification => specification.SortOrder)
+            .ThenBy(specification => specification.Name)
+            .ToLookup(specification => specification.ProductId);
 
         var products = dbContext.Products
             .OrderBy(product => product.Name)
             .ThenBy(product => product.Slug)
-            .Select(product => ToDto(product, categoriesById, variantsByProductId[product.Id]))
+            .Select(product => ToDto(
+                product,
+                categoriesById,
+                variantsByProductId[product.Id],
+                imagesByProductId[product.Id],
+                specificationsByProductId[product.Id]))
             .ToArray();
 
         return Task.FromResult(Result<IReadOnlyCollection<AdminProductDto>>.Success(products));
@@ -65,7 +82,7 @@ internal sealed class AdminProductService(
         dbContext.Add(product);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Result<AdminProductDto>.Success(ToDto(product, GetCategoriesById(), []));
+        return Result<AdminProductDto>.Success(ToDto(product, GetCategoriesById(), [], [], []));
     }
 
     public async Task<Result<AdminProductDto>> UpdateProductAsync(
@@ -104,8 +121,12 @@ internal sealed class AdminProductService(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         var variants = dbContext.ProductVariants.Where(variant => variant.ProductId == product.Id).ToArray();
+        var images = dbContext.ProductImages.Where(image => image.ProductId == product.Id).ToArray();
+        var specifications = dbContext.ProductSpecifications
+            .Where(specification => specification.ProductId == product.Id)
+            .ToArray();
 
-        return Result<AdminProductDto>.Success(ToDto(product, GetCategoriesById(), variants));
+        return Result<AdminProductDto>.Success(ToDto(product, GetCategoriesById(), variants, images, specifications));
     }
 
     public async Task<Result<AdminProductVariantDto>> CreateVariantAsync(
@@ -203,6 +224,178 @@ internal sealed class AdminProductService(
         }
     }
 
+    public async Task<Result<AdminProductImageDto>> CreateImageAsync(
+        Guid productId,
+        CreateProductImageRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var validationResult = await createImageValidator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return Result<AdminProductImageDto>.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
+        }
+
+        var product = dbContext.Products.FirstOrDefault(existing => existing.Id == productId);
+        if (product is null)
+        {
+            return Result<AdminProductImageDto>.NotFound("Product was not found.");
+        }
+
+        try
+        {
+            var image = product.AddImage(
+                Guid.NewGuid(),
+                request.ImageUrl,
+                request.AltText,
+                request.SortOrder);
+
+            dbContext.Update(product);
+            dbContext.Add(image);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Result<AdminProductImageDto>.Success(ToDto(image));
+        }
+        catch (DomainException exception)
+        {
+            return Result<AdminProductImageDto>.Validation([exception.Message]);
+        }
+    }
+
+    public async Task<Result<AdminProductImageDto>> UpdateImageAsync(
+        Guid id,
+        UpdateProductImageRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var validationResult = await updateImageValidator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return Result<AdminProductImageDto>.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
+        }
+
+        var image = dbContext.ProductImages.FirstOrDefault(existing => existing.Id == id);
+        if (image is null)
+        {
+            return Result<AdminProductImageDto>.NotFound("Product image was not found.");
+        }
+
+        try
+        {
+            image.Update(request.ImageUrl, request.AltText, request.SortOrder);
+
+            dbContext.Update(image);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Result<AdminProductImageDto>.Success(ToDto(image));
+        }
+        catch (DomainException exception)
+        {
+            return Result<AdminProductImageDto>.Validation([exception.Message]);
+        }
+    }
+
+    public async Task<Result<AdminProductImageDto>> DeleteImageAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var image = dbContext.ProductImages.FirstOrDefault(existing => existing.Id == id);
+        if (image is null)
+        {
+            return Result<AdminProductImageDto>.NotFound("Product image was not found.");
+        }
+
+        var dto = ToDto(image);
+        dbContext.Remove(image);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Result<AdminProductImageDto>.Success(dto);
+    }
+
+    public async Task<Result<AdminProductSpecificationDto>> CreateSpecificationAsync(
+        Guid productId,
+        CreateProductSpecificationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var validationResult = await createSpecificationValidator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return Result<AdminProductSpecificationDto>.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
+        }
+
+        var product = dbContext.Products.FirstOrDefault(existing => existing.Id == productId);
+        if (product is null)
+        {
+            return Result<AdminProductSpecificationDto>.NotFound("Product was not found.");
+        }
+
+        try
+        {
+            var specification = product.AddSpecification(
+                Guid.NewGuid(),
+                request.Name,
+                request.Value,
+                request.SortOrder);
+
+            dbContext.Update(product);
+            dbContext.Add(specification);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Result<AdminProductSpecificationDto>.Success(ToDto(specification));
+        }
+        catch (DomainException exception)
+        {
+            return Result<AdminProductSpecificationDto>.Validation([exception.Message]);
+        }
+    }
+
+    public async Task<Result<AdminProductSpecificationDto>> UpdateSpecificationAsync(
+        Guid id,
+        UpdateProductSpecificationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var validationResult = await updateSpecificationValidator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return Result<AdminProductSpecificationDto>.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
+        }
+
+        var specification = dbContext.ProductSpecifications.FirstOrDefault(existing => existing.Id == id);
+        if (specification is null)
+        {
+            return Result<AdminProductSpecificationDto>.NotFound("Product specification was not found.");
+        }
+
+        try
+        {
+            specification.Update(request.Name, request.Value, request.SortOrder);
+
+            dbContext.Update(specification);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Result<AdminProductSpecificationDto>.Success(ToDto(specification));
+        }
+        catch (DomainException exception)
+        {
+            return Result<AdminProductSpecificationDto>.Validation([exception.Message]);
+        }
+    }
+
+    public async Task<Result<AdminProductSpecificationDto>> DeleteSpecificationAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var specification = dbContext.ProductSpecifications.FirstOrDefault(existing => existing.Id == id);
+        if (specification is null)
+        {
+            return Result<AdminProductSpecificationDto>.NotFound("Product specification was not found.");
+        }
+
+        var dto = ToDto(specification);
+        dbContext.Remove(specification);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Result<AdminProductSpecificationDto>.Success(dto);
+    }
+
     private Dictionary<Guid, Category> GetCategoriesById()
     {
         return dbContext.Categories.ToDictionary(category => category.Id);
@@ -230,7 +423,9 @@ internal sealed class AdminProductService(
     private static AdminProductDto ToDto(
         Product product,
         IReadOnlyDictionary<Guid, Category> categoriesById,
-        IEnumerable<ProductVariant> variants)
+        IEnumerable<ProductVariant> variants,
+        IEnumerable<ProductImage> images,
+        IEnumerable<ProductSpecification> specifications)
     {
         categoriesById.TryGetValue(product.CategoryId, out var category);
 
@@ -245,7 +440,9 @@ internal sealed class AdminProductService(
             product.IsActive,
             product.CreatedAt,
             product.UpdatedAt,
-            variants.Select(ToDto).ToArray());
+            variants.Select(ToDto).ToArray(),
+            images.Select(ToDto).ToArray(),
+            specifications.Select(ToDto).ToArray());
     }
 
     private static AdminProductVariantDto ToDto(ProductVariant variant)
@@ -262,6 +459,26 @@ internal sealed class AdminProductService(
             variant.StockQuantity,
             variant.RequiresInstallation,
             variant.IsActive);
+    }
+
+    private static AdminProductImageDto ToDto(ProductImage image)
+    {
+        return new AdminProductImageDto(
+            image.Id,
+            image.ProductId,
+            image.ImageUrl,
+            image.AltText,
+            image.SortOrder);
+    }
+
+    private static AdminProductSpecificationDto ToDto(ProductSpecification specification)
+    {
+        return new AdminProductSpecificationDto(
+            specification.Id,
+            specification.ProductId,
+            specification.Name,
+            specification.Value,
+            specification.SortOrder);
     }
 
     private static void SetFeatured(Product product, bool isFeatured)
