@@ -16,8 +16,15 @@ export function StorefrontLayout() {
       {hideHeader ? null : <header className="sticky top-0 z-20 border-b border-slate-100 bg-white/95 shadow-[0_8px_30px_rgba(15,23,42,0.04)] backdrop-blur-xl">
         <div className="mx-auto flex min-h-20 max-w-[1600px] items-center justify-between gap-6 px-5 py-4 sm:px-8 lg:px-10">
           <div className="flex min-w-0 flex-1 items-center gap-5 lg:gap-12">
-            <NavLink to="/" className="shrink-0 text-sm font-black tracking-tight text-slate-950 lg:text-base">
-              Workspace<span className="text-[var(--brand)]">Ecom</span>
+            <NavLink to="/" className="flex shrink-0 items-center gap-2 text-sm font-black tracking-tight text-slate-950 lg:text-base">
+              <img
+                src="/demo/logo.svg"
+                alt="WorkspaceEcom Logo"
+                className="h-6 w-auto object-contain"
+              />
+              <span>
+                Workspace<span className="text-[var(--brand)]">Ecom</span>
+              </span>
             </NavLink>
 
             <nav className="flex min-w-0 items-center gap-3 overflow-x-auto whitespace-nowrap text-xs font-black text-slate-950 scrollbar-hidden sm:gap-5 lg:gap-10 lg:text-sm">
@@ -51,21 +58,15 @@ export function StorefrontLayout() {
           </div>
 
           <div className="flex shrink-0 items-center gap-3 sm:gap-5 lg:gap-8">
-            <button
-              type="button"
-              className="hidden cursor-default items-center gap-2 rounded-full px-1 py-2 text-xs font-black text-slate-950 sm:inline-flex lg:text-sm"
-              aria-disabled="true"
-            >
-              English
-              <span className="mt-0.5 text-[10px] leading-none" aria-hidden="true">v</span>
-            </button>
-
             <NavLink
               to="/products"
               className="grid h-10 w-10 place-items-center rounded-full transition hover:bg-slate-100"
               aria-label="Search"
             >
-              <span className="text-sm font-black text-slate-900" aria-hidden="true">S</span>
+              <svg className="h-5 w-5 text-slate-900" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="2" />
+                <path d="m16 16 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
             </NavLink>
 
             <NavLink
@@ -73,7 +74,10 @@ export function StorefrontLayout() {
               className="grid h-10 w-10 place-items-center rounded-full transition hover:bg-slate-100"
               aria-label="Login"
             >
-              <span className="text-sm font-black text-slate-900" aria-hidden="true">U</span>
+              <svg className="h-5 w-5 text-slate-900" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="2" />
+                <path d="M4.5 20c1.4-4 4-6 7.5-6s6.1 2 7.5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
             </NavLink>
 
             <NavLink
@@ -81,7 +85,11 @@ export function StorefrontLayout() {
               className="grid h-10 w-10 place-items-center rounded-full transition hover:bg-slate-100"
               aria-label="Cart"
             >
-              <span className="text-sm font-black text-slate-900" aria-hidden="true">C</span>
+              <svg className="h-5 w-5 text-slate-900" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M5 6h15l-1.7 8.5a2 2 0 0 1-2 1.5H9a2 2 0 0 1-2-1.6L5 3H2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="9" cy="20" r="1.5" fill="currentColor" />
+                <circle cx="17" cy="20" r="1.5" fill="currentColor" />
+              </svg>
             </NavLink>
           </div>
         </div>
