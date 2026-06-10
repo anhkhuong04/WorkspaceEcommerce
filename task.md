@@ -90,6 +90,12 @@ Dependency hiện tại:
 corepack pnpm typecheck
 corepack pnpm lint
 corepack pnpm build
+dotnet test .\tests\WorkspaceEcommerce.Api.IntegrationTests\WorkspaceEcommerce.Api.IntegrationTests.csproj
+docker compose up -d postgres
+docker compose --profile tools run --rm migrate
+docker compose --profile tools run --rm seed-demo
+docker compose build api
+docker compose up -d api
 ```
 
 Kết quả:
@@ -99,6 +105,19 @@ Kết quả:
 - Production build passed cho Storefront và Admin.
 - Admin build output gần nhất: CSS khoảng `24.01 kB`, JS khoảng `479.14 kB`, gzip JS khoảng `141.11 kB`.
 - Storefront build output gần nhất: CSS khoảng `50.50 kB`, JS khoảng `471.03 kB`, gzip JS khoảng `140.95 kB`.
+- API integration tests passed: 22 tests.
+- PostgreSQL local container chạy healthy.
+- Migration passed; database already up to date.
+- Seed demo passed; seed idempotent nên dữ liệu demo cũ được giữ nguyên.
+- API local container chạy trên `http://localhost:5080`.
+- HTTP smoke-test Admin Product assets passed:
+  - Admin login passed.
+  - Create/update/delete product image passed.
+  - Create/update/delete product specification passed.
+  - Storefront Product Detail API thấy image/spec mới trước khi xóa.
+- Vite dev servers đã start và trả HTML 200:
+  - Admin: `http://localhost:5174`
+  - Storefront Product Detail: `http://localhost:5173/products/atlas-standing-desk`
 
 Đã chạy cho Admin Product Asset API:
 
@@ -118,7 +137,7 @@ Kết quả:
 - Infrastructure tests passed: 60 tests.
 - Frontend typecheck/lint/build passed cho shared packages, Storefront và Admin ở thời điểm backend contract mới được thêm.
 
-Đã thử chạy API integration tests:
+API integration tests từng bị chặn ở lượt trước:
 
 ```powershell
 dotnet test .\tests\WorkspaceEcommerce.Api.IntegrationTests\WorkspaceEcommerce.Api.IntegrationTests.csproj
@@ -126,8 +145,8 @@ dotnet test .\tests\WorkspaceEcommerce.Api.IntegrationTests\WorkspaceEcommerce.A
 
 Kết quả:
 
-- Không chạy được do Docker/Testcontainers không kết nối được Docker endpoint `npipe://./pipe/docker_engine`.
-- Lỗi môi trường: Docker unavailable/misconfigured; cần bật Docker Desktop rồi chạy lại.
+- Lượt cũ không chạy được do Docker/Testcontainers không kết nối được Docker endpoint `npipe://./pipe/docker_engine`.
+- Lượt 2026-06-10 sau khi Docker hoạt động đã chạy lại passed 22/22 tests.
 
 Đã chạy frontend dependency update:
 
@@ -189,12 +208,13 @@ Smoke-test/API/test coverage đã có từ các task trước:
 
 ## Commit gần nhất
 
+- `bea9c6c Update task progress after admin asset UI`
 - `9b72a4a Add admin product asset UI`
 - `2cc7cc6 Add admin product asset APIs`
-- `03fee0c Update task progress and clean storefront login`
 
 Commit lịch sử liên quan:
 
+- `03fee0c Update task progress and clean storefront login`
 - `cfd9753 Polish storefront login page`
 - `b5d4901 Refine storefront header navigation`
 - `513597d Update storefront header navigation`
@@ -214,22 +234,22 @@ Commit lịch sử liên quan:
 - Docker Compose đã chạy API/PostgreSQL/migration/seed local; chưa có production image hardening như non-root user, SBOM, image signing hoặc CI publish.
 - Storefront Home đã đủ điều kiện demo dữ liệu thật, nhưng visual polish cuối vẫn có thể tiếp tục nâng cấp khi chốt branding.
 - Admin auth hiện lưu JWT bằng `localStorage` theo MVP; production nên đánh giá lại threat model, token lifetime, refresh/session strategy và cookie/httpOnly nếu cần.
-- Admin Product Image/Specification backend API đã triển khai nhưng API integration tests chưa xác minh được trong lượt gần nhất do Docker Desktop không chạy.
-- Admin Product Asset UI đã build/typecheck/lint sạch nhưng chưa smoke-test thủ công trên browser với API local.
+- Admin Product Image/Specification backend API đã triển khai và API integration tests đã passed khi Docker Desktop hoạt động.
+- Admin Product Asset UI đã build/typecheck/lint sạch; đã smoke-test qua HTTP API local, nhưng chưa có browser automation để tự động click form trong UI.
 - Dữ liệu smoke-test local cũ có thể vẫn còn trong PostgreSQL dev; seed demo idempotent nhưng chưa có cleanup/reset script riêng cho demo.
 - Admin UI đã chuyển sang Tailwind/native controls; cần smoke-test trình duyệt sâu thêm cho mọi modal/form sau refactor Ant Design.
 
 ## Nhiệm vụ tiếp theo đề xuất
 
-### Ưu tiên 1 - Verify Admin Product Assets End-to-End
+### Ưu tiên 1 - Browser Manual Verification
 
-Mục tiêu: xác minh backend/API/UI image/specification flows với PostgreSQL và browser.
+Mục tiêu: xác minh thao tác click/form trực tiếp trên trình duyệt thật.
 
-1. Bật Docker Desktop và chạy lại `dotnet test .\tests\WorkspaceEcommerce.Api.IntegrationTests\WorkspaceEcommerce.Api.IntegrationTests.csproj`.
-2. Chạy API local với PostgreSQL/migration/seed.
-3. Smoke-test Admin Products browser: create/update/delete image.
-4. Smoke-test Admin Products browser: create/update/delete specification.
-5. Smoke-test Storefront Product Detail xác nhận image/spec mới hiển thị từ dữ liệu Admin.
+1. Mở Admin: `http://localhost:5174`.
+2. Login bằng admin credentials trong `.env`.
+3. Vào Products, expand product và thao tác create/update/delete image.
+4. Thao tác create/update/delete specification.
+5. Mở Storefront Product Detail: `http://localhost:5173/products/atlas-standing-desk` và xác nhận image/spec mới hiển thị nếu giữ dữ liệu chưa xóa.
 
 ### Ưu tiên 2 - Demo readiness end-to-end
 
