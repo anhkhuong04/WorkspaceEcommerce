@@ -43,3 +43,6 @@ appsettings.*.Local.json
 .env
 .env.*
 !.env.example
+
+# Local HTTPS development certificates
+.certs/

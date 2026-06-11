@@ -1,133 +1,165 @@
-const benefits = [
-  { title: "Quality products", description: "Authentic workspace gear with reliable warranty coverage.", icon: "+" },
-  { title: "Fast delivery", description: "Safe nationwide shipping for your setup essentials.", icon: ">" },
-  { title: "Dedicated support", description: "Workspace advice and after-sales support when you need it.", icon: "o" }
-];
+import { useState } from "react";
+import { Link } from "react-router-dom";
 
-const trustBadges = ["Information security", "Secure checkout", "24/7 support"];
+type AuthMode = "login" | "register";
+
+function MailIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m4 7 8 6 8-6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4.5 20c1.4-4 4-6 7.5-6s6.1 2 7.5 6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+      <rect x="5" y="10" width="14" height="11" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function EyeIcon({ hidden }: { hidden: boolean }) {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle cx="12" cy="12" r="2.5" />
+      {hidden ? <path d="m4 4 16 16" strokeLinecap="round" /> : null}
+    </svg>
+  );
+}
+
+function GoogleIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.4a4.6 4.6 0 0 1-2 3v2.6h3.2c1.9-1.8 3-4.4 3-7.5Z" />
+      <path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.3l-3.2-2.6c-.9.6-2 1-3.4 1a5.8 5.8 0 0 1-5.5-4H3.2v2.6A10 10 0 0 0 12 22Z" />
+      <path fill="#FBBC05" d="M6.5 14.1a6 6 0 0 1 0-4.2V7.3H3.2a10 10 0 0 0 0 9.4l3.3-2.6Z" />
+      <path fill="#EA4335" d="M12 5.9c1.5 0 2.9.5 3.9 1.5l2.8-2.8A9.5 9.5 0 0 0 3.2 7.3l3.3 2.6a5.8 5.8 0 0 1 5.5-4Z" />
+    </svg>
+  );
+}
+
+interface TextFieldProps {
+  label: string;
+  type: "text" | "email" | "password";
+  placeholder: string;
+  autoComplete: string;
+  icon: "user" | "mail" | "lock";
+  showPassword?: boolean;
+  onTogglePassword?: () => void;
+}
+
+function TextField({ label, type, placeholder, autoComplete, icon, showPassword, onTogglePassword }: TextFieldProps) {
+  const resolvedType = type === "password" && showPassword ? "text" : type;
+
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-sm font-semibold">{label}</span>
+      <span className="flex h-12 items-center gap-3 rounded-md border border-slate-300 px-4 text-slate-400 transition focus-within:border-slate-950 focus-within:ring-1 focus-within:ring-slate-950">
+        {icon === "user" ? <UserIcon /> : icon === "mail" ? <MailIcon /> : <LockIcon />}
+        <input type={resolvedType} autoComplete={autoComplete} placeholder={placeholder} className="min-w-0 flex-1 bg-transparent text-sm text-slate-950 outline-none placeholder:text-slate-400" />
+        {type === "password" && onTogglePassword ? (
+          <button type="button" onClick={onTogglePassword} className="grid h-8 w-8 place-items-center rounded-full transition hover:bg-slate-100" aria-label={showPassword ? "Hide password" : "Show password"}>
+            <EyeIcon hidden={Boolean(showPassword)} />
+          </button>
+        ) : null}
+      </span>
+    </label>
+  );
+}
 
 export function LoginPage() {
+  const [mode, setMode] = useState<AuthMode>("login");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const isRegister = mode === "register";
+
+  function switchMode(nextMode: AuthMode) {
+    setMode(nextMode);
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+  }
+
   return (
-    <section className="relative -mx-8 -my-8 min-h-[calc(100vh-5rem)] overflow-hidden bg-[#f7fbf9] text-slate-950">
-      <div className="pointer-events-none absolute -left-28 bottom-0 h-80 w-80 rounded-full bg-emerald-100/70 blur-3xl" />
-      <div className="pointer-events-none absolute right-20 top-0 h-56 w-56 rounded-full bg-slate-200/60 blur-3xl" />
+    <section className="min-h-screen bg-[#fafafa] text-slate-950 lg:grid lg:h-screen lg:min-h-[680px] lg:grid-cols-[45%_55%] lg:overflow-hidden">
+      <div className="hidden h-full overflow-hidden border-r border-slate-200 lg:block">
+        <img src="/demo/login-page.png" alt="WorkspaceEcom office" className="h-full w-full object-fill" />
+      </div>
 
-      <div className="relative grid min-h-[calc(100vh-5rem)] lg:grid-cols-[1fr_minmax(520px,0.92fr)]">
-        <div className="relative flex min-h-[620px] flex-col overflow-hidden px-8 py-8 sm:px-12 lg:px-16 lg:py-12">
-          <div className="text-2xl font-black tracking-tight sm:text-3xl">
-            Workspace<span className="text-[var(--brand)]">Ecom</span>
-          </div>
-
-          <div className="relative z-10 mt-16 max-w-xl">
-            <h1 className="text-5xl font-black leading-[1.08] tracking-tight sm:text-6xl lg:text-7xl">
-              Build Your Perfect <span className="relative inline-block text-[var(--brand)]">Workspace<span className="absolute -bottom-2 left-2 h-2 w-[92%] rounded-full bg-[var(--brand)]/80" /></span>
-            </h1>
-            <p className="mt-8 max-w-md text-lg font-semibold leading-8 text-slate-500">
-              Premium furniture and accessories designed to improve focus, comfort, and everyday productivity.
-            </p>
-          </div>
-
-          <div className="relative z-10 mt-10 grid max-w-md gap-5">
-            {benefits.map((benefit) => (
-              <div key={benefit.title} className="flex items-center gap-4">
-                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-emerald-100 text-xl font-black text-[var(--brand)]">
-                  {benefit.icon}
-                </div>
-                <div>
-                  <p className="font-black text-slate-950">{benefit.title}</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">{benefit.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="pointer-events-none absolute bottom-0 left-1/2 hidden w-[760px] -translate-x-[38%] lg:block">
-            <div className="absolute -left-14 bottom-16 h-44 w-44 rounded-full bg-emerald-200/55 blur-2xl" />
-            <div className="relative h-[430px] w-full rounded-t-[3rem] bg-gradient-to-br from-emerald-100 via-white to-slate-200 p-10 shadow-2xl shadow-slate-900/10">
-              <div className="absolute bottom-14 left-14 right-14 h-20 rounded-3xl bg-slate-900/85" />
-              <div className="absolute bottom-32 left-24 h-36 w-64 rounded-3xl border border-white/80 bg-white/80 shadow-xl" />
-              <div className="absolute bottom-32 right-32 h-48 w-24 rounded-full bg-emerald-300/80" />
-              <div className="absolute bottom-8 left-28 h-28 w-8 rounded-full bg-slate-700" />
-              <div className="absolute bottom-8 right-28 h-28 w-8 rounded-full bg-slate-700" />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-center px-5 py-8 sm:px-8 lg:px-12">
-          <div className="w-full max-w-[620px] rounded-[2rem] bg-white/88 p-6 shadow-2xl shadow-slate-900/10 ring-1 ring-white/80 backdrop-blur-xl sm:rounded-[2.4rem] sm:p-10">
-            <div className="grid grid-cols-2 border-b border-slate-200 text-lg font-black text-slate-500">
-              <button type="button" className="flex items-center justify-center gap-3 border-b-2 border-[var(--brand)] pb-5 text-[var(--brand)]">
-                <span className="text-2xl">&gt;</span>
-                Login
+      <div className="flex min-h-screen items-center justify-center px-5 py-6 sm:px-10 lg:min-h-0 lg:px-[4vw] lg:py-5">
+        <div className="w-full max-w-[660px]">
+          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-[0_14px_45px_rgba(0,0,0,0.07)] sm:px-9 lg:px-10 lg:py-7">
+            <div className="mb-6 grid grid-cols-2 border-b border-slate-200" role="tablist" aria-label="Account access">
+              <button type="button" role="tab" aria-selected={!isRegister} onClick={() => switchMode("login")} className={`border-b-2 pb-3 text-sm font-semibold transition ${!isRegister ? "border-slate-950 text-slate-950" : "border-transparent text-slate-400 hover:text-slate-700"}`}>
+                Sign in
               </button>
-              <button type="button" className="flex cursor-default items-center justify-center gap-3 pb-5" aria-disabled="true">
-                <span className="text-2xl">+</span>
+              <button type="button" role="tab" aria-selected={isRegister} onClick={() => switchMode("register")} className={`border-b-2 pb-3 text-sm font-semibold transition ${isRegister ? "border-slate-950 text-slate-950" : "border-transparent text-slate-400 hover:text-slate-700"}`}>
                 Register
               </button>
             </div>
 
-            <form
-              className="mt-10"
-              onSubmit={(event) => event.preventDefault()}
-              noValidate
-            >
-              <div>
-                <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Welcome back</h2>
-                <p className="mt-4 text-base font-semibold text-slate-500">Login will be available when customer accounts are added after the MVP.</p>
+            <div>
+              <h1 className="text-2xl font-bold tracking-[-0.03em] sm:text-3xl">{isRegister ? "Create your account" : "Sign in"}</h1>
+              <p className="mt-1.5 text-sm text-slate-500">{isRegister ? "Join WorkspaceEcom and start building your ideal workspace." : "Welcome back to WorkspaceEcom."}</p>
+            </div>
+
+            <form className="mt-5" onSubmit={(event) => event.preventDefault()}>
+              <div className="grid gap-3.5">
+                {isRegister ? <TextField label="Full name" type="text" placeholder="Enter your full name" autoComplete="name" icon="user" /> : null}
+                <TextField label="Email" type="email" placeholder="Enter your email" autoComplete="email" icon="mail" />
+                <TextField label="Password" type="password" placeholder="Enter your password" autoComplete={isRegister ? "new-password" : "current-password"} icon="lock" showPassword={showPassword} onTogglePassword={() => setShowPassword((visible) => !visible)} />
+                {isRegister ? <TextField label="Confirm password" type="password" placeholder="Confirm your password" autoComplete="new-password" icon="lock" showPassword={showConfirmPassword} onTogglePassword={() => setShowConfirmPassword((visible) => !visible)} /> : null}
               </div>
 
-              <div className="mt-8 grid gap-5">
-                <label className="block">
-                  <span className="mb-2 block font-black text-slate-900">Email</span>
-                  <span className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition focus-within:border-[var(--brand)] focus-within:ring-4 focus-within:ring-emerald-100">
-                    <span className="text-xl text-slate-400">@</span>
-                    <input className="w-full bg-transparent text-base font-semibold outline-none placeholder:text-slate-400" type="email" placeholder="Enter your email" autoComplete="email" />
-                  </span>
+              {isRegister ? (
+                <label className="mt-4 flex items-start gap-2.5 text-xs leading-5 text-slate-500">
+                  <input type="checkbox" required className="mt-0.5 h-4 w-4 shrink-0 accent-slate-950" />
+                  <span>I agree to the Terms of Service and Privacy Policy.</span>
                 </label>
+              ) : (
+                <div className="mt-4 flex items-center justify-between gap-4 text-xs">
+                  <label className="flex items-center gap-2 text-slate-600"><input type="checkbox" className="h-4 w-4 accent-slate-950" />Remember me</label>
+                  <button type="button" className="font-medium underline underline-offset-4">Forgot password?</button>
+                </div>
+              )}
 
-                <label className="block">
-                  <span className="mb-2 block font-black text-slate-900">Password</span>
-                  <span className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition focus-within:border-[var(--brand)] focus-within:ring-4 focus-within:ring-emerald-100">
-                    <span className="text-xl text-slate-400">#</span>
-                    <input className="w-full bg-transparent text-base font-semibold outline-none placeholder:text-slate-400" type="password" placeholder="Enter your password" autoComplete="current-password" />
-                    <span className="text-lg text-slate-400">o</span>
-                  </span>
-                </label>
-              </div>
-
-              <div className="mt-6 flex items-center justify-between gap-4 text-sm font-black">
-                <label className="inline-flex items-center gap-3 text-slate-600">
-                  <input type="checkbox" defaultChecked className="h-5 w-5 rounded border-slate-300 accent-[var(--brand)]" />
-                  Remember me
-                </label>
-                <button type="button" className="cursor-default text-[var(--brand)]" aria-disabled="true">Forgot password?</button>
-              </div>
-
-              <button type="submit" className="mt-8 flex w-full items-center justify-center gap-3 rounded-xl bg-[var(--brand)] px-5 py-4 text-base font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700">
-                Login
-                <span>›</span>
+              <button type="submit" className="mt-5 h-12 w-full rounded-md bg-[#111111] text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2">
+                {isRegister ? "Create account" : "Sign in"}
               </button>
 
-              <div className="my-8 grid grid-cols-[1fr_auto_1fr] items-center gap-4 text-sm font-bold text-slate-400">
-                <span className="h-px bg-slate-200" />
-                or
-                <span className="h-px bg-slate-200" />
+              <div className="my-5 grid grid-cols-[1fr_auto_1fr] items-center gap-4 text-xs font-medium uppercase text-slate-400">
+                <span className="h-px bg-slate-200" />Or<span className="h-px bg-slate-200" />
               </div>
-              <p className="mt-8 text-center text-sm font-semibold text-slate-500">
-                Do not have an account? <button type="button" className="cursor-default font-black text-[var(--brand)]" aria-disabled="true">Register later</button>
-              </p>
+
+              <button type="button" className="flex h-12 w-full items-center justify-center gap-3 rounded-md border border-slate-300 bg-white text-sm font-semibold transition hover:bg-slate-50">
+                <GoogleIcon />
+                {isRegister ? "Register with Google" : "Continue with Google"}
+              </button>
             </form>
 
-            <div className="mt-10 grid gap-4 border-t border-slate-100 pt-6 text-xs font-black text-slate-500 sm:grid-cols-3">
-              {trustBadges.map((badge) => (
-                <div key={badge} className="flex items-center justify-center gap-2">
-                  <span className="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-500">+</span>
-                  {badge}
-                </div>
-              ))}
-            </div>
-            <p className="mt-6 text-center text-xs font-semibold text-slate-400">© 2026 WorkspaceEcom. All rights reserved.</p>
+            <p className="mt-5 text-center text-xs text-slate-500">
+              {isRegister ? "Already have an account?" : "Do not have an account?"}{" "}
+              <button type="button" onClick={() => switchMode(isRegister ? "login" : "register")} className="font-semibold text-slate-950 underline underline-offset-4">
+                {isRegister ? "Sign in" : "Create an account"}
+              </button>
+            </p>
+
+            <p className="mt-5 text-center text-[11px] text-slate-400">&copy; 2026 WorkspaceEcom. All rights reserved.</p>
           </div>
+
+          <Link to="/" className="mx-auto mt-4 block w-fit text-xs font-medium text-slate-500 transition hover:text-slate-950">Back to storefront</Link>
         </div>
       </div>
     </section>

@@ -16,7 +16,7 @@ import { Fragment, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
-import { Button, EmptyState, Field, Modal, Notice, Pill, SelectInput, TextArea, TextInput, Toggle } from "../../components/ui/AdminUi";
+import { Button, ConfirmDialog, EmptyState, Field, Modal, Notice, Pill, SelectInput, TextArea, TextInput, Toggle } from "../../components/ui/AdminUi";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
 
@@ -58,6 +58,9 @@ type VariantFormValues = z.infer<typeof variantSchema>;
 type ImageFormValues = z.infer<typeof imageSchema>;
 type SpecificationFormValues = z.infer<typeof specificationSchema>;
 type CategoryOption = { id: string; label: string; level: number };
+type DeleteTarget =
+  | { type: "image"; item: AdminProductImageDto }
+  | { type: "specification"; item: AdminProductSpecificationDto };
 
 const productDefaultValues: ProductFormValues = { categoryId: "", name: "", slug: "", description: "", isFeatured: false, isActive: true };
 const variantDefaultValues: VariantFormValues = { sku: "", name: "", color: "", size: "", price: 0, compareAtPrice: null, stockQuantity: 0, requiresInstallation: false, isActive: true };
@@ -116,6 +119,7 @@ export function ProductsPage() {
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isSpecificationModalOpen, setIsSpecificationModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [expandedProductIds, setExpandedProductIds] = useState<Set<string>>(new Set());
 
   const productForm = useForm<ProductFormValues>({ resolver: zodResolver(productSchema), defaultValues: productDefaultValues });
@@ -231,16 +235,17 @@ export function ProductsPage() {
   function openEditSpecificationModal(product: AdminProductDto, specification: AdminProductSpecificationDto) { setSpecificationProduct(product); setEditingSpecification(specification); specificationForm.reset(toSpecificationFormValues(specification)); setIsSpecificationModalOpen(true); }
   function toggleExpanded(productId: string) { setExpandedProductIds((current) => { const next = new Set(current); if (next.has(productId)) next.delete(productId); else next.add(productId); return next; }); }
 
-  function deleteImage(image: AdminProductImageDto) {
-    if (window.confirm("Delete this product image?")) {
-      imageDeleteMutation.mutate(image);
+  function confirmDeleteTarget() {
+    if (!deleteTarget) {
+      return;
     }
-  }
 
-  function deleteSpecification(specification: AdminProductSpecificationDto) {
-    if (window.confirm("Delete this product specification?")) {
-      specificationDeleteMutation.mutate(specification);
+    if (deleteTarget.type === "image") {
+      imageDeleteMutation.mutate(deleteTarget.item, { onSuccess: () => setDeleteTarget(null) });
+      return;
     }
+
+    specificationDeleteMutation.mutate(deleteTarget.item, { onSuccess: () => setDeleteTarget(null) });
   }
 
   return (
@@ -283,7 +288,7 @@ export function ProductsPage() {
                               <h3 className="text-sm font-black text-slate-900">Product images</h3>
                               <Button type="button" onClick={() => openCreateImageModal(product)}>Add image</Button>
                             </div>
-                            {product.images.length ? <div className="grid gap-3 md:grid-cols-2">{product.images.map((image) => <div key={image.id} className="rounded-2xl border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-black text-slate-900">{image.imageUrl}</p><p className="mt-1 text-xs text-slate-500">Alt: {image.altText || "-"}</p><p className="mt-1 text-xs text-slate-500">Sort order: {image.sortOrder}</p></div><Pill tone="teal">Image</Pill></div><div className="mt-3 flex gap-2"><Button type="button" onClick={() => openEditImageModal(product, image)}>Edit</Button><Button type="button" variant="danger" disabled={imageDeleteMutation.isPending} onClick={() => deleteImage(image)}>Delete</Button></div></div>)}</div> : <EmptyState>No images for this product</EmptyState>}
+                            {product.images.length ? <div className="grid gap-3 md:grid-cols-2">{product.images.map((image) => <div key={image.id} className="rounded-2xl border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-black text-slate-900">{image.imageUrl}</p><p className="mt-1 text-xs text-slate-500">Alt: {image.altText || "-"}</p><p className="mt-1 text-xs text-slate-500">Sort order: {image.sortOrder}</p></div><Pill tone="teal">Image</Pill></div><div className="mt-3 flex gap-2"><Button type="button" onClick={() => openEditImageModal(product, image)}>Edit</Button><Button type="button" variant="danger" disabled={imageDeleteMutation.isPending} onClick={() => setDeleteTarget({ type: "image", item: image })}>Delete</Button></div></div>)}</div> : <EmptyState>No images for this product</EmptyState>}
                           </section>
 
                           <section className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -291,7 +296,7 @@ export function ProductsPage() {
                               <h3 className="text-sm font-black text-slate-900">Specifications</h3>
                               <Button type="button" onClick={() => openCreateSpecificationModal(product)}>Add spec</Button>
                             </div>
-                            {product.specifications.length ? <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-xs"><thead className="uppercase tracking-wide text-slate-500"><tr><th className="py-2 pr-3">Name</th><th className="py-2 pr-3">Value</th><th className="py-2 pr-3">Sort</th><th className="py-2 pr-3">Actions</th></tr></thead><tbody>{product.specifications.map((specification) => <tr key={specification.id} className="border-t border-slate-200"><td className="py-2 pr-3 font-bold text-slate-900">{specification.name}</td><td className="py-2 pr-3 text-slate-600">{specification.value}</td><td className="py-2 pr-3 text-slate-600">{specification.sortOrder}</td><td className="py-2 pr-3"><div className="flex gap-2"><Button type="button" onClick={() => openEditSpecificationModal(product, specification)}>Edit</Button><Button type="button" variant="danger" disabled={specificationDeleteMutation.isPending} onClick={() => deleteSpecification(specification)}>Delete</Button></div></td></tr>)}</tbody></table></div> : <EmptyState>No specifications for this product</EmptyState>}
+                            {product.specifications.length ? <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-xs"><thead className="uppercase tracking-wide text-slate-500"><tr><th className="py-2 pr-3">Name</th><th className="py-2 pr-3">Value</th><th className="py-2 pr-3">Sort</th><th className="py-2 pr-3">Actions</th></tr></thead><tbody>{product.specifications.map((specification) => <tr key={specification.id} className="border-t border-slate-200"><td className="py-2 pr-3 font-bold text-slate-900">{specification.name}</td><td className="py-2 pr-3 text-slate-600">{specification.value}</td><td className="py-2 pr-3 text-slate-600">{specification.sortOrder}</td><td className="py-2 pr-3"><div className="flex gap-2"><Button type="button" onClick={() => openEditSpecificationModal(product, specification)}>Edit</Button><Button type="button" variant="danger" disabled={specificationDeleteMutation.isPending} onClick={() => setDeleteTarget({ type: "specification", item: specification })}>Delete</Button></div></td></tr>)}</tbody></table></div> : <EmptyState>No specifications for this product</EmptyState>}
                           </section>
                         </div>
                       </td></tr>
@@ -339,6 +344,16 @@ export function ProductsPage() {
           <Controller control={specificationForm.control} name="sortOrder" render={({ field, fieldState }) => <Field label="Sort order" error={fieldState.error?.message}><TextInput type="number" value={field.value} onChange={(event) => field.onChange(Number(event.target.value))} /></Field>} />
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={deleteTarget?.type === "image" ? "Delete product image" : "Delete product specification"}
+        message={deleteTarget?.type === "image" ? "This image will be removed from the product gallery." : "This specification will be removed from the product detail data."}
+        confirmLabel="Delete"
+        busy={imageDeleteMutation.isPending || specificationDeleteMutation.isPending}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={confirmDeleteTarget}
+      />
     </div>
   );
 }

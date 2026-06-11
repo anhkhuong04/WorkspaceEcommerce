@@ -1,11 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --brand: #0f9f7a;
-  --brand-soft: #dff8ef;
-  --ink: #172033;
-  --surface-soft: #f5f8f6;
-  font-family: "Plus Jakarta Sans", "Aptos", sans-serif;
+  --brand: #111111;
+  --brand-soft: #f1f1f1;
+  --ink: #111111;
+  --surface-soft: #ffffff;
+  --surface-card: #ffffff;
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --space-near: 8px;
+  --space-card: 16px;
+  --space-section: 48px;
+  font-family: Inter, sans-serif;
   color: var(--ink);
   background: var(--surface-soft);
 }
@@ -17,6 +25,102 @@
 body {
   margin: 0;
   min-width: 320px;
+  background: var(--surface-soft);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.ui-h1 {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.ui-h2 {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.ui-h3 {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.ui-price {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.ui-body {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.ui-control {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ui-caption {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.ui-card {
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-card);
+}
+
+.ui-card-hover {
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+.ui-card-hover:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+@media (min-width: 768px) {
+  .ui-h1 {
+    font-size: 36px;
+  }
+
+  .ui-h2 {
+    font-size: 28px;
+  }
+
+  .ui-h3 {
+    font-size: 18px;
+  }
+
+  .ui-price {
+    font-size: 20px;
+  }
+
+  .ui-body {
+    font-size: 15px;
+  }
+
+  .ui-control {
+    font-size: 15px;
+  }
+
+  .ui-caption {
+    font-size: 12px;
+  }
 }
 
 @keyframes banner-progress-anim {

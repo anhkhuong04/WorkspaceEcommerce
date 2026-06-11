@@ -10,7 +10,9 @@ services:
     container_name: workspace-ecommerce-api
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_URLS: http://+:8080;https://+:8443
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /https/workspace-ecommerce-devcert.pfx
+      ASPNETCORE_Kestrel__Certificates__Default__Password: ${ASPNETCORE_HTTPS_CERT_PASSWORD:?Set ASPNETCORE_HTTPS_CERT_PASSWORD in .env}
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB:?Set POSTGRES_DB in .env};Username=${POSTGRES_USER:?Set POSTGRES_USER in .env};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       AdminAuth__Email: ${AdminAuth__Email:?Set AdminAuth__Email in .env}
       AdminAuth__Password: ${AdminAuth__Password:?Set AdminAuth__Password in .env}
@@ -20,6 +22,9 @@ services:
       Jwt__AccessTokenMinutes: ${Jwt__AccessTokenMinutes:-60}
     ports:
       - "${API_PORT:-5080}:8080"
+      - "${API_HTTPS_PORT:-5443}:8443"
+    volumes:
+      - ./.certs:/https:ro
     depends_on:
       postgres:
         condition: service_healthy

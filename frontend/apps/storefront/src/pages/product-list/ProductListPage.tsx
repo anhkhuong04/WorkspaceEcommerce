@@ -76,7 +76,7 @@ export function ProductListPage() {
             name="search"
             defaultValue={search}
             placeholder="Desk, chair, lamp..."
-            className="h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none transition focus:border-emerald-400"
+            className="h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none transition focus:border-slate-950"
           />
         </label>
         <label className="grid gap-2">
@@ -84,7 +84,7 @@ export function ProductListPage() {
           <select
             name="categorySlug"
             defaultValue={categorySlug}
-            className="h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none transition focus:border-emerald-400"
+            className="h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none transition focus:border-slate-950"
           >
             <option value="">All categories</option>
             {categoriesQuery.data?.map((category) => (
@@ -95,7 +95,7 @@ export function ProductListPage() {
           </select>
         </label>
         <label className="flex items-end gap-3 pb-3 text-sm font-bold text-slate-700">
-          <input name="inStock" type="checkbox" defaultChecked={inStock} className="h-5 w-5 accent-emerald-600" />
+          <input name="inStock" type="checkbox" defaultChecked={inStock} className="h-5 w-5 accent-slate-950" />
           In stock only
         </label>
         <div className="flex items-end">

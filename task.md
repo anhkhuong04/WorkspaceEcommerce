@@ -1,6 +1,6 @@
 ﻿# Task - WorkspaceEcommerce
 
-Cập nhật lần cuối: 2026-06-10
+Cập nhật lần cuối: 2026-06-11
 
 ## Nguyên tắc trước khi làm task mới
 
@@ -33,6 +33,32 @@ Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, C
 - Admin Product UI đã tích hợp list/create/update/delete cho ảnh sản phẩm và thông số kỹ thuật.
 - Home demo hiện có đủ dữ liệu thật theo `overview.md`: banners, featured categories và featured products.
 - Storefront header navigation và login page đã được polish ở mức UI hiện tại; social login placeholder và asset imports cũ đã được gỡ để phù hợp asset cleanup.
+- Browser manual verification cho Admin Product asset flows và Storefront Product Detail đã hoàn tất theo cập nhật 2026-06-11.
+- Demo readiness end-to-end đã hoàn tất theo cập nhật 2026-06-11: setup sạch, smoke-test Storefront/Admin, full suite và tài liệu/demo script ở mức MVP.
+
+## Tiến độ MVP theo `overview.md`
+
+Ước tính hiện tại: **100% tiêu chí chức năng MVP đã hoàn thành**, **khoảng 90-95% demo readiness/operational hardening tổng thể**.
+
+Đối chiếu tiêu chí hoàn thành MVP trong `overview.md`:
+
+- Admin tạo được danh mục, sản phẩm và SKU: hoàn thành.
+- Khách xem được sản phẩm trên storefront: hoàn thành.
+- Khách thêm sản phẩm vào giỏ: hoàn thành.
+- Khách checkout thành công: hoàn thành.
+- Hệ thống tạo đơn hàng có mã đơn: hoàn thành.
+- Admin xem và cập nhật trạng thái đơn: hoàn thành.
+- Khách tra cứu được đơn hàng: hoàn thành.
+- Tồn kho được cập nhật cơ bản: hoàn thành.
+- Source code chia module rõ ràng: hoàn thành.
+- Có seed data để demo: hoàn thành.
+
+Phần còn lại không còn là blocker chức năng MVP, mà là hardening trước demo/vận hành:
+
+- Admin UI hardening sau khi bỏ Ant Design.
+- Browser automation hoặc checklist sâu cho toàn bộ Admin modal/form.
+- Accessibility/focus/keyboard behavior cho modal và form.
+- Theo dõi bundle/code splitting nếu Admin UI tiếp tục mở rộng.
 
 Dependency hiện tại:
 
@@ -45,6 +71,21 @@ Dependency hiện tại:
 
 ## Đã hoàn thành
 
+### Demo readiness end-to-end
+
+- Hoàn tất kịch bản demo từ setup sạch theo cập nhật 2026-06-11.
+- Luồng setup mục tiêu: `postgres` -> `migrate` -> `seed-demo` -> `api`.
+- Smoke-test Storefront mục tiêu đã hoàn tất: Home -> Catalog -> Product Detail -> Cart -> Checkout -> Success -> Order Lookup.
+- Smoke-test Admin mục tiêu đã hoàn tất: Login -> Dashboard -> Products/Banners -> Orders -> Status update.
+- Full suite và README/demo script đã được cập nhật hoặc xác minh ở mức MVP theo cập nhật 2026-06-11.
+
+### Browser Manual Verification
+
+- Hoàn tất kiểm tra thao tác click/form trực tiếp trên trình duyệt thật theo cập nhật 2026-06-11.
+- Admin Product asset flows đã được kiểm tra: create/update/delete image và specification.
+- Storefront Product Detail đã được kiểm tra để xác nhận image/spec hiển thị đúng khi dữ liệu được giữ lại.
+- Xác nhận luồng browser cho phần đã thêm ở Admin Product Asset UI không còn là blocker MVP.
+
 ### Admin Product Asset UI
 
 - Tích hợp product image list/create/update/delete vào Admin Products expanded row.
@@ -55,34 +96,13 @@ Dependency hiện tại:
 - Sửa Storefront header/login để không còn import các asset đã xóa ở commit trước; dùng fallback text/CSS để frontend build sạch.
 - Commit riêng: `9b72a4a Add admin product asset UI`.
 
-### Admin Product Asset APIs
-
-- Bổ sung Admin Product Image DTO/request/validator và service methods cho create/update/delete.
-- Bổ sung Admin Product Specification DTO/request/validator và service methods cho create/update/delete.
-- Mở rộng `AdminProductDto` trả `images` và `specifications` để Admin UI có dữ liệu quản trị.
-- Thêm Admin API endpoints:
-  - `POST /api/admin/products/{id}/images`
-  - `PUT /api/admin/product-images/{id}`
-  - `DELETE /api/admin/product-images/{id}`
-  - `POST /api/admin/products/{id}/specifications`
-  - `PUT /api/admin/product-specifications/{id}`
-  - `DELETE /api/admin/product-specifications/{id}`
-- Cập nhật shared `api-types` và `api-client` cho image/specification endpoints.
-- Thêm Application service tests, validator tests và API integration test coverage cho product image/specification endpoints.
-- Không cần migration mới vì schema `catalog.product_images` và `catalog.product_specifications` đã có từ migration Catalog ban đầu.
-- Commit riêng: `2cc7cc6 Add admin product asset APIs`.
-
-### Storefront Header/Login Polish
-
-- Cập nhật Storefront header navigation, assets icon và route login.
-- Polish Storefront login page theo visual direction hiện tại.
-- Gỡ placeholder social login Google/Facebook khỏi Storefront login page để tránh tạo kỳ vọng tính năng ngoài MVP.
-- Commit liên quan:
-  - `513597d Update storefront header navigation`
-  - `b5d4901 Refine storefront header navigation`
-  - `cfd9753 Polish storefront login page`
-
 ## Xác minh gần nhất
+
+Theo cập nhật người dùng 2026-06-11:
+
+- Browser Manual Verification đã hoàn tất.
+- Demo readiness end-to-end đã hoàn tất.
+- Ưu tiên 1 và Ưu tiên 2 trong danh sách nhiệm vụ trước đã xong.
 
 Đã chạy cho Admin Product Asset UI:
 
@@ -241,34 +261,36 @@ Commit lịch sử liên quan:
 
 ## Nhiệm vụ tiếp theo đề xuất
 
-### Ưu tiên 1 - Browser Manual Verification
-
-Mục tiêu: xác minh thao tác click/form trực tiếp trên trình duyệt thật.
-
-1. Mở Admin: `http://localhost:5174`.
-2. Login bằng admin credentials trong `.env`.
-3. Vào Products, expand product và thao tác create/update/delete image.
-4. Thao tác create/update/delete specification.
-5. Mở Storefront Product Detail: `http://localhost:5173/products/atlas-standing-desk` và xác nhận image/spec mới hiển thị nếu giữ dữ liệu chưa xóa.
-
-### Ưu tiên 2 - Demo readiness end-to-end
-
-Mục tiêu: có kịch bản demo ổn định từ setup sạch.
-
-1. Chạy Docker Compose từ clean volume: `postgres` -> `migrate` -> `seed-demo` -> `api`.
-2. Smoke-test Storefront: Home -> Catalog -> Product Detail -> Cart -> Checkout -> Success -> Order Lookup.
-3. Smoke-test Admin: Login -> Dashboard -> Products/Banners -> Orders -> Status update.
-4. Chạy full suite: `dotnet test WorkspaceEcommerce.slnx`.
-5. Cập nhật README/demo script với lệnh chạy và dữ liệu demo cần dùng.
-
 ### Ưu tiên 3 - Admin UI hardening
 
 Mục tiêu: tăng độ ổn định vận hành sau khi bỏ Ant Design.
 
-1. Smoke-test browser thủ công hoặc Playwright cho toàn bộ Admin modal/form: Banner, Category, Product, Variant và Order status.
-2. Tách các table/form lớn thành component nhỏ nếu cần giảm kích thước page file.
-3. Rà accessibility cho modal, focus management, keyboard escape và form labels.
-4. Cân nhắc route-level code splitting nếu bundle tăng trở lại khi thêm image/specification flows.
+Phạm vi nên làm:
+
+1. Smoke-test browser thủ công hoặc Playwright cho toàn bộ Admin modal/form: Banner, Category, Product, Variant, Product Image, Product Specification và Order status.
+2. Rà accessibility cho modal/form: label, `aria-*`, focus trap, focus restore sau khi đóng modal, phím `Escape`, keyboard submit/cancel.
+3. Chuẩn hóa trạng thái form: loading, disabled state, validation message, API error message, confirm trước delete.
+4. Rà responsive Admin ở các breakpoint chính: mobile hẹp, tablet và desktop Full HD.
+5. Tách các page lớn thành component nhỏ nếu file đang ôm quá nhiều table/form/modal logic.
+6. Cân nhắc route-level code splitting nếu bundle Admin tăng trở lại khi thêm flow mới.
+
+Kế hoạch triển khai đề xuất:
+
+1. Inventory UI: liệt kê toàn bộ Admin page/modal/form/action hiện có và xác định file chịu trách nhiệm.
+2. Test matrix: tạo checklist hoặc Playwright spec cho các luồng CRUD chính và order status.
+3. Accessibility pass: sửa modal/focus/label/keyboard behavior trước, vì đây là nhóm lỗi ảnh hưởng mọi form.
+4. Form hardening pass: thống nhất loading/error/disabled/delete confirmation cho Banner, Category, Product, Variant, Image, Specification và Order.
+5. Refactor có kiểm soát: chỉ tách component ở những page vượt ngưỡng khó bảo trì; không refactor rộng nếu không giảm rủi ro thực tế.
+6. Verification: chạy `corepack pnpm typecheck`, `corepack pnpm lint`, `corepack pnpm build`, smoke-test Admin trên browser và nếu có Playwright thì chạy suite tương ứng.
+
+Definition of Done cho Ưu tiên 3:
+
+- Tất cả Admin modal/form chính thao tác được bằng mouse và keyboard.
+- Modal có focus behavior hợp lý khi mở/đóng.
+- Form có validation và API error rõ ràng.
+- Delete/update action không gây mất dữ liệu do click nhầm ở các flow rủi ro.
+- Admin build/typecheck/lint sạch.
+- Có checklist hoặc automated test artifact để tái kiểm tra trước demo.
 
 ## Lệnh nên chạy trước task tiếp theo
 

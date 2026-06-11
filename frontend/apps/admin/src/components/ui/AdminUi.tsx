@@ -1,5 +1,19 @@
 ﻿import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import { useEffect, useId, useRef } from "react";
 import { cx } from "./cx";
+
+const focusableSelector = [
+  "a[href]",
+  "button:not([disabled])",
+  "textarea:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])"
+].join(",");
+
+function getFocusableElements(container: HTMLElement) {
+  return Array.from(container.querySelectorAll<HTMLElement>(focusableSelector)).filter((element) => !element.hasAttribute("aria-hidden"));
+}
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "ghost" | "danger";
@@ -60,15 +74,92 @@ interface ModalProps {
 }
 
 export function Modal({ title, open, children, footer, widthClass = "max-w-xl", onClose }: ModalProps) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    previouslyFocusedElementRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    window.setTimeout(() => {
+      const dialog = dialogRef.current;
+      if (!dialog) {
+        return;
+      }
+
+      const [firstFocusableElement] = getFocusableElements(dialog);
+      (firstFocusableElement ?? dialog).focus();
+    }, 0);
+
+    return () => {
+      previouslyFocusedElementRef.current?.focus();
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const dialog = dialogRef.current;
+      if (!dialog) {
+        return;
+      }
+
+      const focusableElements = getFocusableElements(dialog);
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, open]);
+
   if (!open) {
     return null;
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <div className={cx("max-h-[90vh] w-full overflow-hidden rounded-3xl bg-white shadow-2xl", widthClass)}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4 backdrop-blur-sm" role="presentation">
+      <div
+        ref={dialogRef}
+        className={cx("max-h-[90vh] w-full overflow-hidden rounded-3xl bg-white shadow-2xl outline-none", widthClass)}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+      >
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h2 className="text-xl font-black text-slate-950">{title}</h2>
+          <h2 id={titleId} className="text-xl font-black text-slate-950">{title}</h2>
           <button className="rounded-full px-3 py-1 text-2xl leading-none text-slate-500 hover:bg-slate-100" onClick={onClose} aria-label="Close">
             x
           </button>
@@ -76,6 +167,148 @@ export function Modal({ title, open, children, footer, widthClass = "max-w-xl", 
         <div className="max-h-[calc(90vh-140px)] overflow-y-auto px-6 py-5">{children}</div>
         {footer ? <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">{footer}</div> : null}
       </div>
+    </div>
+  );
+}
+
+interface ConfirmDialogProps {
+  open: boolean;
+  title: string;
+  message: ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  busy?: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+export function ConfirmDialog({
+  open,
+  title,
+  message,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  busy = false,
+  onCancel,
+  onConfirm
+}: ConfirmDialogProps) {
+  return (
+    <Modal
+      title={title}
+      open={open}
+      onClose={onCancel}
+      widthClass="max-w-md"
+      footer={(
+        <>
+          <Button type="button" disabled={busy} onClick={onCancel}>{cancelLabel}</Button>
+          <Button type="button" variant="danger" disabled={busy} onClick={onConfirm}>{busy ? "Working..." : confirmLabel}</Button>
+        </>
+      )}
+    >
+      <div className="text-sm font-semibold leading-6 text-slate-600">{message}</div>
+    </Modal>
+  );
+}
+
+interface DrawerProps {
+  title: string;
+  open: boolean;
+  children: ReactNode;
+  widthClass?: string;
+  onClose: () => void;
+}
+
+export function Drawer({ title, open, children, widthClass = "max-w-3xl", onClose }: DrawerProps) {
+  const titleId = useId();
+  const drawerRef = useRef<HTMLElement>(null);
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    previouslyFocusedElementRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    window.setTimeout(() => {
+      const drawer = drawerRef.current;
+      if (!drawer) {
+        return;
+      }
+
+      const [firstFocusableElement] = getFocusableElements(drawer);
+      (firstFocusableElement ?? drawer).focus();
+    }, 0);
+
+    return () => {
+      previouslyFocusedElementRef.current?.focus();
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const drawer = drawerRef.current;
+      if (!drawer) {
+        return;
+      }
+
+      const focusableElements = getFocusableElements(drawer);
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        drawer.focus();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, open]);
+
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/45 backdrop-blur-sm" role="presentation">
+      <aside
+        ref={drawerRef}
+        className={cx("h-full w-full overflow-y-auto bg-white p-6 shadow-2xl outline-none", widthClass)}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+      >
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <h2 id={titleId} className="text-2xl font-black text-slate-950">{title}</h2>
+          <Button type="button" onClick={onClose}>Close</Button>
+        </div>
+        {children}
+      </aside>
     </div>
   );
 }
@@ -91,7 +324,7 @@ export function Field({ label, error, children }: FieldProps) {
     <label className="block">
       <span className="mb-1.5 block text-sm font-bold text-slate-700">{label}</span>
       {children}
-      {error ? <span className="mt-1 block text-sm font-semibold text-red-600">{error}</span> : null}
+      {error ? <span className="mt-1 block text-sm font-semibold text-red-600" role="alert">{error}</span> : null}
     </label>
   );
 }
@@ -111,10 +344,11 @@ export function SelectInput(props: SelectHTMLAttributes<HTMLSelectElement>) {
 interface ToggleProps {
   checked: boolean;
   disabled?: boolean;
+  label?: string;
   onChange: (checked: boolean) => void;
 }
 
-export function Toggle({ checked, disabled, onChange }: ToggleProps) {
+export function Toggle({ checked, disabled, label = "Toggle setting", onChange }: ToggleProps) {
   return (
     <button
       type="button"
@@ -125,6 +359,7 @@ export function Toggle({ checked, disabled, onChange }: ToggleProps) {
         checked ? "bg-teal-700" : "bg-slate-300"
       )}
       aria-pressed={checked}
+      aria-label={label}
     >
       <span className={cx("absolute top-1 h-4 w-4 rounded-full bg-white shadow transition", checked ? "left-6" : "left-1")} />
     </button>
@@ -152,6 +387,3 @@ export function Pill({ children, tone = "slate" }: PillProps) {
 export function EmptyState({ children }: { children: ReactNode }) {
   return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-500">{children}</div>;
 }
-
-
-
