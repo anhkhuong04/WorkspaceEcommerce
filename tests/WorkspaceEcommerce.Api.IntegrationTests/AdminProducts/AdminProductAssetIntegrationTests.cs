@@ -9,6 +9,22 @@ namespace WorkspaceEcommerce.Api.IntegrationTests.AdminProducts;
 public sealed class AdminProductAssetIntegrationTests(ApiIntegrationTestFixture fixture)
 {
     [Fact]
+    public async Task DeleteProduct_WithoutOrderHistory_RemovesProduct()
+    {
+        await fixture.ResetDatabaseAsync();
+        var (_, product) = await SeedProductAsync();
+        using var client = fixture.CreateClient();
+        client.UseBearerToken(await client.LoginAsAdminAsync());
+
+        using var deleteResponse = await client.DeleteAsync($"/api/admin/products/{product.Id}");
+        using var listResponse = await client.GetAsync("/api/admin/products");
+        var list = await listResponse.ReadJsonAsync();
+
+        Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
+        Assert.Empty(list["data"]!.AsArray());
+    }
+
+    [Fact]
     public async Task AdminProductAssetEndpoints_WithBearerToken_CreateUpdateListAndDeleteAssets()
     {
         await fixture.ResetDatabaseAsync();

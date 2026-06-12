@@ -61,6 +61,7 @@ type ImageFormValues = z.infer<typeof imageSchema>;
 type SpecificationFormValues = z.infer<typeof specificationSchema>;
 type CategoryOption = { id: string; label: string; level: number };
 type DeleteTarget =
+  | { type: "product"; item: AdminProductDto }
   | { type: "image"; item: AdminProductImageDto }
   | { type: "specification"; item: AdminProductSpecificationDto };
 
@@ -180,6 +181,23 @@ export function ProductsPage() {
     onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
   });
 
+  const productDeleteMutation = useMutation({
+    mutationFn: (product: AdminProductDto) => adminApi.deleteProduct(product.id),
+    onSuccess: async (_, product) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-products"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] })
+      ]);
+      setExpandedProductIds((current) => {
+        const next = new Set(current);
+        next.delete(product.id);
+        return next;
+      });
+      setNotice({ type: "success", message: "Product deleted." });
+    },
+    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
+  });
+
   const variantSaveMutation = useMutation({
     mutationFn: (values: VariantFormValues) => {
       const request = toVariantRequest(values);
@@ -283,6 +301,11 @@ export function ProductsPage() {
       return;
     }
 
+    if (deleteTarget.type === "product") {
+      productDeleteMutation.mutate(deleteTarget.item, { onSuccess: () => setDeleteTarget(null) });
+      return;
+    }
+
     if (deleteTarget.type === "image") {
       imageDeleteMutation.mutate(deleteTarget.item, { onSuccess: () => setDeleteTarget(null) });
       return;
@@ -313,7 +336,7 @@ export function ProductsPage() {
                       <td className="py-3 pr-4 text-slate-600">{product.images.length} images / {product.specifications.length} specs</td>
                       <td className="py-3 pr-4"><Pill tone={product.isFeatured ? "blue" : "slate"}>{product.isFeatured ? "Featured" : "Standard"}</Pill></td>
                       <td className="py-3 pr-4"><div className="flex items-center gap-3"><Toggle checked={product.isActive} disabled={productToggleMutation.isPending} onChange={() => productToggleMutation.mutate(product)} /><Pill tone={product.isActive ? "green" : "slate"}>{product.isActive ? "Active" : "Inactive"}</Pill></div></td>
-                      <td className="py-3 pr-4"><div className="flex flex-wrap gap-2"><Button type="button" onClick={() => openEditProductModal(product)}>Edit</Button><Button type="button" onClick={() => openCreateVariantModal(product)}>Add SKU</Button><Button type="button" onClick={() => openCreateImageModal(product)}>Add image</Button><Button type="button" onClick={() => openCreateSpecificationModal(product)}>Add spec</Button></div></td>
+                      <td className="py-3 pr-4"><div className="flex flex-wrap gap-2"><Button type="button" onClick={() => openEditProductModal(product)}>Edit</Button><Button type="button" onClick={() => openCreateVariantModal(product)}>Add SKU</Button><Button type="button" onClick={() => openCreateImageModal(product)}>Add image</Button><Button type="button" onClick={() => openCreateSpecificationModal(product)}>Add spec</Button><Button type="button" variant="danger" disabled={productDeleteMutation.isPending} onClick={() => setDeleteTarget({ type: "product", item: product })}>Delete</Button></div></td>
                     </tr>
                     {isProductExpanded(product.id) ? (
                       <tr key={`${product.id}-assets`} className="border-b border-slate-100 bg-slate-50/70"><td colSpan={7} className="p-4">
@@ -390,10 +413,10 @@ export function ProductsPage() {
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        title={deleteTarget?.type === "image" ? "Delete product image" : "Delete product specification"}
-        message={deleteTarget?.type === "image" ? "This image will be removed from the product gallery." : "This specification will be removed from the product detail data."}
+        title={deleteTarget?.type === "product" ? "Delete product" : deleteTarget?.type === "image" ? "Delete product image" : "Delete product specification"}
+        message={deleteTarget?.type === "product" ? "This permanently removes the product, variants, images, and specifications. Products with order history cannot be deleted; deactivate them instead." : deleteTarget?.type === "image" ? "This image will be removed from the product gallery." : "This specification will be removed from the product detail data."}
         confirmLabel="Delete"
-        busy={imageDeleteMutation.isPending || specificationDeleteMutation.isPending}
+        busy={productDeleteMutation.isPending || imageDeleteMutation.isPending || specificationDeleteMutation.isPending}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={confirmDeleteTarget}
       />

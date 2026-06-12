@@ -15,6 +15,10 @@ public interface IAdminProductService
         UpdateProductRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<Result<AdminProductDto>> DeleteProductAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
     Task<Result<AdminProductVariantDto>> CreateVariantAsync(
         Guid productId,
         CreateProductVariantRequest request,

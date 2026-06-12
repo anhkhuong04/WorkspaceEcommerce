@@ -81,6 +81,23 @@ internal sealed class AdminBannerService(
         return Result<AdminBannerDto>.Success(ToDto(banner));
     }
 
+    public async Task<Result<AdminBannerDto>> DeleteBannerAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var banner = dbContext.Banners.FirstOrDefault(existing => existing.Id == id);
+        if (banner is null)
+        {
+            return Result<AdminBannerDto>.NotFound("Banner was not found.");
+        }
+
+        var dto = ToDto(banner);
+        dbContext.Remove(banner);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Result<AdminBannerDto>.Success(dto);
+    }
+
     private static AdminBannerDto ToDto(Banner banner)
     {
         return new AdminBannerDto(

@@ -8,6 +8,54 @@ namespace WorkspaceEcommerce.Application.Tests.Modules.Catalog.Categories;
 public sealed class AdminCategoryServiceTests
 {
     [Fact]
+    public async Task DeleteCategoryAsync_EmptyCategory_RemovesCategory()
+    {
+        var category = CreateCategory();
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(category);
+        var service = CreateService(dbContext);
+
+        var result = await service.DeleteCategoryAsync(category.Id);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(dbContext.Categories);
+        Assert.Equal(1, dbContext.SaveChangesCallCount);
+    }
+
+    [Fact]
+    public async Task DeleteCategoryAsync_CategoryWithChild_ReturnsConflict()
+    {
+        var category = CreateCategory();
+        var child = CreateCategory(parentId: category.Id, slug: "child");
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(category, child);
+        var service = CreateService(dbContext);
+
+        var result = await service.DeleteCategoryAsync(category.Id);
+
+        Assert.Equal(ResultStatus.Conflict, result.Status);
+        Assert.Equal(2, dbContext.Categories.Count());
+        Assert.Equal(0, dbContext.SaveChangesCallCount);
+    }
+
+    [Fact]
+    public async Task DeleteCategoryAsync_CategoryWithProduct_ReturnsConflict()
+    {
+        var category = CreateCategory();
+        var product = new Product(Guid.NewGuid(), category.Id, "Desk", "desk", null);
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(category);
+        dbContext.Seed(product);
+        var service = CreateService(dbContext);
+
+        var result = await service.DeleteCategoryAsync(category.Id);
+
+        Assert.Equal(ResultStatus.Conflict, result.Status);
+        Assert.Single(dbContext.Categories);
+        Assert.Equal(0, dbContext.SaveChangesCallCount);
+    }
+
+    [Fact]
     public async Task CreateCategoryAsync_ValidRequest_CreatesCategory()
     {
         var dbContext = new FakeAppDbContext();

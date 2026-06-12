@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
-import { Button, EmptyState, Field, Modal, Notice, Pill, SelectInput, TextInput, Toggle } from "../../components/ui/AdminUi";
+import { Button, ConfirmDialog, EmptyState, Field, Modal, Notice, Pill, SelectInput, TextInput, Toggle } from "../../components/ui/AdminUi";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
 
@@ -58,6 +58,7 @@ export function CategoriesPage() {
   const categoriesQuery = useQuery({ queryKey: ["admin-categories"], queryFn: adminApi.getCategories });
   const [editingCategory, setEditingCategory] = useState<AdminCategoryDto | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<AdminCategoryDto | null>(null);
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const form = useForm<CategoryFormValues>({ resolver: zodResolver(categorySchema), defaultValues });
@@ -89,6 +90,19 @@ export function CategoriesPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
       setNotice({ type: "success", message: "Category status updated." });
+    },
+    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (category: AdminCategoryDto) => adminApi.deleteCategory(category.id),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-categories"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-products"] })
+      ]);
+      setDeleteTarget(null);
+      setNotice({ type: "success", message: "Category deleted." });
     },
     onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
   });
@@ -126,7 +140,7 @@ export function CategoriesPage() {
                     <td className="py-3 pr-4 text-slate-600">{category.slug}</td>
                     <td className="py-3 pr-4 text-slate-600">{category.sortOrder}</td>
                     <td className="py-3 pr-4"><div className="flex items-center gap-3"><Toggle checked={category.isActive} disabled={toggleMutation.isPending} onChange={() => toggleMutation.mutate(category)} /><Pill tone={category.isActive ? "green" : "slate"}>{category.isActive ? "Active" : "Inactive"}</Pill></div></td>
-                    <td className="py-3 pr-4"><Button type="button" onClick={() => openEditModal(category)}>Edit</Button></td>
+                    <td className="py-3 pr-4"><div className="flex gap-2"><Button type="button" onClick={() => openEditModal(category)}>Edit</Button><Button type="button" variant="danger" disabled={deleteMutation.isPending} onClick={() => setDeleteTarget(category)}>Delete</Button></div></td>
                   </tr>
                 ))}
               </tbody>
@@ -151,6 +165,16 @@ export function CategoriesPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete category"
+        message="This permanently removes the category. Categories with child categories or products cannot be deleted."
+        confirmLabel="Delete"
+        busy={deleteMutation.isPending}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
+      />
     </div>
   );
 }

@@ -119,6 +119,33 @@ internal sealed class AdminCategoryService(
         return Result<AdminCategoryDto>.Success(ToDto(category, []));
     }
 
+    public async Task<Result<AdminCategoryDto>> DeleteCategoryAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var category = dbContext.Categories.FirstOrDefault(existing => existing.Id == id);
+        if (category is null)
+        {
+            return Result<AdminCategoryDto>.NotFound("Category was not found.");
+        }
+
+        if (dbContext.Categories.Any(existing => existing.ParentId == id))
+        {
+            return Result<AdminCategoryDto>.Conflict("Category has child categories and cannot be deleted.");
+        }
+
+        if (dbContext.Products.Any(product => product.CategoryId == id))
+        {
+            return Result<AdminCategoryDto>.Conflict("Category has products and cannot be deleted. Move or delete them first.");
+        }
+
+        var dto = ToDto(category, []);
+        dbContext.Remove(category);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Result<AdminCategoryDto>.Success(dto);
+    }
+
     private static IReadOnlyCollection<AdminCategoryDto> BuildTree(IReadOnlyCollection<Category> categories)
     {
         return categories

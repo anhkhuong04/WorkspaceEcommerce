@@ -53,4 +53,17 @@ public sealed class CategoriesController(IAdminCategoryService categoryService) 
 
         return this.ToApiResponse(result);
     }
+
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(typeof(ApiResponse<AdminCategoryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> DeleteCategory(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await categoryService.DeleteCategoryAsync(id, cancellationToken);
+
+        return this.ToApiResponse(result);
+    }
 }

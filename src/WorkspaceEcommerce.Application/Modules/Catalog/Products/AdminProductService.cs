@@ -129,6 +129,50 @@ internal sealed class AdminProductService(
         return Result<AdminProductDto>.Success(ToDto(product, GetCategoriesById(), variants, images, specifications));
     }
 
+    public async Task<Result<AdminProductDto>> DeleteProductAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var product = dbContext.Products.FirstOrDefault(existing => existing.Id == id);
+        if (product is null)
+        {
+            return Result<AdminProductDto>.NotFound("Product was not found.");
+        }
+
+        var variants = dbContext.ProductVariants.Where(variant => variant.ProductId == id).ToArray();
+        var variantIds = variants.Select(variant => variant.Id).ToArray();
+        if (dbContext.OrderItems.Any(item => variantIds.Contains(item.ProductVariantId)))
+        {
+            return Result<AdminProductDto>.Conflict("Product has order history and cannot be deleted. Deactivate it instead.");
+        }
+
+        var images = dbContext.ProductImages.Where(image => image.ProductId == id).ToArray();
+        var specifications = dbContext.ProductSpecifications
+            .Where(specification => specification.ProductId == id)
+            .ToArray();
+        var dto = ToDto(product, GetCategoriesById(), variants, images, specifications);
+
+        foreach (var image in images)
+        {
+            dbContext.Remove(image);
+        }
+
+        foreach (var specification in specifications)
+        {
+            dbContext.Remove(specification);
+        }
+
+        foreach (var variant in variants)
+        {
+            dbContext.Remove(variant);
+        }
+
+        dbContext.Remove(product);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Result<AdminProductDto>.Success(dto);
+    }
+
     public async Task<Result<AdminProductVariantDto>> CreateVariantAsync(
         Guid productId,
         CreateProductVariantRequest request,

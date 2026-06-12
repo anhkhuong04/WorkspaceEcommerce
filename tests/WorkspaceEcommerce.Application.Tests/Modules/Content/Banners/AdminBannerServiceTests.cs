@@ -8,6 +8,33 @@ namespace WorkspaceEcommerce.Application.Tests.Modules.Content.Banners;
 public sealed class AdminBannerServiceTests
 {
     [Fact]
+    public async Task DeleteBannerAsync_ExistingBanner_RemovesBanner()
+    {
+        var banner = CreateBanner();
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(banner);
+        var service = CreateService(dbContext);
+
+        var result = await service.DeleteBannerAsync(banner.Id);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(dbContext.Banners);
+        Assert.Equal(1, dbContext.SaveChangesCallCount);
+    }
+
+    [Fact]
+    public async Task DeleteBannerAsync_MissingBanner_ReturnsNotFound()
+    {
+        var dbContext = new FakeAppDbContext();
+        var service = CreateService(dbContext);
+
+        var result = await service.DeleteBannerAsync(Guid.NewGuid());
+
+        Assert.Equal(ResultStatus.NotFound, result.Status);
+        Assert.Equal(0, dbContext.SaveChangesCallCount);
+    }
+
+    [Fact]
     public async Task CreateBannerAsync_ValidRequest_CreatesBanner()
     {
         var dbContext = new FakeAppDbContext();

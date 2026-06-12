@@ -9,6 +9,30 @@ namespace WorkspaceEcommerce.Api.IntegrationTests.AdminBanners;
 public sealed class AdminBannerIntegrationTests(ApiIntegrationTestFixture fixture)
 {
     [Fact]
+    public async Task DeleteBanner_ExistingBanner_RemovesBanner()
+    {
+        await fixture.ResetDatabaseAsync();
+        using var client = fixture.CreateClient();
+        client.UseBearerToken(await client.LoginAsAdminAsync());
+        using var createResponse = await client.PostAsJsonAsync("/api/admin/banners", new
+        {
+            title = "Delete Banner",
+            imageUrl = "https://example.test/delete.jpg",
+            sortOrder = 1,
+            isActive = true
+        });
+        var created = await createResponse.ReadJsonAsync();
+        var bannerId = created["data"]!["id"]!.GetValue<Guid>();
+
+        using var deleteResponse = await client.DeleteAsync($"/api/admin/banners/{bannerId}");
+        using var listResponse = await client.GetAsync("/api/admin/banners");
+        var list = await listResponse.ReadJsonAsync();
+
+        Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
+        Assert.Empty(list["data"]!.AsArray());
+    }
+
+    [Fact]
     public async Task AdminBannerEndpoints_WithBearerToken_CreateListAndUpdateBanner()
     {
         await fixture.ResetDatabaseAsync();

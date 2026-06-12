@@ -14,4 +14,8 @@ public interface IAdminBannerService
         Guid id,
         UpdateBannerRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<Result<AdminBannerDto>> DeleteBannerAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
 }

@@ -14,4 +14,8 @@ public interface IAdminCategoryService
         Guid id,
         UpdateCategoryRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<Result<AdminCategoryDto>> DeleteCategoryAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
 }

@@ -76,11 +76,13 @@ export function createAdminApi(client: ApiClient) {
       client.post<AdminCategoryDto, AdminCategoryUpsertRequest>("/api/admin/categories", request),
     updateCategory: (id: string, request: AdminCategoryUpsertRequest) =>
       client.put<AdminCategoryDto, AdminCategoryUpsertRequest>(`/api/admin/categories/${id}`, request),
+    deleteCategory: (id: string) => client.delete<AdminCategoryDto>(`/api/admin/categories/${id}`),
     getProducts: () => client.get<AdminProductDto[]>("/api/admin/products"),
     createProduct: (request: AdminProductUpsertRequest) =>
       client.post<AdminProductDto, AdminProductUpsertRequest>("/api/admin/products", request),
     updateProduct: (id: string, request: AdminProductUpsertRequest) =>
       client.put<AdminProductDto, AdminProductUpsertRequest>(`/api/admin/products/${id}`, request),
+    deleteProduct: (id: string) => client.delete<AdminProductDto>(`/api/admin/products/${id}`),
     createProductVariant: (productId: string, request: AdminProductVariantUpsertRequest) =>
       client.post<AdminProductVariantDto, AdminProductVariantUpsertRequest>(`/api/admin/products/${productId}/variants`, request),
     updateProductVariant: (id: string, request: AdminProductVariantUpsertRequest) =>
@@ -105,6 +107,7 @@ export function createAdminApi(client: ApiClient) {
       client.post<AdminBannerDto, AdminBannerUpsertRequest>("/api/admin/banners", request),
     updateBanner: (id: string, request: AdminBannerUpsertRequest) =>
       client.put<AdminBannerDto, AdminBannerUpsertRequest>(`/api/admin/banners/${id}`, request),
+    deleteBanner: (id: string) => client.delete<AdminBannerDto>(`/api/admin/banners/${id}`),
     getDashboard: () => client.get<AdminDashboardDto>("/api/admin/dashboard")
   };
 }

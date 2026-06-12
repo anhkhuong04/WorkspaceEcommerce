@@ -8,6 +8,30 @@ namespace WorkspaceEcommerce.Api.IntegrationTests.Catalog;
 public sealed class CatalogIntegrationTests(ApiIntegrationTestFixture fixture)
 {
     [Fact]
+    public async Task DeleteCategory_EmptyCategory_RemovesCategory()
+    {
+        await fixture.ResetDatabaseAsync();
+        using var client = fixture.CreateClient();
+        client.UseBearerToken(await client.LoginAsAdminAsync());
+        using var createResponse = await client.PostAsJsonAsync("/api/admin/categories", new
+        {
+            name = "Temporary",
+            slug = "temporary",
+            sortOrder = 1,
+            isActive = true
+        });
+        var created = await createResponse.ReadJsonAsync();
+        var categoryId = created["data"]!["id"]!.GetValue<Guid>();
+
+        using var deleteResponse = await client.DeleteAsync($"/api/admin/categories/{categoryId}");
+        using var listResponse = await client.GetAsync("/api/admin/categories");
+        var list = await listResponse.ReadJsonAsync();
+
+        Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
+        Assert.Empty(list["data"]!.AsArray());
+    }
+
+    [Fact]
     public async Task StorefrontCatalogEndpoints_WithSeededCatalog_ReturnVisibleCatalogData()
     {
         await fixture.ResetDatabaseAsync();

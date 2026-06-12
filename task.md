@@ -32,6 +32,7 @@ Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, C
 - Admin UI hardening sau khi bỏ Ant Design đã hoàn thành ở mức MVP: modal/drawer có focus trap, focus restore, phím `Escape`; Product asset delete có confirm; Order detail/status workflow đã được làm rõ hơn.
 - Admin Product backend/API đã hỗ trợ CRUD ảnh sản phẩm và thông số kỹ thuật; shared frontend API types/client đã có contract tương ứng.
 - Admin Product UI đã tích hợp list/create/update/delete cho ảnh sản phẩm và thông số kỹ thuật.
+- Admin Product, Category và Banner đã có delete end-to-end với confirm UI; Product có order history và Category còn child/product bị chặn bằng `409 Conflict` để bảo toàn dữ liệu.
 - Home demo hiện có đủ dữ liệu thật theo `overview.md`: banners, featured categories và featured products.
 - Storefront header navigation và login page đã được polish ở mức UI hiện tại; social login placeholder và asset imports cũ đã được gỡ để phù hợp asset cleanup.
 - Browser manual verification cho Admin Product asset flows và Storefront Product Detail đã hoàn tất theo cập nhật 2026-06-11.
@@ -196,6 +197,25 @@ Kết quả:
 - Rebuild/restart container bằng `docker compose up -d --build api` thành công.
 - `GET /api/admin/dashboard` trả đủ 7 field; `lowStockThreshold = 5`, status summary đủ 7 trạng thái và recent orders trả dữ liệu hiện tại.
 - Admin typecheck, lint và production build passed; contract cũ giờ được chuyển thành Dashboard error Notice thay vì React Router exception.
+
+Đã chạy cho Product/Category/Banner delete:
+
+```powershell
+dotnet test tests\WorkspaceEcommerce.Application.Tests\WorkspaceEcommerce.Application.Tests.csproj --filter "FullyQualifiedName~AdminProductServiceTests|FullyQualifiedName~AdminCategoryServiceTests|FullyQualifiedName~AdminBannerServiceTests"
+dotnet test tests\WorkspaceEcommerce.Api.IntegrationTests\WorkspaceEcommerce.Api.IntegrationTests.csproj --filter "FullyQualifiedName~AdminBannerIntegrationTests|FullyQualifiedName~CatalogIntegrationTests|FullyQualifiedName~AdminProductAssetIntegrationTests"
+dotnet build WorkspaceEcommerce.slnx
+corepack pnpm typecheck
+corepack pnpm lint
+corepack pnpm build
+docker compose up -d --build api
+```
+
+Kết quả:
+
+- Application targeted tests passed: 44 tests.
+- API integration targeted tests passed trên PostgreSQL/Testcontainers: 13 tests.
+- Backend build passed, warnings 0, errors 0; full frontend typecheck, lint và production build passed.
+- HTTP smoke trên API container thật passed cho create/delete Product, Category và Banner; dữ liệu smoke đã được xóa sạch.
 
 Theo cập nhật người dùng 2026-06-11:
 

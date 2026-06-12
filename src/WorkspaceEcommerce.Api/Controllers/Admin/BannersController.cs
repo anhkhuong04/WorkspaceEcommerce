@@ -51,4 +51,16 @@ public sealed class BannersController(IAdminBannerService bannerService) : Contr
 
         return this.ToApiResponse(result);
     }
+
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(typeof(ApiResponse<AdminBannerDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> DeleteBanner(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await bannerService.DeleteBannerAsync(id, cancellationToken);
+
+        return this.ToApiResponse(result);
+    }
 }

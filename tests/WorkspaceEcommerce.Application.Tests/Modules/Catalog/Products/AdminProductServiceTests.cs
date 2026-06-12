@@ -2,11 +2,59 @@
 using WorkspaceEcommerce.Application.Modules.Catalog.Products;
 using WorkspaceEcommerce.Application.Tests.Common.Fakes;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
+using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Application.Tests.Modules.Catalog.Products;
 
 public sealed class AdminProductServiceTests
 {
+    [Fact]
+    public async Task DeleteProductAsync_ProductWithoutOrderHistory_RemovesProductAndAssets()
+    {
+        var category = CreateCategory();
+        var product = CreateProduct(category.Id);
+        var variant = CreateVariant(product.Id);
+        var image = CreateImage(product.Id);
+        var specification = CreateSpecification(product.Id);
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(category);
+        dbContext.Seed(product);
+        dbContext.Seed(variant);
+        dbContext.Seed(image);
+        dbContext.Seed(specification);
+        var service = CreateService(dbContext);
+
+        var result = await service.DeleteProductAsync(product.Id);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(dbContext.Products);
+        Assert.Empty(dbContext.ProductVariants);
+        Assert.Empty(dbContext.ProductImages);
+        Assert.Empty(dbContext.ProductSpecifications);
+        Assert.Equal(1, dbContext.SaveChangesCallCount);
+    }
+
+    [Fact]
+    public async Task DeleteProductAsync_ProductWithOrderHistory_ReturnsConflict()
+    {
+        var category = CreateCategory();
+        var product = CreateProduct(category.Id);
+        var variant = CreateVariant(product.Id);
+        var orderItem = new OrderItem(Guid.NewGuid(), Guid.NewGuid(), variant.Id, product.Name, variant.Sku, 10m, 1, false);
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(category);
+        dbContext.Seed(product);
+        dbContext.Seed(variant);
+        dbContext.Seed(orderItem);
+        var service = CreateService(dbContext);
+
+        var result = await service.DeleteProductAsync(product.Id);
+
+        Assert.Equal(ResultStatus.Conflict, result.Status);
+        Assert.Single(dbContext.Products);
+        Assert.Equal(0, dbContext.SaveChangesCallCount);
+    }
+
     [Fact]
     public async Task CreateProductAsync_ValidRequest_CreatesProduct()
     {

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
-import { Button, EmptyState, Field, Modal, Notice, Pill, TextInput, Toggle } from "../../components/ui/AdminUi";
+import { Button, ConfirmDialog, EmptyState, Field, Modal, Notice, Pill, TextInput, Toggle } from "../../components/ui/AdminUi";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
 
@@ -52,6 +52,7 @@ export function BannersPage() {
   const bannersQuery = useQuery({ queryKey: ["admin-banners"], queryFn: adminApi.getBanners });
   const [editingBanner, setEditingBanner] = useState<AdminBannerDto | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<AdminBannerDto | null>(null);
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const form = useForm<BannerFormValues>({ resolver: zodResolver(bannerSchema), defaultValues });
@@ -76,6 +77,16 @@ export function BannersPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin-banners"] });
       setNotice({ type: "success", message: "Banner status updated." });
+    },
+    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (banner: AdminBannerDto) => adminApi.deleteBanner(banner.id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin-banners"] });
+      setDeleteTarget(null);
+      setNotice({ type: "success", message: "Banner deleted." });
     },
     onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
   });
@@ -134,7 +145,7 @@ export function BannersPage() {
                         <Pill tone={banner.isActive ? "green" : "slate"}>{banner.isActive ? "Active" : "Inactive"}</Pill>
                       </div>
                     </td>
-                    <td className="py-3 pr-4"><Button type="button" onClick={() => openEditModal(banner)}>Edit</Button></td>
+                    <td className="py-3 pr-4"><div className="flex gap-2"><Button type="button" onClick={() => openEditModal(banner)}>Edit</Button><Button type="button" variant="danger" disabled={deleteMutation.isPending} onClick={() => setDeleteTarget(banner)}>Delete</Button></div></td>
                   </tr>
                 ))}
               </tbody>
@@ -166,6 +177,16 @@ export function BannersPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete banner"
+        message="This permanently removes the banner from Admin and the storefront homepage."
+        confirmLabel="Delete"
+        busy={deleteMutation.isPending}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
+      />
     </div>
   );
 }

@@ -53,6 +53,19 @@ public sealed class ProductsController(IAdminProductService productService) : Co
         return this.ToApiResponse(result);
     }
 
+    [HttpDelete("api/admin/products/{id:guid}")]
+    [ProducesResponseType(typeof(ApiResponse<AdminProductDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> DeleteProduct(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await productService.DeleteProductAsync(id, cancellationToken);
+
+        return this.ToApiResponse(result);
+    }
+
     [HttpPost("api/admin/products/{id:guid}/variants")]
     [ProducesResponseType(typeof(ApiResponse<AdminProductVariantDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
