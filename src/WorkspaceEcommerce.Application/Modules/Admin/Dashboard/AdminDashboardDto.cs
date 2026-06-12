@@ -4,4 +4,7 @@ public sealed record AdminDashboardDto(
     int TotalOrders,
     decimal TotalRevenue,
     int NewOrders,
-    IReadOnlyCollection<LowStockProductVariantDto> LowStockVariants);
+    int LowStockThreshold,
+    IReadOnlyCollection<LowStockProductVariantDto> LowStockVariants,
+    IReadOnlyCollection<AdminOrderStatusSummaryDto> OrderStatusSummary,
+    IReadOnlyCollection<RecentAdminOrderDto> RecentOrders);

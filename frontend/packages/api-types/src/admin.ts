@@ -183,9 +183,26 @@ export interface LowStockProductVariantDto {
   isActive: boolean;
 }
 
+export interface AdminOrderStatusSummaryDto {
+  status: OrderStatus;
+  count: number;
+}
+
+export interface RecentAdminOrderDto {
+  id: string;
+  orderCode: string;
+  customerName: string;
+  totalAmount: number;
+  status: OrderStatus;
+  createdAt: string;
+}
+
 export interface AdminDashboardDto {
   totalOrders: number;
   totalRevenue: number;
   newOrders: number;
+  lowStockThreshold: number;
   lowStockVariants: LowStockProductVariantDto[];
+  orderStatusSummary: AdminOrderStatusSummaryDto[];
+  recentOrders: RecentAdminOrderDto[];
 }

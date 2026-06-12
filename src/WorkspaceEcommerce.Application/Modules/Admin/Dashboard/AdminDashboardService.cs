@@ -8,6 +8,7 @@ internal sealed class AdminDashboardService(IAppDbContext dbContext) : IAdminDas
 {
     private const int LowStockThreshold = 5;
     private const int LowStockLimit = 10;
+    private const int RecentOrderLimit = 5;
 
     public Task<Result<AdminDashboardDto>> GetDashboardAsync(CancellationToken cancellationToken = default)
     {
@@ -36,12 +37,32 @@ internal sealed class AdminDashboardService(IAppDbContext dbContext) : IAdminDas
                     variant.IsActive);
             })
             .ToArray();
+        var orderStatusSummary = Enum.GetValues<OrderStatus>()
+            .Select(status => new AdminOrderStatusSummaryDto(
+                status,
+                orders.Count(order => order.Status == status)))
+            .ToArray();
+        var recentOrders = orders
+            .OrderByDescending(order => order.CreatedAt)
+            .ThenByDescending(order => order.Id)
+            .Take(RecentOrderLimit)
+            .Select(order => new RecentAdminOrderDto(
+                order.Id,
+                order.OrderCode,
+                order.CustomerName,
+                order.TotalAmount,
+                order.Status,
+                order.CreatedAt))
+            .ToArray();
 
         var dashboard = new AdminDashboardDto(
             orders.Length,
             orders.Where(order => order.Status == OrderStatus.Completed).Sum(order => order.TotalAmount),
             orders.Count(order => order.Status == OrderStatus.Pending),
-            lowStockVariants);
+            LowStockThreshold,
+            lowStockVariants,
+            orderStatusSummary,
+            recentOrders);
 
         return Task.FromResult(Result<AdminDashboardDto>.Success(dashboard));
     }
