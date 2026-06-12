@@ -1,473 +1,139 @@
-﻿# Task - WorkspaceEcommerce
+# Task - WorkspaceEcommerce
 
 Cập nhật lần cuối: 2026-06-12
 
-## Nguyên tắc trước khi làm task mới
+## Cách sử dụng
 
-- Luôn đọc `overview.md` trước khi thay đổi nghiệp vụ.
-- Đọc `.agent/README.md` và rule/skill liên quan trước khi code.
-- Không triển khai tính năng ngoài phạm vi `overview.md` nếu chưa được yêu cầu rõ.
-- Trước khi sửa code phải nêu kế hoạch, file bị ảnh hưởng và hướng dependency.
-- Không sửa file không liên quan.
-- Sau khi hoàn thành và test ổn cho mỗi task, commit code ngay với tên commit phù hợp.
-- Mục `Đã hoàn thành` chỉ giữ 3 task lớn `###` gần nhất để giảm dung lượng; task cũ được tóm tắt ở trạng thái hiện tại, xác minh gần nhất và lịch sử commit.
+File này là baseline để bắt đầu các task hậu MVP. Không lưu checklist đã hoàn thành chi tiết; lịch sử triển khai nằm trong Git.
 
-## Trạng thái hiện tại
+Trước mỗi task:
 
-Backend đã có nền tảng Clean Architecture Modular Monolith cho Catalog, Cart, Checkout, Ordering và Content:
+- Đọc `overview.md`, `.agent/README.md` và rule/skill liên quan.
+- Xác định rõ phạm vi, business rule, file bị ảnh hưởng và hướng dependency trước khi sửa.
+- Không đổi route, DTO, database schema hoặc module boundary ngoài phạm vi được yêu cầu.
+- Giữ controller/page mỏng; business rule thuộc Domain/Application, API call thuộc client/service layer.
+- Chạy test/build phù hợp, cập nhật file này nếu baseline hoặc rủi ro thay đổi, rồi commit với tên rõ nghĩa.
 
-- `WorkspaceEcommerce.Domain`: Catalog, Cart và Ordering entities với invariant/domain method cơ bản.
-- `WorkspaceEcommerce.Application`: common contracts/models, DTO, validators và services cho Admin Auth, Admin Catalog, Admin Product, Admin Product Image/Specification, Admin Banner, Admin Dashboard, Admin Order, Storefront Catalog, Storefront Cart, Checkout, Storefront Order Lookup và Storefront Banner.
-- `WorkspaceEcommerce.Infrastructure`: EF Core PostgreSQL persistence, Catalog/Cart/Ordering/Content mappings, migrations, JWT/config validation và transaction-backed checkout store.
-- `WorkspaceEcommerce.Api`: controller mỏng cho Admin Auth, Admin Catalog, Admin Product, Admin Product Image/Specification, Admin Banner, Admin Dashboard, Admin Order, Storefront Catalog, Storefront Cart, Checkout, Storefront Order Lookup và Storefront Banners; có JWT, response envelope, global exception handling, local Development CORS cho frontend dev servers và OpenAPI trong Development.
-- `WorkspaceEcommerce.Application.Tests`: tests cho Domain, validators và Application services thuộc Catalog, Cart, Auth, Product, Product Image/Specification, Storefront Catalog, Checkout, Order Lookup, Admin Order, Admin Banner và Admin Dashboard.
-- `WorkspaceEcommerce.Infrastructure.Tests`: tests cho configuration validation, JWT token generation và EF Core mappings của Catalog, Cart, Ordering, Content.
-- `WorkspaceEcommerce.Api.IntegrationTests`: hạ tầng API integration test dùng `WebApplicationFactory` và Testcontainers PostgreSQL.
-- PostgreSQL local và API backend chạy được bằng Docker Compose service `postgres`, `migrate`, `api`, `seed-demo`.
-- Frontend stack hiện tại: Storefront và Admin đều dùng React + TypeScript + Tailwind CSS; forms dùng React Hook Form + Zod; server state dùng React Query.
-- Frontend monorepo đã scaffold trong `frontend/` với Storefront app, Admin app và shared packages.
-- Storefront đã tích hợp API thật cho Home, Catalog, Product Detail, Cart, Checkout và Order Lookup.
-- Admin portal đã có login/logout, JWT session persistence, protected routes và xử lý unauthorized/expired session ở mức MVP.
-- Admin operational flows đã có UI thao tác MVP chính: Dashboard, Banners, Categories, Products/Variants và Orders.
-- Admin UI hardening sau khi bỏ Ant Design đã hoàn thành ở mức MVP: modal/drawer có focus trap, focus restore, phím `Escape`; Product asset delete có confirm; Order detail/status workflow đã được làm rõ hơn.
-- Admin Product backend/API đã hỗ trợ CRUD ảnh sản phẩm và thông số kỹ thuật; shared frontend API types/client đã có contract tương ứng.
-- Admin Product UI đã tích hợp list/create/update/delete cho ảnh sản phẩm và thông số kỹ thuật.
-- Admin Product, Category và Banner đã có delete end-to-end với confirm UI; Product có order history và Category còn child/product bị chặn bằng `409 Conflict` để bảo toàn dữ liệu.
-- Home demo hiện có đủ dữ liệu thật theo `overview.md`: banners, featured categories và featured products.
-- Storefront header navigation và login page đã được polish ở mức UI hiện tại; social login placeholder và asset imports cũ đã được gỡ để phù hợp asset cleanup.
-- Browser manual verification cho Admin Product asset flows và Storefront Product Detail đã hoàn tất theo cập nhật 2026-06-11.
-- Demo readiness end-to-end đã hoàn tất theo cập nhật 2026-06-11: setup sạch, smoke-test Storefront/Admin, full suite và tài liệu/demo script ở mức MVP.
+## Baseline hậu MVP
 
-## Tiến độ MVP theo `overview.md`
+Trạng thái: **MVP đã hoàn thành về chức năng và sẵn sàng demo local**.
 
-Ước tính hiện tại: **100% tiêu chí chức năng MVP đã hoàn thành**, **khoảng 90-95% demo readiness/operational hardening tổng thể**.
+### Backend
 
-Đối chiếu tiêu chí hoàn thành MVP trong `overview.md`:
+- Clean Architecture Modular Monolith gồm `Domain`, `Application`, `Infrastructure`, `Api`.
+- Module hiện có: Catalog, Cart, Checkout, Ordering, Inventory cơ bản và Content/Banner.
+- ASP.NET Core API dùng JWT Admin auth, response envelope, global exception handling và OpenAPI trong Development.
+- PostgreSQL/EF Core; Docker Compose có `postgres`, `migrate`, `seed-demo`, `api`.
+- Application tests, Infrastructure tests và API integration tests dùng PostgreSQL/Testcontainers.
 
-- Admin tạo được danh mục, sản phẩm và SKU: hoàn thành.
-- Khách xem được sản phẩm trên storefront: hoàn thành.
-- Khách thêm sản phẩm vào giỏ: hoàn thành.
-- Khách checkout thành công: hoàn thành.
-- Hệ thống tạo đơn hàng có mã đơn: hoàn thành.
-- Admin xem và cập nhật trạng thái đơn: hoàn thành.
-- Khách tra cứu được đơn hàng: hoàn thành.
-- Tồn kho được cập nhật cơ bản: hoàn thành.
-- Source code chia module rõ ràng: hoàn thành.
-- Có seed data để demo: hoàn thành.
+### Frontend
 
-Phần còn lại không còn là blocker chức năng MVP. Trọng tâm tiếp theo là nâng Admin Dashboard từ màn hình số liệu cơ bản thành màn hình vận hành rõ ràng, nhất quán và có hành động trực tiếp; browser automation và theo dõi bundle tiếp tục là hardening không chặn MVP.
+- Monorepo `frontend/` gồm Storefront, Admin và shared `api-types`, `api-client`, `shared-utils`.
+- React + TypeScript + Tailwind CSS; React Query cho server state; React Hook Form + Zod cho form.
+- Storefront có Home, Catalog, Product Detail, Cart, Checkout, Success và Order Lookup dùng API thật.
+- Admin có Auth, Dashboard, Categories, Products/Variants/Images/Specifications, Banners và Orders.
+- Admin dùng local UI primitives, không còn Ant Design.
 
-Dependency hiện tại:
+### Admin Dashboard
 
-- `Domain` không phụ thuộc Application, Infrastructure, API hoặc EF Core.
-- `Application` phụ thuộc `Domain` và định nghĩa abstraction như `IAppDbContext`, `ICartStore`, `ICheckoutStore`.
-- `Infrastructure` phụ thuộc `Application` và `Domain`, triển khai EF Core/PostgreSQL, JWT và config validation.
-- `Api` phụ thuộc `Application` và `Infrastructure`, không chứa business logic.
-- Frontend dùng shared `@workspace-ecommerce/api-client` và `@workspace-ecommerce/api-types`; UI pages không gọi `fetch` trực tiếp.
-- Admin frontend không còn phụ thuộc Ant Design; dùng Tailwind/native controls và local UI primitives.
+- API: `GET /api/admin/dashboard`, giữ response envelope hiện tại.
+- KPI: total orders, completed revenue, pending/new orders và low-stock variants.
+- `totalRevenue` chỉ tính đơn `Completed`; `newOrders` chỉ tính đơn `Pending`.
+- Threshold tồn kho lấy từ API; có summary đủ trạng thái, 5 đơn gần nhất và query aggregate/projection tại database.
+- UI responsive, có refresh/last-updated, status overview, Recent orders, Low stock và điều hướng giữ context sang Orders/Products.
+- Admin client có guard cho Dashboard contract để API image cũ không làm sập route.
 
-## Đã hoàn thành
+### Delete behavior
 
-### Admin UI hardening
+- Product có thể xóa cứng khi chưa có order history; nếu đã được tham chiếu bởi đơn hàng thì trả `409 Conflict` và phải deactivate.
+- Category chỉ được xóa khi không còn category con hoặc product; trường hợp bị tham chiếu trả `409 Conflict`.
+- Banner, Product Image và Product Specification hỗ trợ xóa với confirm UI.
+- Product, Category và Variant vẫn dùng `IsActive` cho luồng ẩn/hiện thông thường.
 
-- Hoàn tất hardening chính sau khi bỏ Ant Design trong commit `08af060`.
-- `Modal` và `Drawer` đã có focus trap, focus restore, đóng bằng phím `Escape` và semantics dialog cơ bản.
-- Product image/specification delete đã có confirm dialog và trạng thái pending.
-- Order detail chuyển sang drawer, hiển thị snapshot, status transition và status history rõ ràng hơn.
-- Loading, disabled, validation và API error state đã được chuẩn hóa ở các flow Admin chính ở mức MVP.
+## Luồng đã ổn định
 
-### Demo readiness end-to-end
+- Storefront: Home -> Catalog -> Product Detail -> Cart -> Checkout -> Success -> Order Lookup.
+- Admin: Login -> Dashboard -> Categories/Products/Banners -> Orders -> cập nhật trạng thái.
+- Checkout tạo order/order items/status history, trừ tồn kho và clear cart trong transaction.
+- Seed demo idempotent cung cấp banner, category, product, variant và dữ liệu phục vụ demo.
+- Admin URL query giữ filter/context cho Dashboard -> Orders và Dashboard -> Products.
 
-- Hoàn tất kịch bản demo từ setup sạch theo cập nhật 2026-06-11.
-- Luồng setup mục tiêu: `postgres` -> `migrate` -> `seed-demo` -> `api`.
-- Smoke-test Storefront mục tiêu đã hoàn tất: Home -> Catalog -> Product Detail -> Cart -> Checkout -> Success -> Order Lookup.
-- Smoke-test Admin mục tiêu đã hoàn tất: Login -> Dashboard -> Products/Banners -> Orders -> Status update.
-- Full suite và README/demo script đã được cập nhật hoặc xác minh ở mức MVP theo cập nhật 2026-06-11.
+## Kiến trúc và dependency
 
-### Browser Manual Verification
+- `Domain` không phụ thuộc Application, Infrastructure, API hoặc frontend.
+- `Application` phụ thuộc Domain và định nghĩa persistence/service abstractions.
+- `Infrastructure` triển khai EF Core/PostgreSQL, JWT và external concerns.
+- `Api` chỉ bind request, authorization và map Application result sang HTTP response.
+- Frontend dùng shared typed API client; page không gọi `fetch` trực tiếp.
+- Không tạo abstraction generic nếu chỉ có một use case cụ thể.
 
-- Hoàn tất kiểm tra thao tác click/form trực tiếp trên trình duyệt thật theo cập nhật 2026-06-11.
-- Admin Product asset flows đã được kiểm tra: create/update/delete image và specification.
-- Storefront Product Detail đã được kiểm tra để xác nhận image/spec hiển thị đúng khi dữ liệu được giữ lại.
-- Xác nhận luồng browser cho phần đã thêm ở Admin Product Asset UI không còn là blocker MVP.
+## Business rule cần giữ
+
+- Không xóa Product đã có order history.
+- Product, Category, Variant dùng `IsActive` để kiểm soát hiển thị.
+- SKU là đơn vị quản lý giá và tồn kho; SKU phải unique.
+- Checkout snapshot dữ liệu sản phẩm vào OrderItem.
+- Order status chỉ chuyển theo workflow hợp lệ; mọi thay đổi có status history.
+- Dashboard low-stock threshold chỉ có một nguồn sự thật từ backend.
 
 ## Xác minh gần nhất
 
-Theo kiểm tra code ngày 2026-06-12:
+Ngày 2026-06-12:
 
-- Admin UI hardening đã hoàn thành và được loại khỏi danh sách nhiệm vụ tiếp theo.
-- Commit `08af060` đã bổ sung accessibility/focus behavior cho modal/drawer, confirm delete cho Product assets và hoàn thiện Order drawer/status workflow.
-- Admin Dashboard contract đã được chốt: giữ bốn số liệu MVP, bổ sung `lowStockThreshold`, summary đủ 7 trạng thái đơn và 5 đơn gần nhất.
-- `totalRevenue` được khóa bằng test là tổng đơn `Completed`; `newOrders` là số đơn `Pending`.
-- Dashboard UI đã dùng `lowStockThreshold` từ API, không còn hard-code ngưỡng tồn kho.
-- Dashboard query đã được tối ưu qua `IAdminDashboardQuery`: EF Core aggregate/project trực tiếp tại PostgreSQL bằng async query và `AsNoTracking`, không còn materialize toàn bộ Orders/Products/ProductVariants trong Application service.
-- Low-stock query join và project trực tiếp sang DTO, lọc threshold và `Take(10)` trong database; recent orders được sắp xếp `CreatedAt DESC, Id DESC` và `Take(5)` trong database.
-- `DashboardController` giữ nguyên route `GET /api/admin/dashboard`, authorization và response envelope.
-- Dashboard responsive pass đã chuyển status overview thành dải ngang ở desktop, đặt Recent orders và Low stock cạnh nhau tại viewport lớn, đồng thời giữ thứ tự xếp dọc ở tablet/mobile.
-- `DashboardPage.tsx` chỉ giữ data/navigation composition; các section và table viewport helper được giữ cục bộ trong feature Dashboard, không tạo generic abstraction mới.
-- Lỗi runtime `Cannot read properties of undefined (reading 'map')` đã được xử lý: nguyên nhân là container API cũ trả Dashboard contract thiếu `lowStockThreshold`, `orderStatusSummary`, `recentOrders`; API đã được rebuild/restart và Admin client có contract guard để hiển thị lỗi rõ ràng thay vì làm sập route.
+- Product/Category/Banner delete: 44 Application tests và 13 API integration tests targeted passed.
+- Backend solution build passed, 0 warnings, 0 errors.
+- Frontend monorepo typecheck, lint và production build passed.
+- API container đã rebuild; HTTP smoke create/delete Product, Category và Banner passed, dữ liệu smoke đã được dọn.
+- Dashboard contract/query/UI/navigation/responsive checks đã passed trong chuỗi commit `99007ae` đến `1ef46e5`.
+- Browser manual verification và demo readiness end-to-end đã hoàn tất ngày 2026-06-11.
 
-Đã chạy cho Admin Dashboard contract:
+Commit baseline gần nhất:
 
-```powershell
-dotnet test .\tests\WorkspaceEcommerce.Application.Tests\WorkspaceEcommerce.Application.Tests.csproj --filter "FullyQualifiedName~AdminDashboardServiceTests"
-dotnet test .\tests\WorkspaceEcommerce.Api.IntegrationTests\WorkspaceEcommerce.Api.IntegrationTests.csproj --filter "FullyQualifiedName~AdminDashboardIntegrationTests"
-dotnet build WorkspaceEcommerce.slnx
-corepack pnpm typecheck
-corepack pnpm lint
-corepack pnpm build
+- `98d003b Add product category and banner deletion`
+- `1ef46e5 Handle stale dashboard API contract`
+- `22eba7d Refine admin dashboard responsiveness`
+
+## Technical debt và rủi ro còn mở
+
+- Admin JWT đang lưu trong `localStorage`; cần threat model và session strategy phù hợp trước production.
+- Chưa có browser automation cho các luồng Admin/Storefront quan trọng.
+- Docker image chưa harden cho production: non-root, SBOM, signing và CI publish.
+- Config local cần secret thật cho database, Admin auth và JWT; placeholder phải tiếp tục fail fast.
+- API integration coverage chưa exhaustive cho mọi validation/conflict edge case.
+- Dashboard query cần theo dõi query plan/index khi dữ liệu tăng lớn.
+- Frontend bundle cần được theo dõi khi thêm module hậu MVP.
+- Seed demo idempotent nhưng chưa có cleanup/reset script chuyên dụng.
+- Branding và visual polish cuối của Storefront chưa được chốt.
+
+## Roadmap hậu MVP
+
+Chưa chốt ưu tiên mới. Khi nhận task, thêm một mục ngắn theo mẫu sau và xóa sau khi hoàn thành:
+
+```markdown
+### [Tên task]
+
+- Mục tiêu:
+- Phạm vi:
+- Ngoài phạm vi:
+- Business rule/contract:
+- File/module dự kiến:
+- Verification:
+- Trạng thái:
 ```
 
-Kết quả:
+Các hướng mở rộng trong `overview.md` như payment online, customer account, loyalty, warranty, B2B và installation workflow chỉ triển khai khi được yêu cầu rõ.
 
-- Admin Dashboard Application tests passed: 4 tests.
-- Admin Dashboard API integration tests passed: 3 tests.
-- Backend build passed, warnings 0, errors 0.
-- Frontend typecheck, lint và production build passed.
-
-Đã chạy cho tối ưu Admin Dashboard Application/API:
-
-```powershell
-dotnet test .\tests\WorkspaceEcommerce.Application.Tests\WorkspaceEcommerce.Application.Tests.csproj --filter "FullyQualifiedName~AdminDashboardServiceTests"
-dotnet test .\tests\WorkspaceEcommerce.Api.IntegrationTests\WorkspaceEcommerce.Api.IntegrationTests.csproj --filter "FullyQualifiedName~AdminDashboardIntegrationTests"
-dotnet build WorkspaceEcommerce.slnx
-```
-
-Kết quả:
-
-- Admin Dashboard Application tests passed: 3 tests.
-- Admin Dashboard API integration tests passed: 3 tests trên PostgreSQL/Testcontainers.
-- Integration coverage xác nhận threshold boundary `5`, loại stock `6`, low-stock ordering, recent-order ordering/limit `5`, status summary và empty data.
-- Backend build passed, warnings 0, errors 0.
-- Full backend suite passed: Application 132 tests, Infrastructure 60 tests, API integration 23 tests.
-
-Đã chạy cho nâng UI Admin Dashboard:
-
-```powershell
-corepack pnpm --filter @workspace-ecommerce/admin typecheck
-corepack pnpm --filter @workspace-ecommerce/admin lint
-corepack pnpm --filter @workspace-ecommerce/admin build
-```
-
-Kết quả:
-
-- Admin typecheck và lint passed.
-- Admin production build passed; output JS khoảng `489.13 kB`, gzip khoảng `143.51 kB`; CSS khoảng `31.01 kB`, gzip khoảng `6.64 kB`.
-- Full frontend monorepo typecheck, lint và production build passed.
-- API login local passed và Admin dev server trả HTTP 200.
-- Browser headless screenshot automation qua Chrome DevTools không hoàn tất do protocol timeout; không để lại profile hoặc screenshot artifact trong repo.
-
-Đã chạy cho liên kết Dashboard với Orders/Products và Admin shell:
-
-```powershell
-corepack pnpm --filter @workspace-ecommerce/admin typecheck
-corepack pnpm --filter @workspace-ecommerce/admin lint
-corepack pnpm --filter @workspace-ecommerce/admin build
-```
-
-Kết quả:
-
-- Admin typecheck, lint và production build passed.
-- Dashboard status link tạo `/orders?status=...`; recent order tạo `/orders?search=...`.
-- Orders dùng URL làm nguồn filter/pagination, hỗ trợ reload, bookmark và browser back/forward.
-- Low-stock action tạo `/products?productId=...&variantId=...`; Products tự expand, scroll và highlight đúng product/variant.
-- Admin navigation đã thay icon ký tự lỗi encoding bằng inline SVG và có active/focus-visible state rõ ràng.
-- HTTP smoke bằng dữ liệu Dashboard thật passed: Orders search resolve đúng recent order, Products resolve đúng product/variant và các URL `/orders?status=...`, `/orders?search=...`, `/products?productId=...&variantId=...` trả app shell 200.
-
-Đã chạy cho responsive và maintainability của Admin Dashboard:
-
-```powershell
-corepack pnpm --filter @workspace-ecommerce/admin typecheck
-corepack pnpm --filter @workspace-ecommerce/admin lint
-corepack pnpm --filter @workspace-ecommerce/admin build
-corepack pnpm typecheck
-corepack pnpm lint
-corepack pnpm build
-```
-
-Kết quả:
-
-- Admin và full frontend monorepo typecheck, lint, production build đều passed.
-- Admin production output: JS khoảng `494.38 kB`, gzip khoảng `145.26 kB`; CSS khoảng `34.39 kB`, gzip khoảng `7.05 kB`.
-- Dashboard dùng layout hai cột cho Recent orders/Low stock ở màn hình lớn; table giới hạn chiều cao, sticky header và có vùng cuộn ngang được gắn label/focus state.
-- Tablet/mobile giữ section xếp dọc, KPI hai cột và hiển thị hướng dẫn cuộn ngang cho bảng trên màn hình nhỏ.
-
-Đã xác minh sửa lỗi Dashboard contract drift:
-
-- Rebuild/restart container bằng `docker compose up -d --build api` thành công.
-- `GET /api/admin/dashboard` trả đủ 7 field; `lowStockThreshold = 5`, status summary đủ 7 trạng thái và recent orders trả dữ liệu hiện tại.
-- Admin typecheck, lint và production build passed; contract cũ giờ được chuyển thành Dashboard error Notice thay vì React Router exception.
-
-Đã chạy cho Product/Category/Banner delete:
-
-```powershell
-dotnet test tests\WorkspaceEcommerce.Application.Tests\WorkspaceEcommerce.Application.Tests.csproj --filter "FullyQualifiedName~AdminProductServiceTests|FullyQualifiedName~AdminCategoryServiceTests|FullyQualifiedName~AdminBannerServiceTests"
-dotnet test tests\WorkspaceEcommerce.Api.IntegrationTests\WorkspaceEcommerce.Api.IntegrationTests.csproj --filter "FullyQualifiedName~AdminBannerIntegrationTests|FullyQualifiedName~CatalogIntegrationTests|FullyQualifiedName~AdminProductAssetIntegrationTests"
-dotnet build WorkspaceEcommerce.slnx
-corepack pnpm typecheck
-corepack pnpm lint
-corepack pnpm build
-docker compose up -d --build api
-```
-
-Kết quả:
-
-- Application targeted tests passed: 44 tests.
-- API integration targeted tests passed trên PostgreSQL/Testcontainers: 13 tests.
-- Backend build passed, warnings 0, errors 0; full frontend typecheck, lint và production build passed.
-- HTTP smoke trên API container thật passed cho create/delete Product, Category và Banner; dữ liệu smoke đã được xóa sạch.
-
-Theo cập nhật người dùng 2026-06-11:
-
-- Browser Manual Verification đã hoàn tất.
-- Demo readiness end-to-end đã hoàn tất.
-- Ưu tiên 1 và Ưu tiên 2 trong danh sách nhiệm vụ trước đã xong.
-
-Đã chạy cho Admin Product Asset UI:
-
-```powershell
-corepack pnpm typecheck
-corepack pnpm lint
-corepack pnpm build
-dotnet test .\tests\WorkspaceEcommerce.Api.IntegrationTests\WorkspaceEcommerce.Api.IntegrationTests.csproj
-docker compose up -d postgres
-docker compose --profile tools run --rm migrate
-docker compose --profile tools run --rm seed-demo
-docker compose build api
-docker compose up -d api
-```
-
-Kết quả:
-
-- Typecheck passed cho `api-types`, `api-client`, `shared-utils`, `storefront`, `admin`.
-- Lint passed cho Storefront và Admin.
-- Production build passed cho Storefront và Admin.
-- Admin build output gần nhất: CSS khoảng `24.01 kB`, JS khoảng `479.14 kB`, gzip JS khoảng `141.11 kB`.
-- Storefront build output gần nhất: CSS khoảng `50.50 kB`, JS khoảng `471.03 kB`, gzip JS khoảng `140.95 kB`.
-- API integration tests passed: 22 tests.
-- PostgreSQL local container chạy healthy.
-- Migration passed; database already up to date.
-- Seed demo passed; seed idempotent nên dữ liệu demo cũ được giữ nguyên.
-- API local container chạy trên `http://localhost:5080`.
-- HTTP smoke-test Admin Product assets passed:
-  - Admin login passed.
-  - Create/update/delete product image passed.
-  - Create/update/delete product specification passed.
-  - Storefront Product Detail API thấy image/spec mới trước khi xóa.
-- Vite dev servers đã start và trả HTML 200:
-  - Admin: `http://localhost:5174`
-  - Storefront Product Detail: `http://localhost:5173/products/atlas-standing-desk`
-
-Đã chạy cho Admin Product Asset API:
-
-```powershell
-dotnet build WorkspaceEcommerce.slnx
-dotnet test .\tests\WorkspaceEcommerce.Application.Tests\WorkspaceEcommerce.Application.Tests.csproj
-dotnet test .\tests\WorkspaceEcommerce.Infrastructure.Tests\WorkspaceEcommerce.Infrastructure.Tests.csproj
-corepack pnpm typecheck
-corepack pnpm lint
-corepack pnpm build
-```
-
-Kết quả:
-
-- Backend build passed, warnings 0, errors 0.
-- Application tests passed: 130 tests.
-- Infrastructure tests passed: 60 tests.
-- Frontend typecheck/lint/build passed cho shared packages, Storefront và Admin ở thời điểm backend contract mới được thêm.
-
-API integration tests từng bị chặn ở lượt trước:
-
-```powershell
-dotnet test .\tests\WorkspaceEcommerce.Api.IntegrationTests\WorkspaceEcommerce.Api.IntegrationTests.csproj
-```
-
-Kết quả:
-
-- Lượt cũ không chạy được do Docker/Testcontainers không kết nối được Docker endpoint `npipe://./pipe/docker_engine`.
-- Lượt 2026-06-10 sau khi Docker hoạt động đã chạy lại passed 22/22 tests.
-
-Đã chạy frontend dependency update:
-
-```powershell
-corepack pnpm install
-```
-
-Kết quả:
-
-- Install passed.
-- Ant Design-related packages đã được gỡ khỏi dependency graph của Admin.
-
-Đã chạy frontend checks trong `frontend/`:
-
-```powershell
-corepack pnpm typecheck
-corepack pnpm lint
-corepack pnpm build
-```
-
-Kết quả:
-
-- Typecheck passed cho `api-types`, `api-client`, `shared-utils`, `storefront`, `admin`.
-- Lint passed cho Storefront và Admin.
-- Production build passed cho Storefront và Admin.
-- Admin build không còn warning chunk lớn do Ant Design.
-- Admin production output gần nhất: CSS khoảng `23.91 kB`, JS khoảng `470.32 kB`, gzip JS khoảng `139.95 kB`.
-
-Đã kiểm tra không còn Ant Design reference trong frontend source/package ngoài `node_modules`/artifact cũ:
-
-```powershell
-Select-String -Pattern 'from "antd"|@ant-design|antd/dist|"antd"|Ant Design'
-```
-
-Kết quả:
-
-- Không còn match trong source/package frontend sau khi loại trừ `node_modules` và `dist`.
-
-Đã chạy backend build gần nhất trước đó:
-
-```powershell
-dotnet build WorkspaceEcommerce.slnx
-```
-
-Kết quả:
-
-- Build succeeded.
-- Warnings: 0.
-- Errors: 0.
-
-Smoke-test/API/test coverage đã có từ các task trước:
-
-- Admin auth route guard/login/logout smoke-test: passed.
-- Cart, Checkout, Order Lookup, Admin Order Management smoke-test qua API local: passed.
-- PostgreSQL verification sau checkout: order, order items, status history, stock trừ đúng, cart checkout đã clear/remove đúng.
-- API integration infrastructure với Testcontainers PostgreSQL: passed.
-- Integration coverage cho Auth/Admin authorization, Catalog, Cart, Checkout, Order Lookup, Admin Order và edge cases chính: passed.
-- Full `dotnet test WorkspaceEcommerce.slnx` gần nhất đã passed khi Docker Desktop hoạt động bình thường.
-
-## Commit gần nhất
-
-- `5eb8999 Connect admin dashboard workflows`
-- `ee01287 Upgrade admin dashboard UI`
-- `da275a9 Optimize admin dashboard queries`
-- `08af060 Polish storefront and harden admin workflows`
-- `5409ed8 Fix storefront logo path and header icons`
-- `bad51d7 Adjust storefront header visibility and sizing`
-- `bea9c6c Update task progress after admin asset UI`
-- `9b72a4a Add admin product asset UI`
-- `2cc7cc6 Add admin product asset APIs`
-
-Commit lịch sử liên quan:
-
-- `03fee0c Update task progress and clean storefront login`
-- `cfd9753 Polish storefront login page`
-- `b5d4901 Refine storefront header navigation`
-- `513597d Update storefront header navigation`
-- `5782d3a Update task progress`
-- `aca1d7d Replace admin Ant Design with Tailwind`
-- `2c6da04 Implement admin operational flows`
-- `0d03a3a Add admin auth route protection`
-- `06ff8ec Add storefront banner API`
-- `22df442 Add demo image assets`
-- `39d1904 Update demo seed image records`
-- `285c5b6 Polish storefront home demo`
-
-## Rủi ro và khoảng trống
-
-- Config dùng placeholder nên app sẽ fail sớm nếu chưa override `DefaultConnection`, `AdminAuth` và `Jwt` bằng secret/config local hợp lệ.
-- API integration tests đã cover luồng chính và một số edge cases quan trọng, nhưng chưa cover exhaustively mọi biến thể validation/conflict.
-- Docker Compose đã chạy API/PostgreSQL/migration/seed local; chưa có production image hardening như non-root user, SBOM, image signing hoặc CI publish.
-- Storefront Home đã đủ điều kiện demo dữ liệu thật, nhưng visual polish cuối vẫn có thể tiếp tục nâng cấp khi chốt branding.
-- Admin auth hiện lưu JWT bằng `localStorage` theo MVP; production nên đánh giá lại threat model, token lifetime, refresh/session strategy và cookie/httpOnly nếu cần.
-- Admin Product Image/Specification backend API đã triển khai và API integration tests đã passed khi Docker Desktop hoạt động.
-- Admin frontend chưa có browser automation để tái kiểm tra tự động các luồng modal/form và dashboard navigation.
-- Dữ liệu smoke-test local cũ có thể vẫn còn trong PostgreSQL dev; seed demo idempotent nhưng chưa có cleanup/reset script riêng cho demo.
-- Dashboard query đã chuyển sang EF Core async aggregate/projection; cần tiếp tục theo dõi query plan/index khi dữ liệu vận hành tăng lớn.
-- Dashboard đã có 4 KPI, responsive status overview, recent orders, low-stock table, refresh/last-updated state và điều hướng giữ context sang Orders/Products bằng URL query.
-
-## Nhiệm vụ tiếp theo đề xuất
-
-### Ưu tiên hiện tại - Hoàn thiện Admin Dashboard
-
-Mục tiêu: biến Dashboard thành màn hình tổng quan vận hành hữu ích, vẫn giữ phạm vi `Basic dashboard` trong `overview.md` và tái sử dụng các flow Orders/Products hiện có.
-
-Hiện trạng:
-
-1. Route `/` đã được bảo vệ bằng Admin auth và gọi `GET /api/admin/dashboard` qua shared API client.
-2. API đã trả `totalOrders`, `totalRevenue`, `newOrders`, `lowStockThreshold`, `lowStockVariants`, `orderStatusSummary` và `recentOrders`.
-3. UI đã có compact hero, last-updated/refresh state, 4 KPI, order-status bars, recent orders và inventory attention table.
-4. Low-stock threshold dùng trực tiếp từ API; inventory state phân biệt out-of-stock, critical và low.
-5. Query dashboard đã aggregate/project async tại PostgreSQL qua `IAdminDashboardQuery`.
-
-Phạm vi nâng cấp đề xuất:
-
-1. **Chốt contract Dashboard - hoàn thành 2026-06-12**
-   - Giữ nguyên bốn số liệu bắt buộc từ `overview.md`.
-   - Bổ sung `lowStockThreshold` để UI không hard-code business value.
-   - Bổ sung summary số đơn theo trạng thái và danh sách 5 đơn gần nhất để hỗ trợ vận hành mà không tạo module mới.
-   - Định nghĩa rõ `totalRevenue` chỉ tính đơn `Completed`, `newOrders` là đơn `Pending`.
-2. **Tối ưu Application/API - hoàn thành 2026-06-12**
-   - Aggregate count/revenue theo query thay vì `ToArray()` toàn bảng.
-   - Project low-stock và recent orders trực tiếp sang DTO, giới hạn số bản ghi và sắp xếp ổn định.
-   - Giữ controller mỏng, route `GET /api/admin/dashboard` và response envelope hiện tại.
-   - Mở rộng Application tests và API integration tests cho threshold, status summary, recent order ordering và empty data.
-3. **Nâng UI Dashboard - hoàn thành 2026-06-12**
-   - Làm hero/header gọn với thời điểm cập nhật gần nhất và nút refresh có trạng thái loading.
-   - Thiết kế KPI cards nhất quán cho Total orders, Completed revenue, New orders và Low-stock count.
-   - Thêm Order status overview bằng thanh tỷ lệ/CSS đơn giản, không thêm chart library.
-   - Thêm Recent orders table với mã đơn, khách hàng, tổng tiền, trạng thái, thời gian và action mở trang Orders.
-   - Nâng bảng Low stock: hiển thị threshold từ API, phân biệt out-of-stock/critical/low và action sang Products.
-4. **Liên kết Dashboard với flow hiện có - hoàn thành 2026-06-12**
-   - Dashboard link sang `/orders` với query `status` hoặc `search`; Orders page đọc query param để áp dụng filter ban đầu.
-   - Link low-stock sang `/products` với product/variant context phù hợp; Products page mở hoặc làm nổi bật đúng sản phẩm khi có query param.
-   - Sửa icon navigation đang bị lỗi encoding và chuẩn hóa active/focus state trong Admin shell.
-5. **Responsive và maintainability - hoàn thành 2026-06-12**
-   - Tối ưu 1920x1080 để KPI và hai vùng Recent orders/Low stock xuất hiện trong viewport hợp lý.
-   - Giữ layout sử dụng được ở tablet/mobile, table có fallback scroll rõ ràng.
-   - Tách `DashboardPage.tsx` thành component theo section nếu logic/data mapping tăng; không tạo generic abstraction ngoài nhu cầu hiện tại.
-6. **Verification**
-   - Chạy backend build, Application tests và Admin Dashboard API integration tests.
-   - Chạy frontend typecheck, lint và production build.
-   - Browser smoke-test: login -> dashboard -> refresh -> pending orders -> recent order -> low-stock product -> quay lại dashboard.
-
-File dự kiến bị ảnh hưởng:
-
-- `src/WorkspaceEcommerce.Application/Modules/Admin/Dashboard/*`
-- `src/WorkspaceEcommerce.Api/Controllers/Admin/DashboardController.cs` nếu metadata contract thay đổi.
-- `tests/WorkspaceEcommerce.Application.Tests/Modules/Admin/Dashboard/*`
-- `tests/WorkspaceEcommerce.Api.IntegrationTests/AdminDashboard/*`
-- `frontend/packages/api-types/src/admin.ts`
-- `frontend/apps/admin/src/pages/dashboard/*`
-- `frontend/apps/admin/src/pages/orders/OrdersPage.tsx`
-- `frontend/apps/admin/src/pages/products/ProductsPage.tsx`
-- `frontend/apps/admin/src/components/layout/AdminLayout.tsx`
-- Shared Admin UI/CSS chỉ sửa khi Dashboard thực sự cần primitive hoặc token chung.
-
-Dependency hướng triển khai:
-
-1. Backend DTO/query/test trước để chốt contract.
-2. Shared TypeScript API types theo contract backend.
-3. Dashboard UI và các link điều hướng.
-4. Orders/Products nhận query param.
-5. Responsive/accessibility pass và full verification.
-
-Definition of Done:
-
-- Bốn số liệu Dashboard trong `overview.md` hiển thị đúng và có định nghĩa nhất quán.
-- Low-stock threshold chỉ có một nguồn sự thật từ backend.
-- Dashboard có status overview, recent orders và low-stock actions dùng dữ liệu thật.
-- Điều hướng từ Dashboard sang Orders/Products giữ đúng context lọc/chọn.
-- Loading, error, empty, refresh và responsive states hoạt động rõ ràng.
-- Backend không còn tải toàn bộ bảng vào memory chỉ để tính Dashboard.
-- Application/API tests, frontend typecheck/lint/build và browser smoke-test đều pass.
-
-## Lệnh nên chạy trước task tiếp theo
+## Lệnh kiểm tra chuẩn
 
 ```powershell
 dotnet build WorkspaceEcommerce.slnx
 dotnet test WorkspaceEcommerce.slnx
+Set-Location frontend
 corepack pnpm typecheck
 corepack pnpm lint
 corepack pnpm build
+Set-Location ..
 git status --short
 ```
+
+API integration tests cần Docker Desktop/PostgreSQL Testcontainers hoạt động.
