@@ -98,7 +98,7 @@ Theo kiểm tra code ngày 2026-06-12:
 - Commit `08af060` đã bổ sung accessibility/focus behavior cho modal/drawer, confirm delete cho Product assets và hoàn thiện Order drawer/status workflow.
 - Admin Dashboard contract đã được chốt: giữ bốn số liệu MVP, bổ sung `lowStockThreshold`, summary đủ 7 trạng thái đơn và 5 đơn gần nhất.
 - `totalRevenue` được khóa bằng test là tổng đơn `Completed`; `newOrders` là số đơn `Pending`.
-- UI hiện vẫn ghi low-stock threshold là `10`; contract mới đã trả threshold `5` để bước nâng UI tiếp theo bỏ hard-code.
+- Dashboard UI đã dùng `lowStockThreshold` từ API, không còn hard-code ngưỡng tồn kho.
 - Dashboard query đã được tối ưu qua `IAdminDashboardQuery`: EF Core aggregate/project trực tiếp tại PostgreSQL bằng async query và `AsNoTracking`, không còn materialize toàn bộ Orders/Products/ProductVariants trong Application service.
 - Low-stock query join và project trực tiếp sang DTO, lọc threshold và `Take(10)` trong database; recent orders được sắp xếp `CreatedAt DESC, Id DESC` và `Take(5)` trong database.
 - `DashboardController` giữ nguyên route `GET /api/admin/dashboard`, authorization và response envelope.
@@ -136,6 +136,22 @@ Kết quả:
 - Integration coverage xác nhận threshold boundary `5`, loại stock `6`, low-stock ordering, recent-order ordering/limit `5`, status summary và empty data.
 - Backend build passed, warnings 0, errors 0.
 - Full backend suite passed: Application 132 tests, Infrastructure 60 tests, API integration 23 tests.
+
+Đã chạy cho nâng UI Admin Dashboard:
+
+```powershell
+corepack pnpm --filter @workspace-ecommerce/admin typecheck
+corepack pnpm --filter @workspace-ecommerce/admin lint
+corepack pnpm --filter @workspace-ecommerce/admin build
+```
+
+Kết quả:
+
+- Admin typecheck và lint passed.
+- Admin production build passed; output JS khoảng `489.13 kB`, gzip khoảng `143.51 kB`; CSS khoảng `31.01 kB`, gzip khoảng `6.64 kB`.
+- Full frontend monorepo typecheck, lint và production build passed.
+- API login local passed và Admin dev server trả HTTP 200.
+- Browser headless screenshot automation qua Chrome DevTools không hoàn tất do protocol timeout; không để lại profile hoặc screenshot artifact trong repo.
 
 Theo cập nhật người dùng 2026-06-11:
 
@@ -301,7 +317,7 @@ Commit lịch sử liên quan:
 - Dữ liệu smoke-test local cũ có thể vẫn còn trong PostgreSQL dev; seed demo idempotent nhưng chưa có cleanup/reset script riêng cho demo.
 - Admin Dashboard đang có sai lệch low-stock threshold giữa UI (`10`) và backend (`5`).
 - Dashboard query đã chuyển sang EF Core async aggregate/projection; cần tiếp tục theo dõi query plan/index khi dữ liệu vận hành tăng lớn.
-- Dashboard hiện mới dừng ở 3 KPI và bảng low-stock, chưa có status overview, recent orders, refresh/last-updated state hoặc liên kết thao tác sang Orders/Products.
+- Dashboard đã có 4 KPI, status overview, recent orders, refresh/last-updated state và action mở Orders/Products; điều hướng giữ context lọc/chọn vẫn thuộc task tiếp theo.
 
 ## Nhiệm vụ tiếp theo đề xuất
 
@@ -313,9 +329,9 @@ Hiện trạng:
 
 1. Route `/` đã được bảo vệ bằng Admin auth và gọi `GET /api/admin/dashboard` qua shared API client.
 2. API đã trả `totalOrders`, `totalRevenue`, `newOrders`, `lowStockThreshold`, `lowStockVariants`, `orderStatusSummary` và `recentOrders`.
-3. UI có loading/error/empty state cơ bản nhưng còn thưa, chưa có recent orders, phân bố trạng thái đơn, refresh state hoặc action điều hướng.
-4. Low-stock threshold đã có nguồn sự thật từ backend là `5`, nhưng UI vẫn đang hard-code `10` cho đến bước nâng UI.
-5. Query dashboard đang tải toàn bộ dữ liệu vào memory thay vì aggregate/project tại query boundary.
+3. UI đã có compact hero, last-updated/refresh state, 4 KPI, order-status bars, recent orders và inventory attention table.
+4. Low-stock threshold dùng trực tiếp từ API; inventory state phân biệt out-of-stock, critical và low.
+5. Query dashboard đã aggregate/project async tại PostgreSQL qua `IAdminDashboardQuery`.
 
 Phạm vi nâng cấp đề xuất:
 
@@ -329,7 +345,7 @@ Phạm vi nâng cấp đề xuất:
    - Project low-stock và recent orders trực tiếp sang DTO, giới hạn số bản ghi và sắp xếp ổn định.
    - Giữ controller mỏng, route `GET /api/admin/dashboard` và response envelope hiện tại.
    - Mở rộng Application tests và API integration tests cho threshold, status summary, recent order ordering và empty data.
-3. **Nâng UI Dashboard**
+3. **Nâng UI Dashboard - hoàn thành 2026-06-12**
    - Làm hero/header gọn với thời điểm cập nhật gần nhất và nút refresh có trạng thái loading.
    - Thiết kế KPI cards nhất quán cho Total orders, Completed revenue, New orders và Low-stock count.
    - Thêm Order status overview bằng thanh tỷ lệ/CSS đơn giản, không thêm chart library.
