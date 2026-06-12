@@ -102,6 +102,8 @@ Theo kiểm tra code ngày 2026-06-12:
 - Dashboard query đã được tối ưu qua `IAdminDashboardQuery`: EF Core aggregate/project trực tiếp tại PostgreSQL bằng async query và `AsNoTracking`, không còn materialize toàn bộ Orders/Products/ProductVariants trong Application service.
 - Low-stock query join và project trực tiếp sang DTO, lọc threshold và `Take(10)` trong database; recent orders được sắp xếp `CreatedAt DESC, Id DESC` và `Take(5)` trong database.
 - `DashboardController` giữ nguyên route `GET /api/admin/dashboard`, authorization và response envelope.
+- Dashboard responsive pass đã chuyển status overview thành dải ngang ở desktop, đặt Recent orders và Low stock cạnh nhau tại viewport lớn, đồng thời giữ thứ tự xếp dọc ở tablet/mobile.
+- `DashboardPage.tsx` chỉ giữ data/navigation composition; các section và table viewport helper được giữ cục bộ trong feature Dashboard, không tạo generic abstraction mới.
 
 Đã chạy cho Admin Dashboard contract:
 
@@ -169,6 +171,24 @@ Kết quả:
 - Low-stock action tạo `/products?productId=...&variantId=...`; Products tự expand, scroll và highlight đúng product/variant.
 - Admin navigation đã thay icon ký tự lỗi encoding bằng inline SVG và có active/focus-visible state rõ ràng.
 - HTTP smoke bằng dữ liệu Dashboard thật passed: Orders search resolve đúng recent order, Products resolve đúng product/variant và các URL `/orders?status=...`, `/orders?search=...`, `/products?productId=...&variantId=...` trả app shell 200.
+
+Đã chạy cho responsive và maintainability của Admin Dashboard:
+
+```powershell
+corepack pnpm --filter @workspace-ecommerce/admin typecheck
+corepack pnpm --filter @workspace-ecommerce/admin lint
+corepack pnpm --filter @workspace-ecommerce/admin build
+corepack pnpm typecheck
+corepack pnpm lint
+corepack pnpm build
+```
+
+Kết quả:
+
+- Admin và full frontend monorepo typecheck, lint, production build đều passed.
+- Admin production output: JS khoảng `494.38 kB`, gzip khoảng `145.26 kB`; CSS khoảng `34.39 kB`, gzip khoảng `7.05 kB`.
+- Dashboard dùng layout hai cột cho Recent orders/Low stock ở màn hình lớn; table giới hạn chiều cao, sticky header và có vùng cuộn ngang được gắn label/focus state.
+- Tablet/mobile giữ section xếp dọc, KPI hai cột và hiển thị hướng dẫn cuộn ngang cho bảng trên màn hình nhỏ.
 
 Theo cập nhật người dùng 2026-06-11:
 
@@ -300,6 +320,9 @@ Smoke-test/API/test coverage đã có từ các task trước:
 
 ## Commit gần nhất
 
+- `5eb8999 Connect admin dashboard workflows`
+- `ee01287 Upgrade admin dashboard UI`
+- `da275a9 Optimize admin dashboard queries`
 - `08af060 Polish storefront and harden admin workflows`
 - `5409ed8 Fix storefront logo path and header icons`
 - `bad51d7 Adjust storefront header visibility and sizing`
@@ -332,9 +355,8 @@ Commit lịch sử liên quan:
 - Admin Product Image/Specification backend API đã triển khai và API integration tests đã passed khi Docker Desktop hoạt động.
 - Admin frontend chưa có browser automation để tái kiểm tra tự động các luồng modal/form và dashboard navigation.
 - Dữ liệu smoke-test local cũ có thể vẫn còn trong PostgreSQL dev; seed demo idempotent nhưng chưa có cleanup/reset script riêng cho demo.
-- Admin Dashboard đang có sai lệch low-stock threshold giữa UI (`10`) và backend (`5`).
 - Dashboard query đã chuyển sang EF Core async aggregate/projection; cần tiếp tục theo dõi query plan/index khi dữ liệu vận hành tăng lớn.
-- Dashboard đã có 4 KPI, status overview, recent orders, refresh/last-updated state và điều hướng giữ context sang Orders/Products bằng URL query.
+- Dashboard đã có 4 KPI, responsive status overview, recent orders, low-stock table, refresh/last-updated state và điều hướng giữ context sang Orders/Products bằng URL query.
 
 ## Nhiệm vụ tiếp theo đề xuất
 
@@ -372,7 +394,7 @@ Phạm vi nâng cấp đề xuất:
    - Dashboard link sang `/orders` với query `status` hoặc `search`; Orders page đọc query param để áp dụng filter ban đầu.
    - Link low-stock sang `/products` với product/variant context phù hợp; Products page mở hoặc làm nổi bật đúng sản phẩm khi có query param.
    - Sửa icon navigation đang bị lỗi encoding và chuẩn hóa active/focus state trong Admin shell.
-5. **Responsive và maintainability**
+5. **Responsive và maintainability - hoàn thành 2026-06-12**
    - Tối ưu 1920x1080 để KPI và hai vùng Recent orders/Low stock xuất hiện trong viewport hợp lý.
    - Giữ layout sử dụng được ở tablet/mobile, table có fallback scroll rõ ràng.
    - Tách `DashboardPage.tsx` thành component theo section nếu logic/data mapping tăng; không tạo generic abstraction ngoài nhu cầu hiện tại.

@@ -44,26 +44,26 @@ export function DashboardPage() {
         <>
           <DashboardMetrics dashboard={dashboard} />
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(300px,0.85fr)_minmax(0,2.15fr)]">
-            <OrderStatusOverview
-              summary={dashboard.orderStatusSummary}
-              totalOrders={dashboard.totalOrders}
-              onViewOrders={() => navigate("/orders")}
-              onViewStatus={(status) => navigate(`/orders?${new URLSearchParams({ status: String(status) })}`)}
-            />
+          <OrderStatusOverview
+            summary={dashboard.orderStatusSummary}
+            totalOrders={dashboard.totalOrders}
+            onViewOrders={() => navigate("/orders")}
+            onViewStatus={(status) => navigate(`/orders?${new URLSearchParams({ status: String(status) })}`)}
+          />
+
+          <div className="grid min-w-0 gap-4 2xl:grid-cols-2">
             <RecentOrdersSection
               orders={dashboard.recentOrders}
               onViewOrders={() => navigate("/orders")}
               onViewOrder={(order) => navigate(`/orders?${new URLSearchParams({ search: order.orderCode })}`)}
             />
+            <LowStockSection
+              threshold={dashboard.lowStockThreshold}
+              variants={dashboard.lowStockVariants}
+              onViewProducts={() => navigate("/products")}
+              onViewVariant={(variant) => navigate(`/products?${new URLSearchParams({ productId: variant.productId, variantId: variant.variantId })}`)}
+            />
           </div>
-
-          <LowStockSection
-            threshold={dashboard.lowStockThreshold}
-            variants={dashboard.lowStockVariants}
-            onViewProducts={() => navigate("/products")}
-            onViewVariant={(variant) => navigate(`/products?${new URLSearchParams({ productId: variant.productId, variantId: variant.variantId })}`)}
-          />
         </>
       ) : null}
     </div>

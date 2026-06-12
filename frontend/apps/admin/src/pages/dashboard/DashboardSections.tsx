@@ -29,13 +29,13 @@ interface DashboardHeroProps {
 
 export function DashboardHero({ lastUpdated, refreshing, onRefresh }: DashboardHeroProps) {
   return (
-    <section className="relative overflow-hidden rounded-[1.75rem] border border-teal-900/10 bg-gradient-to-br from-slate-950 via-slate-900 to-teal-950 px-6 py-5 text-white shadow-lg shadow-slate-900/10 sm:px-7">
+    <section className="relative overflow-hidden rounded-[1.75rem] border border-teal-900/10 bg-gradient-to-br from-slate-950 via-slate-900 to-teal-950 px-5 py-4 text-white shadow-lg shadow-slate-900/10 sm:px-6">
       <div className="absolute -right-16 -top-24 h-56 w-56 rounded-full bg-teal-400/10 blur-3xl" aria-hidden="true" />
-      <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.2em] text-teal-300">Operations overview</p>
-          <h1 className="mt-1 text-3xl font-black tracking-tight">Admin dashboard</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+          <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Admin dashboard</h1>
+          <p className="mt-1.5 max-w-2xl text-sm leading-5 text-slate-300">
             Track order throughput, completed revenue, recent activity, and inventory requiring attention.
           </p>
         </div>
@@ -88,13 +88,13 @@ export function DashboardMetrics({ dashboard }: { dashboard: AdminDashboardDto }
   ];
 
   return (
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Dashboard metrics">
+    <section className="grid grid-cols-2 gap-3 xl:grid-cols-4 xl:gap-4" aria-label="Dashboard metrics">
       {metrics.map((metric) => (
-        <article key={metric.label} className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <article key={metric.label} className="relative min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm xl:rounded-3xl">
           <span className={`absolute inset-x-0 top-0 h-1 ${metric.accentClass}`} aria-hidden="true" />
-          <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{metric.label}</p>
-          <p className="mt-3 text-3xl font-black tracking-tight text-slate-950">{metric.value}</p>
-          <p className="mt-1 text-sm font-semibold text-slate-500">{metric.detail}</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-500 sm:text-xs">{metric.label}</p>
+          <p className="mt-2 truncate text-2xl font-black tracking-tight text-slate-950 xl:text-3xl" title={String(metric.value)}>{metric.value}</p>
+          <p className="mt-1 text-xs font-semibold leading-4 text-slate-500 sm:text-sm">{metric.detail}</p>
         </article>
       ))}
     </section>
@@ -115,13 +115,13 @@ export function OrderStatusOverview({ summary, totalOrders, onViewOrders, onView
       description="Current distribution across the MVP workflow."
       action={<Button type="button" onClick={onViewOrders}>View orders</Button>}
     >
-      <div className="grid gap-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
         {summary.map((item) => {
           const presentation = statusPresentation[item.status];
           const percentage = totalOrders === 0 ? 0 : Math.round((item.count / totalOrders) * 100);
 
           return (
-            <div key={item.status}>
+            <div key={item.status} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
               <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
                 <button
                   type="button"
@@ -139,7 +139,7 @@ export function OrderStatusOverview({ summary, totalOrders, onViewOrders, onView
                   {item.count} <span className="font-semibold text-slate-400">({percentage}%)</span>
                 </button>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
                 <div
                   className={`h-full rounded-full transition-[width] ${presentation.barClass}`}
                   style={{ width: `${percentage}%` }}
@@ -172,32 +172,32 @@ export function RecentOrdersSection({ orders, onViewOrders, onViewOrder }: Recen
       action={<Button type="button" onClick={onViewOrders}>Open all orders</Button>}
     >
       {orders.length ? (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+        <DashboardTableViewport label="Recent orders table">
+          <table className="w-full min-w-[680px] text-left text-sm">
+            <thead className="sticky top-0 z-10 bg-white text-xs uppercase tracking-wide text-slate-500 shadow-[0_1px_0_0_#e2e8f0]">
               <tr className="border-b border-slate-100">
-                <th className="pb-3 pr-4">Order</th>
-                <th className="pb-3 pr-4">Customer</th>
-                <th className="pb-3 pr-4">Total</th>
-                <th className="pb-3 pr-4">Status</th>
-                <th className="pb-3 pr-4">Created</th>
-                <th className="pb-3 text-right">Action</th>
+                <th className="px-3 py-2.5">Order</th>
+                <th className="px-3 py-2.5">Customer</th>
+                <th className="px-3 py-2.5">Total</th>
+                <th className="px-3 py-2.5">Status</th>
+                <th className="px-3 py-2.5">Created</th>
+                <th className="px-3 py-2.5 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
               {orders.map((order) => (
                 <tr key={order.id} className="border-b border-slate-100 last:border-0">
-                  <td className="py-3 pr-4 font-black text-slate-900">{order.orderCode}</td>
-                  <td className="py-3 pr-4 font-semibold text-slate-700">{order.customerName}</td>
-                  <td className="py-3 pr-4 font-bold text-slate-900">{formatMoney(order.totalAmount)}</td>
-                  <td className="py-3 pr-4"><OrderStatusPill status={order.status} /></td>
-                  <td className="py-3 pr-4 text-slate-500">{formatDate(order.createdAt)}</td>
-                  <td className="py-3 text-right"><Button type="button" variant="ghost" onClick={() => onViewOrder(order)}>Open</Button></td>
+                  <td className="px-3 py-2.5 font-black text-slate-900">{order.orderCode}</td>
+                  <td className="px-3 py-2.5 font-semibold text-slate-700">{order.customerName}</td>
+                  <td className="px-3 py-2.5 font-bold text-slate-900">{formatMoney(order.totalAmount)}</td>
+                  <td className="px-3 py-2.5"><OrderStatusPill status={order.status} /></td>
+                  <td className="px-3 py-2.5 text-slate-500">{formatDate(order.createdAt)}</td>
+                  <td className="px-3 py-2.5 text-right"><Button type="button" variant="ghost" onClick={() => onViewOrder(order)}>Open</Button></td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </DashboardTableViewport>
       ) : (
         <EmptyState>No recent orders</EmptyState>
       )}
@@ -220,16 +220,16 @@ export function LowStockSection({ threshold, variants, onViewProducts, onViewVar
       action={<Button type="button" onClick={onViewProducts}>Open products</Button>}
     >
       {variants.length ? (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+        <DashboardTableViewport label="Low-stock variants table">
+          <table className="w-full min-w-[680px] text-left text-sm">
+            <thead className="sticky top-0 z-10 bg-white text-xs uppercase tracking-wide text-slate-500 shadow-[0_1px_0_0_#e2e8f0]">
               <tr className="border-b border-slate-100">
-                <th className="pb-3 pr-4">Product</th>
-                <th className="pb-3 pr-4">SKU</th>
-                <th className="pb-3 pr-4">Variant</th>
-                <th className="pb-3 pr-4">Inventory</th>
-                <th className="pb-3 pr-4">Availability</th>
-                <th className="pb-3 text-right">Action</th>
+                <th className="px-3 py-2.5">Product</th>
+                <th className="px-3 py-2.5">SKU</th>
+                <th className="px-3 py-2.5">Variant</th>
+                <th className="px-3 py-2.5">Inventory</th>
+                <th className="px-3 py-2.5">Availability</th>
+                <th className="px-3 py-2.5 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -238,23 +238,23 @@ export function LowStockSection({ threshold, variants, onViewProducts, onViewVar
 
                 return (
                   <tr key={variant.variantId} className="border-b border-slate-100 last:border-0">
-                    <td className="py-3 pr-4 font-black text-slate-900">{variant.productName}</td>
-                    <td className="py-3 pr-4 font-semibold text-slate-600">{variant.sku}</td>
-                    <td className="py-3 pr-4 text-slate-600">{variant.variantName}</td>
-                    <td className="py-3 pr-4">
+                    <td className="px-3 py-2.5 font-black text-slate-900">{variant.productName}</td>
+                    <td className="px-3 py-2.5 font-semibold text-slate-600">{variant.sku}</td>
+                    <td className="px-3 py-2.5 text-slate-600">{variant.variantName}</td>
+                    <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2">
                         <span className="text-lg font-black text-slate-950">{variant.stockQuantity}</span>
                         <Pill tone={stockState.tone}>{stockState.label}</Pill>
                       </div>
                     </td>
-                    <td className="py-3 pr-4"><Pill tone={variant.isActive ? "green" : "slate"}>{variant.isActive ? "Active" : "Inactive"}</Pill></td>
-                    <td className="py-3 text-right"><Button type="button" variant="ghost" onClick={() => onViewVariant(variant)}>Manage</Button></td>
+                    <td className="px-3 py-2.5"><Pill tone={variant.isActive ? "green" : "slate"}>{variant.isActive ? "Active" : "Inactive"}</Pill></td>
+                    <td className="px-3 py-2.5 text-right"><Button type="button" variant="ghost" onClick={() => onViewVariant(variant)}>Manage</Button></td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-        </div>
+        </DashboardTableViewport>
       ) : (
         <EmptyState>No variants are at or below the current threshold</EmptyState>
       )}
@@ -268,19 +268,19 @@ export function DashboardSkeleton() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-3xl bg-slate-200/70" />)}
       </div>
-      <div className="grid gap-4 xl:grid-cols-[minmax(300px,0.85fr)_minmax(0,2.15fr)]">
+      <div className="h-44 animate-pulse rounded-3xl bg-slate-200/70" />
+      <div className="grid gap-4 2xl:grid-cols-2">
         <div className="h-96 animate-pulse rounded-3xl bg-slate-200/70" />
         <div className="h-96 animate-pulse rounded-3xl bg-slate-200/70" />
       </div>
-      <div className="h-72 animate-pulse rounded-3xl bg-slate-200/70" />
     </div>
   );
 }
 
 function DashboardCard({ title, description, action, children }: { title: string; description: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <section className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-xl font-black tracking-tight text-slate-950">{title}</h2>
           <p className="mt-1 text-sm font-semibold text-slate-500">{description}</p>
@@ -289,6 +289,22 @@ function DashboardCard({ title, description, action, children }: { title: string
       </div>
       {children}
     </section>
+  );
+}
+
+function DashboardTableViewport({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-semibold text-slate-400 sm:hidden">Swipe horizontally to view all columns.</p>
+      <div
+        className="admin-table-scroll max-h-[22rem] overflow-auto rounded-2xl border border-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
+        role="region"
+        aria-label={label}
+        tabIndex={0}
+      >
+        {children}
+      </div>
+    </div>
   );
 }
 
