@@ -99,6 +99,9 @@ Theo kiểm tra code ngày 2026-06-12:
 - Admin Dashboard contract đã được chốt: giữ bốn số liệu MVP, bổ sung `lowStockThreshold`, summary đủ 7 trạng thái đơn và 5 đơn gần nhất.
 - `totalRevenue` được khóa bằng test là tổng đơn `Completed`; `newOrders` là số đơn `Pending`.
 - UI hiện vẫn ghi low-stock threshold là `10`; contract mới đã trả threshold `5` để bước nâng UI tiếp theo bỏ hard-code.
+- Dashboard query đã được tối ưu qua `IAdminDashboardQuery`: EF Core aggregate/project trực tiếp tại PostgreSQL bằng async query và `AsNoTracking`, không còn materialize toàn bộ Orders/Products/ProductVariants trong Application service.
+- Low-stock query join và project trực tiếp sang DTO, lọc threshold và `Take(10)` trong database; recent orders được sắp xếp `CreatedAt DESC, Id DESC` và `Take(5)` trong database.
+- `DashboardController` giữ nguyên route `GET /api/admin/dashboard`, authorization và response envelope.
 
 Đã chạy cho Admin Dashboard contract:
 
@@ -117,6 +120,22 @@ Kết quả:
 - Admin Dashboard API integration tests passed: 3 tests.
 - Backend build passed, warnings 0, errors 0.
 - Frontend typecheck, lint và production build passed.
+
+Đã chạy cho tối ưu Admin Dashboard Application/API:
+
+```powershell
+dotnet test .\tests\WorkspaceEcommerce.Application.Tests\WorkspaceEcommerce.Application.Tests.csproj --filter "FullyQualifiedName~AdminDashboardServiceTests"
+dotnet test .\tests\WorkspaceEcommerce.Api.IntegrationTests\WorkspaceEcommerce.Api.IntegrationTests.csproj --filter "FullyQualifiedName~AdminDashboardIntegrationTests"
+dotnet build WorkspaceEcommerce.slnx
+```
+
+Kết quả:
+
+- Admin Dashboard Application tests passed: 3 tests.
+- Admin Dashboard API integration tests passed: 3 tests trên PostgreSQL/Testcontainers.
+- Integration coverage xác nhận threshold boundary `5`, loại stock `6`, low-stock ordering, recent-order ordering/limit `5`, status summary và empty data.
+- Backend build passed, warnings 0, errors 0.
+- Full backend suite passed: Application 132 tests, Infrastructure 60 tests, API integration 23 tests.
 
 Theo cập nhật người dùng 2026-06-11:
 
@@ -281,7 +300,7 @@ Commit lịch sử liên quan:
 - Admin frontend chưa có browser automation để tái kiểm tra tự động các luồng modal/form và dashboard navigation.
 - Dữ liệu smoke-test local cũ có thể vẫn còn trong PostgreSQL dev; seed demo idempotent nhưng chưa có cleanup/reset script riêng cho demo.
 - Admin Dashboard đang có sai lệch low-stock threshold giữa UI (`10`) và backend (`5`).
-- `AdminDashboardService` đang materialize toàn bộ Orders, Products và ProductVariants bằng query đồng bộ trước khi tính số liệu; cách này không phù hợp khi dữ liệu tăng.
+- Dashboard query đã chuyển sang EF Core async aggregate/projection; cần tiếp tục theo dõi query plan/index khi dữ liệu vận hành tăng lớn.
 - Dashboard hiện mới dừng ở 3 KPI và bảng low-stock, chưa có status overview, recent orders, refresh/last-updated state hoặc liên kết thao tác sang Orders/Products.
 
 ## Nhiệm vụ tiếp theo đề xuất
@@ -305,7 +324,7 @@ Phạm vi nâng cấp đề xuất:
    - Bổ sung `lowStockThreshold` để UI không hard-code business value.
    - Bổ sung summary số đơn theo trạng thái và danh sách 5 đơn gần nhất để hỗ trợ vận hành mà không tạo module mới.
    - Định nghĩa rõ `totalRevenue` chỉ tính đơn `Completed`, `newOrders` là đơn `Pending`.
-2. **Tối ưu Application/API**
+2. **Tối ưu Application/API - hoàn thành 2026-06-12**
    - Aggregate count/revenue theo query thay vì `ToArray()` toàn bảng.
    - Project low-stock và recent orders trực tiếp sang DTO, giới hạn số bản ghi và sắp xếp ổn định.
    - Giữ controller mỏng, route `GET /api/admin/dashboard` và response envelope hiện tại.

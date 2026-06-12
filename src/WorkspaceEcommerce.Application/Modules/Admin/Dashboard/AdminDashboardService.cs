@@ -1,69 +1,41 @@
-﻿using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Application.Modules.Admin.Dashboard;
 
-internal sealed class AdminDashboardService(IAppDbContext dbContext) : IAdminDashboardService
+internal sealed class AdminDashboardService(IAdminDashboardQuery dashboardQuery) : IAdminDashboardService
 {
     private const int LowStockThreshold = 5;
     private const int LowStockLimit = 10;
     private const int RecentOrderLimit = 5;
 
-    public Task<Result<AdminDashboardDto>> GetDashboardAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<AdminDashboardDto>> GetDashboardAsync(CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var orders = dbContext.Orders.ToArray();
-        var productsById = dbContext.Products.ToDictionary(product => product.Id);
-        var lowStockVariantEntities = dbContext.ProductVariants
-            .Where(variant => variant.StockQuantity <= LowStockThreshold)
-            .OrderBy(variant => variant.StockQuantity)
-            .ThenBy(variant => variant.Sku)
-            .Take(LowStockLimit)
-            .ToArray();
-        var lowStockVariants = lowStockVariantEntities
-            .Select(variant =>
-            {
-                productsById.TryGetValue(variant.ProductId, out var product);
-
-                return new LowStockProductVariantDto(
-                    variant.ProductId,
-                    product?.Name ?? string.Empty,
-                    variant.Id,
-                    variant.Sku,
-                    variant.Name,
-                    variant.StockQuantity,
-                    variant.IsActive);
-            })
-            .ToArray();
+        var persistedStatusSummary = await dashboardQuery.GetOrderStatusSummaryAsync(cancellationToken);
+        var statusCounts = persistedStatusSummary.ToDictionary(item => item.Status, item => item.Count);
         var orderStatusSummary = Enum.GetValues<OrderStatus>()
             .Select(status => new AdminOrderStatusSummaryDto(
                 status,
-                orders.Count(order => order.Status == status)))
+                statusCounts.GetValueOrDefault(status)))
             .ToArray();
-        var recentOrders = orders
-            .OrderByDescending(order => order.CreatedAt)
-            .ThenByDescending(order => order.Id)
-            .Take(RecentOrderLimit)
-            .Select(order => new RecentAdminOrderDto(
-                order.Id,
-                order.OrderCode,
-                order.CustomerName,
-                order.TotalAmount,
-                order.Status,
-                order.CreatedAt))
-            .ToArray();
+        var totalRevenue = await dashboardQuery.GetCompletedRevenueAsync(cancellationToken);
+        var lowStockVariants = await dashboardQuery.GetLowStockVariantsAsync(
+            LowStockThreshold,
+            LowStockLimit,
+            cancellationToken);
+        var recentOrders = await dashboardQuery.GetRecentOrdersAsync(
+            RecentOrderLimit,
+            cancellationToken);
 
         var dashboard = new AdminDashboardDto(
-            orders.Length,
-            orders.Where(order => order.Status == OrderStatus.Completed).Sum(order => order.TotalAmount),
-            orders.Count(order => order.Status == OrderStatus.Pending),
+            orderStatusSummary.Sum(item => item.Count),
+            totalRevenue,
+            statusCounts.GetValueOrDefault(OrderStatus.Pending),
             LowStockThreshold,
             lowStockVariants,
             orderStatusSummary,
             recentOrders);
 
-        return Task.FromResult(Result<AdminDashboardDto>.Success(dashboard));
+        return Result<AdminDashboardDto>.Success(dashboard);
     }
 }

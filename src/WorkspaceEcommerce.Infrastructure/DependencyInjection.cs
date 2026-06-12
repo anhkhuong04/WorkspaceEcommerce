@@ -4,9 +4,11 @@ using Microsoft.Extensions.DependencyInjection;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Abstractions.Seeding;
+using WorkspaceEcommerce.Application.Modules.Admin.Dashboard;
 using WorkspaceEcommerce.Infrastructure.Authentication;
 using WorkspaceEcommerce.Infrastructure.Configuration;
 using WorkspaceEcommerce.Infrastructure.Persistence;
+using WorkspaceEcommerce.Infrastructure.Persistence.Queries;
 using WorkspaceEcommerce.Infrastructure.Seeding;
 
 namespace WorkspaceEcommerce.Infrastructure;
@@ -26,6 +28,7 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString));
         services.AddScoped<IAppDbContext>(provider => provider.GetRequiredService<AppDbContext>());
+        services.AddScoped<IAdminDashboardQuery, EfAdminDashboardQuery>();
         services.AddScoped<ICartStore>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddScoped<ICheckoutStore>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddScoped<IDemoDataSeeder, DemoDataSeeder>();
