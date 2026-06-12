@@ -12,13 +12,15 @@ import type {
   AdminProductVariantUpsertRequest
 } from "@workspace-ecommerce/api-types";
 import { formatMoney } from "@workspace-ecommerce/shared-utils";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
+import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
 import { Button, ConfirmDialog, EmptyState, Field, Modal, Notice, Pill, SelectInput, TextArea, TextInput, Toggle } from "../../components/ui/AdminUi";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
+import { cx } from "../../components/ui/cx";
 
 const productSchema = z.object({
   categoryId: z.string().min(1, "Category is required."),
@@ -105,6 +107,7 @@ function toSpecificationRequest(values: SpecificationFormValues): AdminProductSp
 
 export function ProductsPage() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const productsQuery = useQuery({ queryKey: ["admin-products"], queryFn: adminApi.getProducts });
   const categoriesQuery = useQuery({ queryKey: ["admin-categories"], queryFn: adminApi.getCategories });
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -121,12 +124,36 @@ export function ProductsPage() {
   const [isSpecificationModalOpen, setIsSpecificationModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [expandedProductIds, setExpandedProductIds] = useState<Set<string>>(new Set());
+  const handledTargetRef = useRef<string | null>(null);
 
   const productForm = useForm<ProductFormValues>({ resolver: zodResolver(productSchema), defaultValues: productDefaultValues });
   const variantForm = useForm<VariantFormValues>({ resolver: zodResolver(variantSchema), defaultValues: variantDefaultValues });
   const imageForm = useForm<ImageFormValues>({ resolver: zodResolver(imageSchema), defaultValues: imageDefaultValues });
   const specificationForm = useForm<SpecificationFormValues>({ resolver: zodResolver(specificationSchema), defaultValues: specificationDefaultValues });
   const categoryOptions = useMemo(() => flattenCategories(categoriesQuery.data ?? []), [categoriesQuery.data]);
+  const targetProductId = searchParams.get("productId");
+  const targetVariantId = searchParams.get("variantId");
+  const targetProduct = useMemo(() => {
+    if (!targetProductId) return null;
+    const product = productsQuery.data?.find((item) => item.id === targetProductId) ?? null;
+    if (targetVariantId && !product?.variants.some((variant) => variant.id === targetVariantId)) return null;
+    return product;
+  }, [productsQuery.data, targetProductId, targetVariantId]);
+
+  useEffect(() => {
+    if (!targetProduct) {
+      handledTargetRef.current = null;
+      return;
+    }
+
+    const targetKey = `${targetProduct.id}:${targetVariantId ?? ""}`;
+    if (handledTargetRef.current === targetKey) return;
+
+    handledTargetRef.current = targetKey;
+    window.setTimeout(() => {
+      document.getElementById(targetVariantId ? `variant-${targetVariantId}` : `product-${targetProduct.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
+  }, [targetProduct, targetVariantId]);
 
   async function refreshProducts() {
     await queryClient.invalidateQueries({ queryKey: ["admin-products"] });
@@ -233,7 +260,23 @@ export function ProductsPage() {
   function openEditImageModal(product: AdminProductDto, image: AdminProductImageDto) { setImageProduct(product); setEditingImage(image); imageForm.reset(toImageFormValues(image)); setIsImageModalOpen(true); }
   function openCreateSpecificationModal(product: AdminProductDto) { setSpecificationProduct(product); setEditingSpecification(null); specificationForm.reset({ ...specificationDefaultValues, sortOrder: product.specifications.length + 1 }); setIsSpecificationModalOpen(true); }
   function openEditSpecificationModal(product: AdminProductDto, specification: AdminProductSpecificationDto) { setSpecificationProduct(product); setEditingSpecification(specification); specificationForm.reset(toSpecificationFormValues(specification)); setIsSpecificationModalOpen(true); }
-  function toggleExpanded(productId: string) { setExpandedProductIds((current) => { const next = new Set(current); if (next.has(productId)) next.delete(productId); else next.add(productId); return next; }); }
+  function toggleExpanded(productId: string) {
+    if (targetProduct?.id === productId) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("productId");
+      nextParams.delete("variantId");
+      setSearchParams(nextParams, { replace: true });
+      return;
+    }
+
+    setExpandedProductIds((current) => {
+      const next = new Set(current);
+      if (next.has(productId)) next.delete(productId);
+      else next.add(productId);
+      return next;
+    });
+  }
+  function isProductExpanded(productId: string) { return expandedProductIds.has(productId) || targetProduct?.id === productId; }
 
   function confirmDeleteTarget() {
     if (!deleteTarget) {
@@ -263,8 +306,8 @@ export function ProductsPage() {
               <tbody>
                 {productsQuery.data.map((product) => (
                   <Fragment key={product.id}>
-                    <tr key={product.id} className="border-b border-slate-100">
-                      <td className="py-3 pr-4"><button type="button" className="mr-2 font-black text-teal-700" onClick={() => toggleExpanded(product.id)}>{expandedProductIds.has(product.id) ? "-" : "+"}</button><span className="font-bold text-slate-900">{product.name}</span><p className="mt-0.5 text-xs text-slate-500">{product.slug}</p></td>
+                    <tr id={`product-${product.id}`} key={product.id} className={cx("border-b border-slate-100 transition-colors", targetProduct?.id === product.id && "bg-teal-50/80")}>
+                      <td className="py-3 pr-4"><button type="button" className="mr-2 rounded font-black text-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2" onClick={() => toggleExpanded(product.id)} aria-label={`${isProductExpanded(product.id) ? "Collapse" : "Expand"} ${product.name}`}>{isProductExpanded(product.id) ? "-" : "+"}</button><span className="font-bold text-slate-900">{product.name}</span><p className="mt-0.5 text-xs text-slate-500">{product.slug}</p></td>
                       <td className="py-3 pr-4 text-slate-600">{product.categoryName ?? "-"}</td>
                       <td className="py-3 pr-4 text-slate-600">{product.variants.length}</td>
                       <td className="py-3 pr-4 text-slate-600">{product.images.length} images / {product.specifications.length} specs</td>
@@ -272,7 +315,7 @@ export function ProductsPage() {
                       <td className="py-3 pr-4"><div className="flex items-center gap-3"><Toggle checked={product.isActive} disabled={productToggleMutation.isPending} onChange={() => productToggleMutation.mutate(product)} /><Pill tone={product.isActive ? "green" : "slate"}>{product.isActive ? "Active" : "Inactive"}</Pill></div></td>
                       <td className="py-3 pr-4"><div className="flex flex-wrap gap-2"><Button type="button" onClick={() => openEditProductModal(product)}>Edit</Button><Button type="button" onClick={() => openCreateVariantModal(product)}>Add SKU</Button><Button type="button" onClick={() => openCreateImageModal(product)}>Add image</Button><Button type="button" onClick={() => openCreateSpecificationModal(product)}>Add spec</Button></div></td>
                     </tr>
-                    {expandedProductIds.has(product.id) ? (
+                    {isProductExpanded(product.id) ? (
                       <tr key={`${product.id}-assets`} className="border-b border-slate-100 bg-slate-50/70"><td colSpan={7} className="p-4">
                         <div className="grid gap-5">
                           <section className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -280,7 +323,7 @@ export function ProductsPage() {
                               <h3 className="text-sm font-black text-slate-900">Variants</h3>
                               <Button type="button" onClick={() => openCreateVariantModal(product)}>Add SKU</Button>
                             </div>
-                            {product.variants.length ? <div className="overflow-x-auto"><table className="w-full min-w-[920px] text-left text-xs"><thead className="uppercase tracking-wide text-slate-500"><tr><th className="py-2 pr-3">SKU</th><th className="py-2 pr-3">Variant</th><th className="py-2 pr-3">Color</th><th className="py-2 pr-3">Size</th><th className="py-2 pr-3">Price</th><th className="py-2 pr-3">Compare at</th><th className="py-2 pr-3">Stock</th><th className="py-2 pr-3">Install</th><th className="py-2 pr-3">Active</th><th className="py-2 pr-3">Actions</th></tr></thead><tbody>{product.variants.map((variant) => <tr key={variant.id} className="border-t border-slate-200"><td className="py-2 pr-3 font-bold">{variant.sku}</td><td className="py-2 pr-3">{variant.name}</td><td className="py-2 pr-3">{variant.color || "-"}</td><td className="py-2 pr-3">{variant.size || "-"}</td><td className="py-2 pr-3">{formatMoney(variant.price)}</td><td className="py-2 pr-3">{variant.compareAtPrice === null ? "-" : formatMoney(variant.compareAtPrice)}</td><td className="py-2 pr-3"><Pill tone={variant.stockQuantity <= 5 ? "red" : variant.stockQuantity <= 10 ? "orange" : "green"}>{variant.stockQuantity}</Pill></td><td className="py-2 pr-3"><Pill tone={variant.requiresInstallation ? "blue" : "slate"}>{variant.requiresInstallation ? "Required" : "None"}</Pill></td><td className="py-2 pr-3"><Toggle checked={variant.isActive} disabled={variantToggleMutation.isPending} onChange={() => variantToggleMutation.mutate(variant)} /></td><td className="py-2 pr-3"><Button type="button" onClick={() => openEditVariantModal(product, variant)}>Edit</Button></td></tr>)}</tbody></table></div> : <EmptyState>No variants for this product</EmptyState>}
+                            {product.variants.length ? <div className="overflow-x-auto"><table className="w-full min-w-[920px] text-left text-xs"><thead className="uppercase tracking-wide text-slate-500"><tr><th className="py-2 pr-3">SKU</th><th className="py-2 pr-3">Variant</th><th className="py-2 pr-3">Color</th><th className="py-2 pr-3">Size</th><th className="py-2 pr-3">Price</th><th className="py-2 pr-3">Compare at</th><th className="py-2 pr-3">Stock</th><th className="py-2 pr-3">Install</th><th className="py-2 pr-3">Active</th><th className="py-2 pr-3">Actions</th></tr></thead><tbody>{product.variants.map((variant) => <tr id={`variant-${variant.id}`} key={variant.id} className={cx("border-t border-slate-200 transition-colors", targetVariantId === variant.id && "bg-amber-100/80 outline outline-2 outline-amber-300 outline-offset-[-2px]")}><td className="py-2 pr-3 font-bold">{variant.sku}</td><td className="py-2 pr-3">{variant.name}</td><td className="py-2 pr-3">{variant.color || "-"}</td><td className="py-2 pr-3">{variant.size || "-"}</td><td className="py-2 pr-3">{formatMoney(variant.price)}</td><td className="py-2 pr-3">{variant.compareAtPrice === null ? "-" : formatMoney(variant.compareAtPrice)}</td><td className="py-2 pr-3"><Pill tone={variant.stockQuantity <= 5 ? "red" : variant.stockQuantity <= 10 ? "orange" : "green"}>{variant.stockQuantity}</Pill></td><td className="py-2 pr-3"><Pill tone={variant.requiresInstallation ? "blue" : "slate"}>{variant.requiresInstallation ? "Required" : "None"}</Pill></td><td className="py-2 pr-3"><Toggle checked={variant.isActive} disabled={variantToggleMutation.isPending} onChange={() => variantToggleMutation.mutate(variant)} /></td><td className="py-2 pr-3"><Button type="button" onClick={() => openEditVariantModal(product, variant)}>Edit</Button></td></tr>)}</tbody></table></div> : <EmptyState>No variants for this product</EmptyState>}
                           </section>
 
                           <section className="rounded-2xl border border-slate-200 bg-white p-4">

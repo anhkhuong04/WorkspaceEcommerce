@@ -105,9 +105,10 @@ interface OrderStatusOverviewProps {
   summary: AdminOrderStatusSummaryDto[];
   totalOrders: number;
   onViewOrders: () => void;
+  onViewStatus: (status: OrderStatus) => void;
 }
 
-export function OrderStatusOverview({ summary, totalOrders, onViewOrders }: OrderStatusOverviewProps) {
+export function OrderStatusOverview({ summary, totalOrders, onViewOrders, onViewStatus }: OrderStatusOverviewProps) {
   return (
     <DashboardCard
       title="Order status"
@@ -122,8 +123,21 @@ export function OrderStatusOverview({ summary, totalOrders, onViewOrders }: Orde
           return (
             <div key={item.status}>
               <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
-                <span className="font-bold text-slate-700">{formatOrderStatus(item.status)}</span>
-                <span className="font-black text-slate-950">{item.count} <span className="font-semibold text-slate-400">({percentage}%)</span></span>
+                <button
+                  type="button"
+                  className="rounded-md font-bold text-slate-700 hover:text-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
+                  onClick={() => onViewStatus(item.status)}
+                >
+                  {formatOrderStatus(item.status)}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md font-black text-slate-950 hover:text-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
+                  onClick={() => onViewStatus(item.status)}
+                  aria-label={`View ${formatOrderStatus(item.status)} orders`}
+                >
+                  {item.count} <span className="font-semibold text-slate-400">({percentage}%)</span>
+                </button>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                 <div
@@ -147,9 +161,10 @@ export function OrderStatusOverview({ summary, totalOrders, onViewOrders }: Orde
 interface RecentOrdersSectionProps {
   orders: RecentAdminOrderDto[];
   onViewOrders: () => void;
+  onViewOrder: (order: RecentAdminOrderDto) => void;
 }
 
-export function RecentOrdersSection({ orders, onViewOrders }: RecentOrdersSectionProps) {
+export function RecentOrdersSection({ orders, onViewOrders, onViewOrder }: RecentOrdersSectionProps) {
   return (
     <DashboardCard
       title="Recent orders"
@@ -177,7 +192,7 @@ export function RecentOrdersSection({ orders, onViewOrders }: RecentOrdersSectio
                   <td className="py-3 pr-4 font-bold text-slate-900">{formatMoney(order.totalAmount)}</td>
                   <td className="py-3 pr-4"><OrderStatusPill status={order.status} /></td>
                   <td className="py-3 pr-4 text-slate-500">{formatDate(order.createdAt)}</td>
-                  <td className="py-3 text-right"><Button type="button" variant="ghost" onClick={onViewOrders}>Open</Button></td>
+                  <td className="py-3 text-right"><Button type="button" variant="ghost" onClick={() => onViewOrder(order)}>Open</Button></td>
                 </tr>
               ))}
             </tbody>
@@ -194,9 +209,10 @@ interface LowStockSectionProps {
   threshold: number;
   variants: LowStockProductVariantDto[];
   onViewProducts: () => void;
+  onViewVariant: (variant: LowStockProductVariantDto) => void;
 }
 
-export function LowStockSection({ threshold, variants, onViewProducts }: LowStockSectionProps) {
+export function LowStockSection({ threshold, variants, onViewProducts, onViewVariant }: LowStockSectionProps) {
   return (
     <DashboardCard
       title="Inventory attention"
@@ -232,7 +248,7 @@ export function LowStockSection({ threshold, variants, onViewProducts }: LowStoc
                       </div>
                     </td>
                     <td className="py-3 pr-4"><Pill tone={variant.isActive ? "green" : "slate"}>{variant.isActive ? "Active" : "Inactive"}</Pill></td>
-                    <td className="py-3 text-right"><Button type="button" variant="ghost" onClick={onViewProducts}>Manage</Button></td>
+                    <td className="py-3 text-right"><Button type="button" variant="ghost" onClick={() => onViewVariant(variant)}>Manage</Button></td>
                   </tr>
                 );
               })}

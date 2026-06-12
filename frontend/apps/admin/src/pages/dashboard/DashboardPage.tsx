@@ -49,10 +49,12 @@ export function DashboardPage() {
               summary={dashboard.orderStatusSummary}
               totalOrders={dashboard.totalOrders}
               onViewOrders={() => navigate("/orders")}
+              onViewStatus={(status) => navigate(`/orders?${new URLSearchParams({ status: String(status) })}`)}
             />
             <RecentOrdersSection
               orders={dashboard.recentOrders}
               onViewOrders={() => navigate("/orders")}
+              onViewOrder={(order) => navigate(`/orders?${new URLSearchParams({ search: order.orderCode })}`)}
             />
           </div>
 
@@ -60,6 +62,7 @@ export function DashboardPage() {
             threshold={dashboard.lowStockThreshold}
             variants={dashboard.lowStockVariants}
             onViewProducts={() => navigate("/products")}
+            onViewVariant={(variant) => navigate(`/products?${new URLSearchParams({ productId: variant.productId, variantId: variant.variantId })}`)}
           />
         </>
       ) : null}

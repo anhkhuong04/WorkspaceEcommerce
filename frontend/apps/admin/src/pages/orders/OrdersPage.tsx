@@ -5,6 +5,7 @@ import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod } from 
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
+import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
 import { Button, Drawer, EmptyState, Field, Notice, Pill, SelectInput, TextArea, TextInput } from "../../components/ui/AdminUi";
@@ -30,10 +31,25 @@ function toStatusRequest(values: StatusFormValues) {
   return { status: values.status, note: values.note?.trim() ? values.note.trim() : null };
 }
 
+function parseOrderStatus(value: string | null): OrderStatus | undefined {
+  if (value === null) return undefined;
+  const status = Number(value);
+  return orderStatuses.includes(status as OrderStatus) ? status as OrderStatus : undefined;
+}
+
+function parsePageNumber(value: string | null): number {
+  const pageNumber = Number(value);
+  return Number.isInteger(pageNumber) && pageNumber > 0 ? pageNumber : 1;
+}
+
 export function OrdersPage() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const [request, setRequest] = useState<AdminOrderListRequest>({ pageNumber: 1, pageSize: 8 });
+  const pageNumber = parsePageNumber(searchParams.get("page"));
+  const statusFilter = parseOrderStatus(searchParams.get("status"));
+  const searchFilter = searchParams.get("search")?.trim() || undefined;
+  const request = useMemo<AdminOrderListRequest>(() => ({ pageNumber, pageSize: 8, status: statusFilter, search: searchFilter }), [pageNumber, searchFilter, statusFilter]);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const ordersQuery = useQuery({ queryKey: ["admin-orders", request], queryFn: () => adminApi.getOrders(request) });
   const orderQuery = useQuery({ queryKey: ["admin-order", selectedOrderId], queryFn: () => adminApi.getOrder(selectedOrderId ?? ""), enabled: selectedOrderId !== null });
@@ -61,8 +77,21 @@ export function OrdersPage() {
     onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
   });
 
-  function updateFilters(values: Partial<AdminOrderListRequest>) {
-    setRequest((current) => ({ ...current, ...values, pageNumber: 1 }));
+  function updateFilters(values: Pick<AdminOrderListRequest, "status" | "search">) {
+    const nextParams = new URLSearchParams(searchParams);
+    if (values.status === undefined) nextParams.delete("status");
+    else nextParams.set("status", String(values.status));
+    if (values.search === undefined) nextParams.delete("search");
+    else nextParams.set("search", values.search);
+    nextParams.delete("page");
+    setSearchParams(nextParams);
+  }
+
+  function updatePage(nextPageNumber: number) {
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextPageNumber <= 1) nextParams.delete("page");
+    else nextParams.set("page", String(nextPageNumber));
+    setSearchParams(nextParams);
   }
 
   return (
@@ -73,8 +102,8 @@ export function OrdersPage() {
 
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row">
-          <TextInput placeholder="Search code, customer, phone" onKeyDown={(event) => { if (event.key === "Enter") updateFilters({ search: event.currentTarget.value.trim() || undefined }); }} />
-          <SelectInput value={request.status ?? ""} onChange={(event) => updateFilters({ status: event.target.value === "" ? undefined : Number(event.target.value) as OrderStatus })} className="lg:max-w-xs">
+          <TextInput key={searchFilter ?? ""} defaultValue={searchFilter ?? ""} placeholder="Search code, customer, phone" onKeyDown={(event) => { if (event.key === "Enter") updateFilters({ status: statusFilter, search: event.currentTarget.value.trim() || undefined }); }} />
+          <SelectInput value={statusFilter ?? ""} onChange={(event) => updateFilters({ status: event.target.value === "" ? undefined : Number(event.target.value) as OrderStatus, search: searchFilter })} className="lg:max-w-xs">
             <option value="">All statuses</option>
             {orderStatuses.map((status) => <option key={status} value={status}>{formatOrderStatus(status)}</option>)}
           </SelectInput>
@@ -111,8 +140,8 @@ export function OrdersPage() {
           <div className="mt-4 flex items-center justify-between text-sm font-semibold text-slate-500">
             <span>Page {ordersQuery.data.pageNumber} of {ordersQuery.data.totalPages || 1}</span>
             <div className="flex gap-2">
-              <Button type="button" disabled={!ordersQuery.data.hasPreviousPage} onClick={() => setRequest((current) => ({ ...current, pageNumber: Math.max(1, (current.pageNumber ?? 1) - 1) }))}>Previous</Button>
-              <Button type="button" disabled={!ordersQuery.data.hasNextPage} onClick={() => setRequest((current) => ({ ...current, pageNumber: (current.pageNumber ?? 1) + 1 }))}>Next</Button>
+              <Button type="button" disabled={!ordersQuery.data.hasPreviousPage} onClick={() => updatePage(Math.max(1, pageNumber - 1))}>Previous</Button>
+              <Button type="button" disabled={!ordersQuery.data.hasNextPage} onClick={() => updatePage(pageNumber + 1)}>Next</Button>
             </div>
           </div>
         ) : null}

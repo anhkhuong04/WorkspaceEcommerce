@@ -153,6 +153,23 @@ Kết quả:
 - API login local passed và Admin dev server trả HTTP 200.
 - Browser headless screenshot automation qua Chrome DevTools không hoàn tất do protocol timeout; không để lại profile hoặc screenshot artifact trong repo.
 
+Đã chạy cho liên kết Dashboard với Orders/Products và Admin shell:
+
+```powershell
+corepack pnpm --filter @workspace-ecommerce/admin typecheck
+corepack pnpm --filter @workspace-ecommerce/admin lint
+corepack pnpm --filter @workspace-ecommerce/admin build
+```
+
+Kết quả:
+
+- Admin typecheck, lint và production build passed.
+- Dashboard status link tạo `/orders?status=...`; recent order tạo `/orders?search=...`.
+- Orders dùng URL làm nguồn filter/pagination, hỗ trợ reload, bookmark và browser back/forward.
+- Low-stock action tạo `/products?productId=...&variantId=...`; Products tự expand, scroll và highlight đúng product/variant.
+- Admin navigation đã thay icon ký tự lỗi encoding bằng inline SVG và có active/focus-visible state rõ ràng.
+- HTTP smoke bằng dữ liệu Dashboard thật passed: Orders search resolve đúng recent order, Products resolve đúng product/variant và các URL `/orders?status=...`, `/orders?search=...`, `/products?productId=...&variantId=...` trả app shell 200.
+
 Theo cập nhật người dùng 2026-06-11:
 
 - Browser Manual Verification đã hoàn tất.
@@ -317,7 +334,7 @@ Commit lịch sử liên quan:
 - Dữ liệu smoke-test local cũ có thể vẫn còn trong PostgreSQL dev; seed demo idempotent nhưng chưa có cleanup/reset script riêng cho demo.
 - Admin Dashboard đang có sai lệch low-stock threshold giữa UI (`10`) và backend (`5`).
 - Dashboard query đã chuyển sang EF Core async aggregate/projection; cần tiếp tục theo dõi query plan/index khi dữ liệu vận hành tăng lớn.
-- Dashboard đã có 4 KPI, status overview, recent orders, refresh/last-updated state và action mở Orders/Products; điều hướng giữ context lọc/chọn vẫn thuộc task tiếp theo.
+- Dashboard đã có 4 KPI, status overview, recent orders, refresh/last-updated state và điều hướng giữ context sang Orders/Products bằng URL query.
 
 ## Nhiệm vụ tiếp theo đề xuất
 
@@ -351,7 +368,7 @@ Phạm vi nâng cấp đề xuất:
    - Thêm Order status overview bằng thanh tỷ lệ/CSS đơn giản, không thêm chart library.
    - Thêm Recent orders table với mã đơn, khách hàng, tổng tiền, trạng thái, thời gian và action mở trang Orders.
    - Nâng bảng Low stock: hiển thị threshold từ API, phân biệt out-of-stock/critical/low và action sang Products.
-4. **Liên kết Dashboard với flow hiện có**
+4. **Liên kết Dashboard với flow hiện có - hoàn thành 2026-06-12**
    - Dashboard link sang `/orders` với query `status` hoặc `search`; Orders page đọc query param để áp dụng filter ban đầu.
    - Link low-stock sang `/products` với product/variant context phù hợp; Products page mở hoặc làm nổi bật đúng sản phẩm khi có query param.
    - Sửa icon navigation đang bị lỗi encoding và chuẩn hóa active/focus state trong Admin shell.
