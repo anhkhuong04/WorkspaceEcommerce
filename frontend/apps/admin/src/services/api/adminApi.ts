@@ -1,5 +1,5 @@
 import { ApiClient, createAdminApi } from "@workspace-ecommerce/api-client";
-import type { AdminLoginResponse } from "@workspace-ecommerce/api-types";
+import type { AdminDashboardDto, AdminLoginResponse } from "@workspace-ecommerce/api-types";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
 const sessionKey = "workspace-ecommerce-admin-session";
@@ -73,10 +73,28 @@ export function setAdminUnauthorizedHandler(handler: (() => void) | null): void 
   unauthorizedHandler = handler;
 }
 
-export const adminApi = createAdminApi(
+const api = createAdminApi(
   new ApiClient({
     baseUrl,
     getAccessToken: getAdminToken,
     onUnauthorized: () => unauthorizedHandler?.()
   })
 );
+
+function assertDashboardContract(value: AdminDashboardDto): AdminDashboardDto {
+  if (
+    typeof value.lowStockThreshold !== "number" ||
+    !Array.isArray(value.lowStockVariants) ||
+    !Array.isArray(value.orderStatusSummary) ||
+    !Array.isArray(value.recentOrders)
+  ) {
+    throw new Error("Dashboard API response is outdated. Rebuild and restart the backend API.");
+  }
+
+  return value;
+}
+
+export const adminApi = {
+  ...api,
+  getDashboard: async () => assertDashboardContract(await api.getDashboard())
+};

@@ -104,6 +104,7 @@ Theo kiểm tra code ngày 2026-06-12:
 - `DashboardController` giữ nguyên route `GET /api/admin/dashboard`, authorization và response envelope.
 - Dashboard responsive pass đã chuyển status overview thành dải ngang ở desktop, đặt Recent orders và Low stock cạnh nhau tại viewport lớn, đồng thời giữ thứ tự xếp dọc ở tablet/mobile.
 - `DashboardPage.tsx` chỉ giữ data/navigation composition; các section và table viewport helper được giữ cục bộ trong feature Dashboard, không tạo generic abstraction mới.
+- Lỗi runtime `Cannot read properties of undefined (reading 'map')` đã được xử lý: nguyên nhân là container API cũ trả Dashboard contract thiếu `lowStockThreshold`, `orderStatusSummary`, `recentOrders`; API đã được rebuild/restart và Admin client có contract guard để hiển thị lỗi rõ ràng thay vì làm sập route.
 
 Đã chạy cho Admin Dashboard contract:
 
@@ -189,6 +190,12 @@ Kết quả:
 - Admin production output: JS khoảng `494.38 kB`, gzip khoảng `145.26 kB`; CSS khoảng `34.39 kB`, gzip khoảng `7.05 kB`.
 - Dashboard dùng layout hai cột cho Recent orders/Low stock ở màn hình lớn; table giới hạn chiều cao, sticky header và có vùng cuộn ngang được gắn label/focus state.
 - Tablet/mobile giữ section xếp dọc, KPI hai cột và hiển thị hướng dẫn cuộn ngang cho bảng trên màn hình nhỏ.
+
+Đã xác minh sửa lỗi Dashboard contract drift:
+
+- Rebuild/restart container bằng `docker compose up -d --build api` thành công.
+- `GET /api/admin/dashboard` trả đủ 7 field; `lowStockThreshold = 5`, status summary đủ 7 trạng thái và recent orders trả dữ liệu hiện tại.
+- Admin typecheck, lint và production build passed; contract cũ giờ được chuyển thành Dashboard error Notice thay vì React Router exception.
 
 Theo cập nhật người dùng 2026-06-11:
 
