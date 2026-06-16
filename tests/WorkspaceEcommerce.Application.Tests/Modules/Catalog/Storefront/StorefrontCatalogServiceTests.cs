@@ -89,6 +89,39 @@ public sealed class StorefrontCatalogServiceTests
     }
 
     [Fact]
+    public async Task GetProductsAsync_SortByNamePriceAndUpdated_ReturnsExpectedOrder()
+    {
+        var category = CreateCategory(name: "Desks", slug: "desks");
+        var beta = CreateProduct(category.Id, name: "Beta Desk", slug: "beta-desk");
+        await Task.Delay(5);
+        var alpha = CreateProduct(category.Id, name: "Alpha Desk", slug: "alpha-desk");
+        await Task.Delay(5);
+        var gamma = CreateProduct(category.Id, name: "Gamma Desk", slug: "gamma-desk");
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(category);
+        dbContext.Seed(beta, alpha, gamma);
+        dbContext.Seed(
+            CreateVariant(beta.Id, sku: "B", price: 200m),
+            CreateVariant(alpha.Id, sku: "A", price: 100m),
+            CreateVariant(gamma.Id, sku: "G", price: 300m));
+        var service = new StorefrontCatalogService(dbContext);
+
+        var nameResult = await service.GetProductsAsync(new ProductListRequest());
+        var priceAscendingResult = await service.GetProductsAsync(new ProductListRequest { SortBy = "price-asc" });
+        var priceDescendingResult = await service.GetProductsAsync(new ProductListRequest { SortBy = "price-desc" });
+        var updatedResult = await service.GetProductsAsync(new ProductListRequest { SortBy = "updated-desc" });
+
+        Assert.True(nameResult.IsSuccess);
+        Assert.True(priceAscendingResult.IsSuccess);
+        Assert.True(priceDescendingResult.IsSuccess);
+        Assert.True(updatedResult.IsSuccess);
+        Assert.Equal(["Alpha Desk", "Beta Desk", "Gamma Desk"], nameResult.Value!.Items.Select(product => product.Name));
+        Assert.Equal(["Alpha Desk", "Beta Desk", "Gamma Desk"], priceAscendingResult.Value!.Items.Select(product => product.Name));
+        Assert.Equal(["Gamma Desk", "Beta Desk", "Alpha Desk"], priceDescendingResult.Value!.Items.Select(product => product.Name));
+        Assert.Equal(["Gamma Desk", "Alpha Desk", "Beta Desk"], updatedResult.Value!.Items.Select(product => product.Name));
+    }
+
+    [Fact]
     public async Task GetProductBySlugAsync_ActiveProduct_ReturnsDetailWithActiveVariantsImagesAndSpecifications()
     {
         var category = CreateCategory(name: "Desks", slug: "desks");

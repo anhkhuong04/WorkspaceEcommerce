@@ -46,15 +46,14 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext) : IStore
             .Where(product => normalizedCategorySlug is null || activeCategoriesById[product.CategoryId].Slug == normalizedCategorySlug)
             .Where(product => normalizedSearch is null || product.Name.Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase))
             .Where(product => MatchesPriceFilter(activeVariantsByProductId[product.Id], request.MinPrice, request.MaxPrice))
-            .Where(product => MatchesStockFilter(activeVariantsByProductId[product.Id], request.InStock))
-            .OrderByDescending(product => product.IsFeatured)
-            .ThenBy(product => product.Name)
-            .ThenBy(product => product.Slug)
+            .Where(product => MatchesStockFilter(activeVariantsByProductId[product.Id], request.InStock));
+
+        var sortedProducts = ApplyProductSorting(products, request.SortBy, activeVariantsByProductId)
             .ToArray();
 
         var pageNumber = request.NormalizedPageNumber;
         var pageSize = request.NormalizedPageSize;
-        var items = products
+        var items = sortedProducts
             .Skip(request.Skip)
             .Take(pageSize)
             .Select(product => ToListItemDto(
@@ -68,7 +67,7 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext) : IStore
             items,
             pageNumber,
             pageSize,
-            products.Length);
+            sortedProducts.Length);
 
         return Task.FromResult(Result<PagedResult<StorefrontProductListItemDto>>.Success(page));
     }
@@ -258,6 +257,43 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext) : IStore
         return inStock.Value
             ? activeVariants.Any(variant => variant.StockQuantity > 0)
             : activeVariants.All(variant => variant.StockQuantity <= 0);
+    }
+
+    private static IEnumerable<Product> ApplyProductSorting(
+        IEnumerable<Product> products,
+        string? sortBy,
+        ILookup<Guid, ProductVariant> activeVariantsByProductId)
+    {
+        var normalizedSortBy = NormalizeOptional(sortBy) ?? "name-asc";
+
+        return normalizedSortBy switch
+        {
+            "price-asc" => products
+                .OrderBy(product => GetMinPrice(activeVariantsByProductId[product.Id]) is null)
+                .ThenBy(product => GetMinPrice(activeVariantsByProductId[product.Id]))
+                .ThenBy(product => product.Name)
+                .ThenBy(product => product.Slug),
+            "price-desc" => products
+                .OrderBy(product => GetMinPrice(activeVariantsByProductId[product.Id]) is null)
+                .ThenByDescending(product => GetMinPrice(activeVariantsByProductId[product.Id]))
+                .ThenBy(product => product.Name)
+                .ThenBy(product => product.Slug),
+            "updated-desc" => products
+                .OrderByDescending(product => product.UpdatedAt)
+                .ThenBy(product => product.Name)
+                .ThenBy(product => product.Slug),
+            _ => products
+                .OrderBy(product => product.Name)
+                .ThenBy(product => product.Slug)
+        };
+    }
+
+    private static decimal? GetMinPrice(IEnumerable<ProductVariant> activeVariants)
+    {
+        var variants = activeVariants.ToArray();
+        return variants.Length == 0
+            ? null
+            : variants.Min(variant => variant.Price);
     }
 
     private static string? NormalizeOptional(string? value)

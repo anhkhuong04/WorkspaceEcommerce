@@ -14,6 +14,8 @@ public sealed record ProductListRequest
 
     public string? Search { get; init; }
 
+    public string? SortBy { get; init; }
+
     public decimal? MinPrice { get; init; }
 
     public decimal? MaxPrice { get; init; }

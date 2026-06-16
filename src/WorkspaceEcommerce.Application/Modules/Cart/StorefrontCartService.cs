@@ -27,7 +27,7 @@ internal sealed class StorefrontCartService(
         var sessionId = NormalizeSessionId(request.SessionId);
         var cart = await cartStore.FindCartBySessionIdAsync(sessionId, cancellationToken);
 
-        return Result<CartDto>.Success(cart is null ? EmptyCart(sessionId) : ToDto(cart));
+        return Result<CartDto>.Success(cart is null ? EmptyCart(sessionId) : await ToDtoAsync(cart, cancellationToken));
     }
 
     public async Task<Result<CartDto>> AddItemAsync(
@@ -81,7 +81,7 @@ internal sealed class StorefrontCartService(
 
             await cartStore.SaveChangesAsync(cancellationToken);
 
-            return Result<CartDto>.Success(ToDto(cart));
+            return Result<CartDto>.Success(await ToDtoAsync(cart, cancellationToken));
         }
         catch (DomainException exception)
         {
@@ -130,7 +130,7 @@ internal sealed class StorefrontCartService(
             cartStore.Update(cart);
             await cartStore.SaveChangesAsync(cancellationToken);
 
-            return Result<CartDto>.Success(ToDto(cart));
+            return Result<CartDto>.Success(await ToDtoAsync(cart, cancellationToken));
         }
         catch (DomainException exception)
         {
@@ -169,7 +169,7 @@ internal sealed class StorefrontCartService(
             cartStore.Update(cart);
             await cartStore.SaveChangesAsync(cancellationToken);
 
-            return Result<CartDto>.Success(ToDto(cart));
+            return Result<CartDto>.Success(await ToDtoAsync(cart, cancellationToken));
         }
         catch (DomainException exception)
         {
@@ -222,22 +222,54 @@ internal sealed class StorefrontCartService(
         return Result<Domain.Modules.Cart.Cart>.Success(cart);
     }
 
-    private static CartDto ToDto(Domain.Modules.Cart.Cart cart)
+    private async Task<CartDto> ToDtoAsync(
+        Domain.Modules.Cart.Cart cart,
+        CancellationToken cancellationToken)
     {
         return new CartDto(
             cart.Id,
             cart.CustomerId,
             cart.SessionId,
-            cart.Items.Select(ToDto).ToArray(),
+            await ToItemDtosAsync(cart.Items, cancellationToken),
             cart.TotalQuantity,
             cart.TotalAmount);
     }
 
-    private static CartItemDto ToDto(CartItem item)
+    private async Task<IReadOnlyCollection<CartItemDto>> ToItemDtosAsync(
+        IEnumerable<CartItem> items,
+        CancellationToken cancellationToken)
     {
+        var result = new List<CartItemDto>();
+        foreach (var item in items)
+        {
+            result.Add(await ToItemDtoAsync(item, cancellationToken));
+        }
+
+        return result;
+    }
+
+    private async Task<CartItemDto> ToItemDtoAsync(
+        CartItem item,
+        CancellationToken cancellationToken)
+    {
+        var variant = await cartStore.FindProductVariantByIdAsync(item.ProductVariantId, cancellationToken);
+        var product = variant is null
+            ? null
+            : await cartStore.FindProductByIdAsync(variant.ProductId, cancellationToken);
+        var image = product is null
+            ? null
+            : await cartStore.FindPrimaryProductImageByProductIdAsync(product.Id, cancellationToken);
+
         return new CartItemDto(
             item.Id,
             item.ProductVariantId,
+            variant?.ProductId ?? Guid.Empty,
+            product?.Name ?? "Product",
+            product?.Slug ?? string.Empty,
+            variant?.Name ?? "Variant",
+            variant?.Color,
+            variant?.Size,
+            image?.ImageUrl,
             item.Quantity,
             item.UnitPriceSnapshot,
             item.LineTotal);

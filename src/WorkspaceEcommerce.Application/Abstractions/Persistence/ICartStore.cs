@@ -11,6 +11,8 @@ public interface ICartStore
 
     Task<Product?> FindProductByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<ProductImage?> FindPrimaryProductImageByProductIdAsync(Guid productId, CancellationToken cancellationToken = default);
+
     Task<Category?> FindCategoryByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     void Add<TEntity>(TEntity entity)

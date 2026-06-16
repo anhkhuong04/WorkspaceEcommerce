@@ -1,6 +1,6 @@
 # Task - WorkspaceEcommerce
 
-Cập nhật lần cuối: 2026-06-12
+Cập nhật lần cuối: 2026-06-16
 
 ## Cách sử dụng
 
@@ -107,7 +107,62 @@ Commit baseline gần nhất:
 
 ## Roadmap hậu MVP
 
-Chưa chốt ưu tiên mới. Khi nhận task, thêm một mục ngắn theo mẫu sau và xóa sau khi hoàn thành:
+Ưu tiên gần nhất: tạm dừng thêm feature mới cho Storefront để refactor UX/UI các trang catalog quan trọng trước.
+
+### Refactor Storefront Product Detail và Product Listing/Category Filtering
+
+- Mục tiêu:
+  - Nâng cấp trải nghiệm xem sản phẩm và tìm/lọc sản phẩm theo category trước khi phát triển feature mới.
+  - Giữ UI sạch, ecommerce-focused, dễ scan, dễ mua hàng và phản ánh đúng category tree trong DB.
+- Phạm vi:
+  - Chỉ sửa Storefront `ProductDetailPage` và `ProductListPage`/luồng category filtering liên quan.
+  - Có thể tái sử dụng/chỉnh component layout/UI nhỏ nếu phục vụ hai page này.
+  - Product Detail:
+    - Thêm breadcrumb `Home > Category > Product`.
+    - Rework layout desktop thành gallery bên trái và purchase panel bên phải, purchase panel sticky khi hợp lý.
+    - Thumbnail gallery có thể chọn ảnh chính; hỗ trợ fallback khi thiếu ảnh.
+    - Hiển thị giá, compare-at price, stock, SKU, variant color/size, `RequiresInstallation`, quantity và CTA rõ ràng.
+    - Specifications và description hiển thị gọn gàng; graceful empty state khi sản phẩm chưa có specs.
+    - Mobile layout không overlap, CTA dễ thao tác.
+  - Product Listing/Category Filtering:
+    - Category filter dùng category tree từ `/api/categories`, tự cập nhật khi Admin thêm/sửa category.
+    - Cho phép lọc theo root category và category con qua URL `categorySlug`.
+    - Hiển thị category context/active filter rõ ràng; có clear filters.
+    - Search, in-stock filter và pagination giữ URL state hiện có.
+    - Product cards trong listing cần đồng nhất với Product Detail về price, stock, category và image treatment.
+- Ngoài phạm vi:
+  - Không thêm feature mới như review/rating, wishlist, compare, recently viewed, online payment hoặc customer account.
+  - Không đổi database schema/API contract trừ khi UI refactor bị block bởi dữ liệu thiếu nghiêm trọng.
+  - Không refactor Home, Cart, Checkout, Admin trong task này.
+- Business rule/contract:
+  - Storefront vẫn dùng typed API client; page không gọi `fetch` trực tiếp.
+  - Product list vẫn query `/api/products`; category menu/filter vẫn query `/api/categories`.
+  - Category trong UI phải phản ánh category DB hiện hành, không hard-code danh sách category.
+  - Add-to-cart vẫn chỉ cho phép variant còn tồn kho.
+- Dữ liệu/API hiện có:
+  - Đủ cho MVP UI refactor: product name, category, description, variants/SKU, price, compare-at price, stock, requires installation, images, specifications.
+  - Ghi nhận gap cho giai đoạn sau: breadcrumb hierarchy trong product detail response, brand/vendor, rich description sections, policy fields, related products, variant-image mapping, reviews/rating.
+- File/module dự kiến:
+  - `frontend/apps/storefront/src/pages/product-detail/ProductDetailPage.tsx`
+  - `frontend/apps/storefront/src/pages/product-list/ProductListPage.tsx`
+  - `frontend/apps/storefront/src/components/ui/ProductCard.tsx` nếu cần đồng bộ card.
+  - `frontend/apps/storefront/src/components/layout/StorefrontLayout.tsx` chỉ nếu category navigation cần đồng bộ với filter.
+  - `frontend/packages/api-types/src/catalog.ts` và API/Application DTO chỉ khi có quyết định mở contract.
+- Kế hoạch thực hiện:
+  1. Audit UI hiện tại và data shape cho Product Detail/Product Listing.
+  2. Refactor Product Detail layout và interaction gallery/variant/CTA.
+  3. Refactor Product Listing filter panel/category tree/active filters/product cards.
+  4. Kiểm tra responsive desktop/mobile, states loading/error/empty/out-of-stock.
+  5. Chạy typecheck/build và smoke test API-backed UI.
+- Verification:
+  - `corepack pnpm --filter @workspace-ecommerce/storefront typecheck`
+  - `corepack pnpm --filter @workspace-ecommerce/storefront build`
+  - Manual check `http://localhost:5173/products`, category filter URLs, product detail URLs, add-to-cart.
+  - Nếu có thay đổi API/DTO: chạy thêm `dotnet build WorkspaceEcommerce.slnx` và frontend monorepo typecheck.
+- Trạng thái:
+  - Planned. Chưa implement trong task này; cần refactor xong trước khi thêm feature Storefront mới.
+
+Khi nhận task tiếp theo, thêm một mục ngắn theo mẫu sau và xóa sau khi hoàn thành:
 
 ```markdown
 ### [Tên task]

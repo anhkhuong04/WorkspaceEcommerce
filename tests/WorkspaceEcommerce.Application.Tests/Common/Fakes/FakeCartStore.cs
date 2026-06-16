@@ -10,6 +10,7 @@ internal sealed class FakeCartStore : ICartStore
     private readonly List<CartItem> _cartItems = [];
     private readonly List<Category> _categories = [];
     private readonly List<Product> _products = [];
+    private readonly List<ProductImage> _productImages = [];
     private readonly List<ProductVariant> _productVariants = [];
 
     public int SaveChangesCallCount { get; private set; }
@@ -39,6 +40,18 @@ internal sealed class FakeCartStore : ICartStore
         return Task.FromResult(_products.FirstOrDefault(product => product.Id == id));
     }
 
+    public Task<ProductImage?> FindPrimaryProductImageByProductIdAsync(Guid productId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return Task.FromResult(
+            _productImages
+                .Where(image => image.ProductId == productId)
+                .OrderBy(image => image.SortOrder)
+                .ThenBy(image => image.ImageUrl)
+                .FirstOrDefault());
+    }
+
     public Task<Category?> FindCategoryByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -59,6 +72,11 @@ internal sealed class FakeCartStore : ICartStore
     public void Seed(params Product[] products)
     {
         _products.AddRange(products);
+    }
+
+    public void Seed(params ProductImage[] images)
+    {
+        _productImages.AddRange(images);
     }
 
     public void Seed(params ProductVariant[] variants)
@@ -117,6 +135,11 @@ internal sealed class FakeCartStore : ICartStore
         if (typeof(TEntity) == typeof(Product))
         {
             return (List<TEntity>)(object)_products;
+        }
+
+        if (typeof(TEntity) == typeof(ProductImage))
+        {
+            return (List<TEntity>)(object)_productImages;
         }
 
         if (typeof(TEntity) == typeof(ProductVariant))

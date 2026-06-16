@@ -75,6 +75,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             .FirstOrDefaultAsync(product => product.Id == id, cancellationToken);
     }
 
+    async Task<ProductImage?> ICartStore.FindPrimaryProductImageByProductIdAsync(
+        Guid productId,
+        CancellationToken cancellationToken)
+    {
+        return await ProductImages
+            .OrderBy(image => image.SortOrder)
+            .ThenBy(image => image.ImageUrl)
+            .FirstOrDefaultAsync(image => image.ProductId == productId, cancellationToken);
+    }
+
     async Task<Category?> ICartStore.FindCategoryByIdAsync(
         Guid id,
         CancellationToken cancellationToken)

@@ -63,6 +63,7 @@ export interface StorefrontProductDetailDto {
 export interface ProductListRequest {
   categorySlug?: string;
   search?: string;
+  sortBy?: string;
   minPrice?: number;
   maxPrice?: number;
   inStock?: boolean;

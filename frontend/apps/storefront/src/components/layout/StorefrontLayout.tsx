@@ -1,6 +1,9 @@
+import { useQuery } from "@tanstack/react-query";
+import type { StorefrontCategoryDto } from "@workspace-ecommerce/api-types";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { StorefrontCartProvider } from "../../features/cart/StorefrontCartProvider";
 import { useStorefrontCart } from "../../features/cart/StorefrontCartContext";
+import { storefrontApi } from "../../services/api/storefrontApi";
 import { StorefrontFooter } from "./StorefrontFooter";
 
 const navItems = [
@@ -21,6 +24,10 @@ export function StorefrontLayout() {
 function StorefrontLayoutContent() {
   const location = useLocation();
   const { cartItemCount, openCartDrawer } = useStorefrontCart();
+  const categoriesQuery = useQuery({
+    queryKey: ["storefront", "categories"],
+    queryFn: storefrontApi.getCategories
+  });
   const isHome = location.pathname === "/";
   const hideHeader = location.pathname === "/login";
 
@@ -47,7 +54,24 @@ function StorefrontLayoutContent() {
 
               <nav className={`ui-control flex min-w-0 items-center gap-3 overflow-x-auto whitespace-nowrap scrollbar-hidden sm:gap-5 lg:gap-10 ${textColorClass}`}>
                 {navItems.map((item) =>
-                  item.to ? (
+                  item.label === "Products" && item.to ? (
+                    <div key={`${item.label}-${item.to}`} className="group inline-flex">
+                      <NavLink
+                        to={item.to}
+                        className={({ isActive }) =>
+                          `inline-flex items-center gap-2 rounded-full px-1 py-2 transition ${isHome ? "hover:text-white/70" : "hover:text-[var(--brand)]"} ${
+                            isActive && !isHome ? "text-[var(--brand)]" : ""
+                          }`
+                        }
+                      >
+                        {item.label}
+                        <span className={`mt-0.5 text-[10px] leading-none ${isHome ? "text-white" : "text-slate-900"}`} aria-hidden="true">
+                          v
+                        </span>
+                      </NavLink>
+                      <ProductMegaMenu categories={categoriesQuery.data ?? []} isLoading={categoriesQuery.isLoading} />
+                    </div>
+                  ) : item.to ? (
                     <NavLink
                       key={`${item.label}-${item.to}`}
                       to={item.to}
@@ -123,6 +147,81 @@ function StorefrontLayoutContent() {
         <Outlet />
       </main>
       {hideHeader ? null : <StorefrontFooter />}
+    </div>
+  );
+}
+
+function ProductMegaMenu({
+  categories,
+  isLoading
+}: {
+  categories: StorefrontCategoryDto[];
+  isLoading: boolean;
+}) {
+  return (
+    <div className="pointer-events-none fixed left-0 right-0 top-14 z-40 pt-6 opacity-0 transition duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+      <div className="border-y border-slate-100 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
+        <div className="mx-auto grid max-h-[calc(100vh-5rem)] max-w-[1600px] gap-10 overflow-y-auto px-8 py-10 sm:grid-cols-2 lg:grid-cols-4 lg:px-10">
+          {isLoading ? (
+            <div className="text-sm font-semibold text-slate-500">Loading categories...</div>
+          ) : categories.length === 0 ? (
+            <div className="text-sm font-semibold text-slate-500">No categories available.</div>
+          ) : (
+            categories.map((category) => <CategoryColumn key={category.id} category={category} />)
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CategoryColumn({ category }: { category: StorefrontCategoryDto }) {
+  return (
+    <div className="min-w-0">
+      <NavLink
+        to={`/products?categorySlug=${encodeURIComponent(category.slug)}`}
+        className="block text-[22px] font-black leading-tight text-slate-900 transition hover:text-[var(--brand)]"
+      >
+        {category.name}
+      </NavLink>
+      <div className="mt-7 grid gap-4">
+        {category.children.length > 0 ? (
+          category.children.map((child) => <CategoryMenuItem key={child.id} category={child} level={0} />)
+        ) : (
+          <NavLink
+            to={`/products?categorySlug=${encodeURIComponent(category.slug)}`}
+            className="block text-base font-bold text-slate-500 transition hover:text-slate-950"
+          >
+            View products
+          </NavLink>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CategoryMenuItem({
+  category,
+  level
+}: {
+  category: StorefrontCategoryDto;
+  level: number;
+}) {
+  return (
+    <div className={level > 0 ? "pl-4" : ""}>
+      <NavLink
+        to={`/products?categorySlug=${encodeURIComponent(category.slug)}`}
+        className="block text-base font-bold text-slate-500 transition hover:text-slate-950"
+      >
+        {category.name}
+      </NavLink>
+      {category.children.length > 0 ? (
+        <div className="mt-3 grid gap-3">
+          {category.children.map((child) => (
+            <CategoryMenuItem key={child.id} category={child} level={level + 1} />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
