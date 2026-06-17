@@ -53,6 +53,7 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
                 ordering.orders,
                 cart.cart_items,
                 cart.carts,
+                customer.customers,
                 catalog.product_specifications,
                 catalog.product_images,
                 catalog.product_variants,

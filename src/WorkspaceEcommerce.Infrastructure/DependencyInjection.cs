@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddSingleton(jwtOptions);
         services.AddSingleton<IAdminCredentialValidator, ConfiguredAdminCredentialValidator>();
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
+        services.AddSingleton<IPasswordHasher, PasswordHasher>();
 
         return services;
     }

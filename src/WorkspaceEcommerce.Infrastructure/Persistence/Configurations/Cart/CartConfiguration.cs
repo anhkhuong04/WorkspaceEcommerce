@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using WorkspaceEcommerce.Domain.Modules.Cart;
+using WorkspaceEcommerce.Domain.Modules.Customers;
 
 namespace WorkspaceEcommerce.Infrastructure.Persistence.Configurations.Cart;
 
@@ -36,6 +37,11 @@ internal sealed class CartConfiguration : IEntityTypeConfiguration<Domain.Module
 
         builder.HasIndex(cart => cart.CustomerId)
             .HasDatabaseName("ix_carts_customer_id");
+
+        builder.HasOne<Customer>()
+            .WithMany()
+            .HasForeignKey(cart => cart.CustomerId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(cart => cart.Items)
             .WithOne()

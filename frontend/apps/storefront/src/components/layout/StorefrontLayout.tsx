@@ -3,6 +3,7 @@ import type { StorefrontCategoryDto } from "@workspace-ecommerce/api-types";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { StorefrontCartProvider } from "../../features/cart/StorefrontCartProvider";
 import { useStorefrontCart } from "../../features/cart/StorefrontCartContext";
+import { useCustomerAuth } from "../../features/customer-auth/useCustomerAuth";
 import { storefrontApi } from "../../services/api/storefrontApi";
 import { StorefrontFooter } from "./StorefrontFooter";
 
@@ -24,6 +25,7 @@ export function StorefrontLayout() {
 function StorefrontLayoutContent() {
   const location = useLocation();
   const { cartItemCount, openCartDrawer } = useStorefrontCart();
+  const { isAuthenticated } = useCustomerAuth();
   const categoriesQuery = useQuery({
     queryKey: ["storefront", "categories"],
     queryFn: storefrontApi.getCategories
@@ -112,9 +114,9 @@ function StorefrontLayoutContent() {
               </NavLink>
 
               <NavLink
-                to="/login"
+                to={isAuthenticated ? "/account" : "/login"}
                 className={`grid h-10 w-10 place-items-center rounded-full transition ${isHome ? "hover:bg-white/20" : "hover:bg-slate-100"}`}
-                aria-label="Login"
+                aria-label={isAuthenticated ? "Account" : "Login"}
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="2" />

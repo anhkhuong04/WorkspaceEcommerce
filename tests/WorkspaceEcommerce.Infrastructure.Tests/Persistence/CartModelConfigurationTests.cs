@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using WorkspaceEcommerce.Domain.Modules.Cart;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
+using WorkspaceEcommerce.Domain.Modules.Customers;
 using WorkspaceEcommerce.Infrastructure.Persistence;
 using CartAggregate = WorkspaceEcommerce.Domain.Modules.Cart.Cart;
 
@@ -61,6 +62,7 @@ public sealed class CartModelConfigurationTests
     [Theory]
     [InlineData(typeof(CartItem), typeof(CartAggregate), nameof(CartItem.CartId), DeleteBehavior.Cascade)]
     [InlineData(typeof(CartItem), typeof(ProductVariant), nameof(CartItem.ProductVariantId), DeleteBehavior.Restrict)]
+    [InlineData(typeof(CartAggregate), typeof(Customer), nameof(CartAggregate.CustomerId), DeleteBehavior.Restrict)]
     public void CartRelationships_HaveExpectedDeleteBehavior(
         Type dependentType,
         Type principalType,

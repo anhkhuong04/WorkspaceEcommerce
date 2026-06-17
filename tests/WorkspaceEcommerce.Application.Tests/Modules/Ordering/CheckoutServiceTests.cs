@@ -1,3 +1,4 @@
+using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Ordering;
 using WorkspaceEcommerce.Application.Tests.Common.Fakes;
@@ -25,6 +26,7 @@ public sealed class CheckoutServiceTests
         Assert.NotNull(result.Value);
         var order = result.Value.Order;
         Assert.StartsWith("ORD-", order.OrderCode, StringComparison.Ordinal);
+        Assert.Null(order.CustomerId);
         Assert.Equal(OrderStatus.Pending, order.Status);
         Assert.Equal(PaymentMethod.Cod, order.PaymentMethod);
         Assert.Equal(240m, order.Subtotal);
@@ -43,6 +45,23 @@ public sealed class CheckoutServiceTests
         Assert.Single(store.Orders);
         Assert.Equal(1, store.TransactionCallCount);
         Assert.Equal(1, store.SaveChangesCallCount);
+    }
+
+    [Fact]
+    public async Task CheckoutAsync_WhenCustomerIsAuthenticated_CreatesOrderWithCustomerId()
+    {
+        var customerId = Guid.NewGuid();
+        var store = new FakeCheckoutStore();
+        var variant = SeedVisibleVariant(store);
+        SeedCart(store, variant.Id);
+        var service = CreateService(store, customerId);
+
+        var result = await service.CheckoutAsync(CreateRequest());
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal(customerId, result.Value.Order.CustomerId);
+        Assert.Equal(customerId, store.Orders.Single().CustomerId);
     }
 
     [Fact]
@@ -138,9 +157,12 @@ public sealed class CheckoutServiceTests
         Assert.Equal(PaymentMethod.ManualBankTransfer, result.Value.Order.PaymentMethod);
     }
 
-    private static CheckoutService CreateService(FakeCheckoutStore store)
+    private static CheckoutService CreateService(FakeCheckoutStore store, Guid? customerId = null)
     {
-        return new CheckoutService(store, new CheckoutRequestValidator());
+        return new CheckoutService(
+            store,
+            new StubCurrentCustomerContext(customerId),
+            new CheckoutRequestValidator());
     }
 
     private static CheckoutRequest CreateRequest(PaymentMethod paymentMethod = PaymentMethod.Cod)
@@ -197,5 +219,12 @@ public sealed class CheckoutServiceTests
         store.Seed(variant);
 
         return variant;
+    }
+
+    private sealed class StubCurrentCustomerContext(Guid? customerId) : ICurrentCustomerContext
+    {
+        public Guid? CustomerId => customerId;
+
+        public string? Email => customerId.HasValue ? "customer@example.com" : null;
     }
 }

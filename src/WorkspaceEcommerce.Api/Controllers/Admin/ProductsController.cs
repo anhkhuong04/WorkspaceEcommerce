@@ -7,7 +7,8 @@ using WorkspaceEcommerce.Application.Modules.Catalog.Products;
 namespace WorkspaceEcommerce.Api.Controllers.Admin;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin")]
+[ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
 public sealed class ProductsController(IAdminProductService productService) : ControllerBase
 {
     [HttpGet("api/admin/products")]

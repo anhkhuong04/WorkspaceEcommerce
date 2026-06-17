@@ -5,7 +5,7 @@ import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "r
 import { Link } from "react-router-dom";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
-import { getCartSessionId } from "../../services/cartSession";
+import { getCartSessionId, resetCartSessionId } from "../../services/cartSession";
 import { StorefrontCartContext, type CartQueryKey, type StorefrontCartContextValue } from "./StorefrontCartContext";
 
 function createCartQueryKey(sessionId: string): CartQueryKey {
@@ -14,7 +14,7 @@ function createCartQueryKey(sessionId: string): CartQueryKey {
 
 export function StorefrontCartProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const cartSessionId = useMemo(() => getCartSessionId(), []);
+  const [cartSessionId, setCartSessionId] = useState(() => getCartSessionId());
   const cartQueryKey = useMemo(() => createCartQueryKey(cartSessionId), [cartSessionId]);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
 
@@ -35,6 +35,23 @@ export function StorefrontCartProvider({ children }: { children: ReactNode }) {
     setIsCartDrawerOpen(false);
   }, []);
 
+  const resetCartSession = useCallback(() => {
+    queryClient.setQueryData<CartDto | undefined>(cartQueryKey, (currentCart) =>
+      currentCart
+        ? {
+            ...currentCart,
+            items: [],
+            totalAmount: 0,
+            totalQuantity: 0
+          }
+        : currentCart);
+
+    const nextSessionId = resetCartSessionId();
+    setCartSessionId(nextSessionId);
+    setIsCartDrawerOpen(false);
+    return nextSessionId;
+  }, [cartQueryKey, queryClient]);
+
   const contextValue = useMemo<StorefrontCartContextValue>(() => ({
     cart: cartQuery.data,
     cartItemCount: cartQuery.data?.totalQuantity ?? 0,
@@ -42,8 +59,9 @@ export function StorefrontCartProvider({ children }: { children: ReactNode }) {
     cartSessionId,
     isCartDrawerOpen,
     openCartDrawer,
-    closeCartDrawer
-  }), [cartQuery.data, cartQueryKey, cartSessionId, closeCartDrawer, isCartDrawerOpen, openCartDrawer]);
+    closeCartDrawer,
+    resetCartSession
+  }), [cartQuery.data, cartQueryKey, cartSessionId, closeCartDrawer, isCartDrawerOpen, openCartDrawer, resetCartSession]);
 
   return (
     <StorefrontCartContext.Provider value={contextValue}>

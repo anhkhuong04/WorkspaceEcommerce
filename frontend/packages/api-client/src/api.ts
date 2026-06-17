@@ -21,6 +21,13 @@
   CartDto,
   CheckoutRequest,
   CheckoutResponse,
+  CustomerAuthResponse,
+  CustomerLoginRequest,
+  CustomerOrderDto,
+  CustomerOrderListItemDto,
+  CustomerOrderListRequest,
+  CustomerProfileDto,
+  CustomerRegisterRequest,
   OrderLookupRequest,
   OrderLookupResponse,
   PagedResult,
@@ -29,6 +36,7 @@
   StorefrontCategoryDto,
   StorefrontProductDetailDto,
   StorefrontProductListItemDto,
+  UpdateCustomerProfileRequest,
   UpdateCartItemRequest,
   UpdateOrderStatusRequest
 } from "@workspace-ecommerce/api-types";
@@ -64,7 +72,17 @@ export function createStorefrontApi(client: ApiClient) {
     removeCartItem: (itemId: string, sessionId: string) =>
       client.delete<CartDto>(`/api/cart/items/${itemId}${buildQuery({ sessionId })}`),
     checkout: (request: CheckoutRequest) => client.post<CheckoutResponse, CheckoutRequest>("/api/checkout", request),
-    lookupOrder: (request: OrderLookupRequest) => client.get<OrderLookupResponse>(`/api/orders/lookup${buildQuery(request)}`)
+    lookupOrder: (request: OrderLookupRequest) => client.get<OrderLookupResponse>(`/api/orders/lookup${buildQuery(request)}`),
+    registerCustomer: (request: CustomerRegisterRequest) =>
+      client.post<CustomerAuthResponse, CustomerRegisterRequest>("/api/customer/auth/register", request),
+    loginCustomer: (request: CustomerLoginRequest) =>
+      client.post<CustomerAuthResponse, CustomerLoginRequest>("/api/customer/auth/login", request),
+    getCustomerMe: () => client.get<CustomerProfileDto>("/api/customer/me"),
+    updateCustomerMe: (request: UpdateCustomerProfileRequest) =>
+      client.put<CustomerProfileDto, UpdateCustomerProfileRequest>("/api/customer/me", request),
+    getCustomerOrders: (request: CustomerOrderListRequest = {}) =>
+      client.get<PagedResult<CustomerOrderListItemDto>>(`/api/customer/orders${buildQuery(request)}`),
+    getCustomerOrder: (id: string) => client.get<CustomerOrderDto>(`/api/customer/orders/${id}`)
   };
 }
 

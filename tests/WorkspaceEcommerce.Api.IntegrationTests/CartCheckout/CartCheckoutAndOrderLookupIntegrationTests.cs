@@ -81,6 +81,69 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
     }
 
     [Fact]
+    public async Task Checkout_WithCustomerToken_LinksOrderToAuthenticatedCustomer()
+    {
+        await fixture.ResetDatabaseAsync();
+        var catalog = TestData.CreateVisibleCatalog();
+        await fixture.SeedAsync(dbContext =>
+        {
+            dbContext.AddRange(catalog.Category, catalog.Product, catalog.Variant);
+
+            return Task.CompletedTask;
+        });
+        using var client = fixture.CreateClient();
+        var token = await client.RegisterCustomerAsync();
+        client.UseBearerToken(token);
+        var customerId = await fixture.ExecuteDbAsync(dbContext =>
+            dbContext.Customers
+                .Where(customer => customer.Email == "customer@example.com")
+                .Select(customer => customer.Id)
+                .SingleAsync());
+        var sessionId = $"authenticated-checkout-{Guid.NewGuid():N}";
+        using var addCartResponse = await client.PostAsJsonAsync(
+            "/api/cart/items",
+            new
+            {
+                sessionId,
+                productVariantId = catalog.Variant.Id,
+                quantity = 1
+            });
+        addCartResponse.EnsureSuccessStatusCode();
+
+        using var checkoutResponse = await client.PostAsJsonAsync(
+            "/api/checkout",
+            new
+            {
+                sessionId,
+                customerName = "Nguyen Van A",
+                customerPhone = "0900000000",
+                customerEmail = "customer@example.com",
+                shippingAddress = "123 Shipping Street",
+                note = "Call before delivery",
+                paymentMethod = 0
+            });
+        var checkoutJson = await checkoutResponse.ReadJsonAsync();
+
+        Assert.Equal(HttpStatusCode.Created, checkoutResponse.StatusCode);
+        Assert.Equal(customerId, checkoutJson["data"]!["order"]!["customerId"]!.GetValue<Guid>());
+        var orderId = checkoutJson["data"]!["order"]!["id"]!.GetValue<Guid>();
+        var persistedCustomerId = await fixture.ExecuteDbAsync(dbContext =>
+            dbContext.Orders
+                .Where(order => order.Id == orderId)
+                .Select(order => order.CustomerId)
+                .SingleAsync());
+
+        Assert.Equal(customerId, persistedCustomerId);
+
+        using var customerOrdersResponse = await client.GetAsync("/api/customer/orders");
+        var customerOrdersJson = await customerOrdersResponse.ReadJsonAsync();
+
+        Assert.Equal(HttpStatusCode.OK, customerOrdersResponse.StatusCode);
+        var item = Assert.Single(customerOrdersJson["data"]!["items"]!.AsArray());
+        Assert.Equal(orderId, item!["id"]!.GetValue<Guid>());
+    }
+
+    [Fact]
     public async Task AddCartItem_InvalidRequest_ReturnsValidationEnvelope()
     {
         await fixture.ResetDatabaseAsync();

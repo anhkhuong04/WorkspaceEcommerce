@@ -29,6 +29,7 @@ export interface OrderItemDto {
 export interface OrderDto {
   id: string;
   orderCode: string;
+  customerId: string | null;
   customerName: string;
   customerPhone: string;
   customerEmail: string | null;

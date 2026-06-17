@@ -7,7 +7,8 @@ using WorkspaceEcommerce.Application.Modules.Content.Banners;
 namespace WorkspaceEcommerce.Api.Controllers.Admin;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin")]
+[ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
 [Route("api/admin/banners")]
 public sealed class BannersController(IAdminBannerService bannerService) : ControllerBase
 {

@@ -1,32 +1,31 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CartItemDto } from "@workspace-ecommerce/api-types";
 import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
+import { VIETNAM_ADMINISTRATIVE_UNITS } from "../../data/vietnamAdministrativeUnits";
+import { useStorefrontCart } from "../../features/cart/StorefrontCartContext";
+import { useCustomerAuth } from "../../features/customer-auth/useCustomerAuth";
+import { buildManualTransferContent } from "../../features/checkout/manualTransfer";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
-import { getCartSessionId, resetCartSessionId } from "../../services/cartSession";
 
 const checkoutSchema = z.object({
-  customerName: z.string().min(2, "Vui lòng nhập họ tên."),
-  customerPhone: z.string().min(8, "Số điện thoại không hợp lệ."),
-  customerEmail: z.string().email("Email không hợp lệ.").optional().or(z.literal("")),
-  addressLine: z.string().min(5, "Vui lòng nhập địa chỉ giao hàng."),
-  ward: z.string().min(2, "Vui lòng nhập phường/xã."),
-  city: z.string().min(1, "Vui lòng chọn tỉnh/thành."),
-  newsletter: z.boolean(),
+  customerName: z.string().min(2, "Vui long nhap ho ten."),
+  customerPhone: z.string().min(8, "So dien thoai khong hop le."),
+  customerEmail: z.string().email("Email khong hop le.").optional().or(z.literal("")),
+  addressLine: z.string().min(5, "Vui long nhap dia chi giao hang."),
+  ward: z.string().min(1, "Vui long chon phuong/xa."),
+  city: z.string().min(1, "Vui long chon tinh/thanh."),
   note: z.string().optional(),
-  wantsVat: z.boolean(),
-  companyName: z.string().optional(),
-  taxCode: z.string().optional(),
-  companyAddress: z.string().optional(),
   paymentMethod: z.enum(["0", "1"])
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
+type CheckoutTextField = "customerName" | "customerPhone" | "customerEmail";
 
 interface FieldProps {
   label: string;
@@ -44,16 +43,20 @@ interface TextAreaProps extends FieldProps, TextareaHTMLAttributes<HTMLTextAreaE
 
 export function CheckoutPage() {
   const navigate = useNavigate();
-  const sessionId = getCartSessionId();
+  const queryClient = useQueryClient();
+  const { cartQueryKey, cartSessionId, openCartDrawer, resetCartSession } = useStorefrontCart();
+  const { customer, isAuthenticated } = useCustomerAuth();
 
   const cartQuery = useQuery({
-    queryKey: ["storefront", "cart", sessionId],
-    queryFn: () => storefrontApi.getCart(sessionId)
+    queryKey: cartQueryKey,
+    queryFn: () => storefrontApi.getCart(cartSessionId)
   });
 
   const {
     register,
     handleSubmit,
+    getValues,
+    setValue,
     watch,
     formState: { errors }
   } = useForm<CheckoutFormValues>({
@@ -65,20 +68,51 @@ export function CheckoutPage() {
       addressLine: "",
       ward: "",
       city: "",
-      newsletter: true,
       note: "",
-      wantsVat: false,
-      companyName: "",
-      taxCode: "",
-      companyAddress: "",
       paymentMethod: "0"
+    }
+  });
+
+  const selectedProvinceCode = watch("city");
+  const selectedPaymentMethod = watch("paymentMethod");
+  const selectedProvince = findProvinceByCode(selectedProvinceCode);
+  const wardOptions = selectedProvince?.wards ?? [];
+  const isManualTransfer = selectedPaymentMethod === "1";
+
+  useEffect(() => {
+    setValue("ward", "", { shouldDirty: Boolean(selectedProvinceCode), shouldValidate: Boolean(selectedProvinceCode) });
+  }, [selectedProvinceCode, setValue]);
+
+  useEffect(() => {
+    if (!customer) {
+      return;
+    }
+
+    const setTextIfEmpty = (name: CheckoutTextField, value: string | null | undefined) => {
+      if (!value || (getValues(name) ?? "").trim().length > 0) {
+        return;
+      }
+
+      setValue(name, value, { shouldDirty: false, shouldValidate: false });
+    };
+
+    setTextIfEmpty("customerName", customer.fullName);
+    setTextIfEmpty("customerPhone", customer.phoneNumber);
+    setTextIfEmpty("customerEmail", customer.email);
+  }, [customer, getValues, setValue]);
+
+  const updateQuantityMutation = useMutation({
+    mutationFn: ({ itemId, quantity }: { itemId: string; quantity: number }) =>
+      storefrontApi.updateCartItem(itemId, { sessionId: cartSessionId, quantity }),
+    onSuccess: (nextCart) => {
+      queryClient.setQueryData(cartQueryKey, nextCart);
     }
   });
 
   const checkoutMutation = useMutation({
     mutationFn: (values: CheckoutFormValues) =>
       storefrontApi.checkout({
-        sessionId,
+        sessionId: cartSessionId,
         customerName: values.customerName,
         customerPhone: values.customerPhone,
         customerEmail: values.customerEmail || null,
@@ -87,122 +121,111 @@ export function CheckoutPage() {
         paymentMethod: Number(values.paymentMethod) as 0 | 1
       }),
     onSuccess: (response) => {
-      resetCartSessionId();
-      void navigate("/checkout/success", { state: { order: response.order } });
+      resetCartSession();
+      const query = new URLSearchParams({
+        orderCode: response.order.orderCode,
+        phone: response.order.customerPhone
+      });
+      void navigate(`/checkout/success?${query.toString()}`, { state: { order: response.order } });
     }
   });
 
-  useEffect(() => {
-    if (cartQuery.data && cartQuery.data.items.length === 0) {
-      void navigate("/cart");
-    }
-  }, [cartQuery.data, navigate]);
-
   const cart = cartQuery.data;
-  const wantsVat = watch("wantsVat");
+  const hasCartItems = Boolean(cart && cart.items.length > 0);
 
   return (
     <section className="-mt-8 ml-[calc(50%-50vw)] min-h-[calc(100vh-5rem)] w-screen bg-[#f6f6f6] px-5 py-10 sm:px-8 lg:py-14">
       <div className="mx-auto grid max-w-[1440px] gap-8">
         <div className="max-w-3xl">
-          <h1 className="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">Thanh toán</h1>
+          <h1 className="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">Thanh toan</h1>
           <p className="mt-6 max-w-2xl text-base leading-7 text-slate-800">
-            Vui lòng điền đầy đủ thông tin để chúng tôi giao đơn hàng tới đúng địa chỉ. Thông tin thanh toán và đơn hàng sẽ được xử lý bảo mật.
+            Dien thong tin giao hang va chon phuong thuc thanh toan. Guest checkout van hoat dong, va don hang se duoc gan vao tai khoan khi ban dang nhap.
           </p>
         </div>
 
-        {cartQuery.isLoading && <StateMessage>Đang tải giỏ hàng...</StateMessage>}
+        {isAuthenticated && customer ? (
+          <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800">
+            Contact fields were prefilled from {customer.email}.
+          </div>
+        ) : null}
 
-        {cartQuery.isError && (
+        {cartQuery.isLoading ? <StateMessage>Dang tai gio hang...</StateMessage> : null}
+
+        {cartQuery.isError ? (
           <StateMessage tone="error">
-            {getApiErrorMessage(cartQuery.error)} - <Link to="/cart" className="underline">Quay lại giỏ hàng</Link>
+            {getApiErrorMessage(cartQuery.error)} - <button type="button" onClick={() => openCartDrawer()} className="underline">Mo gio hang</button>
           </StateMessage>
-        )}
+        ) : null}
 
-        {cart && cart.items.length > 0 && (
+        {!cartQuery.isLoading && !cartQuery.isError && cart && cart.items.length === 0 ? (
+          <EmptyCheckoutState onOpenCart={() => openCartDrawer()} />
+        ) : null}
+
+        {hasCartItems && cart ? (
           <form onSubmit={handleSubmit((values) => checkoutMutation.mutate(values))} className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_440px] lg:items-start">
             <div className="grid gap-5">
               <section>
-                <h2 className="mb-4 text-lg font-black text-slate-950">Thông tin giao hàng</h2>
+                <h2 className="mb-4 text-lg font-black text-slate-950">Thong tin giao hang</h2>
                 <div className="rounded-lg bg-white p-5 shadow-sm sm:p-7">
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <FormInput placeholder="Họ tên *" autoComplete="name" {...register("customerName")} error={errors.customerName?.message} label="Họ tên" />
-                    <FormInput placeholder="Số điện thoại *" type="tel" autoComplete="tel" {...register("customerPhone")} error={errors.customerPhone?.message} label="Số điện thoại" />
-                    <FormInput placeholder="Email *" type="email" autoComplete="email" {...register("customerEmail")} error={errors.customerEmail?.message} label="Email" />
-                    <label className="flex min-h-14 items-center gap-3 rounded-lg px-1 text-sm leading-6 text-slate-500">
-                      <input type="checkbox" className="h-5 w-5 rounded-full accent-slate-700" {...register("newsletter")} />
-                      <span>Đăng ký nhận ưu đãi từ HyperWork. Có thể huỷ đăng ký bất cứ lúc nào.</span>
-                    </label>
+                    <FormInput placeholder="Ho ten *" autoComplete="name" {...register("customerName")} error={errors.customerName?.message} label="Ho ten" />
+                    <FormInput placeholder="So dien thoai *" type="tel" autoComplete="tel" {...register("customerPhone")} error={errors.customerPhone?.message} label="So dien thoai" />
+                    <FormInput placeholder="Email" type="email" autoComplete="email" {...register("customerEmail")} error={errors.customerEmail?.message} label="Email" />
                     <div className="sm:col-span-2">
-                      <FormInput placeholder="Địa chỉ *" autoComplete="street-address" {...register("addressLine")} error={errors.addressLine?.message} label="Địa chỉ" />
+                      <FormInput placeholder="Dia chi *" autoComplete="street-address" {...register("addressLine")} error={errors.addressLine?.message} label="Dia chi" />
                     </div>
-                    <FormInput placeholder="Phường/Xã *" {...register("ward")} error={errors.ward?.message} label="Phường/Xã" />
-                    <FormSelect {...register("city")} error={errors.city?.message} label="Tỉnh/Thành">
-                      <option value="">Tỉnh/Thành *</option>
-                      <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
-                      <option value="Hà Nội">Hà Nội</option>
-                      <option value="Đà Nẵng">Đà Nẵng</option>
-                      <option value="Bình Dương">Bình Dương</option>
-                      <option value="Đồng Nai">Đồng Nai</option>
-                      <option value="Khác">Khác</option>
+                    <FormSelect {...register("city")} error={errors.city?.message} label="Tinh/Thanh">
+                      <option value="">Chon tinh/thanh *</option>
+                      {VIETNAM_ADMINISTRATIVE_UNITS.map((province) => (
+                        <option key={province.code} value={province.code}>
+                          {province.name}
+                        </option>
+                      ))}
+                    </FormSelect>
+                    <FormSelect {...register("ward")} disabled={!selectedProvince} error={errors.ward?.message} label="Phuong/Xa">
+                      <option value="">{selectedProvince ? "Chon phuong/xa *" : "Chon tinh/thanh truoc"}</option>
+                      {wardOptions.map((ward) => (
+                        <option key={ward.code} value={ward.code}>
+                          {ward.name}
+                        </option>
+                      ))}
                     </FormSelect>
                   </div>
                 </div>
               </section>
 
               <section>
-                <h2 className="mb-4 text-lg font-black text-slate-950">Ghi chú đơn hàng</h2>
+                <h2 className="mb-4 text-lg font-black text-slate-950">Ghi chu don hang</h2>
                 <FormTextArea
                   rows={4}
-                  placeholder="VD: giao giờ hành chính, gọi trước 30 phút..."
+                  placeholder="VD: giao gio hanh chinh, goi truoc 30 phut..."
                   {...register("note")}
                   error={errors.note?.message}
-                  label="Ghi chú đơn hàng"
+                  label="Ghi chu don hang"
                 />
               </section>
 
               <section className="rounded-lg bg-white p-5 shadow-sm sm:p-6">
-                <label className="flex cursor-pointer items-start justify-between gap-4">
-                  <span>
-                    <span className="block text-lg font-black text-slate-950">Xuất hoá đơn VAT</span>
-                    <span className="mt-1 block text-sm text-slate-500">Tuỳ chọn - Nhấn để điền thông tin</span>
-                  </span>
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-600">
-                    <input type="checkbox" className="peer sr-only" {...register("wantsVat")} />
-                    <svg className="h-4 w-4 transition peer-checked:rotate-180" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                      <path d="m6 8 4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </span>
-                </label>
-                {wantsVat && (
-                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                    <FormInput placeholder="Tên công ty" {...register("companyName")} error={errors.companyName?.message} label="Tên công ty" />
-                    <FormInput placeholder="Mã số thuế" {...register("taxCode")} error={errors.taxCode?.message} label="Mã số thuế" />
-                    <div className="sm:col-span-2">
-                      <FormInput placeholder="Địa chỉ công ty" {...register("companyAddress")} error={errors.companyAddress?.message} label="Địa chỉ công ty" />
-                    </div>
-                  </div>
-                )}
-              </section>
-
-              <section className="rounded-lg bg-white p-5 shadow-sm sm:p-6">
-                <h2 className="mb-4 text-lg font-black text-slate-950">Phương thức thanh toán</h2>
+                <h2 className="mb-4 text-lg font-black text-slate-950">Phuong thuc thanh toan</h2>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <PaymentOption value="0" label="COD" description="Thanh toán khi nhận hàng" register={register("paymentMethod")} />
-                  <PaymentOption value="1" label="Chuyển khoản" description="Nhân viên xác nhận sau khi đặt hàng" register={register("paymentMethod")} />
+                  <PaymentOption value="0" label="COD" description="Thanh toan khi nhan hang" register={register("paymentMethod")} />
+                  <PaymentOption value="1" label="Chuyen khoan" description="Nhan vien xac nhan sau khi dat hang" register={register("paymentMethod")} />
                 </div>
+                {isManualTransfer ? <ManualTransferNotice /> : null}
               </section>
             </div>
 
             <OrderSummary
               cartItems={cart.items}
-              isPending={checkoutMutation.isPending}
-              mutationError={checkoutMutation.error}
+              isPending={checkoutMutation.isPending || updateQuantityMutation.isPending}
+              mutationError={checkoutMutation.error ?? updateQuantityMutation.error}
+              onUpdateQuantity={(itemId, quantity) => updateQuantityMutation.mutate({ itemId, quantity })}
+              paymentMethod={selectedPaymentMethod}
               subtotal={cart.totalAmount}
               totalAmount={cart.totalAmount}
             />
           </form>
-        )}
+        ) : null}
       </div>
     </section>
   );
@@ -279,33 +302,58 @@ function PaymentOption({
   );
 }
 
+function ManualTransferNotice() {
+  return (
+    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+      <p className="font-bold text-slate-950">Chuyen khoan thu cong</p>
+      <p className="mt-1 leading-6">
+        Sau khi dat hang, he thong se tao ma don va noi dung chuyen khoan de copy. Nhan vien se xac nhan don sau khi nhan thanh toan.
+      </p>
+      <p className="mt-3 font-mono text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+        Noi dung mau: {buildManualTransferContent("ORDER-CODE")}
+      </p>
+    </div>
+  );
+}
+
 function OrderSummary({
   cartItems,
   isPending,
   mutationError,
+  onUpdateQuantity,
+  paymentMethod,
   subtotal,
   totalAmount
 }: {
   cartItems: CartItemDto[];
   isPending: boolean;
   mutationError: unknown;
+  onUpdateQuantity: (itemId: string, quantity: number) => void;
+  paymentMethod: "0" | "1";
   subtotal: number;
   totalAmount: number;
 }) {
+  const submitLabel = paymentMethod === "1" ? "Dat hang va nhan thong tin chuyen khoan" : "Dat hang COD";
+
   return (
     <aside className="lg:sticky lg:top-28">
-      <h2 className="mb-4 text-lg font-black text-slate-950">Tóm tắt đơn hàng</h2>
+      <h2 className="mb-4 text-lg font-black text-slate-950">Tom tat don hang</h2>
       <div className="rounded-lg bg-white p-5 shadow-sm sm:p-7">
         <div className="grid gap-5">
           {cartItems.map((item) => (
-            <CheckoutCartItem key={item.id} item={item} />
+            <CheckoutCartItem
+              key={item.id}
+              isPending={isPending}
+              item={item}
+              onUpdateQuantity={onUpdateQuantity}
+            />
           ))}
         </div>
 
         <div className="mt-5 border-t border-slate-200 pt-5">
           <div className="flex h-12 items-center rounded-full border border-slate-200 bg-white pl-5 pr-1.5 text-slate-400">
-            <span className="min-w-0 flex-1 truncate text-sm font-medium">Nhập mã giảm giá khác</span>
-            <button type="button" className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-white" aria-label="Áp dụng mã giảm giá" disabled>
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">Nhap ma giam gia khac</span>
+            <button type="button" className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-white" aria-label="Ap dung ma giam gia" disabled>
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -314,10 +362,10 @@ function OrderSummary({
         </div>
 
         <div className="mt-5 grid gap-4 text-sm text-slate-500">
-          <SummaryLine label="Tạm tính" value={formatCartMoney(subtotal, false)} strong />
-          <SummaryLine label="Phí vận chuyển" value="Nhập địa chỉ để tính" />
+          <SummaryLine label="Tam tinh" value={formatCartMoney(subtotal, false)} strong />
+          <SummaryLine label="Phi van chuyen" value="Nhap dia chi de tinh" />
           <div className="border-t border-slate-200 pt-5">
-            <SummaryLine label="Tổng cộng (VND)" value={formatCartMoney(totalAmount, false)} strong />
+            <SummaryLine label="Tong cong (VND)" value={formatCartMoney(totalAmount, false)} strong />
           </div>
         </div>
 
@@ -326,18 +374,34 @@ function OrderSummary({
         <button
           type="submit"
           disabled={isPending}
-          className="mt-8 h-14 w-full rounded-full bg-[#9d9d9d] px-6 text-base font-black text-white transition hover:bg-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-8 min-h-14 w-full rounded-full bg-[#9d9d9d] px-6 py-3 text-base font-black text-white transition hover:bg-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isPending ? "Đang xử lý..." : "Chọn phương thức thanh toán"}
+          {isPending ? "Dang xu ly..." : submitLabel}
         </button>
       </div>
     </aside>
   );
 }
 
-function CheckoutCartItem({ item }: { item: CartItemDto }) {
+function CheckoutCartItem({
+  isPending,
+  item,
+  onUpdateQuantity
+}: {
+  isPending: boolean;
+  item: CartItemDto;
+  onUpdateQuantity: (itemId: string, quantity: number) => void;
+}) {
+  const updateQuantity = (quantity: number) => {
+    if (!Number.isFinite(quantity) || quantity < 1 || quantity === item.quantity) {
+      return;
+    }
+
+    onUpdateQuantity(item.id, quantity);
+  };
+
   return (
-    <article className="grid grid-cols-[104px_minmax(0,1fr)_56px] gap-4">
+    <article className="grid grid-cols-[104px_minmax(0,1fr)] gap-4">
       <div className="grid aspect-square place-items-center overflow-hidden rounded-md bg-[#f1f1f1]">
         {item.imageUrl ? (
           <img src={item.imageUrl} alt={item.productName} className="h-full w-full object-contain p-3" />
@@ -353,11 +417,60 @@ function CheckoutCartItem({ item }: { item: CartItemDto }) {
         <h3 className="mt-1 line-clamp-2 text-sm font-black leading-5 text-slate-800">{item.variantName}</h3>
         <p className="mt-2 text-sm font-semibold text-slate-600">{formatCartMoney(item.unitPriceSnapshot, false)}</p>
         {formatVariantOptions(item) ? <p className="mt-2 truncate text-sm text-slate-500">{formatVariantOptions(item)}</p> : null}
-      </div>
-      <div className="grid justify-items-end gap-2 py-5">
-        <span className="grid h-9 w-10 place-items-center rounded-lg border border-slate-200 text-sm text-slate-500">{item.quantity}</span>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="inline-flex h-10 items-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <button
+              type="button"
+              disabled={isPending || item.quantity <= 1}
+              onClick={() => updateQuantity(item.quantity - 1)}
+              className="grid h-10 w-9 place-items-center text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Giam so luong"
+            >
+              -
+            </button>
+            <input
+              type="number"
+              min={1}
+              inputMode="numeric"
+              value={item.quantity}
+              disabled={isPending}
+              onChange={(event) => updateQuantity(Number(event.target.value))}
+              className="h-10 w-12 border-x border-slate-200 text-center text-sm font-bold text-slate-700 outline-none disabled:bg-slate-50"
+              aria-label="So luong"
+            />
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => updateQuantity(item.quantity + 1)}
+              className="grid h-10 w-9 place-items-center text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Tang so luong"
+            >
+              +
+            </button>
+          </div>
+          <p className="text-sm font-black text-slate-800">{formatCartMoney(item.lineTotal, false)}</p>
+        </div>
       </div>
     </article>
+  );
+}
+
+function EmptyCheckoutState({ onOpenCart }: { onOpenCart: () => void }) {
+  return (
+    <section className="rounded-lg border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
+      <h2 className="text-2xl font-black text-slate-950">Gio hang khong con san pham</h2>
+      <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">
+        Gio hang co the da het han hoac da duoc thanh toan. Kiem tra lai drawer hien tai hoac quay lai danh sach san pham de tiep tuc mua hang.
+      </p>
+      <div className="mt-6 flex flex-wrap justify-center gap-3">
+        <button type="button" onClick={onOpenCart} className="ui-control rounded-[var(--radius-control)] border border-slate-200 px-5 py-3 text-slate-700 transition hover:border-slate-950 hover:text-slate-950">
+          Mo gio hang
+        </button>
+        <Link to="/products" className="ui-control rounded-[var(--radius-control)] bg-slate-950 px-5 py-3 text-white transition hover:bg-slate-800">
+          Tiep tuc mua sam
+        </Link>
+      </div>
+    </section>
   );
 }
 
@@ -379,22 +492,14 @@ function StateMessage({ children, tone = "info" }: { children: ReactNode; tone?:
 }
 
 function formatShippingAddress(values: CheckoutFormValues) {
-  return [values.addressLine, values.ward, values.city].filter(Boolean).join(", ");
+  const province = findProvinceByCode(values.city);
+  const ward = province?.wards.find((item) => item.code === values.ward);
+
+  return [values.addressLine, ward?.name, province?.name].filter(Boolean).join(", ");
 }
 
 function formatOrderNote(values: CheckoutFormValues) {
   const notes = [values.note?.trim()].filter(Boolean);
-
-  if (values.wantsVat) {
-    notes.push(
-      [
-        "Yêu cầu xuất hoá đơn VAT",
-        values.companyName ? `Công ty: ${values.companyName}` : null,
-        values.taxCode ? `MST: ${values.taxCode}` : null,
-        values.companyAddress ? `Địa chỉ công ty: ${values.companyAddress}` : null
-      ].filter(Boolean).join(" | ")
-    );
-  }
 
   return notes.length > 0 ? notes.join("\n") : null;
 }
@@ -409,4 +514,8 @@ function formatCartMoney(value: number, includeCurrency = true) {
   }).format(value);
 
   return includeCurrency ? `${formatted} VND` : formatted;
+}
+
+function findProvinceByCode(code: string) {
+  return VIETNAM_ADMINISTRATIVE_UNITS.find((province) => province.code === code);
 }

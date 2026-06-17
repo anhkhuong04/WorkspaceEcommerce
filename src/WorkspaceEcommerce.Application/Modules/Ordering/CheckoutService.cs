@@ -1,4 +1,5 @@
 using FluentValidation;
+using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Domain.Common;
@@ -10,6 +11,7 @@ namespace WorkspaceEcommerce.Application.Modules.Ordering;
 
 internal sealed class CheckoutService(
     ICheckoutStore checkoutStore,
+    ICurrentCustomerContext currentCustomer,
     IValidator<CheckoutRequest> validator) : ICheckoutService
 {
     public async Task<Result<CheckoutResponse>> CheckoutAsync(
@@ -43,7 +45,11 @@ internal sealed class CheckoutService(
                 }
 
                 var snapshots = itemSnapshotsResult.Value!;
-                order = await CreateOrderAsync(request, snapshots, transactionCancellationToken);
+                order = await CreateOrderAsync(
+                    request,
+                    currentCustomer.CustomerId,
+                    snapshots,
+                    transactionCancellationToken);
 
                 foreach (var snapshot in snapshots)
                 {
@@ -114,13 +120,14 @@ internal sealed class CheckoutService(
 
     private async Task<Order> CreateOrderAsync(
         CheckoutRequest request,
+        Guid? customerId,
         IReadOnlyCollection<CheckoutItemSnapshot> snapshots,
         CancellationToken cancellationToken)
     {
         var order = new Order(
             Guid.NewGuid(),
             await GenerateOrderCodeAsync(cancellationToken),
-            null,
+            customerId,
             request.CustomerName,
             request.CustomerPhone,
             request.CustomerEmail,

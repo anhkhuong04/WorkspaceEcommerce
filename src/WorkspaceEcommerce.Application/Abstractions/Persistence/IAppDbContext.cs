@@ -1,5 +1,6 @@
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Content;
+using WorkspaceEcommerce.Domain.Modules.Customers;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Application.Abstractions.Persistence;
@@ -17,6 +18,8 @@ public interface IAppDbContext
     IQueryable<ProductSpecification> ProductSpecifications { get; }
 
     IQueryable<Banner> Banners { get; }
+
+    IQueryable<Customer> Customers { get; }
 
     IQueryable<Order> Orders { get; }
 

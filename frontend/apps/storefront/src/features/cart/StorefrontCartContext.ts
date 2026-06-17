@@ -11,6 +11,7 @@ export interface StorefrontCartContextValue {
   isCartDrawerOpen: boolean;
   openCartDrawer: (cartData?: CartDto) => void;
   closeCartDrawer: () => void;
+  resetCartSession: () => string;
 }
 
 export const StorefrontCartContext = createContext<StorefrontCartContextValue | null>(null);

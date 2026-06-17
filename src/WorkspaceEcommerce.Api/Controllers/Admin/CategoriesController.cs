@@ -7,7 +7,8 @@ using WorkspaceEcommerce.Application.Modules.Catalog.Categories;
 namespace WorkspaceEcommerce.Api.Controllers.Admin;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin")]
+[ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
 [Route("api/admin/categories")]
 public sealed class CategoriesController(IAdminCategoryService categoryService) : ControllerBase
 {

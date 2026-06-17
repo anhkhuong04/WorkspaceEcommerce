@@ -1,6 +1,7 @@
-﻿using WorkspaceEcommerce.Application.Abstractions.Authentication;
+using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Admin.Authentication;
+using WorkspaceEcommerce.Application.Modules.Customers.Authentication;
 
 namespace WorkspaceEcommerce.Application.Tests.Modules.Admin.Authentication;
 
@@ -61,6 +62,15 @@ public sealed class AdminAuthServiceTests
         public AdminLoginResponse GenerateAdminToken(string email)
         {
             return response;
+        }
+
+        public CustomerAuthResponse GenerateCustomerToken(
+            Guid customerId,
+            string email,
+            string fullName,
+            string phoneNumber)
+        {
+            throw new NotSupportedException();
         }
     }
 }

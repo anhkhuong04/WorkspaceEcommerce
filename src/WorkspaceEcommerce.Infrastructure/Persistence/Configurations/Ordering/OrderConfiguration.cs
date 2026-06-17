@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using WorkspaceEcommerce.Domain.Modules.Customers;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Infrastructure.Persistence.Configurations.Ordering;
@@ -94,8 +95,16 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasIndex(order => order.CustomerPhone)
             .HasDatabaseName("ix_orders_customer_phone");
 
+        builder.HasIndex(order => order.CustomerId)
+            .HasDatabaseName("ix_orders_customer_id");
+
         builder.HasIndex(order => order.Status)
             .HasDatabaseName("ix_orders_status");
+
+        builder.HasOne<Customer>()
+            .WithMany()
+            .HasForeignKey(order => order.CustomerId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(order => order.Items)
             .WithOne()

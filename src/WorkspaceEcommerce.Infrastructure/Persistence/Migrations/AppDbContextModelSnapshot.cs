@@ -391,6 +391,56 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                     b.ToTable("banners", "content");
                 });
 
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Customers.Customer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("full_name");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("password_hash");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("phone_number");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasDatabaseName("ux_customers_email");
+
+                    b.HasIndex("PhoneNumber")
+                        .HasDatabaseName("ix_customers_phone_number");
+
+                    b.ToTable("customers", "customer");
+                });
+
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.Order", b =>
                 {
                     b.Property<Guid>("Id")
@@ -476,6 +526,9 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("ix_orders_customer_id");
 
                     b.HasIndex("CustomerPhone")
                         .HasDatabaseName("ix_orders_customer_phone");
@@ -586,6 +639,14 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                     b.ToTable("order_status_history", "ordering");
                 });
 
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Cart.Cart", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Cart.CartItem", b =>
                 {
                     b.HasOne("WorkspaceEcommerce.Domain.Modules.Cart.Cart", null)
@@ -643,6 +704,14 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.Order", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.OrderItem", b =>

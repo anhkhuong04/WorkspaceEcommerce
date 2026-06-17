@@ -9,7 +9,8 @@ using WorkspaceEcommerce.Application.Modules.Ordering;
 namespace WorkspaceEcommerce.Api.Controllers.Admin;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin")]
+[ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
 public sealed class OrdersController(IAdminOrderService orderService) : ControllerBase
 {
     [HttpGet("api/admin/orders")]

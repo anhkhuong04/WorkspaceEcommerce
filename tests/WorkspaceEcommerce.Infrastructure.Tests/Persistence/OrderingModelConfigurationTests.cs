@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
+using WorkspaceEcommerce.Domain.Modules.Customers;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Infrastructure.Persistence;
 
@@ -30,6 +31,18 @@ public sealed class OrderingModelConfigurationTests
 
         Assert.True(index.IsUnique);
         Assert.Equal("ux_orders_order_code", index.GetDatabaseName());
+    }
+
+    [Fact]
+    public void OrderCustomerId_HasIndex()
+    {
+        var metadata = GetEntityType(typeof(Order));
+        var index = metadata.GetIndexes().Single(candidate =>
+            candidate.Properties.Count == 1
+            && candidate.Properties[0].Name == nameof(Order.CustomerId));
+
+        Assert.False(index.IsUnique);
+        Assert.Equal("ix_orders_customer_id", index.GetDatabaseName());
     }
 
     [Theory]
@@ -74,6 +87,7 @@ public sealed class OrderingModelConfigurationTests
     [InlineData(typeof(OrderItem), typeof(Order), nameof(OrderItem.OrderId), DeleteBehavior.Cascade)]
     [InlineData(typeof(OrderItem), typeof(ProductVariant), nameof(OrderItem.ProductVariantId), DeleteBehavior.Restrict)]
     [InlineData(typeof(OrderStatusHistory), typeof(Order), nameof(OrderStatusHistory.OrderId), DeleteBehavior.Cascade)]
+    [InlineData(typeof(Order), typeof(Customer), nameof(Order.CustomerId), DeleteBehavior.Restrict)]
     public void OrderingRelationships_HaveExpectedDeleteBehavior(
         Type dependentType,
         Type principalType,

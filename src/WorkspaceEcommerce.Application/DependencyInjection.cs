@@ -7,6 +7,9 @@ using WorkspaceEcommerce.Application.Modules.Catalog.Categories;
 using WorkspaceEcommerce.Application.Modules.Catalog.Products;
 using WorkspaceEcommerce.Application.Modules.Catalog.Storefront;
 using WorkspaceEcommerce.Application.Modules.Content.Banners;
+using WorkspaceEcommerce.Application.Modules.Customers.Authentication;
+using WorkspaceEcommerce.Application.Modules.Customers.Orders;
+using WorkspaceEcommerce.Application.Modules.Customers.Profile;
 using WorkspaceEcommerce.Application.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Application;
@@ -23,6 +26,9 @@ public static class DependencyInjection
         services.AddScoped<IStorefrontCatalogService, StorefrontCatalogService>();
         services.AddScoped<IAdminBannerService, AdminBannerService>();
         services.AddScoped<IStorefrontBannerService, StorefrontBannerService>();
+        services.AddScoped<ICustomerAuthService, CustomerAuthService>();
+        services.AddScoped<ICustomerProfileService, CustomerProfileService>();
+        services.AddScoped<ICustomerOrderService, CustomerOrderService>();
         services.AddScoped<IStorefrontCartService, StorefrontCartService>();
         services.AddScoped<ICheckoutService, CheckoutService>();
         services.AddScoped<IStorefrontOrderLookupService, StorefrontOrderLookupService>();

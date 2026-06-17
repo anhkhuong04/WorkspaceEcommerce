@@ -23,6 +23,28 @@ internal static class ApiTestClientExtensions
         return token ?? throw new InvalidOperationException("Admin login response did not include an access token.");
     }
 
+    public static async Task<string> RegisterCustomerAsync(
+        this HttpClient client,
+        string email = "customer@example.com",
+        string password = "customer-password")
+    {
+        using var response = await client.PostAsJsonAsync(
+            "/api/customer/auth/register",
+            new
+            {
+                fullName = "Nguyen Van A",
+                phoneNumber = "0900000000",
+                email,
+                password
+            });
+        response.EnsureSuccessStatusCode();
+
+        var json = await response.ReadJsonAsync();
+        var token = json["data"]?["accessToken"]?.GetValue<string>();
+
+        return token ?? throw new InvalidOperationException("Customer register response did not include an access token.");
+    }
+
     public static void UseBearerToken(this HttpClient client, string token)
     {
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

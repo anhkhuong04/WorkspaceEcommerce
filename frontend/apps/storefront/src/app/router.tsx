@@ -1,5 +1,12 @@
 import { createBrowserRouter } from "react-router-dom";
 import { StorefrontLayout } from "../components/layout/StorefrontLayout";
+import { CustomerProtectedRoute } from "../features/customer-auth/CustomerProtectedRoute";
+import {
+  AccountOrderDetailPage,
+  AccountOrdersPage,
+  AccountOverviewPage,
+  AccountProfilePage
+} from "../pages/account/AccountPages";
 import { CartPage } from "../pages/cart/CartPage";
 import { CheckoutPage } from "../pages/checkout/CheckoutPage";
 import { CheckoutSuccessPage } from "../pages/checkout/CheckoutSuccessPage";
@@ -21,7 +28,39 @@ export const router = createBrowserRouter([
       { path: "checkout", element: <CheckoutPage /> },
       { path: "checkout/success", element: <CheckoutSuccessPage /> },
       { path: "login", element: <LoginPage /> },
-      { path: "orders/lookup", element: <OrderLookupPage /> }
+      { path: "orders/lookup", element: <OrderLookupPage /> },
+      {
+        path: "account",
+        element: (
+          <CustomerProtectedRoute>
+            <AccountOverviewPage />
+          </CustomerProtectedRoute>
+        )
+      },
+      {
+        path: "account/profile",
+        element: (
+          <CustomerProtectedRoute>
+            <AccountProfilePage />
+          </CustomerProtectedRoute>
+        )
+      },
+      {
+        path: "account/orders",
+        element: (
+          <CustomerProtectedRoute>
+            <AccountOrdersPage />
+          </CustomerProtectedRoute>
+        )
+      },
+      {
+        path: "account/orders/:id",
+        element: (
+          <CustomerProtectedRoute>
+            <AccountOrderDetailPage />
+          </CustomerProtectedRoute>
+        )
+      }
     ]
   }
 ]);

@@ -1,7 +1,37 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { z } from "zod";
+import { useCustomerAuth } from "../../features/customer-auth/useCustomerAuth";
+import { getApiErrorMessage } from "../../services/api/errors";
+import { storefrontApi } from "../../services/api/storefrontApi";
 
 type AuthMode = "login" | "register";
+
+const authSchema = z
+  .object({
+    fullName: z.string().optional(),
+    phoneNumber: z.string().optional(),
+    email: z.string().email("Enter a valid email.").max(250, "Email is too long."),
+    password: z.string().min(8, "Password must be at least 8 characters.").max(100, "Password is too long."),
+    confirmPassword: z.string().optional()
+  })
+  .superRefine((value, context) => {
+    if (value.fullName !== undefined && value.fullName.trim().length === 0) {
+      context.addIssue({ code: "custom", path: ["fullName"], message: "Full name is required." });
+    }
+
+    if (value.phoneNumber !== undefined && value.phoneNumber.trim().length < 8) {
+      context.addIssue({ code: "custom", path: ["phoneNumber"], message: "Phone number is invalid." });
+    }
+
+    if (value.confirmPassword !== undefined && value.password !== value.confirmPassword) {
+      context.addIssue({ code: "custom", path: ["confirmPassword"], message: "Passwords do not match." });
+    }
+  });
+
+type AuthFormValues = z.infer<typeof authSchema>;
 
 function MailIcon() {
   return (
@@ -17,6 +47,14 @@ function UserIcon() {
     <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
       <circle cx="12" cy="8" r="4" />
       <path d="M4.5 20c1.4-4 4-6 7.5-6s6.1 2 7.5 6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PhoneIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+      <path d="M7 4h3l1.5 4-2 1.2a11 11 0 0 0 5.3 5.3l1.2-2 4 1.5v3a2 2 0 0 1-2.2 2A16 16 0 0 1 5 6.2 2 2 0 0 1 7 4Z" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -40,60 +78,125 @@ function EyeIcon({ hidden }: { hidden: boolean }) {
   );
 }
 
-function GoogleIcon() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-      <path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.4a4.6 4.6 0 0 1-2 3v2.6h3.2c1.9-1.8 3-4.4 3-7.5Z" />
-      <path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.3l-3.2-2.6c-.9.6-2 1-3.4 1a5.8 5.8 0 0 1-5.5-4H3.2v2.6A10 10 0 0 0 12 22Z" />
-      <path fill="#FBBC05" d="M6.5 14.1a6 6 0 0 1 0-4.2V7.3H3.2a10 10 0 0 0 0 9.4l3.3-2.6Z" />
-      <path fill="#EA4335" d="M12 5.9c1.5 0 2.9.5 3.9 1.5l2.8-2.8A9.5 9.5 0 0 0 3.2 7.3l3.3 2.6a5.8 5.8 0 0 1 5.5-4Z" />
-    </svg>
-  );
-}
-
 interface TextFieldProps {
   label: string;
-  type: "text" | "email" | "password";
+  type: "text" | "email" | "password" | "tel";
   placeholder: string;
   autoComplete: string;
-  icon: "user" | "mail" | "lock";
+  icon: "user" | "mail" | "lock" | "phone";
+  error?: string;
   showPassword?: boolean;
   onTogglePassword?: () => void;
+  registration: ReturnType<typeof useForm<AuthFormValues>>["register"] extends (name: infer T) => infer R ? R : never;
 }
 
-function TextField({ label, type, placeholder, autoComplete, icon, showPassword, onTogglePassword }: TextFieldProps) {
+function TextField({ label, type, placeholder, autoComplete, icon, error, showPassword, onTogglePassword, registration }: TextFieldProps) {
   const resolvedType = type === "password" && showPassword ? "text" : type;
 
   return (
     <label className="block">
       <span className="mb-1.5 block text-sm font-semibold">{label}</span>
-      <span className="flex h-12 items-center gap-3 rounded-md border border-slate-300 px-4 text-slate-400 transition focus-within:border-slate-950 focus-within:ring-1 focus-within:ring-slate-950">
-        {icon === "user" ? <UserIcon /> : icon === "mail" ? <MailIcon /> : <LockIcon />}
-        <input type={resolvedType} autoComplete={autoComplete} placeholder={placeholder} className="min-w-0 flex-1 bg-transparent text-sm text-slate-950 outline-none placeholder:text-slate-400" />
+      <span className={`flex h-12 items-center gap-3 rounded-md border px-4 text-slate-400 transition focus-within:ring-1 ${error ? "border-red-400 bg-red-50 focus-within:ring-red-300" : "border-slate-300 focus-within:border-slate-950 focus-within:ring-slate-950"}`}>
+        {icon === "user" ? <UserIcon /> : icon === "mail" ? <MailIcon /> : icon === "phone" ? <PhoneIcon /> : <LockIcon />}
+        <input
+          type={resolvedType}
+          autoComplete={autoComplete}
+          placeholder={placeholder}
+          className="min-w-0 flex-1 bg-transparent text-sm text-slate-950 outline-none placeholder:text-slate-400"
+          {...registration}
+        />
         {type === "password" && onTogglePassword ? (
           <button type="button" onClick={onTogglePassword} className="grid h-8 w-8 place-items-center rounded-full transition hover:bg-slate-100" aria-label={showPassword ? "Hide password" : "Show password"}>
             <EyeIcon hidden={Boolean(showPassword)} />
           </button>
         ) : null}
       </span>
+      {error ? <span className="mt-1.5 block text-xs font-medium text-red-600">{error}</span> : null}
     </label>
   );
+}
+
+function getRedirectPath(state: unknown): string {
+  if (state && typeof state === "object" && "from" in state && typeof state.from === "string") {
+    return state.from;
+  }
+
+  return "/account";
 }
 
 export function LoginPage() {
   const [mode, setMode] = useState<AuthMode>("login");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const { isAuthenticated, signIn } = useCustomerAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const redirectPath = getRedirectPath(location.state);
   const isRegister = mode === "register";
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting }
+  } = useForm<AuthFormValues>({
+    resolver: zodResolver(authSchema),
+    defaultValues: {
+      fullName: undefined,
+      phoneNumber: undefined,
+      email: "",
+      password: "",
+      confirmPassword: undefined
+    }
+  });
+
+  useEffect(() => {
+    reset({
+      fullName: isRegister ? "" : undefined,
+      phoneNumber: isRegister ? "" : undefined,
+      email: "",
+      password: "",
+      confirmPassword: isRegister ? "" : undefined
+    });
+    setApiError(null);
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+  }, [isRegister, reset]);
+
+  async function onSubmit(values: AuthFormValues) {
+    setApiError(null);
+
+    try {
+      const response = isRegister
+        ? await storefrontApi.registerCustomer({
+            fullName: values.fullName?.trim() ?? "",
+            phoneNumber: values.phoneNumber?.trim() ?? "",
+            email: values.email.trim(),
+            password: values.password
+          })
+        : await storefrontApi.loginCustomer({
+            email: values.email.trim(),
+            password: values.password
+          });
+
+      signIn(response);
+      navigate(redirectPath, { replace: true });
+    } catch (error) {
+      setApiError(getApiErrorMessage(error));
+    }
+  }
 
   function switchMode(nextMode: AuthMode) {
     setMode(nextMode);
-    setShowPassword(false);
-    setShowConfirmPassword(false);
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to={redirectPath} replace />;
   }
 
   return (
-    <section className="min-h-screen bg-[#fafafa] text-slate-950 lg:grid lg:h-screen lg:min-h-[680px] lg:grid-cols-[45%_55%] lg:overflow-hidden">
+    <section className="min-h-screen bg-[#fafafa] text-slate-950 lg:grid lg:h-screen lg:min-h-[720px] lg:grid-cols-[45%_55%] lg:overflow-hidden">
       <div className="hidden h-full overflow-hidden border-r border-slate-200 lg:block">
         <img src="/demo/login-page.png" alt="WorkspaceEcom office" className="h-full w-full object-fill" />
       </div>
@@ -111,41 +214,29 @@ export function LoginPage() {
             </div>
 
             <div>
-              <h1 className="text-2xl font-bold tracking-[-0.03em] sm:text-3xl">{isRegister ? "Create your account" : "Sign in"}</h1>
-              <p className="mt-1.5 text-sm text-slate-500">{isRegister ? "Join WorkspaceEcom and start building your ideal workspace." : "Welcome back to WorkspaceEcom."}</p>
+              <h1 className="text-2xl font-bold sm:text-3xl">{isRegister ? "Create your account" : "Sign in"}</h1>
+              <p className="mt-1.5 text-sm text-slate-500">{isRegister ? "Save your details and track every order from one place." : "View your orders and continue checkout faster."}</p>
             </div>
 
-            <form className="mt-5" onSubmit={(event) => event.preventDefault()}>
+            <form className="mt-5" onSubmit={handleSubmit(onSubmit)}>
               <div className="grid gap-3.5">
-                {isRegister ? <TextField label="Full name" type="text" placeholder="Enter your full name" autoComplete="name" icon="user" /> : null}
-                <TextField label="Email" type="email" placeholder="Enter your email" autoComplete="email" icon="mail" />
-                <TextField label="Password" type="password" placeholder="Enter your password" autoComplete={isRegister ? "new-password" : "current-password"} icon="lock" showPassword={showPassword} onTogglePassword={() => setShowPassword((visible) => !visible)} />
-                {isRegister ? <TextField label="Confirm password" type="password" placeholder="Confirm your password" autoComplete="new-password" icon="lock" showPassword={showConfirmPassword} onTogglePassword={() => setShowConfirmPassword((visible) => !visible)} /> : null}
+                {isRegister ? (
+                  <>
+                    <TextField label="Full name" type="text" placeholder="Enter your full name" autoComplete="name" icon="user" error={errors.fullName?.message} registration={register("fullName")} />
+                    <TextField label="Phone number" type="tel" placeholder="Enter your phone number" autoComplete="tel" icon="phone" error={errors.phoneNumber?.message} registration={register("phoneNumber")} />
+                  </>
+                ) : null}
+                <TextField label="Email" type="email" placeholder="Enter your email" autoComplete="email" icon="mail" error={errors.email?.message} registration={register("email")} />
+                <TextField label="Password" type="password" placeholder="Enter your password" autoComplete={isRegister ? "new-password" : "current-password"} icon="lock" error={errors.password?.message} showPassword={showPassword} onTogglePassword={() => setShowPassword((visible) => !visible)} registration={register("password")} />
+                {isRegister ? (
+                  <TextField label="Confirm password" type="password" placeholder="Confirm your password" autoComplete="new-password" icon="lock" error={errors.confirmPassword?.message} showPassword={showConfirmPassword} onTogglePassword={() => setShowConfirmPassword((visible) => !visible)} registration={register("confirmPassword")} />
+                ) : null}
               </div>
 
-              {isRegister ? (
-                <label className="mt-4 flex items-start gap-2.5 text-xs leading-5 text-slate-500">
-                  <input type="checkbox" required className="mt-0.5 h-4 w-4 shrink-0 accent-slate-950" />
-                  <span>I agree to the Terms of Service and Privacy Policy.</span>
-                </label>
-              ) : (
-                <div className="mt-4 flex items-center justify-between gap-4 text-xs">
-                  <label className="flex items-center gap-2 text-slate-600"><input type="checkbox" className="h-4 w-4 accent-slate-950" />Remember me</label>
-                  <button type="button" className="font-medium underline underline-offset-4">Forgot password?</button>
-                </div>
-              )}
+              {apiError ? <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{apiError}</div> : null}
 
-              <button type="submit" className="mt-5 h-12 w-full rounded-md bg-[#111111] text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2">
-                {isRegister ? "Create account" : "Sign in"}
-              </button>
-
-              <div className="my-5 grid grid-cols-[1fr_auto_1fr] items-center gap-4 text-xs font-medium uppercase text-slate-400">
-                <span className="h-px bg-slate-200" />Or<span className="h-px bg-slate-200" />
-              </div>
-
-              <button type="button" className="flex h-12 w-full items-center justify-center gap-3 rounded-md border border-slate-300 bg-white text-sm font-semibold transition hover:bg-slate-50">
-                <GoogleIcon />
-                {isRegister ? "Register with Google" : "Continue with Google"}
+              <button type="submit" disabled={isSubmitting} className="mt-5 h-12 w-full rounded-md bg-[#111111] text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
+                {isSubmitting ? "Please wait..." : isRegister ? "Create account" : "Sign in"}
               </button>
             </form>
 

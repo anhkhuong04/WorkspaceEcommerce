@@ -7,7 +7,8 @@ using WorkspaceEcommerce.Application.Modules.Admin.Dashboard;
 namespace WorkspaceEcommerce.Api.Controllers.Admin;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin")]
+[ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
 [Route("api/admin/dashboard")]
 public sealed class DashboardController(IAdminDashboardService dashboardService) : ControllerBase
 {
