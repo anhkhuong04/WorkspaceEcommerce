@@ -8,11 +8,26 @@ export interface CheckoutRequest {
   customerEmail?: string | null;
   shippingAddress: string;
   note?: string | null;
+  couponCode?: string | null;
   paymentMethod: PaymentMethod;
 }
 
 export interface CheckoutResponse {
   order: OrderDto;
+}
+
+export interface ValidateCheckoutCouponRequest {
+  sessionId: string;
+  couponCode: string;
+}
+
+export interface CheckoutCouponValidationResponse {
+  couponCode: string;
+  discountAmount: number;
+  eligibleSubtotal: number;
+  subtotal: number;
+  totalAmount: number;
+  message: string;
 }
 
 export interface OrderItemDto {
@@ -35,6 +50,9 @@ export interface OrderDto {
   customerEmail: string | null;
   shippingAddress: string;
   note: string | null;
+  couponId: string | null;
+  couponCodeSnapshot: string | null;
+  couponNameSnapshot: string | null;
   subtotal: number;
   shippingFee: number;
   discountAmount: number;
@@ -42,6 +60,7 @@ export interface OrderDto {
   status: OrderStatus;
   paymentMethod: PaymentMethod;
   createdAt: string;
+  updatedAt: string;
   items: OrderItemDto[];
 }
 

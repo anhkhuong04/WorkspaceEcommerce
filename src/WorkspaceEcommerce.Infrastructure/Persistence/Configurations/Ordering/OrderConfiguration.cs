@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using WorkspaceEcommerce.Domain.Modules.Customers;
+using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Infrastructure.Persistence.Configurations.Ordering;
@@ -47,6 +48,17 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(order => order.Note)
             .HasColumnName("note")
             .HasMaxLength(1000);
+
+        builder.Property(order => order.CouponId)
+            .HasColumnName("coupon_id");
+
+        builder.Property(order => order.CouponCodeSnapshot)
+            .HasColumnName("coupon_code_snapshot")
+            .HasMaxLength(50);
+
+        builder.Property(order => order.CouponNameSnapshot)
+            .HasColumnName("coupon_name_snapshot")
+            .HasMaxLength(250);
 
         builder.Property(order => order.Subtotal)
             .HasColumnName("subtotal")
@@ -98,12 +110,20 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasIndex(order => order.CustomerId)
             .HasDatabaseName("ix_orders_customer_id");
 
+        builder.HasIndex(order => order.CouponId)
+            .HasDatabaseName("ix_orders_coupon_id");
+
         builder.HasIndex(order => order.Status)
             .HasDatabaseName("ix_orders_status");
 
         builder.HasOne<Customer>()
             .WithMany()
             .HasForeignKey(order => order.CustomerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Coupon>()
+            .WithMany()
+            .HasForeignKey(order => order.CouponId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(order => order.Items)

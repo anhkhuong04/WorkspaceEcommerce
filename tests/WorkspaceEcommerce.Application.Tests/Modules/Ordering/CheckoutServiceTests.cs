@@ -3,6 +3,7 @@ using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Ordering;
 using WorkspaceEcommerce.Application.Tests.Common.Fakes;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
+using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using CartAggregate = WorkspaceEcommerce.Domain.Modules.Cart.Cart;
 
@@ -157,15 +158,110 @@ public sealed class CheckoutServiceTests
         Assert.Equal(PaymentMethod.ManualBankTransfer, result.Value.Order.PaymentMethod);
     }
 
+    [Fact]
+    public async Task ValidateCouponAsync_ValidCoupon_ReturnsDiscountPreview()
+    {
+        var store = new FakeCheckoutStore();
+        var variant = SeedVisibleVariant(store);
+        SeedCart(store, variant.Id, quantity: 2, unitPriceSnapshot: 100m);
+        store.Seed(CreateCoupon("SAVE10", CouponDiscountType.Percentage, 10m));
+        var service = CreateService(store);
+
+        var result = await service.ValidateCouponAsync(new ValidateCheckoutCouponRequest
+        {
+            SessionId = "session-1",
+            CouponCode = " save10 "
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal("SAVE10", result.Value.CouponCode);
+        Assert.Equal(200m, result.Value.Subtotal);
+        Assert.Equal(200m, result.Value.EligibleSubtotal);
+        Assert.Equal(20m, result.Value.DiscountAmount);
+        Assert.Equal(180m, result.Value.TotalAmount);
+        Assert.Equal(0, store.Coupons.Single().UsedCount);
+    }
+
+    [Fact]
+    public async Task ValidateCouponAsync_TargetedCouponWithoutEligibleItems_ReturnsValidation()
+    {
+        var store = new FakeCheckoutStore();
+        var variant = SeedVisibleVariant(store);
+        SeedCart(store, variant.Id);
+        var coupon = CreateCoupon("TARGET10", CouponDiscountType.Percentage, 10m);
+        store.Seed(coupon);
+        store.Seed(new CouponProductTarget(Guid.NewGuid(), coupon.Id, Guid.NewGuid()));
+        var service = CreateService(store);
+
+        var result = await service.ValidateCouponAsync(new ValidateCheckoutCouponRequest
+        {
+            SessionId = "session-1",
+            CouponCode = "TARGET10"
+        });
+
+        Assert.Equal(ResultStatus.Validation, result.Status);
+        Assert.Contains("Coupon does not apply to items in cart.", result.Errors);
+    }
+
+    [Fact]
+    public async Task CheckoutAsync_WithCoupon_AppliesDiscountStoresSnapshotAndCreatesRedemption()
+    {
+        var store = new FakeCheckoutStore();
+        var variant = SeedVisibleVariant(store);
+        SeedCart(store, variant.Id, quantity: 2, unitPriceSnapshot: 100m);
+        var coupon = CreateCoupon("SAVE25", CouponDiscountType.FixedAmount, 25m);
+        store.Seed(coupon);
+        var service = CreateService(store);
+
+        var result = await service.CheckoutAsync(CreateRequest(couponCode: "save25"));
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        var order = result.Value.Order;
+        Assert.Equal(coupon.Id, order.CouponId);
+        Assert.Equal("SAVE25", order.CouponCodeSnapshot);
+        Assert.Equal("Save coupon", order.CouponNameSnapshot);
+        Assert.Equal(25m, order.DiscountAmount);
+        Assert.Equal(175m, order.TotalAmount);
+        Assert.Equal(1, coupon.UsedCount);
+        var redemption = Assert.Single(store.CouponRedemptions);
+        Assert.Equal(coupon.Id, redemption.CouponId);
+        Assert.Equal(store.Orders.Single().Id, redemption.OrderId);
+        Assert.Equal("SAVE25", redemption.CodeSnapshot);
+    }
+
+    [Fact]
+    public async Task CheckoutAsync_CouponUsageLimitReached_ReturnsConflict()
+    {
+        var store = new FakeCheckoutStore();
+        var variant = SeedVisibleVariant(store);
+        SeedCart(store, variant.Id);
+        var coupon = CreateCoupon("LIMIT1", CouponDiscountType.Percentage, 10m, usageLimit: 1);
+        coupon.ReserveUsage();
+        store.Seed(coupon);
+        var service = CreateService(store);
+
+        var result = await service.CheckoutAsync(CreateRequest(couponCode: "LIMIT1"));
+
+        Assert.Equal(ResultStatus.Conflict, result.Status);
+        Assert.Contains("Coupon usage limit has been reached.", result.Errors);
+        Assert.Empty(store.Orders);
+        Assert.Empty(store.CouponRedemptions);
+    }
+
     private static CheckoutService CreateService(FakeCheckoutStore store, Guid? customerId = null)
     {
         return new CheckoutService(
             store,
             new StubCurrentCustomerContext(customerId),
-            new CheckoutRequestValidator());
+            new CheckoutRequestValidator(),
+            new ValidateCheckoutCouponRequestValidator());
     }
 
-    private static CheckoutRequest CreateRequest(PaymentMethod paymentMethod = PaymentMethod.Cod)
+    private static CheckoutRequest CreateRequest(
+        PaymentMethod paymentMethod = PaymentMethod.Cod,
+        string? couponCode = null)
     {
         return new CheckoutRequest
         {
@@ -175,7 +271,8 @@ public sealed class CheckoutServiceTests
             CustomerEmail = "customer@example.com",
             ShippingAddress = "123 Shipping Street",
             Note = "Call before delivery",
-            PaymentMethod = paymentMethod
+            PaymentMethod = paymentMethod,
+            CouponCode = couponCode
         };
     }
 
@@ -219,6 +316,26 @@ public sealed class CheckoutServiceTests
         store.Seed(variant);
 
         return variant;
+    }
+
+    private static Coupon CreateCoupon(
+        string code,
+        CouponDiscountType discountType,
+        decimal discountValue,
+        int? usageLimit = null)
+    {
+        return new Coupon(
+            Guid.NewGuid(),
+            code,
+            "Save coupon",
+            null,
+            discountType,
+            discountValue,
+            null,
+            null,
+            null,
+            null,
+            usageLimit);
     }
 
     private sealed class StubCurrentCustomerContext(Guid? customerId) : ICurrentCustomerContext

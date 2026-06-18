@@ -4,6 +4,7 @@ using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
+using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using CartAggregate = WorkspaceEcommerce.Domain.Modules.Cart.Cart;
 
@@ -12,8 +13,55 @@ namespace WorkspaceEcommerce.Application.Modules.Ordering;
 internal sealed class CheckoutService(
     ICheckoutStore checkoutStore,
     ICurrentCustomerContext currentCustomer,
-    IValidator<CheckoutRequest> validator) : ICheckoutService
+    IValidator<CheckoutRequest> validator,
+    IValidator<ValidateCheckoutCouponRequest> couponValidator) : ICheckoutService
 {
+    public async Task<Result<CheckoutCouponValidationResponse>> ValidateCouponAsync(
+        ValidateCheckoutCouponRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var validationResult = await couponValidator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return Result<CheckoutCouponValidationResponse>.Validation(
+                validationResult.Errors.Select(error => error.ErrorMessage));
+        }
+
+        var sessionId = NormalizeSessionId(request.SessionId);
+        var cart = await checkoutStore.FindCartBySessionIdAsync(sessionId, cancellationToken);
+        if (cart is null || cart.Items.Count == 0)
+        {
+            return Result<CheckoutCouponValidationResponse>.Validation(["Cart is empty."]);
+        }
+
+        var itemSnapshotsResult = await BuildItemSnapshotsAsync(cart, cancellationToken);
+        if (itemSnapshotsResult.IsFailure)
+        {
+            return ToCouponValidationFailure(itemSnapshotsResult);
+        }
+
+        var snapshots = itemSnapshotsResult.Value!;
+        var evaluationResult = await EvaluateCouponAsync(
+            request.CouponCode,
+            snapshots,
+            lockCoupon: false,
+            cancellationToken);
+        if (evaluationResult.IsFailure)
+        {
+            return ToCouponValidationFailure(evaluationResult);
+        }
+
+        var evaluation = evaluationResult.Value!;
+
+        return Result<CheckoutCouponValidationResponse>.Success(new CheckoutCouponValidationResponse(
+            evaluation.Coupon.Code,
+            evaluation.DiscountAmount,
+            evaluation.EligibleSubtotal,
+            evaluation.Subtotal,
+            evaluation.Subtotal - evaluation.DiscountAmount,
+            "Coupon applied."));
+    }
+
     public async Task<Result<CheckoutResponse>> CheckoutAsync(
         CheckoutRequest request,
         CancellationToken cancellationToken = default)
@@ -45,11 +93,54 @@ internal sealed class CheckoutService(
                 }
 
                 var snapshots = itemSnapshotsResult.Value!;
+                CheckoutCouponEvaluation? couponEvaluation = null;
+                var normalizedCouponCode = NormalizeOptionalCouponCode(request.CouponCode);
+                if (normalizedCouponCode is not null)
+                {
+                    var couponEvaluationResult = await EvaluateCouponAsync(
+                        normalizedCouponCode,
+                        snapshots,
+                        lockCoupon: true,
+                        transactionCancellationToken);
+                    if (couponEvaluationResult.IsFailure)
+                    {
+                        failure = ToCheckoutFailure(couponEvaluationResult);
+                        return;
+                    }
+
+                    couponEvaluation = couponEvaluationResult.Value!;
+                }
+
                 order = await CreateOrderAsync(
                     request,
                     currentCustomer.CustomerId,
                     snapshots,
                     transactionCancellationToken);
+
+                if (couponEvaluation is not null)
+                {
+                    if (IsUsageLimitReached(couponEvaluation.Coupon))
+                    {
+                        failure = Result<CheckoutResponse>.Conflict("Coupon usage limit has been reached.");
+                        return;
+                    }
+
+                    order.ApplyCoupon(
+                        couponEvaluation.Coupon.Id,
+                        couponEvaluation.Coupon.Code,
+                        couponEvaluation.Coupon.Name,
+                        couponEvaluation.DiscountAmount);
+                    couponEvaluation.Coupon.ReserveUsage();
+                    checkoutStore.Update(couponEvaluation.Coupon);
+                    checkoutStore.Add(new CouponRedemption(
+                        Guid.NewGuid(),
+                        couponEvaluation.Coupon.Id,
+                        order.Id,
+                        currentCustomer.CustomerId,
+                        order.CustomerPhone,
+                        couponEvaluation.Coupon.Code,
+                        couponEvaluation.DiscountAmount));
+                }
 
                 foreach (var snapshot in snapshots)
                 {
@@ -108,6 +199,7 @@ internal sealed class CheckoutService(
 
             snapshots.Add(new CheckoutItemSnapshot(
                 variant,
+                product.Id,
                 product.Name,
                 variant.Sku,
                 cartItem.UnitPriceSnapshot,
@@ -116,6 +208,60 @@ internal sealed class CheckoutService(
         }
 
         return Result<IReadOnlyCollection<CheckoutItemSnapshot>>.Success(snapshots);
+    }
+
+    private async Task<Result<CheckoutCouponEvaluation>> EvaluateCouponAsync(
+        string couponCode,
+        IReadOnlyCollection<CheckoutItemSnapshot> snapshots,
+        bool lockCoupon,
+        CancellationToken cancellationToken)
+    {
+        var normalizedCouponCode = NormalizeOptionalCouponCode(couponCode);
+        if (normalizedCouponCode is null)
+        {
+            return Result<CheckoutCouponEvaluation>.Validation(["Coupon code is required."]);
+        }
+
+        var coupon = lockCoupon
+            ? await checkoutStore.FindCouponByCodeForUpdateAsync(normalizedCouponCode, cancellationToken)
+            : await checkoutStore.FindCouponByCodeAsync(normalizedCouponCode, cancellationToken);
+        if (coupon is null)
+        {
+            return Result<CheckoutCouponEvaluation>.Validation(["Coupon was not found."]);
+        }
+
+        var availabilityResult = ValidateCouponAvailability(coupon, DateTimeOffset.UtcNow);
+        if (availabilityResult.IsFailure)
+        {
+            return availabilityResult.Status == ResultStatus.Conflict
+                ? Result<CheckoutCouponEvaluation>.Conflict(availabilityResult.FirstError ?? "A conflict occurred.")
+                : Result<CheckoutCouponEvaluation>.Validation(availabilityResult.Errors);
+        }
+
+        var productTargetIds = await checkoutStore.FindCouponProductTargetIdsAsync(coupon.Id, cancellationToken);
+        var productTargetSet = productTargetIds.ToHashSet();
+        var eligibleSubtotal = snapshots
+            .Where(snapshot => productTargetSet.Count == 0 || productTargetSet.Contains(snapshot.ProductId))
+            .Sum(snapshot => snapshot.LineTotal);
+        if (eligibleSubtotal <= 0m)
+        {
+            return Result<CheckoutCouponEvaluation>.Validation(["Coupon does not apply to items in cart."]);
+        }
+
+        try
+        {
+            var discountAmount = coupon.CalculateDiscount(eligibleSubtotal);
+
+            return Result<CheckoutCouponEvaluation>.Success(new CheckoutCouponEvaluation(
+                coupon,
+                eligibleSubtotal,
+                snapshots.Sum(snapshot => snapshot.LineTotal),
+                discountAmount));
+        }
+        catch (DomainException exception)
+        {
+            return Result<CheckoutCouponEvaluation>.Validation([exception.Message]);
+        }
     }
 
     private async Task<Order> CreateOrderAsync(
@@ -177,6 +323,9 @@ internal sealed class CheckoutService(
             order.CustomerEmail,
             order.ShippingAddress,
             order.Note,
+            order.CouponId,
+            order.CouponCodeSnapshot,
+            order.CouponNameSnapshot,
             order.Subtotal,
             order.ShippingFee,
             order.DiscountAmount,
@@ -213,16 +362,75 @@ internal sealed class CheckoutService(
         };
     }
 
+    private static Result<CheckoutCouponValidationResponse> ToCouponValidationFailure<T>(Result<T> result)
+    {
+        return result.Status switch
+        {
+            ResultStatus.Validation => Result<CheckoutCouponValidationResponse>.Validation(result.Errors),
+            ResultStatus.NotFound => Result<CheckoutCouponValidationResponse>.NotFound(result.FirstError ?? "Resource was not found."),
+            ResultStatus.Conflict => Result<CheckoutCouponValidationResponse>.Conflict(result.FirstError ?? "A conflict occurred."),
+            ResultStatus.Unauthorized => Result<CheckoutCouponValidationResponse>.Unauthorized(result.FirstError ?? "Unauthorized."),
+            _ => Result<CheckoutCouponValidationResponse>.Failure(result.Errors)
+        };
+    }
+
+    private static Result ValidateCouponAvailability(Coupon coupon, DateTimeOffset at)
+    {
+        if (!coupon.IsActive)
+        {
+            return Result.Validation(["Coupon is inactive."]);
+        }
+
+        if (coupon.StartsAt is not null && at < coupon.StartsAt.Value)
+        {
+            return Result.Validation(["Coupon has not started."]);
+        }
+
+        if (coupon.EndsAt is not null && at > coupon.EndsAt.Value)
+        {
+            return Result.Validation(["Coupon has expired."]);
+        }
+
+        if (IsUsageLimitReached(coupon))
+        {
+            return Result.Conflict("Coupon usage limit has been reached.");
+        }
+
+        return Result.Success();
+    }
+
+    private static bool IsUsageLimitReached(Coupon coupon)
+    {
+        return coupon.UsageLimit is not null && coupon.UsedCount >= coupon.UsageLimit.Value;
+    }
+
     private static string NormalizeSessionId(string sessionId)
     {
         return sessionId.Trim();
     }
 
+    private static string? NormalizeOptionalCouponCode(string? couponCode)
+    {
+        return string.IsNullOrWhiteSpace(couponCode)
+            ? null
+            : couponCode.Trim().ToUpperInvariant();
+    }
+
     private sealed record CheckoutItemSnapshot(
         ProductVariant Variant,
+        Guid ProductId,
         string ProductNameSnapshot,
         string SkuSnapshot,
         decimal UnitPrice,
         int Quantity,
-        bool RequiresInstallation);
+        bool RequiresInstallation)
+    {
+        public decimal LineTotal => UnitPrice * Quantity;
+    }
+
+    private sealed record CheckoutCouponEvaluation(
+        Coupon Coupon,
+        decimal EligibleSubtotal,
+        decimal Subtotal,
+        decimal DiscountAmount);
 }

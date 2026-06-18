@@ -47,6 +47,9 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         await dbContext.Database.ExecuteSqlRawAsync(
             """
             TRUNCATE TABLE
+                promotions.coupon_redemptions,
+                promotions.coupon_product_targets,
+                promotions.coupons,
                 content.banners,
                 ordering.order_status_history,
                 ordering.order_items,

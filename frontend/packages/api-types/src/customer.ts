@@ -70,6 +70,9 @@ export interface CustomerOrderDto {
   customerEmail: string | null;
   shippingAddress: string;
   note: string | null;
+  couponId?: string | null;
+  couponCodeSnapshot?: string | null;
+  couponNameSnapshot?: string | null;
   subtotal: number;
   shippingFee: number;
   discountAmount: number;

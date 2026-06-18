@@ -1,5 +1,6 @@
 ﻿import type { PaginationRequest } from "./common";
 import type { OrderStatus, PaymentMethod, OrderItemDto } from "./orders";
+import type { CouponDiscountType } from "./coupons";
 
 export interface AdminLoginRequest {
   email: string;
@@ -142,6 +143,9 @@ export interface AdminOrderDto extends AdminOrderListItemDto {
   customerEmail: string | null;
   shippingAddress: string;
   note: string | null;
+  couponId?: string | null;
+  couponCodeSnapshot?: string | null;
+  couponNameSnapshot?: string | null;
   subtotal: number;
   shippingFee: number;
   discountAmount: number;
@@ -152,6 +156,51 @@ export interface AdminOrderDto extends AdminOrderListItemDto {
 export interface UpdateOrderStatusRequest {
   status: OrderStatus;
   note?: string | null;
+}
+
+export interface AdminCouponListRequest extends PaginationRequest {
+  search?: string;
+  isActive?: boolean;
+  effectiveAt?: string;
+}
+
+export interface AdminCouponDto {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  discountType: CouponDiscountType;
+  discountValue: number;
+  maxDiscountAmount: number | null;
+  minimumSubtotal: number | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  usageLimit: number | null;
+  usedCount: number;
+  redemptionCount: number;
+  isActive: boolean;
+  productTargetIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminCouponUpsertRequest {
+  code: string;
+  name: string;
+  description?: string | null;
+  discountType: CouponDiscountType;
+  discountValue: number;
+  maxDiscountAmount?: number | null;
+  minimumSubtotal?: number | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  usageLimit?: number | null;
+  isActive: boolean;
+  productTargetIds: string[];
+}
+
+export interface UpdateCouponStatusRequest {
+  isActive: boolean;
 }
 
 export interface AdminBannerDto {

@@ -31,9 +31,25 @@ public sealed class CheckoutRequestValidator : AbstractValidator<CheckoutRequest
         RuleFor(request => request.Note)
             .MaximumLength(1000);
 
+        RuleFor(request => request.CouponCode)
+            .MaximumLength(50)
+            .Must(BeValidCouponCode)
+            .WithMessage("Coupon code must use letters, numbers, underscores, or hyphens.")
+            .When(request => !string.IsNullOrWhiteSpace(request.CouponCode));
+
         RuleFor(request => request.PaymentMethod)
             .IsInEnum()
             .Must(method => method is PaymentMethod.Cod or PaymentMethod.ManualBankTransfer)
             .WithMessage("Payment method is not supported.");
+    }
+
+    private static bool BeValidCouponCode(string? code)
+    {
+        var normalizedCode = code?.Trim();
+
+        return !string.IsNullOrEmpty(normalizedCode) &&
+            normalizedCode.All(character =>
+                char.IsAsciiLetterOrDigit(character) ||
+                character is '_' or '-');
     }
 }

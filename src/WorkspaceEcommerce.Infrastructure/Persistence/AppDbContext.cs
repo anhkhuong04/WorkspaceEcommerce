@@ -4,6 +4,7 @@ using WorkspaceEcommerce.Domain.Modules.Cart;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Content;
 using WorkspaceEcommerce.Domain.Modules.Customers;
+using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Infrastructure.Persistence;
@@ -35,6 +36,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<Customer> Customers => Set<Customer>();
 
+    public DbSet<Coupon> Coupons => Set<Coupon>();
+
+    public DbSet<CouponProductTarget> CouponProductTargets => Set<CouponProductTarget>();
+
+    public DbSet<CouponRedemption> CouponRedemptions => Set<CouponRedemption>();
+
     IQueryable<Category> IAppDbContext.Categories => Categories;
 
     IQueryable<Product> IAppDbContext.Products => Products;
@@ -48,6 +55,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     IQueryable<Banner> IAppDbContext.Banners => Banners;
 
     IQueryable<Customer> IAppDbContext.Customers => Customers;
+
+    IQueryable<Coupon> IAppDbContext.Coupons => Coupons;
+
+    IQueryable<CouponProductTarget> IAppDbContext.CouponProductTargets => CouponProductTargets;
+
+    IQueryable<CouponRedemption> IAppDbContext.CouponRedemptions => CouponRedemptions;
 
     IQueryable<Order> IAppDbContext.Orders => Orders;
 
@@ -130,6 +143,33 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     {
         return await Categories
             .FirstOrDefaultAsync(category => category.Id == id, cancellationToken);
+    }
+
+    async Task<Coupon?> ICheckoutStore.FindCouponByCodeAsync(
+        string code,
+        CancellationToken cancellationToken)
+    {
+        return await Coupons
+            .FirstOrDefaultAsync(coupon => coupon.Code == code, cancellationToken);
+    }
+
+    async Task<Coupon?> ICheckoutStore.FindCouponByCodeForUpdateAsync(
+        string code,
+        CancellationToken cancellationToken)
+    {
+        return await Coupons
+            .FromSqlInterpolated($"SELECT * FROM promotions.coupons WHERE code = {code} FOR UPDATE")
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    async Task<IReadOnlyCollection<Guid>> ICheckoutStore.FindCouponProductTargetIdsAsync(
+        Guid couponId,
+        CancellationToken cancellationToken)
+    {
+        return await CouponProductTargets
+            .Where(target => target.CouponId == couponId)
+            .Select(target => target.ProductId)
+            .ToArrayAsync(cancellationToken);
     }
 
     async Task<bool> ICheckoutStore.OrderCodeExistsAsync(

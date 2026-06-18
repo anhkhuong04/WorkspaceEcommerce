@@ -7,6 +7,7 @@ using WorkspaceEcommerce.Application.Modules.Catalog.Categories;
 using WorkspaceEcommerce.Application.Modules.Catalog.Products;
 using WorkspaceEcommerce.Application.Modules.Catalog.Storefront;
 using WorkspaceEcommerce.Application.Modules.Content.Banners;
+using WorkspaceEcommerce.Application.Modules.Coupons;
 using WorkspaceEcommerce.Application.Modules.Customers.Authentication;
 using WorkspaceEcommerce.Application.Modules.Customers.Orders;
 using WorkspaceEcommerce.Application.Modules.Customers.Profile;
@@ -33,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<ICheckoutService, CheckoutService>();
         services.AddScoped<IStorefrontOrderLookupService, StorefrontOrderLookupService>();
         services.AddScoped<IAdminOrderService, AdminOrderService>();
+        services.AddScoped<IAdminCouponService, AdminCouponService>();
 
         return services;
     }

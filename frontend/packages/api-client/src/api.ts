@@ -4,6 +4,9 @@
   AdminBannerUpsertRequest,
   AdminCategoryDto,
   AdminCategoryUpsertRequest,
+  AdminCouponDto,
+  AdminCouponListRequest,
+  AdminCouponUpsertRequest,
   AdminDashboardDto,
   AdminLoginRequest,
   AdminLoginResponse,
@@ -19,6 +22,7 @@
   AdminProductVariantDto,
   AdminProductVariantUpsertRequest,
   CartDto,
+  CheckoutCouponValidationResponse,
   CheckoutRequest,
   CheckoutResponse,
   CustomerAuthResponse,
@@ -36,9 +40,11 @@
   StorefrontCategoryDto,
   StorefrontProductDetailDto,
   StorefrontProductListItemDto,
+  UpdateCouponStatusRequest,
   UpdateCustomerProfileRequest,
   UpdateCartItemRequest,
-  UpdateOrderStatusRequest
+  UpdateOrderStatusRequest,
+  ValidateCheckoutCouponRequest
 } from "@workspace-ecommerce/api-types";
 import { ApiClient } from "./httpClient";
 
@@ -72,6 +78,8 @@ export function createStorefrontApi(client: ApiClient) {
     removeCartItem: (itemId: string, sessionId: string) =>
       client.delete<CartDto>(`/api/cart/items/${itemId}${buildQuery({ sessionId })}`),
     checkout: (request: CheckoutRequest) => client.post<CheckoutResponse, CheckoutRequest>("/api/checkout", request),
+    validateCheckoutCoupon: (request: ValidateCheckoutCouponRequest) =>
+      client.post<CheckoutCouponValidationResponse, ValidateCheckoutCouponRequest>("/api/checkout/coupons/validate", request),
     lookupOrder: (request: OrderLookupRequest) => client.get<OrderLookupResponse>(`/api/orders/lookup${buildQuery(request)}`),
     registerCustomer: (request: CustomerRegisterRequest) =>
       client.post<CustomerAuthResponse, CustomerRegisterRequest>("/api/customer/auth/register", request),
@@ -120,6 +128,16 @@ export function createAdminApi(client: ApiClient) {
     getOrder: (id: string) => client.get<AdminOrderDto>(`/api/admin/orders/${id}`),
     updateOrderStatus: (id: string, request: UpdateOrderStatusRequest) =>
       client.put<AdminOrderDto, UpdateOrderStatusRequest>(`/api/admin/orders/${id}/status`, request),
+    getCoupons: (request: AdminCouponListRequest = {}) =>
+      client.get<PagedResult<AdminCouponDto>>(`/api/admin/coupons${buildQuery(request)}`),
+    getCoupon: (id: string) => client.get<AdminCouponDto>(`/api/admin/coupons/${id}`),
+    createCoupon: (request: AdminCouponUpsertRequest) =>
+      client.post<AdminCouponDto, AdminCouponUpsertRequest>("/api/admin/coupons", request),
+    updateCoupon: (id: string, request: AdminCouponUpsertRequest) =>
+      client.put<AdminCouponDto, AdminCouponUpsertRequest>(`/api/admin/coupons/${id}`, request),
+    updateCouponStatus: (id: string, request: UpdateCouponStatusRequest) =>
+      client.patch<AdminCouponDto, UpdateCouponStatusRequest>(`/api/admin/coupons/${id}/status`, request),
+    deleteCoupon: (id: string) => client.delete<AdminCouponDto>(`/api/admin/coupons/${id}`),
     getBanners: () => client.get<AdminBannerDto[]>("/api/admin/banners"),
     createBanner: (request: AdminBannerUpsertRequest) =>
       client.post<AdminBannerDto, AdminBannerUpsertRequest>("/api/admin/banners", request),

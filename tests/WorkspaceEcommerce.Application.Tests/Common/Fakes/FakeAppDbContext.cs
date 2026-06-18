@@ -2,6 +2,7 @@ using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Content;
 using WorkspaceEcommerce.Domain.Modules.Customers;
+using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Application.Tests.Common.Fakes;
@@ -15,6 +16,9 @@ internal sealed class FakeAppDbContext : IAppDbContext
     private readonly List<ProductSpecification> _productSpecifications = [];
     private readonly List<Banner> _banners = [];
     private readonly List<Customer> _customers = [];
+    private readonly List<Coupon> _coupons = [];
+    private readonly List<CouponProductTarget> _couponProductTargets = [];
+    private readonly List<CouponRedemption> _couponRedemptions = [];
     private readonly List<Order> _orders = [];
     private readonly List<OrderItem> _orderItems = [];
     private readonly List<OrderStatusHistory> _orderStatusHistories = [];
@@ -32,6 +36,12 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public IQueryable<Banner> Banners => _banners.AsQueryable();
 
     public IQueryable<Customer> Customers => _customers.AsQueryable();
+
+    public IQueryable<Coupon> Coupons => _coupons.AsQueryable();
+
+    public IQueryable<CouponProductTarget> CouponProductTargets => _couponProductTargets.AsQueryable();
+
+    public IQueryable<CouponRedemption> CouponRedemptions => _couponRedemptions.AsQueryable();
 
     public IQueryable<Order> Orders => _orders.AsQueryable();
 
@@ -74,6 +84,22 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public void Seed(params Customer[] customers)
     {
         _customers.AddRange(customers);
+    }
+
+    public void Seed(params Coupon[] coupons)
+    {
+        _coupons.AddRange(coupons);
+        _couponProductTargets.AddRange(coupons.SelectMany(coupon => coupon.ProductTargets));
+    }
+
+    public void Seed(params CouponProductTarget[] couponProductTargets)
+    {
+        _couponProductTargets.AddRange(couponProductTargets);
+    }
+
+    public void Seed(params CouponRedemption[] couponRedemptions)
+    {
+        _couponRedemptions.AddRange(couponRedemptions);
     }
 
     public void Seed(params Order[] orders)
@@ -159,6 +185,21 @@ internal sealed class FakeAppDbContext : IAppDbContext
         if (typeof(TEntity) == typeof(Customer))
         {
             return (List<TEntity>)(object)_customers;
+        }
+
+        if (typeof(TEntity) == typeof(Coupon))
+        {
+            return (List<TEntity>)(object)_coupons;
+        }
+
+        if (typeof(TEntity) == typeof(CouponProductTarget))
+        {
+            return (List<TEntity>)(object)_couponProductTargets;
+        }
+
+        if (typeof(TEntity) == typeof(CouponRedemption))
+        {
+            return (List<TEntity>)(object)_couponRedemptions;
         }
 
         if (typeof(TEntity) == typeof(Order))

@@ -48,6 +48,12 @@ public sealed class Order : Entity
 
     public string? Note { get; private set; }
 
+    public Guid? CouponId { get; private set; }
+
+    public string? CouponCodeSnapshot { get; private set; }
+
+    public string? CouponNameSnapshot { get; private set; }
+
     public decimal Subtotal { get; private set; }
 
     public decimal ShippingFee { get; private set; }
@@ -97,6 +103,41 @@ public sealed class Order : Entity
         Touch();
 
         return item;
+    }
+
+    public void ApplyCoupon(
+        Guid couponId,
+        string couponCodeSnapshot,
+        string couponNameSnapshot,
+        decimal discountAmount)
+    {
+        if (couponId == Guid.Empty)
+        {
+            throw new DomainException("Order coupon id cannot be empty.");
+        }
+
+        if (CouponId is not null)
+        {
+            throw new DomainException("Order already has a coupon applied.");
+        }
+
+        if (discountAmount <= 0m)
+        {
+            throw new DomainException("Order discount amount must be greater than zero.");
+        }
+
+        var maximumDiscount = Subtotal + ShippingFee;
+        if (discountAmount > maximumDiscount)
+        {
+            throw new DomainException("Order discount amount cannot exceed order subtotal and shipping fee.");
+        }
+
+        CouponId = couponId;
+        CouponCodeSnapshot = Guard.Required(couponCodeSnapshot, nameof(CouponCodeSnapshot)).ToUpperInvariant();
+        CouponNameSnapshot = Guard.Required(couponNameSnapshot, nameof(CouponNameSnapshot));
+        DiscountAmount = discountAmount;
+        RecalculateTotals();
+        Touch();
     }
 
     public OrderStatusHistory RecordCreated(Guid historyId, string? note, string? changedBy)

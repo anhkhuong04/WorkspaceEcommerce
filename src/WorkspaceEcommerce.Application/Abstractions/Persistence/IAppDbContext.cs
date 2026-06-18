@@ -1,6 +1,7 @@
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Content;
 using WorkspaceEcommerce.Domain.Modules.Customers;
+using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Application.Abstractions.Persistence;
@@ -20,6 +21,12 @@ public interface IAppDbContext
     IQueryable<Banner> Banners { get; }
 
     IQueryable<Customer> Customers { get; }
+
+    IQueryable<Coupon> Coupons { get; }
+
+    IQueryable<CouponProductTarget> CouponProductTargets { get; }
+
+    IQueryable<CouponRedemption> CouponRedemptions { get; }
 
     IQueryable<Order> Orders { get; }
 

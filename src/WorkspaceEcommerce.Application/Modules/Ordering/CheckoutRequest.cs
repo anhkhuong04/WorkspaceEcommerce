@@ -17,4 +17,6 @@ public sealed class CheckoutRequest
     public string? Note { get; init; }
 
     public PaymentMethod PaymentMethod { get; init; }
+
+    public string? CouponCode { get; init; }
 }

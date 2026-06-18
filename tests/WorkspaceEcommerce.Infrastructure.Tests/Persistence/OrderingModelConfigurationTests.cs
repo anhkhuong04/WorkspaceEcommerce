@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Customers;
+using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Infrastructure.Persistence;
 
@@ -61,6 +62,29 @@ public sealed class OrderingModelConfigurationTests
     }
 
     [Fact]
+    public void OrderCouponId_HasIndex()
+    {
+        var metadata = GetEntityType(typeof(Order));
+        var index = metadata.GetIndexes().Single(candidate =>
+            candidate.Properties.Count == 1
+            && candidate.Properties[0].Name == nameof(Order.CouponId));
+
+        Assert.False(index.IsUnique);
+        Assert.Equal("ix_orders_coupon_id", index.GetDatabaseName());
+    }
+
+    [Theory]
+    [InlineData(nameof(Order.CouponCodeSnapshot), "coupon_code_snapshot")]
+    [InlineData(nameof(Order.CouponNameSnapshot), "coupon_name_snapshot")]
+    public void OrderCouponSnapshotFields_AreMapped(string propertyName, string columnName)
+    {
+        var property = GetEntityType(typeof(Order)).FindProperty(propertyName);
+
+        Assert.NotNull(property);
+        Assert.Equal(columnName, property.GetColumnName());
+    }
+
+    [Fact]
     public void OrderItemUnitPrice_HasDecimalPrecision()
     {
         var property = GetEntityType(typeof(OrderItem)).FindProperty(nameof(OrderItem.UnitPrice));
@@ -88,6 +112,7 @@ public sealed class OrderingModelConfigurationTests
     [InlineData(typeof(OrderItem), typeof(ProductVariant), nameof(OrderItem.ProductVariantId), DeleteBehavior.Restrict)]
     [InlineData(typeof(OrderStatusHistory), typeof(Order), nameof(OrderStatusHistory.OrderId), DeleteBehavior.Cascade)]
     [InlineData(typeof(Order), typeof(Customer), nameof(Order.CustomerId), DeleteBehavior.Restrict)]
+    [InlineData(typeof(Order), typeof(Coupon), nameof(Order.CouponId), DeleteBehavior.Restrict)]
     public void OrderingRelationships_HaveExpectedDeleteBehavior(
         Type dependentType,
         Type principalType,

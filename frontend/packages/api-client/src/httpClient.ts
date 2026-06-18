@@ -39,6 +39,13 @@ export class ApiClient {
     });
   }
 
+  patch<TResponse, TBody>(path: string, body: TBody): Promise<TResponse> {
+    return this.send<TResponse>(path, {
+      method: "PATCH",
+      body: JSON.stringify(body)
+    });
+  }
+
   delete<T>(path: string): Promise<T> {
     return this.send<T>(path, { method: "DELETE" });
   }

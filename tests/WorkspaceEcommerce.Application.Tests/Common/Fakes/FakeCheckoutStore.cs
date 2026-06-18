@@ -1,6 +1,7 @@
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Domain.Modules.Cart;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
+using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Application.Tests.Common.Fakes;
@@ -11,11 +12,20 @@ internal sealed class FakeCheckoutStore : ICheckoutStore
     private readonly List<Category> _categories = [];
     private readonly List<Product> _products = [];
     private readonly List<ProductVariant> _productVariants = [];
+    private readonly List<Coupon> _coupons = [];
+    private readonly List<CouponProductTarget> _couponProductTargets = [];
+    private readonly List<CouponRedemption> _couponRedemptions = [];
     private readonly List<Order> _orders = [];
 
     public IReadOnlyCollection<Cart> Carts => _carts;
 
     public IReadOnlyCollection<Order> Orders => _orders;
+
+    public IReadOnlyCollection<Coupon> Coupons => _coupons;
+
+    public IReadOnlyCollection<CouponProductTarget> CouponProductTargets => _couponProductTargets;
+
+    public IReadOnlyCollection<CouponRedemption> CouponRedemptions => _couponRedemptions;
 
     public int SaveChangesCallCount { get; private set; }
 
@@ -53,6 +63,38 @@ internal sealed class FakeCheckoutStore : ICheckoutStore
         return Task.FromResult(_categories.FirstOrDefault(category => category.Id == id));
     }
 
+    public Task<Coupon?> FindCouponByCodeAsync(
+        string code,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return Task.FromResult(_coupons.FirstOrDefault(coupon => coupon.Code == code));
+    }
+
+    public Task<Coupon?> FindCouponByCodeForUpdateAsync(
+        string code,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return Task.FromResult(_coupons.FirstOrDefault(coupon => coupon.Code == code));
+    }
+
+    public Task<IReadOnlyCollection<Guid>> FindCouponProductTargetIdsAsync(
+        Guid couponId,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        IReadOnlyCollection<Guid> productIds = _couponProductTargets
+            .Where(target => target.CouponId == couponId)
+            .Select(target => target.ProductId)
+            .ToArray();
+
+        return Task.FromResult(productIds);
+    }
+
     public Task<bool> OrderCodeExistsAsync(string orderCode, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -88,6 +130,21 @@ internal sealed class FakeCheckoutStore : ICheckoutStore
     public void Seed(params ProductVariant[] variants)
     {
         _productVariants.AddRange(variants);
+    }
+
+    public void Seed(params Coupon[] coupons)
+    {
+        _coupons.AddRange(coupons);
+    }
+
+    public void Seed(params CouponProductTarget[] couponProductTargets)
+    {
+        _couponProductTargets.AddRange(couponProductTargets);
+    }
+
+    public void Seed(params CouponRedemption[] couponRedemptions)
+    {
+        _couponRedemptions.AddRange(couponRedemptions);
     }
 
     public void Seed(params Order[] orders)
@@ -146,6 +203,21 @@ internal sealed class FakeCheckoutStore : ICheckoutStore
         if (typeof(TEntity) == typeof(ProductVariant))
         {
             return (List<TEntity>)(object)_productVariants;
+        }
+
+        if (typeof(TEntity) == typeof(Coupon))
+        {
+            return (List<TEntity>)(object)_coupons;
+        }
+
+        if (typeof(TEntity) == typeof(CouponProductTarget))
+        {
+            return (List<TEntity>)(object)_couponProductTargets;
+        }
+
+        if (typeof(TEntity) == typeof(CouponRedemption))
+        {
+            return (List<TEntity>)(object)_couponRedemptions;
         }
 
         if (typeof(TEntity) == typeof(Order))
