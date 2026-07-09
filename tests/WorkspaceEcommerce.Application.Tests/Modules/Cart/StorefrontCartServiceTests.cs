@@ -1,6 +1,7 @@
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Cart;
 using WorkspaceEcommerce.Application.Tests.Common.Fakes;
+using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using CartAggregate = WorkspaceEcommerce.Domain.Modules.Cart.Cart;
 
@@ -197,6 +198,7 @@ public sealed class StorefrontCartServiceTests
     {
         return new StorefrontCartService(
             store,
+            new StubCurrentLanguageProvider(),
             new GetCartRequestValidator(),
             new AddCartItemRequestValidator(),
             new UpdateCartItemRequestValidator(),
@@ -211,8 +213,8 @@ public sealed class StorefrontCartServiceTests
         bool isProductActive = true,
         bool isVariantActive = true)
     {
-        var category = new Category(Guid.NewGuid(), null, "Desks", "desks", 1, isCategoryActive);
-        var product = new Product(Guid.NewGuid(), category.Id, "Standing Desk", "standing-desk", "Description", false, isProductActive);
+        var category = new Category(Guid.NewGuid(), null, LocalizedText.Of("Desks"), "desks", 1, isCategoryActive);
+        var product = new Product(Guid.NewGuid(), category.Id, LocalizedText.Of("Standing Desk"), "standing-desk", LocalizedText.Of("Description"), false, isProductActive);
         var variant = new ProductVariant(
             Guid.NewGuid(),
             product.Id,
@@ -231,5 +233,10 @@ public sealed class StorefrontCartServiceTests
         store.Seed(variant);
 
         return variant;
+    }
+
+    private sealed class StubCurrentLanguageProvider : WorkspaceEcommerce.Application.Common.Localization.ICurrentLanguageProvider
+    {
+        public string CurrentLanguage => "en";
     }
 }

@@ -1,8 +1,9 @@
-﻿import type { ApiResponse } from "@workspace-ecommerce/api-types";
+import type { ApiResponse } from "@workspace-ecommerce/api-types";
 
 export interface ApiClientOptions {
   baseUrl: string;
   getAccessToken?: () => string | null;
+  getLanguage?: () => string | null;
   onUnauthorized?: () => void;
 }
 
@@ -61,6 +62,11 @@ export class ApiClient {
     const accessToken = this.options.getAccessToken?.();
     if (accessToken) {
       headers.set("Authorization", `Bearer ${accessToken}`);
+    }
+
+    const language = this.options.getLanguage?.();
+    if (language) {
+      headers.set("Accept-Language", language);
     }
 
     const response = await fetch(`${this.options.baseUrl}${path}`, {

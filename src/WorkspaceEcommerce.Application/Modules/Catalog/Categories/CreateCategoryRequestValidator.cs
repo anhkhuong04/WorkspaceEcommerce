@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 
 namespace WorkspaceEcommerce.Application.Modules.Catalog.Categories;
 
@@ -7,8 +7,7 @@ public sealed class CreateCategoryRequestValidator : AbstractValidator<CreateCat
     public CreateCategoryRequestValidator()
     {
         RuleFor(request => request.Name)
-            .NotEmpty()
-            .MaximumLength(200);
+            .NotEmpty();
 
         RuleFor(request => request.Slug)
             .NotEmpty()

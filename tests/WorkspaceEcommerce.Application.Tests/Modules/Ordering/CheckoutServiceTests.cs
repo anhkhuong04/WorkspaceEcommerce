@@ -1,9 +1,11 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
+using WorkspaceEcommerce.Application.Common.Localization;
 using WorkspaceEcommerce.Application.Abstractions.Shipment;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Ordering;
 using WorkspaceEcommerce.Application.Tests.Common.Fakes;
+using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
@@ -257,6 +259,7 @@ public sealed class CheckoutServiceTests
         return new CheckoutService(
             store,
             new StubCurrentCustomerContext(customerId),
+            new StubCurrentLanguageProvider(),
             new FakeShipmentService(),
             NullLogger<CheckoutService>.Instance,
             new CheckoutRequestValidator(),
@@ -303,8 +306,8 @@ public sealed class CheckoutServiceTests
         bool isProductActive = true,
         bool isVariantActive = true)
     {
-        var category = new Category(Guid.NewGuid(), null, "Desks", "desks", 1, isCategoryActive);
-        var product = new Product(Guid.NewGuid(), category.Id, "Standing Desk", "standing-desk", "Description", false, isProductActive);
+        var category = new Category(Guid.NewGuid(), null, LocalizedText.Of("Desks"), "desks", 1, isCategoryActive);
+        var product = new Product(Guid.NewGuid(), category.Id, LocalizedText.Of("Standing Desk"), "standing-desk", LocalizedText.Of("Description"), false, isProductActive);
         var variant = new ProductVariant(
             Guid.NewGuid(),
             product.Id,
@@ -350,6 +353,11 @@ public sealed class CheckoutServiceTests
         public Guid? CustomerId => customerId;
 
         public string? Email => customerId.HasValue ? "customer@example.com" : null;
+    }
+
+    private sealed class StubCurrentLanguageProvider : ICurrentLanguageProvider
+    {
+        public string CurrentLanguage => "en";
     }
 
     private sealed class FakeShipmentService : IShipmentService

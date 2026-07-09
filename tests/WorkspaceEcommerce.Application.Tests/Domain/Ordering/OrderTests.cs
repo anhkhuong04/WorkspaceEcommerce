@@ -31,7 +31,9 @@ public sealed class OrderTests
                 null,
                 "Shipping address",
                 null,
-                PaymentMethod.Cod));
+                PaymentMethod.Cod,
+                "USD",
+                1m));
 
         Assert.Equal("CustomerName is required.", exception.Message);
     }
@@ -174,6 +176,8 @@ public sealed class OrderTests
             "customer@example.com",
             "123 Shipping Street",
             "Call before delivery",
-            PaymentMethod.Cod);
+            PaymentMethod.Cod,
+            "USD",
+            1m);
     }
 }

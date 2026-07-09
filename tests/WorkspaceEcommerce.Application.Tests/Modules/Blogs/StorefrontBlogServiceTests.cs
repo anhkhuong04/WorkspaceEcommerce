@@ -84,6 +84,12 @@ public sealed class StorefrontBlogServiceTests
     {
         return new StorefrontBlogService(
             dbContext,
+            new StubCurrentLanguageProvider(),
             new CreateCommentRequestValidator());
+    }
+
+    private sealed class StubCurrentLanguageProvider : WorkspaceEcommerce.Application.Common.Localization.ICurrentLanguageProvider
+    {
+        public string CurrentLanguage => "en";
     }
 }

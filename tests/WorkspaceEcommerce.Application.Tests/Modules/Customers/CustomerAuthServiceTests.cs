@@ -35,7 +35,7 @@ public sealed class CustomerAuthServiceTests
     public async Task RegisterAsync_WhenEmailAlreadyExists_ReturnsConflict()
     {
         var dbContext = new FakeAppDbContext();
-        dbContext.Seed(new Customer(
+        dbContext.Seed(Customer.Create(
             Guid.NewGuid(),
             "Nguyen Van A",
             "0900000000",
@@ -58,7 +58,7 @@ public sealed class CustomerAuthServiceTests
     public async Task LoginAsync_WhenCredentialsAreValid_ReturnsToken()
     {
         var dbContext = new FakeAppDbContext();
-        var customer = new Customer(
+        var customer = Customer.Create(
             Guid.NewGuid(),
             "Nguyen Van A",
             "0900000000",
@@ -81,7 +81,7 @@ public sealed class CustomerAuthServiceTests
     public async Task LoginAsync_WhenPasswordIsInvalid_ReturnsUnauthorized()
     {
         var dbContext = new FakeAppDbContext();
-        dbContext.Seed(new Customer(
+        dbContext.Seed(Customer.Create(
             Guid.NewGuid(),
             "Nguyen Van A",
             "0900000000",
@@ -123,7 +123,8 @@ public sealed class CustomerAuthServiceTests
             new CustomerRegisterRequestValidator(),
             new CustomerLoginRequestValidator(),
             new StubPasswordHasher(),
-            tokenGenerator ?? new StubTokenGenerator());
+            tokenGenerator ?? new StubTokenGenerator(),
+            new StubCurrentCustomerContext());
     }
 
     private sealed class StubPasswordHasher : IPasswordHasher
@@ -155,7 +156,7 @@ public sealed class CustomerAuthServiceTests
             Guid customerId,
             string email,
             string fullName,
-            string phoneNumber)
+            string? phoneNumber)
         {
             LastCustomerId = customerId;
 
@@ -166,7 +167,13 @@ public sealed class CustomerAuthServiceTests
                 customerId,
                 email,
                 fullName,
-                phoneNumber);
+                phoneNumber ?? string.Empty);
         }
+    }
+
+    private sealed class StubCurrentCustomerContext : WorkspaceEcommerce.Application.Abstractions.Authentication.ICurrentCustomerContext
+    {
+        public Guid? CustomerId => Guid.NewGuid();
+        public string? Email => null;
     }
 }

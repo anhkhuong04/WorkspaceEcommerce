@@ -22,7 +22,7 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(product => product.Name)
             .HasColumnName("name")
-            .HasMaxLength(250)
+            .HasColumnType("jsonb")
             .IsRequired();
 
         builder.Property(product => product.Slug)
@@ -32,7 +32,7 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(product => product.Description)
             .HasColumnName("description")
-            .HasColumnType("text");
+            .HasColumnType("jsonb");
 
         builder.Property(product => product.IsFeatured)
             .HasColumnName("is_featured")

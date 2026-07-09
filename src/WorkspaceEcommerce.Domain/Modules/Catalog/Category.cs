@@ -7,14 +7,14 @@ public sealed class Category : Entity
     public Category(
         Guid id,
         Guid? parentId,
-        string name,
+        LocalizedText name,
         string slug,
         int sortOrder,
         bool isActive = true)
         : base(id)
     {
         ParentId = parentId;
-        Name = Guard.Required(name, nameof(Name));
+        Name = name ?? new LocalizedText();
         Slug = Guard.Required(slug, nameof(Slug));
         SortOrder = sortOrder;
         IsActive = isActive;
@@ -22,7 +22,7 @@ public sealed class Category : Entity
 
     public Guid? ParentId { get; private set; }
 
-    public string Name { get; private set; }
+    public LocalizedText Name { get; private set; }
 
     public string Slug { get; private set; }
 
@@ -30,9 +30,9 @@ public sealed class Category : Entity
 
     public int SortOrder { get; private set; }
 
-    public void UpdateDetails(string name, string slug, int sortOrder)
+    public void UpdateDetails(LocalizedText name, string slug, int sortOrder)
     {
-        Name = Guard.Required(name, nameof(Name));
+        Name = name ?? new LocalizedText();
         Slug = Guard.Required(slug, nameof(Slug));
         SortOrder = sortOrder;
     }

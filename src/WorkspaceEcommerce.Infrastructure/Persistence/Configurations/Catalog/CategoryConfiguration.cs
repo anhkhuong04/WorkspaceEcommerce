@@ -21,7 +21,7 @@ internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
 
         builder.Property(category => category.Name)
             .HasColumnName("name")
-            .HasMaxLength(200)
+            .HasColumnType("jsonb")
             .IsRequired();
 
         builder.Property(category => category.Slug)

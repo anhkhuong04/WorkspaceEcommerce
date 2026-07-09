@@ -1,10 +1,12 @@
-﻿using WorkspaceEcommerce.Application.Abstractions.Persistence;
+using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 
+using WorkspaceEcommerce.Application.Common.Localization;
+
 namespace WorkspaceEcommerce.Application.Modules.Catalog.Storefront;
 
-internal sealed class StorefrontCatalogService(IAppDbContext dbContext) : IStorefrontCatalogService
+internal sealed class StorefrontCatalogService(IAppDbContext dbContext, ICurrentLanguageProvider languageProvider) : IStorefrontCatalogService
 {
     public Task<Result<IReadOnlyCollection<StorefrontCategoryDto>>> GetCategoriesAsync(
         CancellationToken cancellationToken = default)
@@ -14,11 +16,11 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext) : IStore
         var categories = dbContext.Categories
             .Where(category => category.IsActive)
             .OrderBy(category => category.SortOrder)
-            .ThenBy(category => category.Name)
+            .ThenBy(category => category.Slug)
             .ToArray();
 
         return Task.FromResult(
-            Result<IReadOnlyCollection<StorefrontCategoryDto>>.Success(BuildCategoryTree(categories)));
+            Result<IReadOnlyCollection<StorefrontCategoryDto>>.Success(BuildCategoryTree(categories, languageProvider.CurrentLanguage)));
     }
 
     public Task<Result<PagedResult<StorefrontProductListItemDto>>> GetProductsAsync(
@@ -44,11 +46,11 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext) : IStore
             .ToArray()
             .Where(product => activeCategoriesById.ContainsKey(product.CategoryId))
             .Where(product => normalizedCategorySlug is null || activeCategoriesById[product.CategoryId].Slug == normalizedCategorySlug)
-            .Where(product => normalizedSearch is null || product.Name.Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase))
+            .Where(product => normalizedSearch is null || product.Name.Get(languageProvider.CurrentLanguage).Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase))
             .Where(product => MatchesPriceFilter(activeVariantsByProductId[product.Id], request.MinPrice, request.MaxPrice))
             .Where(product => MatchesStockFilter(activeVariantsByProductId[product.Id], request.InStock));
 
-        var sortedProducts = ApplyProductSorting(products, request.SortBy, activeVariantsByProductId)
+        var sortedProducts = ApplyProductSorting(products, request.SortBy, activeVariantsByProductId, languageProvider.CurrentLanguage)
             .ToArray();
 
         var pageNumber = request.NormalizedPageNumber;
@@ -60,7 +62,8 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext) : IStore
                 product,
                 activeCategoriesById[product.CategoryId],
                 activeVariantsByProductId[product.Id],
-                imagesByProductId[product.Id].FirstOrDefault()))
+                imagesByProductId[product.Id].FirstOrDefault(),
+                languageProvider.CurrentLanguage))
             .ToArray();
 
         var page = new PagedResult<StorefrontProductListItemDto>(
@@ -111,37 +114,37 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext) : IStore
             .ToArray();
 
         return Task.FromResult(Result<StorefrontProductDetailDto>.Success(
-            ToDetailDto(product, category, variants, images, specifications)));
+            ToDetailDto(product, category, variants, images, specifications, languageProvider.CurrentLanguage)));
     }
 
-    private static IReadOnlyCollection<StorefrontCategoryDto> BuildCategoryTree(IReadOnlyCollection<Category> categories)
+    private static IReadOnlyCollection<StorefrontCategoryDto> BuildCategoryTree(IReadOnlyCollection<Category> categories, string currentLanguage)
     {
         return categories
             .Where(category => category.ParentId is null || categories.All(parent => parent.Id != category.ParentId.Value))
-            .Select(category => ToCategoryDto(category, BuildChildren(category.Id, categories)))
+            .Select(category => ToCategoryDto(category, BuildChildren(category.Id, categories, currentLanguage), currentLanguage))
             .ToArray();
     }
 
     private static IReadOnlyCollection<StorefrontCategoryDto> BuildChildren(
         Guid parentId,
-        IReadOnlyCollection<Category> categories)
+        IReadOnlyCollection<Category> categories, string currentLanguage)
     {
         return categories
             .Where(category => category.ParentId == parentId)
             .OrderBy(category => category.SortOrder)
-            .ThenBy(category => category.Name)
-            .Select(category => ToCategoryDto(category, BuildChildren(category.Id, categories)))
+            .ThenBy(category => category.Name.Get(currentLanguage))
+            .Select(category => ToCategoryDto(category, BuildChildren(category.Id, categories, currentLanguage), currentLanguage))
             .ToArray();
     }
 
     private static StorefrontCategoryDto ToCategoryDto(
         Category category,
-        IReadOnlyCollection<StorefrontCategoryDto> children)
+        IReadOnlyCollection<StorefrontCategoryDto> children, string currentLanguage)
     {
         return new StorefrontCategoryDto(
             category.Id,
             category.ParentId,
-            category.Name,
+            category.Name.Get(currentLanguage),
             category.Slug,
             category.SortOrder,
             children);
@@ -151,7 +154,7 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext) : IStore
         Product product,
         Category category,
         IEnumerable<ProductVariant> activeVariants,
-        ProductImage? primaryImage)
+        ProductImage? primaryImage, string currentLanguage)
     {
         var variants = activeVariants.ToArray();
         decimal? minPrice = variants.Length == 0
@@ -168,10 +171,10 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext) : IStore
         return new StorefrontProductListItemDto(
             product.Id,
             product.CategoryId,
-            category.Name,
-            product.Name,
+            category.Name.Get(currentLanguage),
+            product.Name.Get(currentLanguage),
             product.Slug,
-            product.Description,
+            product.Description?.Get(currentLanguage),
             product.IsFeatured,
             minPrice,
             compareAtPrice,
@@ -184,15 +187,15 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext) : IStore
         Category category,
         IEnumerable<ProductVariant> activeVariants,
         IEnumerable<ProductImage> images,
-        IEnumerable<ProductSpecification> specifications)
+        IEnumerable<ProductSpecification> specifications, string currentLanguage)
     {
         return new StorefrontProductDetailDto(
             product.Id,
             product.CategoryId,
-            category.Name,
-            product.Name,
+            category.Name.Get(currentLanguage),
+            product.Name.Get(currentLanguage),
             product.Slug,
-            product.Description,
+            product.Description?.Get(currentLanguage),
             product.IsFeatured,
             activeVariants.Select(ToVariantDto).ToArray(),
             images.Select(ToImageDto).ToArray(),
@@ -262,7 +265,8 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext) : IStore
     private static IEnumerable<Product> ApplyProductSorting(
         IEnumerable<Product> products,
         string? sortBy,
-        ILookup<Guid, ProductVariant> activeVariantsByProductId)
+        ILookup<Guid, ProductVariant> activeVariantsByProductId,
+        string currentLanguage)
     {
         var normalizedSortBy = NormalizeOptional(sortBy) ?? "name-asc";
 
@@ -271,19 +275,19 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext) : IStore
             "price-asc" => products
                 .OrderBy(product => GetMinPrice(activeVariantsByProductId[product.Id]) is null)
                 .ThenBy(product => GetMinPrice(activeVariantsByProductId[product.Id]))
-                .ThenBy(product => product.Name)
+                .ThenBy(product => product.Name.Get(currentLanguage))
                 .ThenBy(product => product.Slug),
             "price-desc" => products
                 .OrderBy(product => GetMinPrice(activeVariantsByProductId[product.Id]) is null)
                 .ThenByDescending(product => GetMinPrice(activeVariantsByProductId[product.Id]))
-                .ThenBy(product => product.Name)
+                .ThenBy(product => product.Name.Get(currentLanguage))
                 .ThenBy(product => product.Slug),
             "updated-desc" => products
                 .OrderByDescending(product => product.UpdatedAt)
-                .ThenBy(product => product.Name)
+                .ThenBy(product => product.Name.Get(currentLanguage))
                 .ThenBy(product => product.Slug),
             _ => products
-                .OrderBy(product => product.Name)
+                .OrderBy(product => product.Name.Get(currentLanguage))
                 .ThenBy(product => product.Slug)
         };
     }

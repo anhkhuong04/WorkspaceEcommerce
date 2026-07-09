@@ -83,7 +83,9 @@ public sealed class StorefrontOrderLookupServiceTests
             "customer@example.com",
             "123 Shipping Street",
             "Call before delivery",
-            PaymentMethod.Cod);
+            PaymentMethod.Cod,
+            "USD",
+            1m);
 
         order.AddItem(
             Guid.NewGuid(),

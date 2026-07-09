@@ -12,6 +12,7 @@ using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Content;
 using WorkspaceEcommerce.Domain.Modules.Blogs;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Infrastructure.Persistence;
 
 namespace WorkspaceEcommerce.Infrastructure.Seeding;
@@ -93,7 +94,8 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext) : IDemoDataSeeder
             .FirstOrDefaultAsync(category => category.Id == id || category.Slug == slug, cancellationToken);
         if (existingCategory is not null)
         {
-            existingCategory.UpdateDetails(name, slug, sortOrder);
+            var locName = new LocalizedText(new Dictionary<string, string> { ["en"] = name, ["vi"] = name });
+            existingCategory.UpdateDetails(locName, slug, sortOrder);
             existingCategory.MoveToParent(parentId);
             existingCategory.Activate();
             dbContext.Update(existingCategory);
@@ -101,7 +103,8 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext) : IDemoDataSeeder
             return 0;
         }
 
-        dbContext.Add(new Category(id, parentId, name, slug, sortOrder, isActive: true));
+        var newLocName = new LocalizedText(new Dictionary<string, string> { ["en"] = name, ["vi"] = name });
+        dbContext.Add(new Category(id, parentId, newLocName, slug, sortOrder, isActive: true));
 
         return 1;
     }
@@ -158,7 +161,9 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext) : IDemoDataSeeder
             .FirstOrDefaultAsync(product => product.Id == id || product.Slug == slug, cancellationToken);
         if (existingProduct is not null)
         {
-            existingProduct.UpdateDetails(categoryId, name, slug, description);
+            var locName = new LocalizedText(new Dictionary<string, string> { ["en"] = name, ["vi"] = name });
+            var locDesc = description != null ? new LocalizedText(new Dictionary<string, string> { ["en"] = description, ["vi"] = description }) : null;
+            existingProduct.UpdateDetails(categoryId, locName, slug, locDesc);
             if (isFeatured)
             {
                 existingProduct.MarkAsFeatured();
@@ -174,7 +179,9 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext) : IDemoDataSeeder
             return 0;
         }
 
-        dbContext.Add(new Product(id, categoryId, name, slug, description, isFeatured, isActive: true));
+        var newLocName = new LocalizedText(new Dictionary<string, string> { ["en"] = name, ["vi"] = name });
+        var newLocDesc = description != null ? new LocalizedText(new Dictionary<string, string> { ["en"] = description, ["vi"] = description }) : null;
+        dbContext.Add(new Product(id, categoryId, newLocName, slug, newLocDesc, isFeatured, isActive: true));
 
         return 1;
     }
@@ -742,7 +749,9 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext) : IDemoDataSeeder
             "minhanh@example.test",
             "12 Nguyen Trai, District 1, Ho Chi Minh City",
             "Demo pending order",
-            PaymentMethod.Cod);
+            PaymentMethod.Cod,
+            "USD",
+            1m);
         order.AddItem(Guid.Parse("81000000-0000-0000-0000-000000000001"), StandingDeskOakVariantId, "Atlas Standing Desk", "DEMO-DESK-OAK-140", 699m, 1, true);
         order.RecordCreated(Guid.Parse("82000000-0000-0000-0000-000000000001"), "Created by demo seed.", null);
 
@@ -760,7 +769,9 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext) : IDemoDataSeeder
             "quocbao@example.test",
             "88 Dien Bien Phu, Binh Thanh, Ho Chi Minh City",
             "Demo confirmed order",
-            PaymentMethod.ManualBankTransfer);
+            PaymentMethod.ManualBankTransfer,
+            "USD",
+            1m);
         order.AddItem(Guid.Parse("81000000-0000-0000-0000-000000000002"), ChairVariantId, "Forma Ergonomic Chair", "DEMO-CHAIR-GRAPHITE", 329m, 1, false);
         order.RecordCreated(Guid.Parse("82000000-0000-0000-0000-000000000002"), "Created by demo seed.", null);
         order.ChangeStatus(Guid.Parse("82000000-0000-0000-0000-000000000003"), OrderStatus.Confirmed, "Confirmed by demo seed.", "admin@example.com");
@@ -779,7 +790,9 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext) : IDemoDataSeeder
             "hoangnam@example.test",
             "25 Le Loi, District 3, Ho Chi Minh City",
             "Demo completed order",
-            PaymentMethod.Cod);
+            PaymentMethod.Cod,
+            "USD",
+            1m);
         order.AddItem(Guid.Parse("81000000-0000-0000-0000-000000000003"), MonitorArmVariantId, "Axis Dual Monitor Arm", "DEMO-ARM-DUAL", 189m, 2, false);
         order.AddItem(Guid.Parse("81000000-0000-0000-0000-000000000004"), DeskLampVariantId, "Halo Desk Lamp", "DEMO-LAMP-WARM", 79m, 1, false);
         order.RecordCreated(Guid.Parse("82000000-0000-0000-0000-000000000004"), "Created by demo seed.", null);

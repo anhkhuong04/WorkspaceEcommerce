@@ -1,6 +1,7 @@
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Coupons;
 using WorkspaceEcommerce.Application.Tests.Common.Fakes;
+using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 
@@ -273,7 +274,7 @@ public sealed class AdminCouponServiceTests
         return new Product(
             Guid.NewGuid(),
             Guid.NewGuid(),
-            "Standing Desk",
+            new LocalizedText(new Dictionary<string, string> { ["en"] = "Standing Desk" }),
             $"standing-desk-{Guid.NewGuid():N}",
             null);
     }

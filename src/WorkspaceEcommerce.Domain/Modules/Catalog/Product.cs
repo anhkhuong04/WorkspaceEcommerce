@@ -11,9 +11,9 @@ public sealed class Product : Entity
     public Product(
         Guid id,
         Guid categoryId,
-        string name,
+        LocalizedText name,
         string slug,
-        string? description,
+        LocalizedText? description,
         bool isFeatured = false,
         bool isActive = true)
         : base(id)
@@ -24,9 +24,9 @@ public sealed class Product : Entity
         }
 
         CategoryId = categoryId;
-        Name = Guard.Required(name, nameof(Name));
+        Name = name ?? new LocalizedText();
         Slug = Guard.Required(slug, nameof(Slug));
-        Description = Guard.Optional(description);
+        Description = description;
         IsFeatured = isFeatured;
         IsActive = isActive;
         CreatedAt = DateTimeOffset.UtcNow;
@@ -35,11 +35,11 @@ public sealed class Product : Entity
 
     public Guid CategoryId { get; private set; }
 
-    public string Name { get; private set; }
+    public LocalizedText Name { get; private set; }
 
     public string Slug { get; private set; }
 
-    public string? Description { get; private set; }
+    public LocalizedText? Description { get; private set; }
 
     public bool IsFeatured { get; private set; }
 
@@ -59,7 +59,7 @@ public sealed class Product : Entity
 
     public IReadOnlyCollection<ProductSpecification> Specifications => _specifications;
 
-    public void UpdateDetails(Guid categoryId, string name, string slug, string? description)
+    public void UpdateDetails(Guid categoryId, LocalizedText name, string slug, LocalizedText? description)
     {
         if (categoryId == Guid.Empty)
         {
@@ -67,9 +67,9 @@ public sealed class Product : Entity
         }
 
         CategoryId = categoryId;
-        Name = Guard.Required(name, nameof(Name));
+        Name = name ?? new LocalizedText();
         Slug = Guard.Required(slug, nameof(Slug));
-        Description = Guard.Optional(description);
+        Description = description;
         Touch();
     }
 

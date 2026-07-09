@@ -105,7 +105,7 @@ public sealed class CustomerAccountIntegrationTests(ApiIntegrationTestFixture fi
                 .Where(customer => customer.Email == "customer@example.com")
                 .Select(customer => customer.Id)
                 .SingleAsync());
-        var otherCustomer = new Customer(
+        var otherCustomer = Customer.Create(
             Guid.NewGuid(),
             "Tran Thi B",
             "0911111111",
@@ -206,7 +206,9 @@ public sealed class CustomerAccountIntegrationTests(ApiIntegrationTestFixture fi
             customerEmail,
             "123 Shipping Street",
             "Call before delivery",
-            PaymentMethod.Cod);
+            PaymentMethod.Cod,
+            "USD",
+            1m);
 
         order.AddItem(
             Guid.NewGuid(),

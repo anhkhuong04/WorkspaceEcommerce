@@ -8,7 +8,7 @@ public sealed class CustomerTests
     [Fact]
     public void Constructor_ValidInput_NormalizesEmailAndSetsAuditTimestamps()
     {
-        var customer = new Customer(
+        var customer = Customer.Create(
             Guid.NewGuid(),
             " Nguyen Van A ",
             " 0900000000 ",
@@ -27,7 +27,7 @@ public sealed class CustomerTests
     public void Constructor_MissingEmail_ThrowsDomainException()
     {
         var exception = Assert.Throws<DomainException>(() =>
-            new Customer(
+            Customer.Create(
                 Guid.NewGuid(),
                 "Nguyen Van A",
                 "0900000000",
@@ -62,7 +62,7 @@ public sealed class CustomerTests
 
     private static Customer CreateCustomer()
     {
-        return new Customer(
+        return Customer.Create(
             Guid.NewGuid(),
             "Nguyen Van A",
             "0900000000",

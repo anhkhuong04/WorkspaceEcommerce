@@ -92,6 +92,16 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasMaxLength(50)
             .IsRequired();
 
+        builder.Property(order => order.CurrencyCode)
+            .HasColumnName("currency_code")
+            .HasMaxLength(10)
+            .IsRequired();
+
+        builder.Property(order => order.ExchangeRate)
+            .HasColumnName("exchange_rate")
+            .HasPrecision(18, 6)
+            .IsRequired();
+
         builder.Property(order => order.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

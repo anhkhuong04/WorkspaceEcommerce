@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using FluentValidation;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Localization;
 using WorkspaceEcommerce.Application.Modules.Catalog.Storefront;
 using WorkspaceEcommerce.Domain.Modules.Blogs;
 
@@ -13,6 +14,7 @@ namespace WorkspaceEcommerce.Application.Modules.Blogs;
 
 internal sealed class StorefrontBlogService(
     IAppDbContext dbContext,
+    ICurrentLanguageProvider languageProvider,
     IValidator<CreateCommentRequest> commentValidator) : IStorefrontBlogService
 {
     public Task<Result<IReadOnlyCollection<StorefrontBlogPostDto>>> GetPublishedBlogPostsAsync(
@@ -144,7 +146,7 @@ internal sealed class StorefrontBlogService(
         foreach (var product in products)
         {
             categories.TryGetValue(product.CategoryId, out var category);
-            var categoryName = category?.Name ?? "Unknown";
+            var categoryName = category?.Name.Get(languageProvider.CurrentLanguage) ?? "Unknown";
 
             var activeVariants = variants[product.Id].ToArray();
             decimal? minPrice = activeVariants.Length == 0 ? null : activeVariants.Min(v => v.Price);
@@ -159,9 +161,9 @@ internal sealed class StorefrontBlogService(
                 product.Id,
                 product.CategoryId,
                 categoryName,
-                product.Name,
+                product.Name.Get(languageProvider.CurrentLanguage),
                 product.Slug,
-                product.Description,
+                product.Description?.Get(languageProvider.CurrentLanguage),
                 product.IsFeatured,
                 minPrice,
                 compareAtPrice,

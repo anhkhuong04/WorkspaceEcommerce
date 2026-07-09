@@ -1,4 +1,4 @@
-﻿using WorkspaceEcommerce.Application.Modules.Catalog.Categories;
+using WorkspaceEcommerce.Application.Modules.Catalog.Categories;
 
 namespace WorkspaceEcommerce.Application.Tests.Modules.Catalog.Categories;
 
@@ -10,7 +10,7 @@ public sealed class CategoryRequestValidatorTests
         var validator = new CreateCategoryRequestValidator();
         var request = new CreateCategoryRequest
         {
-            Name = "Desk Accessories",
+            Name = new Dictionary<string, string> { { "en", "Desk Accessories" } },
             Slug = "desk-accessories",
             SortOrder = 1,
             IsActive = true
@@ -27,7 +27,7 @@ public sealed class CategoryRequestValidatorTests
         var validator = new CreateCategoryRequestValidator();
         var request = new CreateCategoryRequest
         {
-            Name = string.Empty,
+            Name = new Dictionary<string, string>(),
             Slug = "Invalid Slug",
             SortOrder = -1
         };
@@ -46,7 +46,7 @@ public sealed class CategoryRequestValidatorTests
         var validator = new UpdateCategoryRequestValidator();
         var request = new UpdateCategoryRequest
         {
-            Name = "Standing Desks",
+            Name = new Dictionary<string, string> { { "en", "Standing Desks" } },
             Slug = "standing-desks",
             SortOrder = 2,
             IsActive = false
@@ -63,7 +63,7 @@ public sealed class CategoryRequestValidatorTests
         var validator = new UpdateCategoryRequestValidator();
         var request = new UpdateCategoryRequest
         {
-            Name = " ",
+            Name = new Dictionary<string, string>(),
             Slug = "standing_desks",
             SortOrder = -10,
             IsActive = true

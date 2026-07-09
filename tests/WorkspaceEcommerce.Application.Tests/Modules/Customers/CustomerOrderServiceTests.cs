@@ -2,6 +2,7 @@ using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Customers.Orders;
 using WorkspaceEcommerce.Application.Tests.Common.Fakes;
+using WorkspaceEcommerce.Application.Abstractions.Notifications;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Application.Tests.Modules.Customers;
@@ -95,6 +96,7 @@ public sealed class CustomerOrderServiceTests
         return new CustomerOrderService(
             dbContext,
             new StubCurrentCustomerContext(customerId),
+            new StubNotificationService(),
             new CustomerOrderListRequestValidator());
     }
 
@@ -109,7 +111,9 @@ public sealed class CustomerOrderServiceTests
             "customer@example.com",
             "123 Shipping Street",
             "Call before delivery",
-            PaymentMethod.Cod);
+            PaymentMethod.Cod,
+            "USD",
+            1m);
 
         order.AddItem(
             Guid.NewGuid(),
@@ -129,5 +133,10 @@ public sealed class CustomerOrderServiceTests
         public Guid? CustomerId => customerId;
 
         public string? Email => "customer@example.com";
+    }
+
+    private sealed class StubNotificationService : INotificationService
+    {
+        public Task NotifyCustomerAsync(Guid customerId, string eventType, object payload, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

@@ -1,12 +1,12 @@
-﻿namespace WorkspaceEcommerce.Application.Modules.Catalog.Products;
+namespace WorkspaceEcommerce.Application.Modules.Catalog.Products;
 
 public sealed record AdminProductDto(
     Guid Id,
     Guid CategoryId,
     string? CategoryName,
-    string Name,
+    IDictionary<string, string> Name,
     string Slug,
-    string? Description,
+    IDictionary<string, string>? Description,
     bool IsFeatured,
     bool IsActive,
     DateTimeOffset CreatedAt,

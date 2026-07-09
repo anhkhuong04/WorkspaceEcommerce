@@ -1,0 +1,11 @@
+{
+  "header": {
+    "login": "Đăng nhập",
+    "cart": "Giỏ hàng"
+  },
+  "cart": {
+    "title": "Giỏ hàng của bạn",
+    "empty": "Giỏ hàng của bạn đang trống",
+    "checkout": "Thanh toán"
+  }
+}

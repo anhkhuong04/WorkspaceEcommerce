@@ -1,4 +1,4 @@
-﻿using WorkspaceEcommerce.Application.Modules.Catalog.Products;
+using WorkspaceEcommerce.Application.Modules.Catalog.Products;
 
 namespace WorkspaceEcommerce.Application.Tests.Modules.Catalog.Products;
 
@@ -11,9 +11,9 @@ public sealed class ProductRequestValidatorTests
         var request = new CreateProductRequest
         {
             CategoryId = Guid.NewGuid(),
-            Name = "Standing Desk",
+            Name = new Dictionary<string, string> { { "en", "Standing Desk" } },
             Slug = "standing-desk",
-            Description = "Adjustable desk",
+            Description = new Dictionary<string, string> { { "en", "Adjustable desk" } },
             IsFeatured = true,
             IsActive = true
         };
@@ -30,7 +30,7 @@ public sealed class ProductRequestValidatorTests
         var request = new CreateProductRequest
         {
             CategoryId = Guid.Empty,
-            Name = string.Empty,
+            Name = new Dictionary<string, string>(),
             Slug = "Invalid Slug"
         };
 
@@ -49,7 +49,7 @@ public sealed class ProductRequestValidatorTests
         var request = new UpdateProductRequest
         {
             CategoryId = Guid.NewGuid(),
-            Name = "Monitor Arm",
+            Name = new Dictionary<string, string> { { "en", "Monitor Arm" } },
             Slug = "monitor-arm",
             IsFeatured = false,
             IsActive = false

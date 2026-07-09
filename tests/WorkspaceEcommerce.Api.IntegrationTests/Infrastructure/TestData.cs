@@ -1,3 +1,4 @@
+using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
@@ -10,16 +11,16 @@ internal static class TestData
         var category = new Category(
             Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
             null,
-            "Desks",
+            LocalizedText.Of("Desks"),
             "desks",
             1,
             isActive: true);
         var product = new Product(
             Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
             category.Id,
-            "Standing Desk",
+            LocalizedText.Of("Standing Desk"),
             "standing-desk",
-            "A desk for focused work.",
+            LocalizedText.Of("A desk for focused work."),
             isFeatured: true,
             isActive: true);
         var variant = new ProductVariant(
@@ -59,7 +60,9 @@ internal static class TestData
             "customer@example.com",
             "123 Shipping Street",
             "Call before delivery",
-            PaymentMethod.Cod);
+            PaymentMethod.Cod,
+            "USD",
+            1m);
 
         order.AddItem(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),

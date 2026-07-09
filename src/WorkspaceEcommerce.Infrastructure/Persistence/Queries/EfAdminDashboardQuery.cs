@@ -30,22 +30,32 @@ internal sealed class EfAdminDashboardQuery(AppDbContext dbContext) : IAdminDash
         int limit,
         CancellationToken cancellationToken = default)
     {
-        return await (
+        var data = await (
                 from variant in dbContext.ProductVariants.AsNoTracking()
                 join product in dbContext.Products.AsNoTracking()
                     on variant.ProductId equals product.Id
                 where variant.StockQuantity <= threshold
                 orderby variant.StockQuantity, variant.Sku, variant.Id
-                select new LowStockProductVariantDto(
+                select new {
                     variant.ProductId,
-                    product.Name,
+                    ProductName = product.Name,
                     variant.Id,
                     variant.Sku,
                     variant.Name,
                     variant.StockQuantity,
-                    variant.IsActive))
+                    variant.IsActive
+                })
             .Take(limit)
             .ToArrayAsync(cancellationToken);
+
+        return data.Select(x => new LowStockProductVariantDto(
+            x.ProductId,
+            x.ProductName.Get("en"),
+            x.Id,
+            x.Sku,
+            x.Name,
+            x.StockQuantity,
+            x.IsActive)).ToArray();
     }
 
     public async Task<IReadOnlyCollection<RecentAdminOrderDto>> GetRecentOrdersAsync(

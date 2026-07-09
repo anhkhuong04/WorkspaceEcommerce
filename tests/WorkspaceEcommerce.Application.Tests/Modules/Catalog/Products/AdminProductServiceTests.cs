@@ -1,6 +1,7 @@
-﻿using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Catalog.Products;
 using WorkspaceEcommerce.Application.Tests.Common.Fakes;
+using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
@@ -40,7 +41,7 @@ public sealed class AdminProductServiceTests
         var category = CreateCategory();
         var product = CreateProduct(category.Id);
         var variant = CreateVariant(product.Id);
-        var orderItem = new OrderItem(Guid.NewGuid(), Guid.NewGuid(), variant.Id, product.Name, variant.Sku, 10m, 1, false);
+        var orderItem = new OrderItem(Guid.NewGuid(), Guid.NewGuid(), variant.Id, product.Name["en"], variant.Sku, 10m, 1, false);
         var dbContext = new FakeAppDbContext();
         dbContext.Seed(category);
         dbContext.Seed(product);
@@ -66,9 +67,9 @@ public sealed class AdminProductServiceTests
         var result = await service.CreateProductAsync(new CreateProductRequest
         {
             CategoryId = category.Id,
-            Name = "Standing Desk",
+            Name = new Dictionary<string, string> { { "en", "Standing Desk" } },
             Slug = "standing-desk",
-            Description = "Adjustable desk",
+            Description = new Dictionary<string, string> { { "en", "Adjustable desk" } },
             IsFeatured = true,
             IsActive = true
         });
@@ -124,16 +125,16 @@ public sealed class AdminProductServiceTests
         var result = await service.UpdateProductAsync(product.Id, new UpdateProductRequest
         {
             CategoryId = category.Id,
-            Name = "Updated Desk",
+            Name = new Dictionary<string, string> { ["en"] = "Updated Desk" },
             Slug = "updated-desk",
-            Description = "Updated",
+            Description = new Dictionary<string, string> { ["en"] = "Updated" },
             IsFeatured = false,
             IsActive = false
         });
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
-        Assert.Equal("Updated Desk", result.Value.Name);
+        Assert.Equal("Updated Desk", result.Value.Name["en"]);
         Assert.Equal("updated-desk", result.Value.Slug);
         Assert.False(result.Value.IsFeatured);
         Assert.False(result.Value.IsActive);
@@ -477,7 +478,7 @@ public sealed class AdminProductServiceTests
 
     private static Category CreateCategory(string name = "Desks")
     {
-        return new Category(Guid.NewGuid(), null, name, "desks", 1, true);
+        return new Category(Guid.NewGuid(), null, new LocalizedText(new Dictionary<string, string> { ["en"] = name }), "desks", 1, true);
     }
 
     private static Product CreateProduct(
@@ -487,7 +488,7 @@ public sealed class AdminProductServiceTests
         bool isActive = true,
         bool isFeatured = false)
     {
-        return new Product(Guid.NewGuid(), categoryId, name, slug, "Description", isFeatured, isActive);
+        return new Product(Guid.NewGuid(), categoryId, new LocalizedText(new Dictionary<string, string> { ["en"] = name }), slug, new LocalizedText(new Dictionary<string, string> { ["en"] = "Description" }), isFeatured, isActive);
     }
 
     private static ProductVariant CreateVariant(
@@ -534,9 +535,9 @@ public sealed class AdminProductServiceTests
         return new CreateProductRequest
         {
             CategoryId = categoryId,
-            Name = "Standing Desk",
+            Name = new Dictionary<string, string> { ["en"] = "Standing Desk" },
             Slug = slug,
-            Description = "Description",
+            Description = new Dictionary<string, string> { ["en"] = "Description" },
             IsFeatured = false,
             IsActive = true
         };
@@ -547,9 +548,9 @@ public sealed class AdminProductServiceTests
         return new UpdateProductRequest
         {
             CategoryId = categoryId,
-            Name = "Standing Desk",
+            Name = new Dictionary<string, string> { ["en"] = "Standing Desk" },
             Slug = slug,
-            Description = "Description",
+            Description = new Dictionary<string, string> { ["en"] = "Description" },
             IsFeatured = false,
             IsActive = true
         };

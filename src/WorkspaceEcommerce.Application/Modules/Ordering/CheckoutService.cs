@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.Extensions.Logging;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
+using WorkspaceEcommerce.Application.Common.Localization;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Abstractions.Shipment;
 using WorkspaceEcommerce.Application.Common.Models;
@@ -15,6 +16,7 @@ namespace WorkspaceEcommerce.Application.Modules.Ordering;
 internal sealed class CheckoutService(
     ICheckoutStore checkoutStore,
     ICurrentCustomerContext currentCustomer,
+    ICurrentLanguageProvider languageProvider,
     IShipmentService shipmentService,
     ILogger<CheckoutService> logger,
     IValidator<CheckoutRequest> validator,
@@ -314,7 +316,7 @@ internal sealed class CheckoutService(
             snapshots.Add(new CheckoutItemSnapshot(
                 variant,
                 product.Id,
-                product.Name,
+                product.Name.Get(languageProvider.CurrentLanguage),
                 variant.Sku,
                 cartItem.UnitPriceSnapshot,
                 cartItem.Quantity,
@@ -392,6 +394,9 @@ internal sealed class CheckoutService(
             ? $"{request.ShippingStreet}, {request.ShippingWard}, {request.ShippingProvince}"
             : request.ShippingAddress;
 
+        var currencyCode = languageProvider.CurrentLanguage == "vi" ? "VND" : "USD";
+        var exchangeRate = languageProvider.CurrentLanguage == "vi" ? 26000m : 1m;
+
         var order = new Order(
             Guid.NewGuid(),
             await GenerateOrderCodeAsync(cancellationToken),
@@ -401,7 +406,9 @@ internal sealed class CheckoutService(
             request.CustomerEmail,
             shippingAddress,
             request.Note,
-            request.PaymentMethod);
+            request.PaymentMethod,
+            currencyCode,
+            exchangeRate);
 
         foreach (var snapshot in snapshots)
         {

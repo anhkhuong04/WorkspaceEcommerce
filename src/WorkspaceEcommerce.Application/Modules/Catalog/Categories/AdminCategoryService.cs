@@ -1,6 +1,7 @@
-﻿using FluentValidation;
+using FluentValidation;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 
 namespace WorkspaceEcommerce.Application.Modules.Catalog.Categories;
@@ -17,7 +18,7 @@ internal sealed class AdminCategoryService(
 
         var categories = dbContext.Categories
             .OrderBy(category => category.SortOrder)
-            .ThenBy(category => category.Name)
+            .ThenBy(category => category.Slug)
             .ToArray();
 
         var tree = BuildTree(categories);
@@ -49,7 +50,7 @@ internal sealed class AdminCategoryService(
         var category = new Category(
             Guid.NewGuid(),
             request.ParentId,
-            request.Name,
+            new LocalizedText(request.Name),
             normalizedSlug,
             request.SortOrder,
             request.IsActive);
@@ -101,7 +102,7 @@ internal sealed class AdminCategoryService(
             }
         }
 
-        category.UpdateDetails(request.Name, normalizedSlug, request.SortOrder);
+        category.UpdateDetails(new LocalizedText(request.Name), normalizedSlug, request.SortOrder);
         category.MoveToParent(request.ParentId);
 
         if (request.IsActive)
@@ -161,7 +162,7 @@ internal sealed class AdminCategoryService(
         return categories
             .Where(category => category.ParentId == parentId)
             .OrderBy(category => category.SortOrder)
-            .ThenBy(category => category.Name)
+            .ThenBy(category => category.Slug)
             .Select(category => ToDto(category, BuildChildren(category.Id, categories)))
             .ToArray();
     }

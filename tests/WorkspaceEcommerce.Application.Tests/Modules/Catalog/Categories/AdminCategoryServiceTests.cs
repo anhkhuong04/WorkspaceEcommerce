@@ -1,4 +1,4 @@
-﻿using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Catalog.Categories;
 using WorkspaceEcommerce.Application.Tests.Common.Fakes;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
@@ -42,7 +42,7 @@ public sealed class AdminCategoryServiceTests
     public async Task DeleteCategoryAsync_CategoryWithProduct_ReturnsConflict()
     {
         var category = CreateCategory();
-        var product = new Product(Guid.NewGuid(), category.Id, "Desk", "desk", null);
+        var product = new Product(Guid.NewGuid(), category.Id, WorkspaceEcommerce.Domain.Common.LocalizedText.Of("Desk"), "desk", null, false, true);
         var dbContext = new FakeAppDbContext();
         dbContext.Seed(category);
         dbContext.Seed(product);
@@ -62,7 +62,7 @@ public sealed class AdminCategoryServiceTests
         var service = CreateService(dbContext);
         var request = new CreateCategoryRequest
         {
-            Name = "Desk Accessories",
+            Name = new Dictionary<string, string> { ["en"] = "Desk Accessories" },
             Slug = "desk-accessories",
             SortOrder = 3,
             IsActive = true
@@ -73,7 +73,7 @@ public sealed class AdminCategoryServiceTests
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
         Assert.Equal("desk-accessories", result.Value.Slug);
-        Assert.Equal("Desk Accessories", result.Value.Name);
+        Assert.Equal("Desk Accessories", result.Value.Name["en"]);
         Assert.True(result.Value.IsActive);
         Assert.Single(dbContext.Categories);
         Assert.Equal(1, dbContext.SaveChangesCallCount);
@@ -87,7 +87,7 @@ public sealed class AdminCategoryServiceTests
         var service = CreateService(dbContext);
         var request = new CreateCategoryRequest
         {
-            Name = "Desk Accessories",
+            Name = new Dictionary<string, string> { ["en"] = "Desk Accessories" },
             Slug = "desk-accessories",
             SortOrder = 1,
             IsActive = true
@@ -107,7 +107,7 @@ public sealed class AdminCategoryServiceTests
         var request = new CreateCategoryRequest
         {
             ParentId = Guid.NewGuid(),
-            Name = "Monitor Arms",
+            Name = new Dictionary<string, string> { ["en"] = "Monitor Arms" },
             Slug = "monitor-arms",
             SortOrder = 1,
             IsActive = true
@@ -129,7 +129,7 @@ public sealed class AdminCategoryServiceTests
         var service = CreateService(dbContext);
         var request = new UpdateCategoryRequest
         {
-            Name = "New Name",
+            Name = new Dictionary<string, string> { ["en"] = "New Name" },
             Slug = "new-name",
             SortOrder = 9,
             IsActive = false
@@ -139,7 +139,7 @@ public sealed class AdminCategoryServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
-        Assert.Equal("New Name", result.Value.Name);
+        Assert.Equal("New Name", result.Value.Name["en"]);
         Assert.Equal("new-name", result.Value.Slug);
         Assert.Equal(9, result.Value.SortOrder);
         Assert.False(result.Value.IsActive);
@@ -179,7 +179,7 @@ public sealed class AdminCategoryServiceTests
         var service = CreateService(dbContext);
         var request = new UpdateCategoryRequest
         {
-            Name = "Target Category",
+            Name = new Dictionary<string, string> { ["en"] = "Target Category" },
             Slug = existing.Slug,
             SortOrder = 1,
             IsActive = true
@@ -198,7 +198,7 @@ public sealed class AdminCategoryServiceTests
         var service = CreateService(dbContext);
         var request = new UpdateCategoryRequest
         {
-            Name = "Missing",
+            Name = new Dictionary<string, string> { ["en"] = "Missing" },
             Slug = "missing",
             SortOrder = 1,
             IsActive = true
@@ -317,6 +317,6 @@ public sealed class AdminCategoryServiceTests
         int sortOrder = 1,
         bool isActive = true)
     {
-        return new Category(Guid.NewGuid(), parentId, name, slug, sortOrder, isActive);
+        return new Category(Guid.NewGuid(), parentId, WorkspaceEcommerce.Domain.Common.LocalizedText.Of(name), slug, sortOrder, isActive);
     }
 }

@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 
 namespace WorkspaceEcommerce.Application.Modules.Catalog.Products;
 
@@ -10,8 +10,7 @@ public sealed class CreateProductRequestValidator : AbstractValidator<CreateProd
             .NotEmpty();
 
         RuleFor(request => request.Name)
-            .NotEmpty()
-            .MaximumLength(250);
+            .NotEmpty();
 
         RuleFor(request => request.Slug)
             .NotEmpty()

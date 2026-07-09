@@ -1,4 +1,4 @@
-﻿using WorkspaceEcommerce.Domain.Common;
+using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 
 namespace WorkspaceEcommerce.Application.Tests.Domain.Catalog;
@@ -59,8 +59,8 @@ public sealed class ProductTests
         return new Product(
             Guid.NewGuid(),
             Guid.NewGuid(),
-            "Standing Desk",
+            new WorkspaceEcommerce.Domain.Common.LocalizedText { { "en", "Standing Desk" } },
             "standing-desk",
-            "Adjustable standing desk");
+            new WorkspaceEcommerce.Domain.Common.LocalizedText { { "en", "Adjustable standing desk" } });
     }
 }

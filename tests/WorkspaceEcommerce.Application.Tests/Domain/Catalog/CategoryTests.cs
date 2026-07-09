@@ -1,4 +1,4 @@
-﻿using WorkspaceEcommerce.Domain.Common;
+using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 
 namespace WorkspaceEcommerce.Application.Tests.Domain.Catalog;
@@ -48,6 +48,6 @@ public sealed class CategoryTests
 
     private static Category CreateCategory(bool isActive = true)
     {
-        return new Category(Guid.NewGuid(), null, "Category", "category", 1, isActive);
+        return new Category(Guid.NewGuid(), null, new WorkspaceEcommerce.Domain.Common.LocalizedText { { "en", "Category" } }, "category", 1, isActive);
     }
 }

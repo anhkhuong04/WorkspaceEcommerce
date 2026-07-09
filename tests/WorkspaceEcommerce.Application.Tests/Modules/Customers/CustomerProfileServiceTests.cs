@@ -88,7 +88,7 @@ public sealed class CustomerProfileServiceTests
 
     private static Customer CreateCustomer()
     {
-        return new Customer(
+        return Customer.Create(
             Guid.NewGuid(),
             "Nguyen Van A",
             "0900000000",

@@ -16,7 +16,9 @@ public sealed class Order : Entity
         string? customerEmail,
         string shippingAddress,
         string? note,
-        PaymentMethod paymentMethod)
+        PaymentMethod paymentMethod,
+        string currencyCode,
+        decimal exchangeRate)
         : base(id)
     {
         OrderCode = Guard.Required(orderCode, nameof(OrderCode));
@@ -27,6 +29,8 @@ public sealed class Order : Entity
         ShippingAddress = Guard.Required(shippingAddress, nameof(ShippingAddress));
         Note = Guard.Optional(note);
         PaymentMethod = paymentMethod;
+        CurrencyCode = Guard.Required(currencyCode, nameof(CurrencyCode));
+        ExchangeRate = Guard.NotNegative(exchangeRate, nameof(ExchangeRate));
         Status = OrderStatus.Pending;
         ShippingFee = 0m;
         DiscountAmount = 0m;
@@ -65,6 +69,10 @@ public sealed class Order : Entity
     public OrderStatus Status { get; private set; }
 
     public PaymentMethod PaymentMethod { get; private set; }
+
+    public string CurrencyCode { get; private set; }
+
+    public decimal ExchangeRate { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
 

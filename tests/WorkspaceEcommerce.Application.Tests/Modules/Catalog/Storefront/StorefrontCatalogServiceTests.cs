@@ -1,5 +1,6 @@
-﻿using WorkspaceEcommerce.Application.Modules.Catalog.Storefront;
+using WorkspaceEcommerce.Application.Modules.Catalog.Storefront;
 using WorkspaceEcommerce.Application.Tests.Common.Fakes;
+using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 
 namespace WorkspaceEcommerce.Application.Tests.Modules.Catalog.Storefront;
@@ -14,7 +15,7 @@ public sealed class StorefrontCatalogServiceTests
         var inactive = CreateCategory(name: "Hidden", slug: "hidden", isActive: false);
         var dbContext = new FakeAppDbContext();
         dbContext.Seed(root, child, inactive);
-        var service = new StorefrontCatalogService(dbContext);
+        var service = new StorefrontCatalogService(dbContext, new StubCurrentLanguageProvider());
 
         var result = await service.GetCategoriesAsync();
 
@@ -40,7 +41,7 @@ public sealed class StorefrontCatalogServiceTests
         dbContext.Seed(activeCategory, inactiveCategory);
         dbContext.Seed(visibleProduct, inactiveProduct, hiddenCategoryProduct);
         dbContext.Seed(activeVariant, inactiveVariant);
-        var service = new StorefrontCatalogService(dbContext);
+        var service = new StorefrontCatalogService(dbContext, new StubCurrentLanguageProvider());
 
         var result = await service.GetProductsAsync(new ProductListRequest());
 
@@ -67,7 +68,7 @@ public sealed class StorefrontCatalogServiceTests
             CreateVariant(first.Id, sku: "A", price: 100m, stockQuantity: 1),
             CreateVariant(second.Id, sku: "B", price: 200m, stockQuantity: 0),
             CreateVariant(chair.Id, sku: "C", price: 100m, stockQuantity: 1));
-        var service = new StorefrontCatalogService(dbContext);
+        var service = new StorefrontCatalogService(dbContext, new StubCurrentLanguageProvider());
 
         var result = await service.GetProductsAsync(new ProductListRequest
         {
@@ -104,7 +105,7 @@ public sealed class StorefrontCatalogServiceTests
             CreateVariant(beta.Id, sku: "B", price: 200m),
             CreateVariant(alpha.Id, sku: "A", price: 100m),
             CreateVariant(gamma.Id, sku: "G", price: 300m));
-        var service = new StorefrontCatalogService(dbContext);
+        var service = new StorefrontCatalogService(dbContext, new StubCurrentLanguageProvider());
 
         var nameResult = await service.GetProductsAsync(new ProductListRequest());
         var priceAscendingResult = await service.GetProductsAsync(new ProductListRequest { SortBy = "price-asc" });
@@ -136,7 +137,7 @@ public sealed class StorefrontCatalogServiceTests
         dbContext.Seed(activeVariant, inactiveVariant);
         dbContext.Seed(image);
         dbContext.Seed(specification);
-        var service = new StorefrontCatalogService(dbContext);
+        var service = new StorefrontCatalogService(dbContext, new StubCurrentLanguageProvider());
 
         var result = await service.GetProductBySlugAsync("standing-desk");
 
@@ -158,7 +159,7 @@ public sealed class StorefrontCatalogServiceTests
         var dbContext = new FakeAppDbContext();
         dbContext.Seed(category);
         dbContext.Seed(product);
-        var service = new StorefrontCatalogService(dbContext);
+        var service = new StorefrontCatalogService(dbContext, new StubCurrentLanguageProvider());
 
         var result = await service.GetProductBySlugAsync("hidden-product");
 
@@ -174,7 +175,7 @@ public sealed class StorefrontCatalogServiceTests
         var dbContext = new FakeAppDbContext();
         dbContext.Seed(category);
         dbContext.Seed(product);
-        var service = new StorefrontCatalogService(dbContext);
+        var service = new StorefrontCatalogService(dbContext, new StubCurrentLanguageProvider());
 
         var result = await service.GetProductBySlugAsync("standing-desk");
 
@@ -188,7 +189,7 @@ public sealed class StorefrontCatalogServiceTests
         string slug = "category",
         bool isActive = true)
     {
-        return new Category(Guid.NewGuid(), parentId, name, slug, 1, isActive);
+        return new Category(Guid.NewGuid(), parentId, LocalizedText.Of(name), slug, 1, isActive);
     }
 
     private static Product CreateProduct(
@@ -197,7 +198,7 @@ public sealed class StorefrontCatalogServiceTests
         string slug = "product",
         bool isActive = true)
     {
-        return new Product(Guid.NewGuid(), categoryId, name, slug, "Description", false, isActive);
+        return new Product(Guid.NewGuid(), categoryId, LocalizedText.Of(name), slug, LocalizedText.Of("Description"), false, isActive);
     }
 
     private static ProductVariant CreateVariant(
@@ -220,4 +221,10 @@ public sealed class StorefrontCatalogServiceTests
             requiresInstallation: false,
             isActive);
     }
+
+    private sealed class StubCurrentLanguageProvider : WorkspaceEcommerce.Application.Common.Localization.ICurrentLanguageProvider
+    {
+        public string CurrentLanguage => "en";
+    }
+
 }

@@ -40,7 +40,7 @@ public sealed class AdminDashboardServiceTests
         Assert.Equal(1, result.Value.NewOrders);
         Assert.Equal(5, result.Value.LowStockThreshold);
         Assert.Same(lowStockVariant, Assert.Single(result.Value.LowStockVariants));
-        Assert.Equal(7, result.Value.OrderStatusSummary.Count);
+        Assert.Equal(8, result.Value.OrderStatusSummary.Count);
         Assert.Equal(1, GetStatusCount(result.Value, OrderStatus.Pending));
         Assert.Equal(1, GetStatusCount(result.Value, OrderStatus.Completed));
         Assert.Equal(0, GetStatusCount(result.Value, OrderStatus.Cancelled));
@@ -89,7 +89,7 @@ public sealed class AdminDashboardServiceTests
         Assert.Equal(0, result.Value.NewOrders);
         Assert.Equal(5, result.Value.LowStockThreshold);
         Assert.Empty(result.Value.LowStockVariants);
-        Assert.Equal(7, result.Value.OrderStatusSummary.Count);
+        Assert.Equal(8, result.Value.OrderStatusSummary.Count);
         Assert.All(result.Value.OrderStatusSummary, item => Assert.Equal(0, item.Count));
         Assert.Empty(result.Value.RecentOrders);
     }

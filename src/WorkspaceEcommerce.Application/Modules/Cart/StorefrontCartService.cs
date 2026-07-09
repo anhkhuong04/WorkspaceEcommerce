@@ -1,6 +1,7 @@
 using FluentValidation;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Localization;
 using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Cart;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
@@ -9,6 +10,7 @@ namespace WorkspaceEcommerce.Application.Modules.Cart;
 
 internal sealed class StorefrontCartService(
     ICartStore cartStore,
+    ICurrentLanguageProvider languageProvider,
     IValidator<GetCartRequest> getCartValidator,
     IValidator<AddCartItemRequest> addItemValidator,
     IValidator<UpdateCartItemRequest> updateItemValidator,
@@ -264,7 +266,7 @@ internal sealed class StorefrontCartService(
             item.Id,
             item.ProductVariantId,
             variant?.ProductId ?? Guid.Empty,
-            product?.Name ?? "Product",
+            product?.Name.Get(languageProvider.CurrentLanguage) ?? "Product",
             product?.Slug ?? string.Empty,
             variant?.Name ?? "Variant",
             variant?.Color,

@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using WorkspaceEcommerce.Api.IntegrationTests.Infrastructure;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
@@ -156,7 +156,9 @@ public sealed class AdminDashboardIntegrationTests(ApiIntegrationTestFixture fix
             "customer2@example.com",
             "456 Shipping Street",
             null,
-            PaymentMethod.Cod);
+            PaymentMethod.Cod,
+            "USD",
+            1m);
         order.AddItem(
             Guid.Parse("88888888-8888-8888-8888-888888888888"),
             productVariantId,
@@ -185,7 +187,9 @@ public sealed class AdminDashboardIntegrationTests(ApiIntegrationTestFixture fix
             $"customer{index}@example.com",
             $"{index} Shipping Street",
             null,
-            PaymentMethod.Cod);
+            PaymentMethod.Cod,
+            "USD",
+            1m);
         order.AddItem(
             Guid.Parse($"{index + 3:D8}-5555-5555-5555-555555555555"),
             productVariantId,

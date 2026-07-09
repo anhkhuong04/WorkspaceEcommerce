@@ -29,7 +29,7 @@ internal sealed class AdminReviewService(IAppDbContext db) : IAdminReviewService
             .Select(r => new AdminReviewListItemDto(
                 r.Id,
                 r.ProductId,
-                productsById.TryGetValue(r.ProductId, out var productName) ? productName : "Unknown Product",
+                productsById.TryGetValue(r.ProductId, out var productName) ? productName.Get("en") : "Unknown Product",
                 r.CustomerId,
                 customersById.TryGetValue(r.CustomerId, out var customerName) ? customerName : "Unknown Customer",
                 r.Rating,

@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Domain.Common;
@@ -73,9 +73,9 @@ internal sealed class AdminProductService(
         var product = new Product(
             Guid.NewGuid(),
             request.CategoryId,
-            request.Name,
+            new LocalizedText(request.Name),
             normalizedSlug,
-            request.Description,
+            request.Description != null ? new LocalizedText(request.Description) : null,
             request.IsFeatured,
             request.IsActive);
 
@@ -113,7 +113,7 @@ internal sealed class AdminProductService(
             return Result<AdminProductDto>.Conflict("Product slug already exists.");
         }
 
-        product.UpdateDetails(request.CategoryId, request.Name, normalizedSlug, request.Description);
+        product.UpdateDetails(request.CategoryId, new LocalizedText(request.Name), normalizedSlug, request.Description != null ? new LocalizedText(request.Description) : null);
         SetFeatured(product, request.IsFeatured);
         SetActive(product, request.IsActive);
 
@@ -476,7 +476,7 @@ internal sealed class AdminProductService(
         return new AdminProductDto(
             product.Id,
             product.CategoryId,
-            category?.Name,
+            category?.Name.Get("en"),
             product.Name,
             product.Slug,
             product.Description,

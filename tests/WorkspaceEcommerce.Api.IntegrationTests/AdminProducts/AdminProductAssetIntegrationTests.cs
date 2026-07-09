@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using WorkspaceEcommerce.Api.IntegrationTests.Infrastructure;
+using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 
 namespace WorkspaceEcommerce.Api.IntegrationTests.AdminProducts;
@@ -153,16 +154,16 @@ public sealed class AdminProductAssetIntegrationTests(ApiIntegrationTestFixture 
         var category = new Category(
             Guid.NewGuid(),
             null,
-            "Desks",
+            LocalizedText.Of("Desks"),
             $"desks-{Guid.NewGuid():N}",
             1,
             isActive: true);
         var product = new Product(
             Guid.NewGuid(),
             category.Id,
-            "Standing Desk",
+            LocalizedText.Of("Standing Desk"),
             $"standing-desk-{Guid.NewGuid():N}",
-            "A desk for focused work.",
+            LocalizedText.Of("A desk for focused work."),
             isFeatured: true,
             isActive: true);
 

@@ -1,0 +1,11 @@
+{
+  "header": {
+    "login": "Login",
+    "cart": "Cart"
+  },
+  "cart": {
+    "title": "Your Cart",
+    "empty": "Your cart is empty",
+    "checkout": "Checkout"
+  }
+}
