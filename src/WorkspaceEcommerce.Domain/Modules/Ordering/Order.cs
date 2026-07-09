@@ -70,6 +70,10 @@ public sealed class Order : Entity
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    public string? TrackingCode { get; private set; }
+
+    public Guid? ShipmentId { get; private set; }
+
     public IReadOnlyCollection<OrderItem> Items => _items;
 
     public IReadOnlyCollection<OrderStatusHistory> StatusHistory => _statusHistory;
@@ -140,6 +144,25 @@ public sealed class Order : Entity
         Touch();
     }
 
+    public void SetShippingFee(decimal shippingFee)
+    {
+        ShippingFee = Guard.NotNegative(shippingFee, nameof(ShippingFee));
+        RecalculateTotals();
+        Touch();
+    }
+
+    public void UpdateShipmentInfo(string trackingCode, Guid shipmentId)
+    {
+        if (shipmentId == Guid.Empty)
+        {
+            throw new DomainException("Shipment id cannot be empty.");
+        }
+
+        TrackingCode = Guard.Required(trackingCode, nameof(TrackingCode));
+        ShipmentId = shipmentId;
+        Touch();
+    }
+
     public OrderStatusHistory RecordCreated(Guid historyId, string? note, string? changedBy)
     {
         if (_statusHistory.Any(history => history.FromStatus is null && history.ToStatus == OrderStatus.Pending))
@@ -184,10 +207,11 @@ public sealed class Order : Entity
         return fromStatus switch
         {
             OrderStatus.Pending => toStatus is OrderStatus.Confirmed or OrderStatus.Cancelled,
-            OrderStatus.Confirmed => toStatus == OrderStatus.Processing,
+            OrderStatus.Confirmed => toStatus is OrderStatus.Processing or OrderStatus.Cancelled,
             OrderStatus.Processing => toStatus == OrderStatus.Shipping,
             OrderStatus.Shipping => toStatus is OrderStatus.Completed or OrderStatus.FailedDelivery,
             OrderStatus.FailedDelivery => toStatus is OrderStatus.Shipping or OrderStatus.Cancelled,
+            OrderStatus.Completed => toStatus == OrderStatus.Returned,
             _ => false
         };
     }

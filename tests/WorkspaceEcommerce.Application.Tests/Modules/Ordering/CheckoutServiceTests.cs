@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
+using WorkspaceEcommerce.Application.Abstractions.Shipment;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Ordering;
 using WorkspaceEcommerce.Application.Tests.Common.Fakes;
@@ -45,7 +47,7 @@ public sealed class CheckoutServiceTests
         Assert.Empty(store.Carts);
         Assert.Single(store.Orders);
         Assert.Equal(1, store.TransactionCallCount);
-        Assert.Equal(1, store.SaveChangesCallCount);
+        Assert.Equal(2, store.SaveChangesCallCount);
     }
 
     [Fact]
@@ -255,6 +257,8 @@ public sealed class CheckoutServiceTests
         return new CheckoutService(
             store,
             new StubCurrentCustomerContext(customerId),
+            new FakeShipmentService(),
+            NullLogger<CheckoutService>.Instance,
             new CheckoutRequestValidator(),
             new ValidateCheckoutCouponRequestValidator());
     }
@@ -269,7 +273,10 @@ public sealed class CheckoutServiceTests
             CustomerName = "Nguyen Van A",
             CustomerPhone = "0900000000",
             CustomerEmail = "customer@example.com",
-            ShippingAddress = "123 Shipping Street",
+            ShippingAddress = "123 Shipping Street, Ward 1, Ho Chi Minh",
+            ShippingStreet = "123 Shipping Street",
+            ShippingWard = "Ward 1",
+            ShippingProvince = "Ho Chi Minh",
             Note = "Call before delivery",
             PaymentMethod = paymentMethod,
             CouponCode = couponCode
@@ -343,5 +350,46 @@ public sealed class CheckoutServiceTests
         public Guid? CustomerId => customerId;
 
         public string? Email => customerId.HasValue ? "customer@example.com" : null;
+    }
+
+    private sealed class FakeShipmentService : IShipmentService
+    {
+        public Task<ShippingQuoteResponse> GetShippingQuoteAsync(ShippingQuoteRequest request, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new ShippingQuoteResponse
+            {
+                TotalFeeAmount = 0m,
+                BaseFeeAmount = 0m,
+                ExtraWeightFeeAmount = 0m,
+                InsuranceFeeAmount = 0m,
+                RouteType = "Standard",
+                Currency = "VND"
+            });
+        }
+
+        public Task<CreateShipmentResponse> CreateShipmentAsync(CreateShipmentRequest request, string idempotencyKey, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new CreateShipmentResponse
+            {
+                ShipmentId = Guid.NewGuid(),
+                ExternalOrderId = request.ExternalOrderId,
+                TrackingCode = "ML-" + Guid.NewGuid().ToString("N")[..10].ToUpperInvariant(),
+                Status = "PendingPickup",
+                ShippingFeeAmount = 0m,
+                Currency = "VND"
+            });
+        }
+
+        public Task<TrackingResponse> GetTrackingAsync(string trackingCode, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new TrackingResponse
+            {
+                TrackingCode = trackingCode,
+                ExternalOrderId = "ECOM-1001",
+                Status = "PendingPickup",
+                ShippingFeeAmount = 0m,
+                Timeline = []
+            });
+        }
     }
 }

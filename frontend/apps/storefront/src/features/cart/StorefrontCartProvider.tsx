@@ -1,4 +1,4 @@
-﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CartDto, CartItemDto } from "@workspace-ecommerce/api-types";
 import type { ReactNode, RefObject } from "react";
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -265,7 +265,7 @@ function CartDrawerHeader({
           onClick={onClear}
           className="text-sm font-medium text-slate-400 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 sm:text-base"
         >
-          Xoá tất cả
+          Clear all
         </button>
         <CartCloseButton ref={closeButtonRef} onClose={onClose} />
       </div>
@@ -299,13 +299,13 @@ function EmptyCartState({ onClose }: { onClose: () => void }) {
         </svg>
         <span className="absolute right-0.5 top-1.5 grid h-7 w-7 place-items-center rounded-full bg-[#171717] text-sm font-bold text-white">0</span>
       </div>
-      <p className="mt-6 text-xl font-medium text-slate-800">Giỏ hàng đang trống</p>
+      <p className="mt-6 text-xl font-medium text-slate-800">Your cart is empty</p>
       <Link
         to="/products"
         onClick={onClose}
         className="mt-8 inline-flex h-14 min-w-[220px] items-center justify-center rounded-full bg-[#171717] px-8 text-base font-bold text-white transition hover:bg-black"
       >
-        Tiếp tục mua sắm
+        Continue shopping
       </Link>
     </div>
   );
@@ -353,7 +353,7 @@ function CartDrawerFooter({ totalAmount, onClose }: { totalAmount: number; onClo
       </div>
 
       <div className="mt-6 flex h-12 items-center rounded-full border border-slate-200 bg-white pl-5 pr-1.5 text-slate-400">
-        <span className="min-w-0 flex-1 truncate text-sm font-medium sm:text-base">Nhập mã giảm giá khác</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium sm:text-base">Enter discount code</span>
         <button type="button" className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-white" aria-label="Apply discount code" disabled>
           <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />

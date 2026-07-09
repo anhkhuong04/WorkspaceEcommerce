@@ -127,6 +127,9 @@ internal sealed class AdminOrderService(
             order.CustomerEmail,
             order.ShippingAddress,
             order.Note,
+            order.CouponId,
+            order.CouponCodeSnapshot,
+            order.CouponNameSnapshot,
             order.Subtotal,
             order.ShippingFee,
             order.DiscountAmount,
@@ -135,6 +138,8 @@ internal sealed class AdminOrderService(
             order.PaymentMethod,
             order.CreatedAt,
             order.UpdatedAt,
+            order.TrackingCode,
+            order.ShipmentId,
             items.Select(ToItemDto).ToArray(),
             statusHistory.Select(ToStatusHistoryDto).ToArray());
     }

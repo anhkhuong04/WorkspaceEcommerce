@@ -23,7 +23,6 @@ public sealed class CustomerOrdersController(ICustomerOrderService customerOrder
         CancellationToken cancellationToken)
     {
         var result = await customerOrderService.GetOrdersAsync(request, cancellationToken);
-
         return this.ToApiResponse(result);
     }
 
@@ -38,7 +37,38 @@ public sealed class CustomerOrdersController(ICustomerOrderService customerOrder
         CancellationToken cancellationToken)
     {
         var result = await customerOrderService.GetOrderByIdAsync(id, cancellationToken);
+        return this.ToApiResponse(result);
+    }
 
+    [HttpPost("api/customer/orders/{id:guid}/cancel")]
+    [ProducesResponseType(typeof(ApiResponse<CustomerOrderDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CancelOrder(
+        Guid id,
+        [FromBody] OrderActionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await customerOrderService.CancelOrderAsync(id, request.Reason, cancellationToken);
+        return this.ToApiResponse(result);
+    }
+
+    [HttpPost("api/customer/orders/{id:guid}/return")]
+    [ProducesResponseType(typeof(ApiResponse<CustomerOrderDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> RequestReturn(
+        Guid id,
+        [FromBody] OrderActionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await customerOrderService.RequestReturnAsync(id, request.Reason, cancellationToken);
         return this.ToApiResponse(result);
     }
 }
+
+public sealed record OrderActionRequest(string Reason = "");

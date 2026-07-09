@@ -23,6 +23,20 @@ public sealed class CheckoutController(ICheckoutService checkoutService) : Contr
         return this.ToApiResponse(result);
     }
 
+    [HttpPost("api/checkout/shipping-quote")]
+    [ProducesResponseType(typeof(ApiResponse<GetShippingQuoteResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetShippingQuote(
+        [FromBody] GetShippingQuoteRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await checkoutService.GetShippingQuoteAsync(request, cancellationToken);
+
+        return this.ToApiResponse(result);
+    }
+
     [HttpPost("api/checkout")]
     [ProducesResponseType(typeof(ApiResponse<CheckoutResponse>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]

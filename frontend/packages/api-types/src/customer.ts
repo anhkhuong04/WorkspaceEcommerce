@@ -12,6 +12,11 @@ export interface CustomerLoginRequest {
   password: string;
 }
 
+export interface CustomerGoogleLoginRequest {
+  idToken: string;
+  googleClientId?: string;
+}
+
 export interface CustomerAuthResponse {
   accessToken: string;
   tokenType: string;
@@ -70,9 +75,9 @@ export interface CustomerOrderDto {
   customerEmail: string | null;
   shippingAddress: string;
   note: string | null;
-  couponId?: string | null;
-  couponCodeSnapshot?: string | null;
-  couponNameSnapshot?: string | null;
+  couponId: string | null;
+  couponCodeSnapshot: string | null;
+  couponNameSnapshot: string | null;
   subtotal: number;
   shippingFee: number;
   discountAmount: number;

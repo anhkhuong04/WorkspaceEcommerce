@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useStorefrontCart } from "../../features/cart/StorefrontCartContext";
+import { ProductReviews } from "./ProductReviews";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
 
@@ -349,6 +350,8 @@ export function ProductDetailPage() {
           )}
         </div>
       </section>
+
+      <ProductReviews slug={slug} product={product} />
     </div>
   );
 }

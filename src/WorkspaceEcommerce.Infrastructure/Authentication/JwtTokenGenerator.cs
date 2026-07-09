@@ -38,7 +38,7 @@ internal sealed class JwtTokenGenerator(JwtOptions options) : IJwtTokenGenerator
         Guid customerId,
         string email,
         string fullName,
-        string phoneNumber)
+        string? phoneNumber)
     {
         if (customerId == Guid.Empty)
         {
@@ -47,11 +47,10 @@ internal sealed class JwtTokenGenerator(JwtOptions options) : IJwtTokenGenerator
 
         ArgumentException.ThrowIfNullOrWhiteSpace(email);
         ArgumentException.ThrowIfNullOrWhiteSpace(fullName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(phoneNumber);
 
         var normalizedEmail = email.Trim().ToLowerInvariant();
         var normalizedFullName = fullName.Trim();
-        var normalizedPhoneNumber = phoneNumber.Trim();
+        var normalizedPhoneNumber = phoneNumber?.Trim() ?? string.Empty;
         var customerIdValue = customerId.ToString("D");
         var expiresAt = DateTimeOffset.UtcNow.AddMinutes(options.AccessTokenMinutes);
         var accessToken = CreateToken(

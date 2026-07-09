@@ -20,6 +20,9 @@ services:
       Jwt__Audience: ${Jwt__Audience:?Set Jwt__Audience in .env}
       Jwt__SigningKey: ${Jwt__SigningKey:?Set Jwt__SigningKey in .env}
       Jwt__AccessTokenMinutes: ${Jwt__AccessTokenMinutes:-60}
+      MiniLogistics__BaseUrl: ${MiniLogistics__BaseUrl:-http://host.docker.internal:5221/api/v1/partner}
+      MiniLogistics__ApiKey: ${MiniLogistics__ApiKey:-ml_demo_partner_key_123456}
+      MiniLogistics__WebhookSecret: ${MiniLogistics__WebhookSecret:-minilogistics_webhook_secret_dev}
     ports:
       - "${API_PORT:-5080}:8080"
       - "${API_HTTPS_PORT:-5443}:8443"

@@ -31,7 +31,8 @@ const statusStyles: Record<OrderStatus, string> = {
   3: "bg-violet-100 text-violet-800",
   4: "bg-emerald-100 text-emerald-800",
   5: "bg-red-100 text-red-800",
-  6: "bg-slate-100 text-slate-600"
+  6: "bg-slate-100 text-slate-600",
+  7: "bg-orange-100 text-orange-800"
 };
 
 export function AccountOverviewPage() {
@@ -324,6 +325,7 @@ function OrderDetail({ order }: { order: CustomerOrderDto }) {
                 {order.customerEmail ? <InfoBlock label="Email" value={order.customerEmail} /> : null}
                 <InfoBlock label="Shipping address" value={order.shippingAddress} />
                 {order.note ? <InfoBlock label="Note" value={order.note} /> : null}
+                {order.couponCodeSnapshot ? <InfoBlock label="Coupon" value={formatCouponSnapshot(order)} /> : null}
                 <InfoBlock label="Payment" value={formatPaymentMethod(order.paymentMethod)} />
               </div>
             </section>
@@ -379,7 +381,7 @@ function OrderTotals({ order }: { order: CustomerOrderDto }) {
     <div className="mt-4 grid gap-2 border-t border-slate-200 pt-4">
       <TotalLine label="Subtotal" value={formatMoney(order.subtotal)} />
       {order.shippingFee > 0 ? <TotalLine label="Shipping fee" value={formatMoney(order.shippingFee)} /> : null}
-      {order.discountAmount > 0 ? <TotalLine label="Discount" value={`-${formatMoney(order.discountAmount)}`} tone="success" /> : null}
+      {order.discountAmount > 0 ? <TotalLine label={formatDiscountLabel(order)} value={`-${formatMoney(order.discountAmount)}`} tone="success" /> : null}
       <div className="flex justify-between text-xl font-black text-slate-950">
         <span>Total</span>
         <span className="text-[var(--brand)]">{formatMoney(order.totalAmount)}</span>
@@ -395,6 +397,14 @@ function TotalLine({ label, tone = "muted", value }: { label: string; tone?: "mu
       <span>{value}</span>
     </div>
   );
+}
+
+function formatDiscountLabel(order: CustomerOrderDto): string {
+  return order.couponCodeSnapshot ? `Discount (${order.couponCodeSnapshot})` : "Discount";
+}
+
+function formatCouponSnapshot(order: CustomerOrderDto): string {
+  return order.couponNameSnapshot ? `${order.couponCodeSnapshot} - ${order.couponNameSnapshot}` : order.couponCodeSnapshot ?? "";
 }
 
 function StatusTimeline({ order }: { order: CustomerOrderDto }) {

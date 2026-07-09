@@ -11,5 +11,6 @@ public interface IJwtTokenGenerator
         Guid customerId,
         string email,
         string fullName,
-        string phoneNumber);
+        string? phoneNumber);
+
 }

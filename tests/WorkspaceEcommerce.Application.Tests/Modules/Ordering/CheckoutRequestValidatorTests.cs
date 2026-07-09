@@ -27,6 +27,9 @@ public sealed class CheckoutRequestValidatorTests
             CustomerPhone = string.Empty,
             CustomerEmail = "invalid-email",
             ShippingAddress = string.Empty,
+            ShippingStreet = string.Empty,
+            ShippingWard = string.Empty,
+            ShippingProvince = string.Empty,
             PaymentMethod = (PaymentMethod)999
         };
 
@@ -37,7 +40,10 @@ public sealed class CheckoutRequestValidatorTests
         Assert.Contains(result.Errors, error => error.PropertyName == nameof(CheckoutRequest.CustomerName));
         Assert.Contains(result.Errors, error => error.PropertyName == nameof(CheckoutRequest.CustomerPhone));
         Assert.Contains(result.Errors, error => error.PropertyName == nameof(CheckoutRequest.CustomerEmail));
-        Assert.Contains(result.Errors, error => error.PropertyName == nameof(CheckoutRequest.ShippingAddress));
+        // ShippingAddress is no longer strictly validated since we use structured fields
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(CheckoutRequest.ShippingStreet));
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(CheckoutRequest.ShippingWard));
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(CheckoutRequest.ShippingProvince));
         Assert.Contains(result.Errors, error => error.PropertyName == nameof(CheckoutRequest.PaymentMethod));
     }
 
@@ -49,7 +55,10 @@ public sealed class CheckoutRequestValidatorTests
             CustomerName = "Nguyen Van A",
             CustomerPhone = "0900000000",
             CustomerEmail = "customer@example.com",
-            ShippingAddress = "123 Shipping Street",
+            ShippingAddress = "123 Shipping Street, Ward 1, District 1, Ho Chi Minh",
+            ShippingStreet = "123 Shipping Street",
+            ShippingWard = "Ward 1",
+            ShippingProvince = "Ho Chi Minh",
             Note = "Call before delivery",
             PaymentMethod = PaymentMethod.Cod
         };

@@ -1,4 +1,4 @@
-﻿import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AdminCategoryDto,
@@ -329,8 +329,8 @@ export function ProductsPage() {
               <tbody>
                 {productsQuery.data.map((product) => (
                   <Fragment key={product.id}>
-                    <tr id={`product-${product.id}`} key={product.id} className={cx("border-b border-slate-100 transition-colors", targetProduct?.id === product.id && "bg-teal-50/80")}>
-                      <td className="py-3 pr-4"><button type="button" className="mr-2 rounded font-black text-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2" onClick={() => toggleExpanded(product.id)} aria-label={`${isProductExpanded(product.id) ? "Collapse" : "Expand"} ${product.name}`}>{isProductExpanded(product.id) ? "-" : "+"}</button><span className="font-bold text-slate-900">{product.name}</span><p className="mt-0.5 text-xs text-slate-500">{product.slug}</p></td>
+                    <tr id={`product-${product.id}`} key={product.id} className={cx("border-b border-slate-100 transition-colors", targetProduct?.id === product.id && "bg-slate-50")}>
+                      <td className="py-3 pr-4"><button type="button" className="mr-2 rounded font-black text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-600 focus-visible:ring-offset-2" onClick={() => toggleExpanded(product.id)} aria-label={`${isProductExpanded(product.id) ? "Collapse" : "Expand"} ${product.name}`}>{isProductExpanded(product.id) ? "-" : "+"}</button><span className="font-bold text-slate-900">{product.name}</span><p className="mt-0.5 text-xs text-slate-500">{product.slug}</p></td>
                       <td className="py-3 pr-4 text-slate-600">{product.categoryName ?? "-"}</td>
                       <td className="py-3 pr-4 text-slate-600">{product.variants.length}</td>
                       <td className="py-3 pr-4 text-slate-600">{product.images.length} images / {product.specifications.length} specs</td>
@@ -354,7 +354,7 @@ export function ProductsPage() {
                               <h3 className="text-sm font-black text-slate-900">Product images</h3>
                               <Button type="button" onClick={() => openCreateImageModal(product)}>Add image</Button>
                             </div>
-                            {product.images.length ? <div className="grid gap-3 md:grid-cols-2">{product.images.map((image) => <div key={image.id} className="rounded-2xl border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-black text-slate-900">{image.imageUrl}</p><p className="mt-1 text-xs text-slate-500">Alt: {image.altText || "-"}</p><p className="mt-1 text-xs text-slate-500">Sort order: {image.sortOrder}</p></div><Pill tone="teal">Image</Pill></div><div className="mt-3 flex gap-2"><Button type="button" onClick={() => openEditImageModal(product, image)}>Edit</Button><Button type="button" variant="danger" disabled={imageDeleteMutation.isPending} onClick={() => setDeleteTarget({ type: "image", item: image })}>Delete</Button></div></div>)}</div> : <EmptyState>No images for this product</EmptyState>}
+                            {product.images.length ? <div className="grid gap-3 md:grid-cols-2">{product.images.map((image) => <div key={image.id} className="rounded-2xl border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-black text-slate-900">{image.imageUrl}</p><p className="mt-1 text-xs text-slate-500">Alt: {image.altText || "-"}</p><p className="mt-1 text-xs text-slate-500">Sort order: {image.sortOrder}</p></div><Pill tone="slate">Image</Pill></div><div className="mt-3 flex gap-2"><Button type="button" onClick={() => openEditImageModal(product, image)}>Edit</Button><Button type="button" variant="danger" disabled={imageDeleteMutation.isPending} onClick={() => setDeleteTarget({ type: "image", item: image })}>Delete</Button></div></div>)}</div> : <EmptyState>No images for this product</EmptyState>}
                           </section>
 
                           <section className="rounded-2xl border border-slate-200 bg-white p-4">

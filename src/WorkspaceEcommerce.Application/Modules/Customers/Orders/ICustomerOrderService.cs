@@ -11,4 +11,14 @@ public interface ICustomerOrderService
     Task<Result<CustomerOrderDto>> GetOrderByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default);
+
+    Task<Result<CustomerOrderDto>> CancelOrderAsync(
+        Guid id,
+        string reason,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<CustomerOrderDto>> RequestReturnAsync(
+        Guid id,
+        string reason,
+        CancellationToken cancellationToken = default);
 }

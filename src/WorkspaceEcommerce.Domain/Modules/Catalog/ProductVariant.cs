@@ -15,7 +15,11 @@ public sealed class ProductVariant : Entity
         decimal? compareAtPrice,
         int stockQuantity,
         bool requiresInstallation,
-        bool isActive = true)
+        bool isActive = true,
+        decimal? weightKg = null,
+        decimal? lengthCm = null,
+        decimal? widthCm = null,
+        decimal? heightCm = null)
         : base(id)
     {
         if (productId == Guid.Empty)
@@ -33,6 +37,7 @@ public sealed class ProductVariant : Entity
 
         UpdatePricing(price, compareAtPrice);
         UpdateStock(stockQuantity);
+        UpdateDimensions(weightKg, lengthCm, widthCm, heightCm);
     }
 
     public Guid ProductId { get; private set; }
@@ -55,6 +60,14 @@ public sealed class ProductVariant : Entity
 
     public bool IsActive { get; private set; }
 
+    public decimal? WeightKg { get; private set; }
+
+    public decimal? LengthCm { get; private set; }
+
+    public decimal? WidthCm { get; private set; }
+
+    public decimal? HeightCm { get; private set; }
+
     public void UpdateDetails(
         string sku,
         string name,
@@ -67,6 +80,38 @@ public sealed class ProductVariant : Entity
         Color = Guard.Optional(color);
         Size = Guard.Optional(size);
         RequiresInstallation = requiresInstallation;
+    }
+
+    public void UpdateDimensions(
+        decimal? weightKg,
+        decimal? lengthCm,
+        decimal? widthCm,
+        decimal? heightCm)
+    {
+        if (weightKg is not null)
+        {
+            Guard.NotNegative(weightKg.Value, nameof(WeightKg));
+        }
+
+        if (lengthCm is not null)
+        {
+            Guard.NotNegative(lengthCm.Value, nameof(LengthCm));
+        }
+
+        if (widthCm is not null)
+        {
+            Guard.NotNegative(widthCm.Value, nameof(WidthCm));
+        }
+
+        if (heightCm is not null)
+        {
+            Guard.NotNegative(heightCm.Value, nameof(HeightCm));
+        }
+
+        WeightKg = weightKg;
+        LengthCm = lengthCm;
+        WidthCm = widthCm;
+        HeightCm = heightCm;
     }
 
     public void UpdatePricing(decimal price, decimal? compareAtPrice)
@@ -99,6 +144,16 @@ public sealed class ProductVariant : Entity
         }
 
         StockQuantity -= quantity;
+    }
+
+    public void RestoreStock(int quantity)
+    {
+        if (quantity <= 0)
+        {
+            throw new DomainException("Stock restore quantity must be greater than zero.");
+        }
+
+        StockQuantity += quantity;
     }
 
     public void Activate()

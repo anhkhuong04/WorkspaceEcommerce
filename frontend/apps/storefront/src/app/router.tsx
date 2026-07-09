@@ -15,6 +15,8 @@ import { LoginPage } from "../pages/login/LoginPage";
 import { OrderLookupPage } from "../pages/order-lookup/OrderLookupPage";
 import { ProductDetailPage } from "../pages/product-detail/ProductDetailPage";
 import { ProductListPage } from "../pages/product-list/ProductListPage";
+import { BlogListPage } from "../pages/news/BlogListPage";
+import { BlogDetailPage } from "../pages/news/BlogDetailPage";
 
 export const router = createBrowserRouter([
   {
@@ -24,9 +26,25 @@ export const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: "products", element: <ProductListPage /> },
       { path: "products/:slug", element: <ProductDetailPage /> },
+      { path: "news", element: <BlogListPage /> },
+      { path: "news/:slug", element: <BlogDetailPage /> },
       { path: "cart", element: <CartPage /> },
-      { path: "checkout", element: <CheckoutPage /> },
-      { path: "checkout/success", element: <CheckoutSuccessPage /> },
+      {
+        path: "checkout",
+        element: (
+          <CustomerProtectedRoute>
+            <CheckoutPage />
+          </CustomerProtectedRoute>
+        )
+      },
+      {
+        path: "checkout/success",
+        element: (
+          <CustomerProtectedRoute>
+            <CheckoutSuccessPage />
+          </CustomerProtectedRoute>
+        )
+      },
       { path: "login", element: <LoginPage /> },
       { path: "orders/lookup", element: <OrderLookupPage /> },
       {

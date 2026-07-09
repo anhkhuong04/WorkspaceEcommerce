@@ -63,6 +63,8 @@ internal sealed class StorefrontOrderLookupService(
             order.PaymentMethod,
             order.CreatedAt,
             order.UpdatedAt,
+            order.TrackingCode,
+            order.ShipmentId,
             items.Select(ToDto).ToArray());
     }
 

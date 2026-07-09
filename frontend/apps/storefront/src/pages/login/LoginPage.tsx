@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { GoogleLogin } from "@react-oauth/google";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
@@ -187,6 +188,20 @@ export function LoginPage() {
     }
   }
 
+  async function handleGoogleSuccess(credential: string) {
+    setApiError(null);
+    try {
+      const response = await storefrontApi.loginWithGoogle({
+        idToken: credential,
+        googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID
+      });
+      signIn(response);
+      navigate(redirectPath, { replace: true });
+    } catch (error) {
+      setApiError(getApiErrorMessage(error));
+    }
+  }
+
   function switchMode(nextMode: AuthMode) {
     setMode(nextMode);
   }
@@ -239,6 +254,26 @@ export function LoginPage() {
                 {isSubmitting ? "Please wait..." : isRegister ? "Create account" : "Sign in"}
               </button>
             </form>
+
+            <div className="my-5 flex items-center gap-3">
+              <div className="h-px flex-1 bg-slate-200" />
+              <span className="text-xs font-medium text-slate-400">or continue with</span>
+              <div className="h-px flex-1 bg-slate-200" />
+            </div>
+
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={(response) => {
+                  if (response.credential) void handleGoogleSuccess(response.credential);
+                }}
+                onError={() => setApiError("Google sign-in failed. Please try again.")}
+                text={isRegister ? "signup_with" : "signin_with"}
+                shape="rectangular"
+                theme="outline"
+                size="large"
+                width="400"
+              />
+            </div>
 
             <p className="mt-5 text-center text-xs text-slate-500">
               {isRegister ? "Already have an account?" : "Do not have an account?"}{" "}

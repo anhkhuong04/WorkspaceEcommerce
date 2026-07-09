@@ -1,4 +1,4 @@
-﻿import type { PaginationRequest } from "./common";
+import type { PaginationRequest } from "./common";
 import type { OrderStatus, PaymentMethod, OrderItemDto } from "./orders";
 import type { CouponDiscountType } from "./coupons";
 
@@ -143,9 +143,9 @@ export interface AdminOrderDto extends AdminOrderListItemDto {
   customerEmail: string | null;
   shippingAddress: string;
   note: string | null;
-  couponId?: string | null;
-  couponCodeSnapshot?: string | null;
-  couponNameSnapshot?: string | null;
+  couponId: string | null;
+  couponCodeSnapshot: string | null;
+  couponNameSnapshot: string | null;
   subtotal: number;
   shippingFee: number;
   discountAmount: number;
@@ -255,3 +255,36 @@ export interface AdminDashboardDto {
   orderStatusSummary: AdminOrderStatusSummaryDto[];
   recentOrders: RecentAdminOrderDto[];
 }
+
+export interface ReviewDto {
+  id: string;
+  productId: string;
+  customerId: string;
+  customerName: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+}
+
+export interface ProductReviewSummaryDto {
+  averageRating: number;
+  reviewCount: number;
+  reviews: ReviewDto[];
+}
+
+export interface AdminReviewListItemDto {
+  id: string;
+  productId: string;
+  productName: string;
+  customerId: string;
+  customerName: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+}
+
+export interface CreateReviewRequest {
+  rating: number;
+  comment?: string | null;
+}
+

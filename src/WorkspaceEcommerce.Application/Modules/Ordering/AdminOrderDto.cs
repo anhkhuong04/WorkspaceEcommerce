@@ -11,6 +11,9 @@ public sealed record AdminOrderDto(
     string? CustomerEmail,
     string ShippingAddress,
     string? Note,
+    Guid? CouponId,
+    string? CouponCodeSnapshot,
+    string? CouponNameSnapshot,
     decimal Subtotal,
     decimal ShippingFee,
     decimal DiscountAmount,
@@ -19,5 +22,7 @@ public sealed record AdminOrderDto(
     PaymentMethod PaymentMethod,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
+    string? TrackingCode,
+    Guid? ShipmentId,
     IReadOnlyCollection<OrderItemDto> Items,
     IReadOnlyCollection<AdminOrderStatusHistoryDto> StatusHistory);

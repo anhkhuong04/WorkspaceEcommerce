@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { StorefrontCategoryDto } from "@workspace-ecommerce/api-types";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
@@ -10,7 +11,7 @@ import { StorefrontFooter } from "./StorefrontFooter";
 const navItems = [
   { to: "/products", label: "Products", hasDropdown: true },
   { label: "Warranty", hasDropdown: true },
-  { label: "News" },
+  { to: "/news", label: "News" },
   { label: "Showroom" }
 ];
 
@@ -33,41 +34,54 @@ function StorefrontLayoutContent() {
   const isHome = location.pathname === "/";
   const hideHeader = location.pathname === "/login";
 
+  const [isHovered, setIsHovered] = useState(false);
+
+  const isHeaderSolid = !isHome || isHovered;
+
   const headerClass = isHome
-    ? "absolute top-0 left-0 right-0 z-50 bg-transparent text-white"
+    ? `absolute top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${
+        isHovered
+          ? "bg-white text-slate-950 border-b border-slate-100 shadow-[0_8px_30px_rgba(15,23,42,0.04)]"
+          : "bg-transparent text-white"
+      }`
     : "sticky top-0 z-20 border-b border-slate-100 bg-white/95 shadow-[0_8px_30px_rgba(15,23,42,0.04)] backdrop-blur-xl text-slate-950";
 
-  const textColorClass = isHome ? "text-white" : "text-slate-950";
-  const iconColorClass = isHome ? "text-white" : "text-slate-900";
+  const textColorClass = isHeaderSolid ? "text-slate-950" : "text-white";
+  const iconColorClass = isHeaderSolid ? "text-slate-900" : "text-white";
+
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--surface-soft)] text-[var(--ink)]">
       {hideHeader ? null : (
-        <header className={headerClass}>
+        <header
+          className={headerClass}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+        >
           <div className="mx-auto flex min-h-20 max-w-[1600px] items-center justify-between gap-6 px-5 py-4 sm:px-8 lg:px-10">
             <div className="flex min-w-0 flex-1 items-center gap-5 lg:gap-12">
               <NavLink to="/" className="flex shrink-0 items-center" aria-label="WorkspaceEcom home">
                 <img
                   src="/demo/logo.svg"
                   alt="WorkspaceEcom"
-                  className={`h-auto w-[150px] sm:w-[180px] ${isHome ? "brightness-0 invert" : ""}`}
+                  className={`h-auto w-[150px] sm:w-[180px] transition-all duration-300 ${isHeaderSolid ? "" : "brightness-0 invert"}`}
                 />
               </NavLink>
 
-              <nav className={`ui-control flex min-w-0 items-center gap-3 overflow-x-auto whitespace-nowrap scrollbar-hidden sm:gap-5 lg:gap-10 ${textColorClass}`}>
+              <nav className={`ui-control flex min-w-0 items-center gap-3 overflow-x-auto whitespace-nowrap scrollbar-hidden sm:gap-5 lg:gap-10 transition-colors duration-300 ${textColorClass}`}>
                 {navItems.map((item) =>
                   item.label === "Products" && item.to ? (
                     <div key={`${item.label}-${item.to}`} className="group inline-flex">
                       <NavLink
                         to={item.to}
                         className={({ isActive }) =>
-                          `inline-flex items-center gap-2 rounded-full px-1 py-2 transition ${isHome ? "hover:text-white/70" : "hover:text-[var(--brand)]"} ${
-                            isActive && !isHome ? "text-[var(--brand)]" : ""
+                          `inline-flex items-center gap-2 rounded-full px-1 py-2 transition ${isHeaderSolid ? "hover:text-[var(--brand)]" : "hover:text-white/70"} ${
+                            isActive && isHeaderSolid ? "text-[var(--brand)]" : ""
                           }`
                         }
                       >
                         {item.label}
-                        <span className={`mt-0.5 text-[10px] leading-none ${isHome ? "text-white" : "text-slate-900"}`} aria-hidden="true">
+                        <span className={`mt-0.5 text-[10px] leading-none transition-colors duration-300 ${isHeaderSolid ? "text-slate-900" : "text-white"}`} aria-hidden="true">
                           v
                         </span>
                       </NavLink>
@@ -78,13 +92,13 @@ function StorefrontLayoutContent() {
                       key={`${item.label}-${item.to}`}
                       to={item.to}
                       className={({ isActive }) =>
-                        `inline-flex items-center gap-2 rounded-full px-1 py-2 transition ${isHome ? "hover:text-white/70" : "hover:text-[var(--brand)]"} ${
-                          isActive && !isHome ? "text-[var(--brand)]" : ""
+                        `inline-flex items-center gap-2 rounded-full px-1 py-2 transition ${isHeaderSolid ? "hover:text-[var(--brand)]" : "hover:text-white/70"} ${
+                          isActive && isHeaderSolid ? "text-[var(--brand)]" : ""
                         }`
                       }
                     >
                       {item.label}
-                      {item.hasDropdown ? <span className={`mt-0.5 text-[10px] leading-none ${isHome ? "text-white" : "text-slate-900"}`} aria-hidden="true">v</span> : null}
+                      {item.hasDropdown ? <span className={`mt-0.5 text-[10px] leading-none transition-colors duration-300 ${isHeaderSolid ? "text-slate-900" : "text-white"}`} aria-hidden="true">v</span> : null}
                     </NavLink>
                   ) : (
                     <button
@@ -94,17 +108,17 @@ function StorefrontLayoutContent() {
                       aria-disabled="true"
                     >
                       {item.label}
-                      {item.hasDropdown ? <span className={`mt-0.5 text-[10px] leading-none ${isHome ? "text-white" : "text-slate-900"}`} aria-hidden="true">v</span> : null}
+                      {item.hasDropdown ? <span className={`mt-0.5 text-[10px] leading-none transition-colors duration-300 ${isHeaderSolid ? "text-slate-900" : "text-white"}`} aria-hidden="true">v</span> : null}
                     </button>
                   )
                 )}
               </nav>
             </div>
 
-            <div className={`flex shrink-0 items-center gap-3 sm:gap-5 lg:gap-8 ${iconColorClass}`}>
+            <div className={`flex shrink-0 items-center gap-3 sm:gap-5 lg:gap-8 transition-colors duration-300 ${iconColorClass}`}>
               <NavLink
                 to="/products"
-                className={`grid h-10 w-10 place-items-center rounded-full transition ${isHome ? "hover:bg-white/20" : "hover:bg-slate-100"}`}
+                className={`grid h-10 w-10 place-items-center rounded-full transition ${isHeaderSolid ? "hover:bg-slate-100" : "hover:bg-white/20"}`}
                 aria-label="Search"
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -115,7 +129,7 @@ function StorefrontLayoutContent() {
 
               <NavLink
                 to={isAuthenticated ? "/account" : "/login"}
-                className={`grid h-10 w-10 place-items-center rounded-full transition ${isHome ? "hover:bg-white/20" : "hover:bg-slate-100"}`}
+                className={`grid h-10 w-10 place-items-center rounded-full transition ${isHeaderSolid ? "hover:bg-slate-100" : "hover:bg-white/20"}`}
                 aria-label={isAuthenticated ? "Account" : "Login"}
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -127,7 +141,7 @@ function StorefrontLayoutContent() {
               <button
                 type="button"
                 onClick={() => openCartDrawer()}
-                className={`relative grid h-10 w-10 place-items-center rounded-full transition ${isHome ? "hover:bg-white/20" : "hover:bg-slate-100"}`}
+                className={`relative grid h-10 w-10 place-items-center rounded-full transition ${isHeaderSolid ? "hover:bg-slate-100" : "hover:bg-white/20"}`}
                 aria-label="Cart"
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">

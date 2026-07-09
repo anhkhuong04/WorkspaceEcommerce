@@ -1,6 +1,8 @@
 using FluentValidation;
+using Microsoft.Extensions.Logging;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
+using WorkspaceEcommerce.Application.Abstractions.Shipment;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
@@ -13,9 +15,67 @@ namespace WorkspaceEcommerce.Application.Modules.Ordering;
 internal sealed class CheckoutService(
     ICheckoutStore checkoutStore,
     ICurrentCustomerContext currentCustomer,
+    IShipmentService shipmentService,
+    ILogger<CheckoutService> logger,
     IValidator<CheckoutRequest> validator,
     IValidator<ValidateCheckoutCouponRequest> couponValidator) : ICheckoutService
 {
+    public async Task<Result<GetShippingQuoteResponse>> GetShippingQuoteAsync(
+        GetShippingQuoteRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var sessionId = NormalizeSessionId(request.SessionId);
+        var cart = await checkoutStore.FindCartBySessionIdAsync(sessionId, cancellationToken);
+        if (cart is null || cart.Items.Count == 0)
+        {
+            return Result<GetShippingQuoteResponse>.Validation(["Cart is empty."]);
+        }
+
+        var itemSnapshotsResult = await BuildItemSnapshotsAsync(cart, cancellationToken);
+        if (itemSnapshotsResult.IsFailure)
+        {
+            return itemSnapshotsResult.Status switch
+            {
+                ResultStatus.NotFound => Result<GetShippingQuoteResponse>.NotFound(itemSnapshotsResult.FirstError ?? "Resource was not found."),
+                ResultStatus.Conflict => Result<GetShippingQuoteResponse>.Conflict(itemSnapshotsResult.FirstError ?? "A conflict occurred."),
+                _ => Result<GetShippingQuoteResponse>.Validation(itemSnapshotsResult.Errors)
+            };
+        }
+
+        var snapshots = itemSnapshotsResult.Value!;
+        var parcel = AggregateParcel(snapshots);
+        var subtotal = snapshots.Sum(s => s.LineTotal);
+
+        try
+        {
+            var quoteResponse = await shipmentService.GetShippingQuoteAsync(new ShippingQuoteRequest
+            {
+                DeliveryAddress = new ShippingAddress
+                {
+                    Street = request.Street,
+                    Ward = request.Ward,
+                    Province = request.Province
+                },
+                Parcel = parcel,
+                GoodsValueAmount = subtotal,
+                CodAmount = 0
+            }, cancellationToken);
+
+            return Result<GetShippingQuoteResponse>.Success(new GetShippingQuoteResponse(
+                quoteResponse.TotalFeeAmount,
+                quoteResponse.BaseFeeAmount,
+                quoteResponse.ExtraWeightFeeAmount,
+                quoteResponse.InsuranceFeeAmount,
+                quoteResponse.RouteType,
+                quoteResponse.Currency));
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogError(ex, "Failed to get shipping quote from MiniLogistics");
+            return Result<GetShippingQuoteResponse>.Failure("Could not calculate shipping fee. Please try again.");
+        }
+    }
+
     public async Task<Result<CheckoutCouponValidationResponse>> ValidateCouponAsync(
         ValidateCheckoutCouponRequest request,
         CancellationToken cancellationToken = default)
@@ -81,6 +141,7 @@ internal sealed class CheckoutService(
 
         Order? order = null;
         Result<CheckoutResponse>? failure = null;
+        IReadOnlyCollection<CheckoutItemSnapshot>? snapshots = null;
         try
         {
             await checkoutStore.ExecuteInTransactionAsync(async transactionCancellationToken =>
@@ -92,7 +153,7 @@ internal sealed class CheckoutService(
                     return;
                 }
 
-                var snapshots = itemSnapshotsResult.Value!;
+                snapshots = itemSnapshotsResult.Value!;
                 CheckoutCouponEvaluation? couponEvaluation = null;
                 var normalizedCouponCode = NormalizeOptionalCouponCode(request.CouponCode);
                 if (normalizedCouponCode is not null)
@@ -163,6 +224,59 @@ internal sealed class CheckoutService(
             return failure;
         }
 
+        // After order saved, calculate shipping fee and create shipment in MiniLogistics
+        try
+        {
+            // Use saved item snapshots for parcel
+            var parcelForShipment = AggregateParcel(snapshots!);
+
+            // Use the structured address fields if available
+            var deliveryAddress = new ShippingAddress
+            {
+                Street = !string.IsNullOrWhiteSpace(request.ShippingStreet) ? request.ShippingStreet : request.ShippingAddress,
+                Ward = request.ShippingWard,
+                Province = request.ShippingProvince
+            };
+
+            var isCod = request.PaymentMethod == PaymentMethod.Cod;
+            var codAmount = isCod ? order!.TotalAmount : 0m;
+
+            var quoteResponse = await shipmentService.GetShippingQuoteAsync(new ShippingQuoteRequest
+            {
+                ExternalOrderId = order!.OrderCode,
+                DeliveryAddress = deliveryAddress,
+                Parcel = parcelForShipment,
+                GoodsValueAmount = order.Subtotal,
+                CodAmount = codAmount
+            }, cancellationToken);
+
+            order.SetShippingFee(quoteResponse.TotalFeeAmount);
+
+            var shipmentResponse = await shipmentService.CreateShipmentAsync(new CreateShipmentRequest
+            {
+                ExternalOrderId = order.OrderCode,
+                Receiver = new ShipmentContact
+                {
+                    Name = order.CustomerName,
+                    Phone = order.CustomerPhone
+                },
+                DeliveryAddress = deliveryAddress,
+                Parcel = parcelForShipment,
+                GoodsValueAmount = order.Subtotal,
+                CodAmount = codAmount,
+                Note = order.Note
+            }, order.OrderCode, cancellationToken);
+
+            order.UpdateShipmentInfo(shipmentResponse.TrackingCode, shipmentResponse.ShipmentId);
+
+            checkoutStore.Update(order);
+            await checkoutStore.SaveChangesAsync(cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning(ex, "MiniLogistics shipment creation failed for order {OrderCode}. Order was placed without shipment.", order!.OrderCode);
+        }
+
         return Result<CheckoutResponse>.Success(new CheckoutResponse(ToDto(order!)));
     }
 
@@ -204,7 +318,11 @@ internal sealed class CheckoutService(
                 variant.Sku,
                 cartItem.UnitPriceSnapshot,
                 cartItem.Quantity,
-                variant.RequiresInstallation));
+                variant.RequiresInstallation,
+                variant.WeightKg,
+                variant.LengthCm,
+                variant.WidthCm,
+                variant.HeightCm));
         }
 
         return Result<IReadOnlyCollection<CheckoutItemSnapshot>>.Success(snapshots);
@@ -270,6 +388,10 @@ internal sealed class CheckoutService(
         IReadOnlyCollection<CheckoutItemSnapshot> snapshots,
         CancellationToken cancellationToken)
     {
+        var shippingAddress = string.IsNullOrWhiteSpace(request.ShippingAddress)
+            ? $"{request.ShippingStreet}, {request.ShippingWard}, {request.ShippingProvince}"
+            : request.ShippingAddress;
+
         var order = new Order(
             Guid.NewGuid(),
             await GenerateOrderCodeAsync(cancellationToken),
@@ -277,7 +399,7 @@ internal sealed class CheckoutService(
             request.CustomerName,
             request.CustomerPhone,
             request.CustomerEmail,
-            request.ShippingAddress,
+            shippingAddress,
             request.Note,
             request.PaymentMethod);
 
@@ -334,6 +456,8 @@ internal sealed class CheckoutService(
             order.PaymentMethod,
             order.CreatedAt,
             order.UpdatedAt,
+            order.TrackingCode,
+            order.ShipmentId,
             order.Items.Select(ToDto).ToArray());
     }
 
@@ -416,6 +540,40 @@ internal sealed class CheckoutService(
             : couponCode.Trim().ToUpperInvariant();
     }
 
+    private static ShippingParcel AggregateParcel(IReadOnlyCollection<CheckoutItemSnapshot> snapshots)
+    {
+        const decimal defaultWeightKg = 0.5m;
+        const decimal defaultLengthCm = 15m;
+        const decimal defaultWidthCm = 10m;
+        const decimal defaultHeightCm = 8m;
+
+        var totalWeight = 0m;
+        var maxLength = 0m;
+        var maxWidth = 0m;
+        var totalHeight = 0m;
+
+        foreach (var snapshot in snapshots)
+        {
+            var weight = snapshot.WeightKg ?? defaultWeightKg;
+            var length = snapshot.LengthCm ?? defaultLengthCm;
+            var width = snapshot.WidthCm ?? defaultWidthCm;
+            var height = snapshot.HeightCm ?? defaultHeightCm;
+
+            totalWeight += weight * snapshot.Quantity;
+            if (length > maxLength) maxLength = length;
+            if (width > maxWidth) maxWidth = width;
+            totalHeight += height * snapshot.Quantity;
+        }
+
+        return new ShippingParcel
+        {
+            WeightKg = totalWeight,
+            LengthCm = maxLength,
+            WidthCm = maxWidth,
+            HeightCm = totalHeight
+        };
+    }
+
     private sealed record CheckoutItemSnapshot(
         ProductVariant Variant,
         Guid ProductId,
@@ -423,7 +581,11 @@ internal sealed class CheckoutService(
         string SkuSnapshot,
         decimal UnitPrice,
         int Quantity,
-        bool RequiresInstallation)
+        bool RequiresInstallation,
+        decimal? WeightKg,
+        decimal? LengthCm,
+        decimal? WidthCm,
+        decimal? HeightCm)
     {
         public decimal LineTotal => UnitPrice * Quantity;
     }

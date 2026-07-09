@@ -8,5 +8,6 @@ public enum OrderStatus
     Shipping = 3,
     Completed = 4,
     FailedDelivery = 5,
-    Cancelled = 6
+    Cancelled = 6,
+    Returned = 7
 }

@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
+using WorkspaceEcommerce.Application.Abstractions.Shipment;
 using WorkspaceEcommerce.Infrastructure.Persistence;
 
 namespace WorkspaceEcommerce.Api.IntegrationTests.Infrastructure;
@@ -51,6 +53,9 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
                 promotions.coupon_product_targets,
                 promotions.coupons,
                 content.banners,
+                content.blog_comments,
+                content.blog_post_related_products,
+                content.blog_posts,
                 ordering.order_status_history,
                 ordering.order_items,
                 ordering.orders,
@@ -148,6 +153,52 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Development");
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IShipmentService>();
+                services.AddScoped<IShipmentService, FakeIntegrationShipmentService>();
+            });
+        }
+    }
+
+    private sealed class FakeIntegrationShipmentService : IShipmentService
+    {
+        public Task<ShippingQuoteResponse> GetShippingQuoteAsync(ShippingQuoteRequest request, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new ShippingQuoteResponse
+            {
+                TotalFeeAmount = 0m,
+                BaseFeeAmount = 0m,
+                ExtraWeightFeeAmount = 0m,
+                InsuranceFeeAmount = 0m,
+                RouteType = "Mock",
+                Currency = "VND"
+            });
+        }
+
+        public Task<CreateShipmentResponse> CreateShipmentAsync(CreateShipmentRequest request, string idempotencyKey, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new CreateShipmentResponse
+            {
+                ShipmentId = Guid.NewGuid(),
+                ExternalOrderId = request.ExternalOrderId,
+                TrackingCode = "ML-MOCK-INT",
+                Status = "PendingPickup",
+                ShippingFeeAmount = 0m,
+                Currency = "VND"
+            });
+        }
+
+        public Task<TrackingResponse> GetTrackingAsync(string trackingCode, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new TrackingResponse
+            {
+                TrackingCode = trackingCode,
+                ExternalOrderId = "ECOM-1001",
+                Status = "PendingPickup",
+                ShippingFeeAmount = 0m,
+                Timeline = []
+            });
         }
     }
 }

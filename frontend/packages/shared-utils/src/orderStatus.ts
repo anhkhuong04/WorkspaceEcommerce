@@ -1,4 +1,4 @@
-﻿import type { OrderStatus, PaymentMethod } from "@workspace-ecommerce/api-types";
+import type { OrderStatus, PaymentMethod } from "@workspace-ecommerce/api-types";
 
 const orderStatusLabels: Record<OrderStatus, string> = {
   0: "Pending",
@@ -7,7 +7,8 @@ const orderStatusLabels: Record<OrderStatus, string> = {
   3: "Shipping",
   4: "Completed",
   5: "Failed delivery",
-  6: "Cancelled"
+  6: "Cancelled",
+  7: "Returned"
 };
 
 const paymentMethodLabels: Record<PaymentMethod, string> = {

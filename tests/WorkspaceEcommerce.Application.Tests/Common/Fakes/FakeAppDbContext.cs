@@ -1,9 +1,11 @@
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
+using WorkspaceEcommerce.Domain.Modules.Blogs;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Content;
 using WorkspaceEcommerce.Domain.Modules.Customers;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Domain.Modules.Reviews;
 
 namespace WorkspaceEcommerce.Application.Tests.Common.Fakes;
 
@@ -22,6 +24,12 @@ internal sealed class FakeAppDbContext : IAppDbContext
     private readonly List<Order> _orders = [];
     private readonly List<OrderItem> _orderItems = [];
     private readonly List<OrderStatusHistory> _orderStatusHistories = [];
+    private readonly List<BlogPost> _blogPosts = [];
+    private readonly List<BlogPostRelatedProduct> _blogPostRelatedProducts = [];
+    private readonly List<BlogComment> _blogComments = [];
+    private readonly List<Review> _reviews = [];
+    private readonly List<CustomerAddress> _customerAddresses = [];
+    private readonly List<CustomerLoginHistory> _customerLoginHistories = [];
 
     public IQueryable<Category> Categories => _categories.AsQueryable();
 
@@ -48,6 +56,18 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public IQueryable<OrderItem> OrderItems => _orderItems.AsQueryable();
 
     public IQueryable<OrderStatusHistory> OrderStatusHistories => _orderStatusHistories.AsQueryable();
+
+    public IQueryable<BlogPost> BlogPosts => _blogPosts.AsQueryable();
+
+    public IQueryable<BlogPostRelatedProduct> BlogPostRelatedProducts => _blogPostRelatedProducts.AsQueryable();
+
+    public IQueryable<BlogComment> BlogComments => _blogComments.AsQueryable();
+
+    public IQueryable<Review> Reviews => _reviews.AsQueryable();
+
+    public IQueryable<CustomerAddress> CustomerAddresses => _customerAddresses.AsQueryable();
+
+    public IQueryable<CustomerLoginHistory> CustomerLoginHistories => _customerLoginHistories.AsQueryable();
 
     public int SaveChangesCallCount { get; private set; }
 
@@ -117,6 +137,26 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public void Seed(params OrderStatusHistory[] orderStatusHistories)
     {
         _orderStatusHistories.AddRange(orderStatusHistories);
+    }
+
+    public void Seed(params BlogPost[] blogPosts)
+    {
+        _blogPosts.AddRange(blogPosts);
+    }
+
+    public void Seed(params BlogPostRelatedProduct[] relatedProducts)
+    {
+        _blogPostRelatedProducts.AddRange(relatedProducts);
+    }
+
+    public void Seed(params BlogComment[] comments)
+    {
+        _blogComments.AddRange(comments);
+    }
+
+    public void Seed(params Review[] reviews)
+    {
+        _reviews.AddRange(reviews);
     }
 
     public void Add<TEntity>(TEntity entity)
@@ -215,6 +255,36 @@ internal sealed class FakeAppDbContext : IAppDbContext
         if (typeof(TEntity) == typeof(OrderStatusHistory))
         {
             return (List<TEntity>)(object)_orderStatusHistories;
+        }
+
+        if (typeof(TEntity) == typeof(BlogPost))
+        {
+            return (List<TEntity>)(object)_blogPosts;
+        }
+
+        if (typeof(TEntity) == typeof(BlogPostRelatedProduct))
+        {
+            return (List<TEntity>)(object)_blogPostRelatedProducts;
+        }
+
+        if (typeof(TEntity) == typeof(BlogComment))
+        {
+            return (List<TEntity>)(object)_blogComments;
+        }
+
+        if (typeof(TEntity) == typeof(Review))
+        {
+            return (List<TEntity>)(object)_reviews;
+        }
+
+        if (typeof(TEntity) == typeof(CustomerAddress))
+        {
+            return (List<TEntity>)(object)_customerAddresses;
+        }
+
+        if (typeof(TEntity) == typeof(CustomerLoginHistory))
+        {
+            return (List<TEntity>)(object)_customerLoginHistories;
         }
 
         throw new InvalidOperationException($"Unsupported entity type '{typeof(TEntity).Name}'.");

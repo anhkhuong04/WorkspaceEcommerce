@@ -1,8 +1,10 @@
+using WorkspaceEcommerce.Domain.Modules.Blogs;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Content;
 using WorkspaceEcommerce.Domain.Modules.Customers;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Domain.Modules.Reviews;
 
 namespace WorkspaceEcommerce.Application.Abstractions.Persistence;
 
@@ -22,6 +24,10 @@ public interface IAppDbContext
 
     IQueryable<Customer> Customers { get; }
 
+    IQueryable<CustomerAddress> CustomerAddresses { get; }
+
+    IQueryable<CustomerLoginHistory> CustomerLoginHistories { get; }
+
     IQueryable<Coupon> Coupons { get; }
 
     IQueryable<CouponProductTarget> CouponProductTargets { get; }
@@ -33,6 +39,14 @@ public interface IAppDbContext
     IQueryable<OrderItem> OrderItems { get; }
 
     IQueryable<OrderStatusHistory> OrderStatusHistories { get; }
+
+    IQueryable<BlogPost> BlogPosts { get; }
+
+    IQueryable<BlogPostRelatedProduct> BlogPostRelatedProducts { get; }
+
+    IQueryable<BlogComment> BlogComments { get; }
+
+    IQueryable<Review> Reviews { get; }
 
     void Add<TEntity>(TEntity entity)
         where TEntity : class;

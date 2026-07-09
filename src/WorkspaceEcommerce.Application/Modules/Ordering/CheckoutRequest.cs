@@ -14,6 +14,12 @@ public sealed class CheckoutRequest
 
     public string ShippingAddress { get; init; } = string.Empty;
 
+    public string ShippingStreet { get; init; } = string.Empty;
+
+    public string ShippingWard { get; init; } = string.Empty;
+
+    public string ShippingProvince { get; init; } = string.Empty;
+
     public string? Note { get; init; }
 
     public PaymentMethod PaymentMethod { get; init; }

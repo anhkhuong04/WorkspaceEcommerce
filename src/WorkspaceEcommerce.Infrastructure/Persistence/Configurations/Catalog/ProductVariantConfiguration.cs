@@ -59,6 +59,22 @@ internal sealed class ProductVariantConfiguration : IEntityTypeConfiguration<Pro
             .HasColumnName("is_active")
             .IsRequired();
 
+        builder.Property(variant => variant.WeightKg)
+            .HasColumnName("weight_kg")
+            .HasPrecision(10, 3);
+
+        builder.Property(variant => variant.LengthCm)
+            .HasColumnName("length_cm")
+            .HasPrecision(10, 2);
+
+        builder.Property(variant => variant.WidthCm)
+            .HasColumnName("width_cm")
+            .HasPrecision(10, 2);
+
+        builder.Property(variant => variant.HeightCm)
+            .HasColumnName("height_cm")
+            .HasPrecision(10, 2);
+
         builder.HasIndex(variant => variant.Sku)
             .IsUnique()
             .HasDatabaseName("ux_product_variants_sku");

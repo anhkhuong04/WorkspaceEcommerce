@@ -22,6 +22,137 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Blogs.BlogComment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AuthorEmail")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("author_email");
+
+                    b.Property<string>("AuthorName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("author_name");
+
+                    b.Property<Guid>("BlogPostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("blog_post_id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("content");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsApproved")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_approved");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BlogPostId")
+                        .HasDatabaseName("ix_blog_comments_blog_post_id");
+
+                    b.ToTable("blog_comments", "content");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Blogs.BlogPost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("image_url");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_published");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("slug");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("summary");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsPublished")
+                        .HasDatabaseName("ix_blog_posts_is_published");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_blog_posts_slug");
+
+                    b.ToTable("blog_posts", "content");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Blogs.BlogPostRelatedProduct", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BlogPostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("blog_post_id");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("BlogPostId", "ProductId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_blog_post_related_products_blog_post_id_product_id");
+
+                    b.ToTable("blog_post_related_products", "content");
+                });
+
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Cart.Cart", b =>
                 {
                     b.Property<Guid>("Id")
@@ -145,6 +276,12 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<double>("AverageRating")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("double precision")
+                        .HasDefaultValue(0.0)
+                        .HasColumnName("average_rating");
+
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uuid")
                         .HasColumnName("category_id");
@@ -170,6 +307,12 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)")
                         .HasColumnName("name");
+
+                    b.Property<int>("ReviewCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("review_count");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -288,9 +431,19 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("compare_at_price");
 
+                    b.Property<decimal?>("HeightCm")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("height_cm");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
+
+                    b.Property<decimal?>("LengthCm")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("length_cm");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -325,6 +478,16 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                     b.Property<int>("StockQuantity")
                         .HasColumnType("integer")
                         .HasColumnName("stock_quantity");
+
+                    b.Property<decimal?>("WeightKg")
+                        .HasPrecision(10, 3)
+                        .HasColumnType("numeric(10,3)")
+                        .HasColumnName("weight_kg");
+
+                    b.Property<decimal?>("WidthCm")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("width_cm");
 
                     b.HasKey("Id");
 
@@ -573,6 +736,11 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AvatarUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("avatar_url");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -589,17 +757,43 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(250)")
                         .HasColumnName("full_name");
 
+                    b.Property<string>("GoogleId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("google_id");
+
+                    b.Property<bool>("IsEmailVerified")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_email_verified");
+
                     b.Property<string>("PasswordHash")
-                        .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("password_hash");
 
                     b.Property<string>("PhoneNumber")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("phone_number");
+
+                    b.Property<int>("RewardPoints")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("reward_points");
+
+                    b.Property<bool>("TwoFactorEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("two_factor_enabled");
+
+                    b.Property<string>("TwoFactorSecret")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("two_factor_secret");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -611,10 +805,116 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_customers_email");
 
+                    b.HasIndex("GoogleId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_customers_google_id")
+                        .HasFilter("google_id IS NOT NULL");
+
                     b.HasIndex("PhoneNumber")
                         .HasDatabaseName("ix_customers_phone_number");
 
                     b.ToTable("customers", "customer");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Customers.CustomerAddress", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ContactName")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("contact_name");
+
+                    b.Property<string>("ContactPhone")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("contact_phone");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<bool>("IsDefault")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_default");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("label");
+
+                    b.Property<string>("Province")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("province");
+
+                    b.Property<string>("Street")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("street");
+
+                    b.Property<string>("Ward")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("ward");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("ix_addresses_customer_id");
+
+                    b.ToTable("addresses", "customer");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Customers.CustomerLoginHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("IpAddress")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("ip_address");
+
+                    b.Property<DateTimeOffset>("LoginTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("login_time");
+
+                    b.Property<bool>("Success")
+                        .HasColumnType("boolean")
+                        .HasColumnName("success");
+
+                    b.Property<string>("UserAgent")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("user_agent");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("ix_login_history_customer_id");
+
+                    b.HasIndex("LoginTime")
+                        .HasDatabaseName("ix_login_history_login_time");
+
+                    b.ToTable("login_history", "customer");
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.Order", b =>
@@ -684,6 +984,10 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("payment_method");
 
+                    b.Property<Guid?>("ShipmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shipment_id");
+
                     b.Property<string>("ShippingAddress")
                         .IsRequired()
                         .HasMaxLength(1000)
@@ -710,6 +1014,11 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("total_amount");
+
+                    b.Property<string>("TrackingCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("tracking_code");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -830,6 +1139,75 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_order_status_history_order_id");
 
                     b.ToTable("order_status_history", "ordering");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Reviews.Review", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Comment")
+                        .HasColumnType("text")
+                        .HasColumnName("comment");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("integer")
+                        .HasColumnName("rating");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("ix_reviews_customer_id");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_reviews_product_id");
+
+                    b.HasIndex("ProductId", "CustomerId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_reviews_product_customer");
+
+                    b.ToTable("reviews", "catalog");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Blogs.BlogComment", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Blogs.BlogPost", null)
+                        .WithMany()
+                        .HasForeignKey("BlogPostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Blogs.BlogPostRelatedProduct", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Blogs.BlogPost", null)
+                        .WithMany()
+                        .HasForeignKey("BlogPostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Catalog.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Cart.Cart", b =>

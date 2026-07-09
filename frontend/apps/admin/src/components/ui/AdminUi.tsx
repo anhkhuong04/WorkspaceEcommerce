@@ -1,4 +1,4 @@
-﻿import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { useEffect, useId, useRef } from "react";
 import { cx } from "./cx";
 
@@ -22,8 +22,8 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 export function Button({ className, variant = "secondary", fullWidth = false, disabled, ...props }: ButtonProps) {
   const variants = {
-    primary: "border-teal-700 bg-teal-700 text-white hover:bg-teal-800",
-    secondary: "border-slate-200 bg-white text-slate-800 hover:border-teal-300 hover:text-teal-800",
+    primary: "border-slate-900 bg-slate-900 text-white hover:bg-black hover:border-black",
+    secondary: "border-slate-200 bg-white text-slate-800 hover:border-slate-400 hover:text-slate-900",
     ghost: "border-transparent bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900",
     danger: "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
   };
@@ -330,15 +330,15 @@ export function Field({ label, error, children }: FieldProps) {
 }
 
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cx("w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:bg-slate-100", props.className)} />;
+  return <input {...props} className={cx("w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-100 disabled:bg-slate-100", props.className)} />;
 }
 
 export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={cx("w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:bg-slate-100", props.className)} />;
+  return <textarea {...props} className={cx("w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-100 disabled:bg-slate-100", props.className)} />;
 }
 
 export function SelectInput(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={cx("w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:bg-slate-100", props.className)} />;
+  return <select {...props} className={cx("w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-100 disabled:bg-slate-100", props.className)} />;
 }
 
 interface ToggleProps {
@@ -356,7 +356,7 @@ export function Toggle({ checked, disabled, label = "Toggle setting", onChange }
       onClick={() => onChange(!checked)}
       className={cx(
         "relative h-6 w-11 rounded-full transition disabled:opacity-60",
-        checked ? "bg-teal-700" : "bg-slate-300"
+        checked ? "bg-slate-900" : "bg-slate-300"
       )}
       aria-pressed={checked}
       aria-label={label}
@@ -368,7 +368,7 @@ export function Toggle({ checked, disabled, label = "Toggle setting", onChange }
 
 interface PillProps {
   children: ReactNode;
-  tone?: "green" | "red" | "blue" | "orange" | "slate" | "teal";
+  tone?: "green" | "red" | "blue" | "orange" | "slate";
 }
 
 export function Pill({ children, tone = "slate" }: PillProps) {
@@ -377,8 +377,7 @@ export function Pill({ children, tone = "slate" }: PillProps) {
     red: "bg-red-50 text-red-700 ring-red-200",
     blue: "bg-blue-50 text-blue-700 ring-blue-200",
     orange: "bg-orange-50 text-orange-700 ring-orange-200",
-    slate: "bg-slate-100 text-slate-700 ring-slate-200",
-    teal: "bg-teal-50 text-teal-700 ring-teal-200"
+    slate: "bg-slate-100 text-slate-700 ring-slate-200"
   };
 
   return <span className={cx("inline-flex rounded-full px-2.5 py-1 text-xs font-black ring-1", tones[tone])}>{children}</span>;

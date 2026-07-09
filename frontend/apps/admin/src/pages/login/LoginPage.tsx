@@ -1,4 +1,4 @@
-﻿import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -55,9 +55,9 @@ export function LoginPage() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top_left,#dff8ef,transparent_34%),linear-gradient(135deg,#f7fbf9,#dceee8)] p-4">
+    <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top_left,#f1f5f9,transparent_34%),linear-gradient(135deg,#f8fafc,#e2e8f0)] p-4">
       <section className="w-full max-w-md rounded-[2rem] border border-white/70 bg-white p-8 shadow-2xl shadow-slate-900/10">
-        <p className="text-xs font-black uppercase tracking-[0.18em] text-teal-700">Workspace Admin</p>
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Workspace Admin</p>
         <h1 className="mt-3 text-3xl font-black text-slate-950">Sign in</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500">Use your admin credentials to access operations screens.</p>
 

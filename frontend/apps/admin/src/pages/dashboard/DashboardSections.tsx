@@ -9,16 +9,17 @@ import { formatDate, formatMoney, formatOrderStatus } from "@workspace-ecommerce
 import type { ReactNode } from "react";
 import { Button, EmptyState, Pill } from "../../components/ui/AdminUi";
 
-type PillTone = "green" | "red" | "blue" | "orange" | "slate" | "teal";
+type PillTone = "green" | "red" | "blue" | "orange" | "slate";
 
 const statusPresentation: Record<OrderStatus, { tone: PillTone; barClass: string }> = {
   0: { tone: "orange", barClass: "bg-amber-500" },
-  1: { tone: "teal", barClass: "bg-teal-600" },
+  1: { tone: "slate", barClass: "bg-slate-600" },
   2: { tone: "blue", barClass: "bg-sky-600" },
   3: { tone: "blue", barClass: "bg-indigo-500" },
   4: { tone: "green", barClass: "bg-emerald-600" },
   5: { tone: "orange", barClass: "bg-orange-500" },
-  6: { tone: "red", barClass: "bg-red-500" }
+  6: { tone: "red", barClass: "bg-red-500" },
+  7: { tone: "slate", barClass: "bg-slate-500" }
 };
 
 interface DashboardHeroProps {
@@ -29,11 +30,11 @@ interface DashboardHeroProps {
 
 export function DashboardHero({ lastUpdated, refreshing, onRefresh }: DashboardHeroProps) {
   return (
-    <section className="relative overflow-hidden rounded-[1.75rem] border border-teal-900/10 bg-gradient-to-br from-slate-950 via-slate-900 to-teal-950 px-5 py-4 text-white shadow-lg shadow-slate-900/10 sm:px-6">
-      <div className="absolute -right-16 -top-24 h-56 w-56 rounded-full bg-teal-400/10 blur-3xl" aria-hidden="true" />
+    <section className="relative overflow-hidden rounded-[1.75rem] border border-slate-900/10 bg-gradient-to-br from-slate-950 via-slate-900 to-black px-5 py-4 text-white shadow-lg shadow-slate-900/10 sm:px-6">
+      <div className="absolute -right-16 -top-24 h-56 w-56 rounded-full bg-slate-400/10 blur-3xl" aria-hidden="true" />
       <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-teal-300">Operations overview</p>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-300">Operations overview</p>
           <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Admin dashboard</h1>
           <p className="mt-1.5 max-w-2xl text-sm leading-5 text-slate-300">
             Track order throughput, completed revenue, recent activity, and inventory requiring attention.
@@ -47,7 +48,7 @@ export function DashboardHero({ lastUpdated, refreshing, onRefresh }: DashboardH
           <Button
             type="button"
             variant="primary"
-            className="border-teal-400 bg-teal-500 text-slate-950 hover:bg-teal-300"
+            className="border-slate-600 bg-white text-slate-950 hover:bg-slate-200"
             disabled={refreshing}
             onClick={onRefresh}
           >
@@ -125,14 +126,14 @@ export function OrderStatusOverview({ summary, totalOrders, onViewOrders, onView
               <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
                 <button
                   type="button"
-                  className="rounded-md font-bold text-slate-700 hover:text-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
+                  className="rounded-md font-bold text-slate-700 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-600 focus-visible:ring-offset-2"
                   onClick={() => onViewStatus(item.status)}
                 >
                   {formatOrderStatus(item.status)}
                 </button>
                 <button
                   type="button"
-                  className="rounded-md font-black text-slate-950 hover:text-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
+                  className="rounded-md font-black text-slate-950 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-600 focus-visible:ring-offset-2"
                   onClick={() => onViewStatus(item.status)}
                   aria-label={`View ${formatOrderStatus(item.status)} orders`}
                 >
@@ -297,7 +298,7 @@ function DashboardTableViewport({ label, children }: { label: string; children: 
     <div>
       <p className="mb-2 text-xs font-semibold text-slate-400 sm:hidden">Swipe horizontally to view all columns.</p>
       <div
-        className="admin-table-scroll max-h-[22rem] overflow-auto rounded-2xl border border-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
+        className="admin-table-scroll max-h-[22rem] overflow-auto rounded-2xl border border-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-600 focus-visible:ring-offset-2"
         role="region"
         aria-label={label}
         tabIndex={0}

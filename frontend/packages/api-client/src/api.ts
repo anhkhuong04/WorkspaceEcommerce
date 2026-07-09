@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   AddCartItemRequest,
   AdminBannerDto,
   AdminBannerUpsertRequest,
@@ -32,6 +32,7 @@
   CustomerOrderListRequest,
   CustomerProfileDto,
   CustomerRegisterRequest,
+  CustomerGoogleLoginRequest,
   OrderLookupRequest,
   OrderLookupResponse,
   PagedResult,
@@ -44,7 +45,19 @@
   UpdateCustomerProfileRequest,
   UpdateCartItemRequest,
   UpdateOrderStatusRequest,
-  ValidateCheckoutCouponRequest
+  ValidateCheckoutCouponRequest,
+  GetShippingQuoteRequest,
+  GetShippingQuoteResponse,
+  AdminBlogPostDto,
+  StorefrontBlogPostDto,
+  BlogCommentDto,
+  CreateBlogPostRequest,
+  UpdateBlogPostRequest,
+  CreateCommentRequest,
+  ProductReviewSummaryDto,
+  AdminReviewListItemDto,
+  CreateReviewRequest,
+  ReviewDto
 } from "@workspace-ecommerce/api-types";
 import { ApiClient } from "./httpClient";
 
@@ -80,17 +93,28 @@ export function createStorefrontApi(client: ApiClient) {
     checkout: (request: CheckoutRequest) => client.post<CheckoutResponse, CheckoutRequest>("/api/checkout", request),
     validateCheckoutCoupon: (request: ValidateCheckoutCouponRequest) =>
       client.post<CheckoutCouponValidationResponse, ValidateCheckoutCouponRequest>("/api/checkout/coupons/validate", request),
+    getShippingQuote: (request: GetShippingQuoteRequest) =>
+      client.post<GetShippingQuoteResponse, GetShippingQuoteRequest>("/api/checkout/shipping-quote", request),
     lookupOrder: (request: OrderLookupRequest) => client.get<OrderLookupResponse>(`/api/orders/lookup${buildQuery(request)}`),
     registerCustomer: (request: CustomerRegisterRequest) =>
       client.post<CustomerAuthResponse, CustomerRegisterRequest>("/api/customer/auth/register", request),
     loginCustomer: (request: CustomerLoginRequest) =>
       client.post<CustomerAuthResponse, CustomerLoginRequest>("/api/customer/auth/login", request),
+    loginWithGoogle: (request: CustomerGoogleLoginRequest) =>
+      client.post<CustomerAuthResponse, CustomerGoogleLoginRequest>("/api/customer/auth/google", request),
     getCustomerMe: () => client.get<CustomerProfileDto>("/api/customer/me"),
     updateCustomerMe: (request: UpdateCustomerProfileRequest) =>
       client.put<CustomerProfileDto, UpdateCustomerProfileRequest>("/api/customer/me", request),
     getCustomerOrders: (request: CustomerOrderListRequest = {}) =>
       client.get<PagedResult<CustomerOrderListItemDto>>(`/api/customer/orders${buildQuery(request)}`),
-    getCustomerOrder: (id: string) => client.get<CustomerOrderDto>(`/api/customer/orders/${id}`)
+    getCustomerOrder: (id: string) => client.get<CustomerOrderDto>(`/api/customer/orders/${id}`),
+    getBlogPosts: () => client.get<StorefrontBlogPostDto[]>("/api/blog-posts"),
+    getBlogPost: (slug: string) => client.get<StorefrontBlogPostDto>(`/api/blog-posts/${slug}`),
+    submitBlogComment: (slug: string, request: CreateCommentRequest) =>
+      client.post<BlogCommentDto, CreateCommentRequest>(`/api/blog-posts/${slug}/comments`, request),
+    getProductReviews: (slug: string) => client.get<ProductReviewSummaryDto>(`/api/products/${slug}/reviews`),
+    submitReview: (slug: string, request: CreateReviewRequest) =>
+      client.post<ReviewDto, CreateReviewRequest>(`/api/products/${slug}/reviews`, request)
   };
 }
 
@@ -144,6 +168,18 @@ export function createAdminApi(client: ApiClient) {
     updateBanner: (id: string, request: AdminBannerUpsertRequest) =>
       client.put<AdminBannerDto, AdminBannerUpsertRequest>(`/api/admin/banners/${id}`, request),
     deleteBanner: (id: string) => client.delete<AdminBannerDto>(`/api/admin/banners/${id}`),
-    getDashboard: () => client.get<AdminDashboardDto>("/api/admin/dashboard")
+    getDashboard: () => client.get<AdminDashboardDto>("/api/admin/dashboard"),
+    getBlogPosts: () => client.get<AdminBlogPostDto[]>("/api/admin/blog-posts"),
+    getBlogPost: (id: string) => client.get<AdminBlogPostDto>(`/api/admin/blog-posts/${id}`),
+    createBlogPost: (request: CreateBlogPostRequest) =>
+      client.post<AdminBlogPostDto, CreateBlogPostRequest>("/api/admin/blog-posts", request),
+    updateBlogPost: (id: string, request: UpdateBlogPostRequest) =>
+      client.put<AdminBlogPostDto, UpdateBlogPostRequest>(`/api/admin/blog-posts/${id}`, request),
+    deleteBlogPost: (id: string) => client.delete<AdminBlogPostDto>(`/api/admin/blog-posts/${id}`),
+    toggleBlogPostPublish: (id: string) => client.post<AdminBlogPostDto, void>(`/api/admin/blog-posts/${id}/toggle-publish`, undefined),
+    getBlogPostComments: (id: string) => client.get<BlogCommentDto[]>(`/api/admin/blog-posts/${id}/comments`),
+    deleteBlogComment: (id: string) => client.delete<BlogCommentDto>(`/api/admin/blog-comments/${id}`),
+    getReviews: (page = 1, pageSize = 20) => client.get<PagedResult<AdminReviewListItemDto>>(`/api/admin/reviews${buildQuery({ page, pageSize })}`),
+    deleteReview: (id: string) => client.delete<void>(`/api/admin/reviews/${id}`)
   };
 }

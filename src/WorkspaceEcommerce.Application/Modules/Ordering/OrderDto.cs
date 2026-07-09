@@ -22,4 +22,6 @@ public sealed record OrderDto(
     PaymentMethod PaymentMethod,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
+    string? TrackingCode,
+    Guid? ShipmentId,
     IReadOnlyCollection<OrderItemDto> Items);

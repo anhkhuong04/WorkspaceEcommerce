@@ -47,6 +47,9 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
                 customerPhone = "0900000000",
                 customerEmail = "customer@example.com",
                 shippingAddress = "123 Shipping Street",
+                shippingStreet = "123 Shipping Street",
+                shippingWard = "Ward 1",
+                shippingProvince = "Ho Chi Minh",
                 note = "Call before delivery",
                 paymentMethod = 0
             });
@@ -120,6 +123,9 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
                 customerPhone = "0900000000",
                 customerEmail = "customer@example.com",
                 shippingAddress = "123 Shipping Street",
+                shippingStreet = "123 Shipping Street",
+                shippingWard = "Ward 1",
+                shippingProvince = "Ho Chi Minh",
                 note = "Call before delivery",
                 paymentMethod = 0
             });
@@ -227,6 +233,9 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
                 customerPhone = "0900000000",
                 customerEmail = "customer@example.com",
                 shippingAddress = "123 Shipping Street",
+                shippingStreet = "123 Shipping Street",
+                shippingWard = "Ward 1",
+                shippingProvince = "Ho Chi Minh",
                 note = "Call before delivery",
                 paymentMethod = 0,
                 couponCode = "save20"
@@ -302,6 +311,9 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
                 customerPhone = "0900000000",
                 customerEmail = "customer@example.com",
                 shippingAddress = "123 Shipping Street",
+                shippingStreet = "123 Shipping Street",
+                shippingWard = "Ward 1",
+                shippingProvince = "Ho Chi Minh",
                 note = "Call before delivery",
                 paymentMethod = 0,
                 couponCode = "LIMIT1"
@@ -411,6 +423,9 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
                 customerPhone = "0900000000",
                 customerEmail = "customer@example.com",
                 shippingAddress = "123 Shipping Street",
+                shippingStreet = "123 Shipping Street",
+                shippingWard = "Ward 1",
+                shippingProvince = "Ho Chi Minh",
                 note = "Call before delivery",
                 paymentMethod = 0
             });

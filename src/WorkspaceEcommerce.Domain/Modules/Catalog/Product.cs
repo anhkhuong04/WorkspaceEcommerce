@@ -45,6 +45,10 @@ public sealed class Product : Entity
 
     public bool IsActive { get; private set; }
 
+    public double AverageRating { get; private set; }
+
+    public int ReviewCount { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -147,6 +151,18 @@ public sealed class Product : Entity
         Touch();
 
         return specification;
+    }
+
+    public void UpdateRatingStats(double averageRating, int reviewCount)
+    {
+        if (reviewCount < 0)
+        {
+            throw new DomainException("Review count cannot be negative.");
+        }
+
+        AverageRating = reviewCount > 0 ? Math.Round(averageRating, 2) : 0;
+        ReviewCount = reviewCount;
+        Touch();
     }
 
     private void Touch()

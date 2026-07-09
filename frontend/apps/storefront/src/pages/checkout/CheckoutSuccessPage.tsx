@@ -82,7 +82,7 @@ export function CheckoutSuccessPage() {
           <div className="mt-5 grid gap-2 border-t border-slate-200 pt-4">
             <div className="flex justify-between text-sm font-bold text-slate-500"><span>Subtotal</span><span>{formatMoney(order.subtotal)}</span></div>
             {order.shippingFee > 0 ? <div className="flex justify-between text-sm font-bold text-slate-500"><span>Shipping fee</span><span>{formatMoney(order.shippingFee)}</span></div> : null}
-            {order.discountAmount > 0 ? <div className="flex justify-between text-sm font-bold text-emerald-600"><span>Discount</span><span>-{formatMoney(order.discountAmount)}</span></div> : null}
+            {order.discountAmount > 0 ? <div className="flex justify-between text-sm font-bold text-emerald-600"><span>{formatDiscountLabel(order)}</span><span>-{formatMoney(order.discountAmount)}</span></div> : null}
             <div className="flex justify-between text-xl font-black text-slate-950"><span>Total</span><span className="text-[var(--brand)]">{formatMoney(order.totalAmount)}</span></div>
           </div>
         </section>
@@ -95,6 +95,7 @@ export function CheckoutSuccessPage() {
               <InfoRow label="Status" value={formatOrderStatus(order.status)} />
               <InfoRow label="Created" value={formatDate(order.createdAt)} />
               <InfoRow label="Payment" value={formatPaymentMethod(order.paymentMethod)} />
+              {order.couponCodeSnapshot ? <InfoRow label="Coupon" value={formatCouponSnapshot(order)} mono /> : null}
               <InfoRow label="Recipient" value={order.customerName} />
               <InfoRow label="Phone" value={order.customerPhone} />
               {order.customerEmail ? <InfoRow label="Email" value={order.customerEmail} /> : null}
@@ -189,6 +190,14 @@ function getStateOrder(state: unknown): OrderDto | undefined {
   }
 
   return undefined;
+}
+
+function formatDiscountLabel(order: OrderDto): string {
+  return order.couponCodeSnapshot ? `Discount (${order.couponCodeSnapshot})` : "Discount";
+}
+
+function formatCouponSnapshot(order: OrderDto): string {
+  return order.couponNameSnapshot ? `${order.couponCodeSnapshot} - ${order.couponNameSnapshot}` : order.couponCodeSnapshot ?? "";
 }
 
 function formatTransferMoney(value: number): string {

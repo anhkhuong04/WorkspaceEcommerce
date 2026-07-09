@@ -1,6 +1,6 @@
-﻿import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AdminOrderListRequest, OrderStatus } from "@workspace-ecommerce/api-types";
+import type { AdminOrderDto, AdminOrderListRequest, OrderStatus } from "@workspace-ecommerce/api-types";
 import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod } from "@workspace-ecommerce/shared-utils";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -12,16 +12,16 @@ import { Button, Drawer, EmptyState, Field, Notice, Pill, SelectInput, TextArea,
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
 
-const orderStatuses: OrderStatus[] = [0, 1, 2, 3, 4, 5, 6];
-const nextStatusesByStatus: Record<OrderStatus, OrderStatus[]> = { 0: [1, 6], 1: [2], 2: [3], 3: [4, 5], 4: [], 5: [3, 6], 6: [] };
+const orderStatuses: OrderStatus[] = [0, 1, 2, 3, 4, 5, 6, 7];
+const nextStatusesByStatus: Record<OrderStatus, OrderStatus[]> = { 0: [1, 6], 1: [2], 2: [3], 3: [4, 5], 4: [7], 5: [3, 6], 6: [], 7: [] };
 const statusSchema = z.object({
-  status: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6)]),
+  status: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7)]),
   note: z.string().trim().max(1000, "Note is too long.").optional()
 });
 
 type StatusFormValues = z.infer<typeof statusSchema>;
 
-const statusTones: Record<OrderStatus, "green" | "red" | "blue" | "orange" | "slate" | "teal"> = { 0: "orange", 1: "teal", 2: "blue", 3: "blue", 4: "green", 5: "orange", 6: "red" };
+const statusTones: Record<OrderStatus, "green" | "red" | "blue" | "orange" | "slate"> = { 0: "orange", 1: "slate", 2: "blue", 3: "blue", 4: "green", 5: "orange", 6: "red", 7: "slate" };
 
 function orderStatusPill(status: OrderStatus) {
   return <Pill tone={statusTones[status]}>{formatOrderStatus(status)}</Pill>;
@@ -163,9 +163,10 @@ export function OrdersPage() {
                 <Info label="Created" value={formatDate(order.createdAt)} />
                 <Info wide label="Shipping address" value={order.shippingAddress} />
                 <Info wide label="Customer note" value={order.note ?? "-"} />
+                {order.couponCodeSnapshot ? <Info wide label="Coupon" value={formatCouponSnapshot(order)} /> : null}
                 <Info label="Subtotal" value={formatMoney(order.subtotal)} />
                 <Info label="Shipping fee" value={formatMoney(order.shippingFee)} />
-                <Info label="Discount" value={formatMoney(order.discountAmount)} />
+                <Info label={formatDiscountLabel(order)} value={formatMoney(order.discountAmount)} />
                 <Info label="Total" value={formatMoney(order.totalAmount)} />
               </div>
             </section>
@@ -194,7 +195,7 @@ export function OrdersPage() {
             <section className="rounded-3xl border border-slate-200 p-5">
               <h3 className="mb-3 text-lg font-black">Status history</h3>
               {order.statusHistory.length ? (
-                <div className="grid gap-3">{order.statusHistory.map((history) => <div key={history.id} className="border-l-4 border-teal-600 pl-4"><p className="font-bold">{history.fromStatus === null ? "Created" : formatOrderStatus(history.fromStatus)} to {formatOrderStatus(history.toStatus)}</p><p className="text-sm text-slate-500">{formatDate(history.changedAt)} by {history.changedBy ?? "system"}</p>{history.note ? <p className="mt-1 text-sm text-slate-700">{history.note}</p> : null}</div>)}</div>
+                <div className="grid gap-3">{order.statusHistory.map((history) => <div key={history.id} className="border-l-4 border-slate-600 pl-4"><p className="font-bold">{history.fromStatus === null ? "Created" : formatOrderStatus(history.fromStatus)} to {formatOrderStatus(history.toStatus)}</p><p className="text-sm text-slate-500">{formatDate(history.changedAt)} by {history.changedBy ?? "system"}</p>{history.note ? <p className="mt-1 text-sm text-slate-700">{history.note}</p> : null}</div>)}</div>
               ) : <EmptyState>No status history</EmptyState>}
             </section>
           </div>
@@ -206,4 +207,12 @@ export function OrdersPage() {
 
 function Info({ label, value, wide = false }: { label: string; value: ReactNode; wide?: boolean }) {
   return <div className={wide ? "sm:col-span-2" : undefined}><p className="text-xs font-black uppercase tracking-wide text-slate-400">{label}</p><div className="mt-1 font-semibold text-slate-800">{value}</div></div>;
+}
+
+function formatDiscountLabel(order: AdminOrderDto): string {
+  return order.couponCodeSnapshot ? `Discount (${order.couponCodeSnapshot})` : "Discount";
+}
+
+function formatCouponSnapshot(order: AdminOrderDto): string {
+  return order.couponNameSnapshot ? `${order.couponCodeSnapshot} - ${order.couponNameSnapshot}` : order.couponCodeSnapshot ?? "";
 }

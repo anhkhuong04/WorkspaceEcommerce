@@ -42,6 +42,16 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasColumnName("is_active")
             .IsRequired();
 
+        builder.Property(product => product.AverageRating)
+            .HasColumnName("average_rating")
+            .HasDefaultValue(0.0)
+            .IsRequired();
+
+        builder.Property(product => product.ReviewCount)
+            .HasColumnName("review_count")
+            .HasDefaultValue(0)
+            .IsRequired();
+
         builder.Property(product => product.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

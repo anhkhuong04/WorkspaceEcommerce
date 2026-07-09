@@ -100,6 +100,13 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasColumnName("updated_at")
             .IsRequired();
 
+        builder.Property(order => order.TrackingCode)
+            .HasColumnName("tracking_code")
+            .HasMaxLength(100);
+
+        builder.Property(order => order.ShipmentId)
+            .HasColumnName("shipment_id");
+
         builder.HasIndex(order => order.OrderCode)
             .IsUnique()
             .HasDatabaseName("ux_orders_order_code");

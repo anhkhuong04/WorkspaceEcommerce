@@ -8,6 +8,10 @@ public interface ICheckoutService
         ValidateCheckoutCouponRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<Result<GetShippingQuoteResponse>> GetShippingQuoteAsync(
+        GetShippingQuoteRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<Result<CheckoutResponse>> CheckoutAsync(
         CheckoutRequest request,
         CancellationToken cancellationToken = default);

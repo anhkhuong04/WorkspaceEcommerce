@@ -1,5 +1,6 @@
 using FluentValidation;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
+using WorkspaceEcommerce.Application.Abstractions.Notifications;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Ordering;
@@ -10,6 +11,7 @@ namespace WorkspaceEcommerce.Application.Modules.Customers.Orders;
 internal sealed class CustomerOrderService(
     IAppDbContext dbContext,
     ICurrentCustomerContext currentCustomer,
+    INotificationService notificationService,
     IValidator<CustomerOrderListRequest> listValidator) : ICustomerOrderService
 {
     public async Task<Result<PagedResult<CustomerOrderListItemDto>>> GetOrdersAsync(
@@ -80,6 +82,105 @@ internal sealed class CustomerOrderService(
         return Task.FromResult(Result<CustomerOrderDto>.Success(ToDetailDto(order, customerId.Value)));
     }
 
+    public async Task<Result<CustomerOrderDto>> CancelOrderAsync(
+        Guid id,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var customerId = currentCustomer.CustomerId;
+        if (!customerId.HasValue)
+        {
+            return Result<CustomerOrderDto>.Unauthorized("Customer authentication is required.");
+        }
+
+        var order = dbContext.Orders.FirstOrDefault(existing =>
+            existing.Id == id &&
+            existing.CustomerId == customerId.Value);
+        if (order is null)
+        {
+            return Result<CustomerOrderDto>.NotFound("Order was not found.");
+        }
+
+        if (order.Status is not (OrderStatus.Pending or OrderStatus.Confirmed))
+        {
+            return Result<CustomerOrderDto>.Failure("Order cannot be cancelled at this stage. Only Pending or Confirmed orders can be cancelled.");
+        }
+
+        var cancelNote = string.IsNullOrWhiteSpace(reason)
+            ? "Cancelled by customer."
+            : $"Cancelled by customer: {reason.Trim()}";
+
+        order.ChangeStatus(Guid.NewGuid(), OrderStatus.Cancelled, cancelNote, "Customer");
+
+        // Restore variant stocks
+        var orderItems = dbContext.OrderItems
+            .Where(item => item.OrderId == order.Id)
+            .ToArray();
+
+        foreach (var orderItem in orderItems)
+        {
+            var variant = dbContext.ProductVariants
+                .FirstOrDefault(v => v.Id == orderItem.ProductVariantId);
+            variant?.RestoreStock(orderItem.Quantity);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        // Send real-time notification
+        await notificationService.NotifyCustomerAsync(
+            customerId.Value,
+            "order_status_changed",
+            new { orderId = order.Id, orderCode = order.OrderCode, newStatus = (int)order.Status },
+            cancellationToken);
+
+        return Result<CustomerOrderDto>.Success(ToDetailDto(order, customerId.Value));
+    }
+
+    public async Task<Result<CustomerOrderDto>> RequestReturnAsync(
+        Guid id,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var customerId = currentCustomer.CustomerId;
+        if (!customerId.HasValue)
+        {
+            return Result<CustomerOrderDto>.Unauthorized("Customer authentication is required.");
+        }
+
+        var order = dbContext.Orders.FirstOrDefault(existing =>
+            existing.Id == id &&
+            existing.CustomerId == customerId.Value);
+        if (order is null)
+        {
+            return Result<CustomerOrderDto>.NotFound("Order was not found.");
+        }
+
+        if (order.Status != OrderStatus.Completed)
+        {
+            return Result<CustomerOrderDto>.Failure("Only completed orders can be returned.");
+        }
+
+        var returnNote = string.IsNullOrWhiteSpace(reason)
+            ? "Return requested by customer."
+            : $"Return requested: {reason.Trim()}";
+
+        order.ChangeStatus(Guid.NewGuid(), OrderStatus.Returned, returnNote, "Customer");
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await notificationService.NotifyCustomerAsync(
+            customerId.Value,
+            "order_status_changed",
+            new { orderId = order.Id, orderCode = order.OrderCode, newStatus = (int)order.Status },
+            cancellationToken);
+
+        return Result<CustomerOrderDto>.Success(ToDetailDto(order, customerId.Value));
+    }
+
     private CustomerOrderDto ToDetailDto(Order order, Guid customerId)
     {
         var items = dbContext.OrderItems
@@ -104,6 +205,9 @@ internal sealed class CustomerOrderService(
             order.CustomerEmail,
             order.ShippingAddress,
             order.Note,
+            order.CouponId,
+            order.CouponCodeSnapshot,
+            order.CouponNameSnapshot,
             order.Subtotal,
             order.ShippingFee,
             order.DiscountAmount,
@@ -112,6 +216,8 @@ internal sealed class CustomerOrderService(
             order.PaymentMethod,
             order.CreatedAt,
             order.UpdatedAt,
+            order.TrackingCode,
+            order.ShipmentId,
             items,
             statusHistory);
     }

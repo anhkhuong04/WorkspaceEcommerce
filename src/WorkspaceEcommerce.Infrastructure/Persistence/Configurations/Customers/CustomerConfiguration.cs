@@ -23,8 +23,7 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 
         builder.Property(customer => customer.PhoneNumber)
             .HasColumnName("phone_number")
-            .HasMaxLength(50)
-            .IsRequired();
+            .HasMaxLength(50);
 
         builder.Property(customer => customer.Email)
             .HasColumnName("email")
@@ -33,8 +32,34 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 
         builder.Property(customer => customer.PasswordHash)
             .HasColumnName("password_hash")
-            .HasMaxLength(500)
-            .IsRequired();
+            .HasMaxLength(500);
+
+        builder.Property(customer => customer.GoogleId)
+            .HasColumnName("google_id")
+            .HasMaxLength(100);
+
+        builder.Property(customer => customer.AvatarUrl)
+            .HasColumnName("avatar_url")
+            .HasMaxLength(1000);
+
+        builder.Property(customer => customer.IsEmailVerified)
+            .HasColumnName("is_email_verified")
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(customer => customer.RewardPoints)
+            .HasColumnName("reward_points")
+            .IsRequired()
+            .HasDefaultValue(0);
+
+        builder.Property(customer => customer.TwoFactorEnabled)
+            .HasColumnName("two_factor_enabled")
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(customer => customer.TwoFactorSecret)
+            .HasColumnName("two_factor_secret")
+            .HasMaxLength(64);
 
         builder.Property(customer => customer.CreatedAt)
             .HasColumnName("created_at")
@@ -50,5 +75,10 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 
         builder.HasIndex(customer => customer.PhoneNumber)
             .HasDatabaseName("ix_customers_phone_number");
+
+        builder.HasIndex(customer => customer.GoogleId)
+            .IsUnique()
+            .HasFilter("google_id IS NOT NULL")
+            .HasDatabaseName("ux_customers_google_id");
     }
 }

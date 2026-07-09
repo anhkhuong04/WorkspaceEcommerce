@@ -1,4 +1,4 @@
-﻿using System.Net.Mime;
+using System.Net.Mime;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using WorkspaceEcommerce.Api.Authentication;
 using WorkspaceEcommerce.Api.Common;
+using WorkspaceEcommerce.Api.Hubs;
 using WorkspaceEcommerce.Api.Middleware;
 using WorkspaceEcommerce.Application;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
@@ -83,8 +84,11 @@ builder.Services.AddCors(options =>
                 "http://localhost:5174",
                 "http://127.0.0.1:5174")
             .AllowAnyHeader()
-            .AllowAnyMethod());
+            .AllowAnyMethod()
+            .AllowCredentials());
 });
+builder.Services.AddSignalR();
+builder.Services.AddScoped<WorkspaceEcommerce.Application.Abstractions.Notifications.INotificationService, WorkspaceEcommerce.Api.Hubs.SignalRNotificationService>();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -112,6 +116,7 @@ if (app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.Run();
 

@@ -1,11 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
+using WorkspaceEcommerce.Domain.Modules.Blogs;
 using WorkspaceEcommerce.Domain.Modules.Cart;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Content;
 using WorkspaceEcommerce.Domain.Modules.Customers;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Domain.Modules.Reviews;
 
 namespace WorkspaceEcommerce.Infrastructure.Persistence;
 
@@ -36,11 +38,23 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<Customer> Customers => Set<Customer>();
 
+    public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
+
+    public DbSet<CustomerLoginHistory> CustomerLoginHistories => Set<CustomerLoginHistory>();
+
     public DbSet<Coupon> Coupons => Set<Coupon>();
 
     public DbSet<CouponProductTarget> CouponProductTargets => Set<CouponProductTarget>();
 
     public DbSet<CouponRedemption> CouponRedemptions => Set<CouponRedemption>();
+
+    public DbSet<BlogPost> BlogPosts => Set<BlogPost>();
+
+    public DbSet<BlogPostRelatedProduct> BlogPostRelatedProducts => Set<BlogPostRelatedProduct>();
+
+    public DbSet<BlogComment> BlogComments => Set<BlogComment>();
+
+    public DbSet<Review> Reviews => Set<Review>();
 
     IQueryable<Category> IAppDbContext.Categories => Categories;
 
@@ -56,6 +70,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     IQueryable<Customer> IAppDbContext.Customers => Customers;
 
+    IQueryable<CustomerAddress> IAppDbContext.CustomerAddresses => CustomerAddresses;
+
+    IQueryable<CustomerLoginHistory> IAppDbContext.CustomerLoginHistories => CustomerLoginHistories;
+
     IQueryable<Coupon> IAppDbContext.Coupons => Coupons;
 
     IQueryable<CouponProductTarget> IAppDbContext.CouponProductTargets => CouponProductTargets;
@@ -67,6 +85,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     IQueryable<OrderItem> IAppDbContext.OrderItems => OrderItems;
 
     IQueryable<OrderStatusHistory> IAppDbContext.OrderStatusHistories => OrderStatusHistories;
+
+    IQueryable<BlogPost> IAppDbContext.BlogPosts => BlogPosts;
+
+    IQueryable<BlogPostRelatedProduct> IAppDbContext.BlogPostRelatedProducts => BlogPostRelatedProducts;
+
+    IQueryable<BlogComment> IAppDbContext.BlogComments => BlogComments;
+
+    IQueryable<Review> IAppDbContext.Reviews => Reviews;
 
     async Task<Cart?> ICartStore.FindCartBySessionIdAsync(
         string sessionId,

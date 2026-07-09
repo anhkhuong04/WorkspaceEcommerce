@@ -24,9 +24,17 @@ public sealed class CheckoutRequestValidator : AbstractValidator<CheckoutRequest
             .MaximumLength(250)
             .When(request => !string.IsNullOrWhiteSpace(request.CustomerEmail));
 
-        RuleFor(request => request.ShippingAddress)
+        RuleFor(request => request.ShippingStreet)
             .NotEmpty()
-            .MaximumLength(1000);
+            .MaximumLength(250);
+
+        RuleFor(request => request.ShippingWard)
+            .NotEmpty()
+            .MaximumLength(100);
+
+        RuleFor(request => request.ShippingProvince)
+            .NotEmpty()
+            .MaximumLength(100);
 
         RuleFor(request => request.Note)
             .MaximumLength(1000);

@@ -141,7 +141,7 @@ export function OrderLookupPage() {
               <div className="mt-4 grid gap-2 border-t border-slate-200 pt-4">
                 <div className="flex justify-between text-sm font-bold text-slate-500"><span>Subtotal</span><span>{formatMoney(result.subtotal)}</span></div>
                 {result.shippingFee > 0 && <div className="flex justify-between text-sm font-bold text-slate-500"><span>Shipping fee</span><span>{formatMoney(result.shippingFee)}</span></div>}
-                {result.discountAmount > 0 && <div className="flex justify-between text-sm font-bold text-emerald-600"><span>Discount</span><span>-{formatMoney(result.discountAmount)}</span></div>}
+                {result.discountAmount > 0 && <div className="flex justify-between text-sm font-bold text-emerald-600"><span>{formatDiscountLabel(result)}</span><span>-{formatMoney(result.discountAmount)}</span></div>}
                 <div className="flex justify-between text-xl font-black text-slate-950"><span>Total</span><span className="text-[var(--brand)]">{formatMoney(result.totalAmount)}</span></div>
               </div>
             </div>
@@ -153,6 +153,7 @@ export function OrderLookupPage() {
               {result.customerEmail && <SideInfoRow label="Email" value={result.customerEmail} />}
               <SideInfoRow label="Shipping address" value={result.shippingAddress} />
               {result.note && <SideInfoRow label="Note" value={result.note} />}
+              {result.couponCodeSnapshot && <SideInfoRow label="Coupon" value={formatCouponSnapshot(result)} />}
               <div className="mt-2 border-t border-slate-200 pt-3"><SideInfoRow label="Payment" value={formatPaymentMethod(result.paymentMethod)} /></div>
             </aside>
           </div>
@@ -169,4 +170,12 @@ function SideInfoRow({ label, value }: { label: string; value: string }) {
       <span className="text-sm font-bold text-slate-800">{value}</span>
     </div>
   );
+}
+
+function formatDiscountLabel(order: OrderDto): string {
+  return order.couponCodeSnapshot ? `Discount (${order.couponCodeSnapshot})` : "Discount";
+}
+
+function formatCouponSnapshot(order: OrderDto): string {
+  return order.couponNameSnapshot ? `${order.couponCodeSnapshot} - ${order.couponNameSnapshot}` : order.couponCodeSnapshot ?? "";
 }
