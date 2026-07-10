@@ -28,7 +28,8 @@ public sealed class Order : Entity
         CustomerEmail = Guard.Optional(customerEmail);
         ShippingAddress = Guard.Required(shippingAddress, nameof(ShippingAddress));
         Note = Guard.Optional(note);
-        PaymentMethod = paymentMethod;
+        PaymentMethod = NormalizePaymentMethod(paymentMethod);
+        PaymentStatus = GetInitialPaymentStatus(PaymentMethod);
         CurrencyCode = Guard.Required(currencyCode, nameof(CurrencyCode));
         ExchangeRate = Guard.NotNegative(exchangeRate, nameof(ExchangeRate));
         Status = OrderStatus.Pending;
@@ -50,6 +51,12 @@ public sealed class Order : Entity
 
     public string ShippingAddress { get; private set; }
 
+    public string? ShippingStreet { get; private set; }
+
+    public string? ShippingWard { get; private set; }
+
+    public string? ShippingProvince { get; private set; }
+
     public string? Note { get; private set; }
 
     public Guid? CouponId { get; private set; }
@@ -69,6 +76,10 @@ public sealed class Order : Entity
     public OrderStatus Status { get; private set; }
 
     public PaymentMethod PaymentMethod { get; private set; }
+
+    public PaymentStatus PaymentStatus { get; private set; }
+
+    public DateTimeOffset? PaidAt { get; private set; }
 
     public string CurrencyCode { get; private set; }
 
@@ -159,6 +170,17 @@ public sealed class Order : Entity
         Touch();
     }
 
+    public void SetShippingAddressDetails(
+        string shippingStreet,
+        string shippingWard,
+        string shippingProvince)
+    {
+        ShippingStreet = Guard.Required(shippingStreet, nameof(ShippingStreet));
+        ShippingWard = Guard.Required(shippingWard, nameof(ShippingWard));
+        ShippingProvince = Guard.Required(shippingProvince, nameof(ShippingProvince));
+        Touch();
+    }
+
     public void UpdateShipmentInfo(string trackingCode, Guid shipmentId)
     {
         if (shipmentId == Guid.Empty)
@@ -168,6 +190,54 @@ public sealed class Order : Entity
 
         TrackingCode = Guard.Required(trackingCode, nameof(TrackingCode));
         ShipmentId = shipmentId;
+        Touch();
+    }
+
+    public void MarkPaymentPending()
+    {
+        if (PaymentStatus == PaymentStatus.Paid)
+        {
+            throw new DomainException("Paid order payment cannot be moved back to pending.");
+        }
+
+        PaymentStatus = PaymentStatus.Pending;
+        PaidAt = null;
+        Touch();
+    }
+
+    public void MarkPaymentPaid(DateTimeOffset paidAt)
+    {
+        if (paidAt == default)
+        {
+            throw new DomainException("Order paid timestamp is required.");
+        }
+
+        PaymentStatus = PaymentStatus.Paid;
+        PaidAt = paidAt;
+        Touch();
+    }
+
+    public void MarkPaymentFailed()
+    {
+        if (PaymentStatus == PaymentStatus.Paid)
+        {
+            throw new DomainException("Paid order payment cannot be marked as failed.");
+        }
+
+        PaymentStatus = PaymentStatus.Failed;
+        PaidAt = null;
+        Touch();
+    }
+
+    public void MarkPaymentCancelled()
+    {
+        if (PaymentStatus == PaymentStatus.Paid)
+        {
+            throw new DomainException("Paid order payment cannot be marked as cancelled.");
+        }
+
+        PaymentStatus = PaymentStatus.Cancelled;
+        PaidAt = null;
         Touch();
     }
 
@@ -243,5 +313,24 @@ public sealed class Order : Entity
         }
 
         return customerId;
+    }
+
+    private static PaymentMethod NormalizePaymentMethod(PaymentMethod paymentMethod)
+    {
+        return paymentMethod switch
+        {
+            PaymentMethod.Cod or PaymentMethod.ManualBankTransfer or PaymentMethod.VNPay => paymentMethod,
+            _ => throw new DomainException("Order payment method is not supported.")
+        };
+    }
+
+    private static PaymentStatus GetInitialPaymentStatus(PaymentMethod paymentMethod)
+    {
+        return paymentMethod switch
+        {
+            PaymentMethod.Cod => PaymentStatus.Unpaid,
+            PaymentMethod.ManualBankTransfer or PaymentMethod.VNPay => PaymentStatus.Pending,
+            _ => throw new DomainException("Order payment method is not supported.")
+        };
     }
 }

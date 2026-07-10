@@ -61,6 +61,8 @@ internal sealed class StorefrontOrderLookupService(
             order.TotalAmount,
             order.Status,
             order.PaymentMethod,
+            order.PaymentStatus,
+            order.PaidAt,
             order.CreatedAt,
             order.UpdatedAt,
             order.TrackingCode,

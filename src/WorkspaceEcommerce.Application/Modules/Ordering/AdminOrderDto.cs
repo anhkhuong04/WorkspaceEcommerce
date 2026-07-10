@@ -20,6 +20,8 @@ public sealed record AdminOrderDto(
     decimal TotalAmount,
     OrderStatus Status,
     PaymentMethod PaymentMethod,
+    PaymentStatus PaymentStatus,
+    DateTimeOffset? PaidAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     string? TrackingCode,

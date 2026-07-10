@@ -164,6 +164,8 @@ internal sealed class AdminOrderService(
             order.TotalAmount,
             order.Status,
             order.PaymentMethod,
+            order.PaymentStatus,
+            order.PaidAt,
             order.CreatedAt,
             order.UpdatedAt,
             order.TrackingCode,
@@ -182,6 +184,8 @@ internal sealed class AdminOrderService(
             order.TotalAmount,
             order.Status,
             order.PaymentMethod,
+            order.PaymentStatus,
+            order.PaidAt,
             order.CreatedAt,
             order.UpdatedAt,
             itemCount);

@@ -98,6 +98,7 @@ public sealed class OrderingModelConfigurationTests
     [Theory]
     [InlineData(nameof(Order.Status), "status")]
     [InlineData(nameof(Order.PaymentMethod), "payment_method")]
+    [InlineData(nameof(Order.PaymentStatus), "payment_status")]
     public void OrderEnums_AreStoredAsStrings(string propertyName, string columnName)
     {
         var property = GetEntityType(typeof(Order)).FindProperty(propertyName);
@@ -105,6 +106,27 @@ public sealed class OrderingModelConfigurationTests
         Assert.NotNull(property);
         Assert.Equal("character varying(50)", property.GetColumnType());
         Assert.Equal(columnName, property.GetColumnName());
+    }
+
+    [Fact]
+    public void OrderPaidAt_IsMapped()
+    {
+        var property = GetEntityType(typeof(Order)).FindProperty(nameof(Order.PaidAt));
+
+        Assert.NotNull(property);
+        Assert.Equal("paid_at", property.GetColumnName());
+    }
+
+    [Fact]
+    public void OrderPaymentStatus_HasIndex()
+    {
+        var metadata = GetEntityType(typeof(Order));
+        var index = metadata.GetIndexes().Single(candidate =>
+            candidate.Properties.Count == 1
+            && candidate.Properties[0].Name == nameof(Order.PaymentStatus));
+
+        Assert.False(index.IsUnique);
+        Assert.Equal("ix_orders_payment_status", index.GetDatabaseName());
     }
 
     [Theory]

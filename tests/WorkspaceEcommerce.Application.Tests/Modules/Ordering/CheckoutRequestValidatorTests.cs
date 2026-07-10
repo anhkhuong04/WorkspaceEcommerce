@@ -16,6 +16,20 @@ public sealed class CheckoutRequestValidatorTests
         Assert.True(result.IsValid);
     }
 
+    [Theory]
+    [InlineData(PaymentMethod.Cod)]
+    [InlineData(PaymentMethod.ManualBankTransfer)]
+    [InlineData(PaymentMethod.VNPay)]
+    public void CheckoutRequestValidator_SupportedPaymentMethod_IsValid(PaymentMethod paymentMethod)
+    {
+        var validator = new CheckoutRequestValidator();
+        var request = CreateRequest(paymentMethod);
+
+        var result = validator.Validate(request);
+
+        Assert.True(result.IsValid);
+    }
+
     [Fact]
     public void CheckoutRequestValidator_InvalidRequest_HasValidationErrors()
     {
@@ -47,7 +61,7 @@ public sealed class CheckoutRequestValidatorTests
         Assert.Contains(result.Errors, error => error.PropertyName == nameof(CheckoutRequest.PaymentMethod));
     }
 
-    private static CheckoutRequest CreateRequest()
+    private static CheckoutRequest CreateRequest(PaymentMethod paymentMethod = PaymentMethod.Cod)
     {
         return new CheckoutRequest
         {
@@ -60,7 +74,7 @@ public sealed class CheckoutRequestValidatorTests
             ShippingWard = "Ward 1",
             ShippingProvince = "Ho Chi Minh",
             Note = "Call before delivery",
-            PaymentMethod = PaymentMethod.Cod
+            PaymentMethod = paymentMethod
         };
     }
 }

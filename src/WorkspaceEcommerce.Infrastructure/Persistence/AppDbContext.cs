@@ -8,6 +8,7 @@ using WorkspaceEcommerce.Domain.Modules.Customers;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Loyalty;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Domain.Modules.Payments;
 using WorkspaceEcommerce.Domain.Modules.Reviews;
 
 namespace WorkspaceEcommerce.Infrastructure.Persistence;
@@ -24,6 +25,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
 
     public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
+
+    public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
 
     public DbSet<Category> Categories => Set<Category>();
 
@@ -98,6 +101,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     IQueryable<OrderItem> IAppDbContext.OrderItems => OrderItems;
 
     IQueryable<OrderStatusHistory> IAppDbContext.OrderStatusHistories => OrderStatusHistories;
+
+    IQueryable<PaymentTransaction> IAppDbContext.PaymentTransactions => PaymentTransactions;
 
     IQueryable<BlogPost> IAppDbContext.BlogPosts => BlogPosts;
 

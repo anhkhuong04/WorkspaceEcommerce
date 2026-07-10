@@ -6,6 +6,7 @@ using WorkspaceEcommerce.Domain.Modules.Customers;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Loyalty;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Domain.Modules.Payments;
 using WorkspaceEcommerce.Domain.Modules.Reviews;
 
 namespace WorkspaceEcommerce.Application.Tests.Common.Fakes;
@@ -28,6 +29,7 @@ internal sealed class FakeAppDbContext : IAppDbContext
     private readonly List<Order> _orders = [];
     private readonly List<OrderItem> _orderItems = [];
     private readonly List<OrderStatusHistory> _orderStatusHistories = [];
+    private readonly List<PaymentTransaction> _paymentTransactions = [];
     private readonly List<BlogPost> _blogPosts = [];
     private readonly List<BlogPostRelatedProduct> _blogPostRelatedProducts = [];
     private readonly List<BlogComment> _blogComments = [];
@@ -66,6 +68,8 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public IQueryable<OrderItem> OrderItems => _orderItems.AsQueryable();
 
     public IQueryable<OrderStatusHistory> OrderStatusHistories => _orderStatusHistories.AsQueryable();
+
+    public IQueryable<PaymentTransaction> PaymentTransactions => _paymentTransactions.AsQueryable();
 
     public IQueryable<BlogPost> BlogPosts => _blogPosts.AsQueryable();
 
@@ -165,6 +169,11 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public void Seed(params OrderStatusHistory[] orderStatusHistories)
     {
         _orderStatusHistories.AddRange(orderStatusHistories);
+    }
+
+    public void Seed(params PaymentTransaction[] paymentTransactions)
+    {
+        _paymentTransactions.AddRange(paymentTransactions);
     }
 
     public void Seed(params BlogPost[] blogPosts)
@@ -308,6 +317,11 @@ internal sealed class FakeAppDbContext : IAppDbContext
         if (typeof(TEntity) == typeof(OrderStatusHistory))
         {
             return (List<TEntity>)(object)_orderStatusHistories;
+        }
+
+        if (typeof(TEntity) == typeof(PaymentTransaction))
+        {
+            return (List<TEntity>)(object)_paymentTransactions;
         }
 
         if (typeof(TEntity) == typeof(BlogPost))

@@ -70,7 +70,10 @@ internal sealed class CustomerAuthService(
         // Record login history if we have context
         if (customer is not null && !string.IsNullOrEmpty(request.IpAddress))
         {
-            var userAgent = (request.UserAgent ?? "Unknown")[..Math.Min((request.UserAgent ?? "Unknown").Length, 499)];
+            var rawUserAgent = string.IsNullOrWhiteSpace(request.UserAgent)
+                ? "Unknown"
+                : request.UserAgent.Trim();
+            var userAgent = rawUserAgent[..Math.Min(rawUserAgent.Length, 499)];
             var loginHistory = new CustomerLoginHistory(
                 Guid.NewGuid(),
                 customer.Id,

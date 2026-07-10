@@ -1,4 +1,4 @@
-import type { OrderItemDto, OrderStatus, PaymentMethod } from "./orders";
+import type { OrderItemDto, OrderStatus, PaymentMethod, PaymentStatus } from "./orders";
 
 export interface CustomerRegisterRequest {
   fullName: string;
@@ -53,6 +53,8 @@ export interface CustomerOrderListItemDto {
   totalAmount: number;
   status: OrderStatus;
   paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  paidAt: string | null;
   createdAt: string;
   updatedAt: string;
   itemCount: number;
@@ -84,6 +86,8 @@ export interface CustomerOrderDto {
   totalAmount: number;
   status: OrderStatus;
   paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  paidAt: string | null;
   createdAt: string;
   updatedAt: string;
   items: OrderItemDto[];

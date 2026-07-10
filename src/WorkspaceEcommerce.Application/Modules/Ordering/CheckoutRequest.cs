@@ -25,4 +25,6 @@ public sealed class CheckoutRequest
     public PaymentMethod PaymentMethod { get; init; }
 
     public string? CouponCode { get; init; }
+
+    public string? ClientIpAddress { get; init; }
 }

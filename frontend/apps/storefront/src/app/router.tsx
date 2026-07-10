@@ -11,6 +11,7 @@ import {
 import { CartPage } from "../pages/cart/CartPage";
 import { CheckoutPage } from "../pages/checkout/CheckoutPage";
 import { CheckoutSuccessPage } from "../pages/checkout/CheckoutSuccessPage";
+import { PaymentResultPage } from "../pages/checkout/PaymentResultPage";
 import { HomePage } from "../pages/home/HomePage";
 import { LoginPage } from "../pages/login/LoginPage";
 import { OrderLookupPage } from "../pages/order-lookup/OrderLookupPage";
@@ -46,6 +47,7 @@ export const router = createBrowserRouter([
           </CustomerProtectedRoute>
         )
       },
+      { path: "checkout/payment-result", element: <PaymentResultPage /> },
       { path: "login", element: <LoginPage /> },
       { path: "orders/lookup", element: <OrderLookupPage /> },
       {

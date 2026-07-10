@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Common.Localization;
+using WorkspaceEcommerce.Application.Abstractions.Payments;
 using WorkspaceEcommerce.Application.Abstractions.Shipment;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Ordering;
@@ -9,6 +10,7 @@ using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Domain.Modules.Payments;
 using CartAggregate = WorkspaceEcommerce.Domain.Modules.Cart.Cart;
 
 namespace WorkspaceEcommerce.Application.Tests.Modules.Ordering;
@@ -34,6 +36,9 @@ public sealed class CheckoutServiceTests
         Assert.Null(order.CustomerId);
         Assert.Equal(OrderStatus.Pending, order.Status);
         Assert.Equal(PaymentMethod.Cod, order.PaymentMethod);
+        Assert.Equal(PaymentStatus.Unpaid, store.Orders.Single().PaymentStatus);
+        Assert.False(result.Value.PaymentRequired);
+        Assert.Null(result.Value.PaymentUrl);
         Assert.Equal(240m, order.Subtotal);
         Assert.Equal(0m, order.ShippingFee);
         Assert.Equal(0m, order.DiscountAmount);
@@ -160,6 +165,52 @@ public sealed class CheckoutServiceTests
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
         Assert.Equal(PaymentMethod.ManualBankTransfer, result.Value.Order.PaymentMethod);
+        Assert.Equal(PaymentStatus.Pending, store.Orders.Single().PaymentStatus);
+        Assert.False(result.Value.PaymentRequired);
+        Assert.Null(result.Value.PaymentUrl);
+        Assert.Empty(store.PaymentTransactions);
+    }
+
+    [Fact]
+    public async Task CheckoutAsync_VNPay_CreatesPendingPaymentTransactionAndPaymentUrl()
+    {
+        var store = new FakeCheckoutStore();
+        var variant = SeedVisibleVariant(store);
+        SeedCart(store, variant.Id, quantity: 2, unitPriceSnapshot: 100m);
+        var shipmentService = new FakeShipmentService();
+        var vnPayPaymentService = new FakeVNPayPaymentService();
+        var service = CreateService(
+            store,
+            shipmentService: shipmentService,
+            vnPayPaymentService: vnPayPaymentService);
+
+        var result = await service.CheckoutAsync(CreateRequest(PaymentMethod.VNPay));
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.True(result.Value.PaymentRequired);
+        Assert.Equal("https://vnpay.test/pay/TXN", result.Value.PaymentUrl);
+        Assert.Equal(1, shipmentService.GetShippingQuoteCallCount);
+        Assert.Equal(0, shipmentService.CreateShipmentCallCount);
+        var order = Assert.Single(store.Orders);
+        Assert.Equal(PaymentMethod.VNPay, order.PaymentMethod);
+        Assert.Equal(PaymentStatus.Pending, order.PaymentStatus);
+        Assert.Null(order.ShipmentId);
+        Assert.Null(order.TrackingCode);
+        Assert.Equal(0m, order.ShippingFee);
+        Assert.Equal(200m, order.TotalAmount);
+        Assert.Equal(8, variant.StockQuantity);
+        Assert.Empty(store.Carts);
+        var transaction = Assert.Single(store.PaymentTransactions);
+        Assert.Equal(order.Id, transaction.OrderId);
+        Assert.Equal(PaymentProvider.VNPay, transaction.Provider);
+        Assert.Equal(PaymentTransactionStatus.Pending, transaction.Status);
+        Assert.Equal(order.TotalAmount, transaction.Amount);
+        Assert.Equal(order.CurrencyCode, transaction.CurrencyCode);
+        Assert.Equal(transaction.TxnRef, vnPayPaymentService.LastRequest?.TxnRef);
+        Assert.Equal(transaction.Amount, vnPayPaymentService.LastRequest?.Amount);
+        Assert.Equal(1, store.TransactionCallCount);
+        Assert.Equal(1, store.SaveChangesCallCount);
     }
 
     [Fact]
@@ -312,13 +363,18 @@ public sealed class CheckoutServiceTests
         Assert.Empty(store.CouponRedemptions);
     }
 
-    private static CheckoutService CreateService(FakeCheckoutStore store, Guid? customerId = null)
+    private static CheckoutService CreateService(
+        FakeCheckoutStore store,
+        Guid? customerId = null,
+        IShipmentService? shipmentService = null,
+        IVNPayPaymentService? vnPayPaymentService = null)
     {
         return new CheckoutService(
             store,
             new StubCurrentCustomerContext(customerId),
             new StubCurrentLanguageProvider(),
-            new FakeShipmentService(),
+            shipmentService ?? new FakeShipmentService(),
+            vnPayPaymentService ?? new FakeVNPayPaymentService(),
             NullLogger<CheckoutService>.Instance,
             new CheckoutRequestValidator(),
             new ValidateCheckoutCouponRequestValidator());
@@ -432,8 +488,14 @@ public sealed class CheckoutServiceTests
 
     private sealed class FakeShipmentService : IShipmentService
     {
+        public int GetShippingQuoteCallCount { get; private set; }
+
+        public int CreateShipmentCallCount { get; private set; }
+
         public Task<ShippingQuoteResponse> GetShippingQuoteAsync(ShippingQuoteRequest request, CancellationToken cancellationToken = default)
         {
+            GetShippingQuoteCallCount++;
+
             return Task.FromResult(new ShippingQuoteResponse
             {
                 TotalFeeAmount = 0m,
@@ -447,6 +509,8 @@ public sealed class CheckoutServiceTests
 
         public Task<CreateShipmentResponse> CreateShipmentAsync(CreateShipmentRequest request, string idempotencyKey, CancellationToken cancellationToken = default)
         {
+            CreateShipmentCallCount++;
+
             return Task.FromResult(new CreateShipmentResponse
             {
                 ShipmentId = Guid.NewGuid(),
@@ -468,6 +532,38 @@ public sealed class CheckoutServiceTests
                 ShippingFeeAmount = 0m,
                 Timeline = []
             });
+        }
+    }
+
+    private sealed class FakeVNPayPaymentService : IVNPayPaymentService
+    {
+        public VNPayCreatePaymentUrlRequest? LastRequest { get; private set; }
+
+        public string CreatePaymentUrl(VNPayCreatePaymentUrlRequest request)
+        {
+            LastRequest = request;
+            return "https://vnpay.test/pay/TXN";
+        }
+
+        public VNPayCallbackVerificationResult VerifyCallback(IReadOnlyDictionary<string, string?> parameters)
+        {
+            return new VNPayCallbackVerificationResult(
+                true,
+                parameters.GetValueOrDefault("vnp_TxnRef"),
+                null,
+                parameters.GetValueOrDefault("vnp_ResponseCode"),
+                parameters.GetValueOrDefault("vnp_TransactionStatus"),
+                parameters.GetValueOrDefault("vnp_TransactionNo"),
+                parameters.GetValueOrDefault("vnp_SecureHash"),
+                parameters.GetValueOrDefault("vnp_OrderInfo"),
+                parameters);
+        }
+
+        public VNPayPaymentOutcome GetPaymentOutcome(string? responseCode, string? transactionStatus)
+        {
+            return responseCode == "00"
+                ? VNPayPaymentOutcome.Success
+                : VNPayPaymentOutcome.Failed;
         }
     }
 }

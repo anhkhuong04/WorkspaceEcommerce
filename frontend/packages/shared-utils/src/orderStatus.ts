@@ -1,4 +1,4 @@
-import type { OrderStatus, PaymentMethod } from "@workspace-ecommerce/api-types";
+import type { OrderStatus, PaymentMethod, PaymentStatus } from "@workspace-ecommerce/api-types";
 
 const orderStatusLabels: Record<OrderStatus, string> = {
   0: "Pending",
@@ -13,7 +13,16 @@ const orderStatusLabels: Record<OrderStatus, string> = {
 
 const paymentMethodLabels: Record<PaymentMethod, string> = {
   0: "COD",
-  1: "Manual bank transfer"
+  1: "Manual bank transfer",
+  2: "VNPay"
+};
+
+const paymentStatusLabels: Record<PaymentStatus, string> = {
+  0: "Unpaid",
+  1: "Pending",
+  2: "Paid",
+  3: "Failed",
+  4: "Cancelled"
 };
 
 export function formatOrderStatus(status: OrderStatus): string {
@@ -22,4 +31,8 @@ export function formatOrderStatus(status: OrderStatus): string {
 
 export function formatPaymentMethod(paymentMethod: PaymentMethod): string {
   return paymentMethodLabels[paymentMethod] ?? "Unknown";
+}
+
+export function formatPaymentStatus(paymentStatus: PaymentStatus): string {
+  return paymentStatusLabels[paymentStatus] ?? "Unknown";
 }

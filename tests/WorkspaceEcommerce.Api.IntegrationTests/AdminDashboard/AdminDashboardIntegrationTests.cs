@@ -93,7 +93,7 @@ public sealed class AdminDashboardIntegrationTests(ApiIntegrationTestFixture fix
             lowStock.Select(item => item!["sku"]!.GetValue<string>()));
         Assert.DoesNotContain(lowStock, item => item!["sku"]!.GetValue<string>() == "C-HEALTHY");
         var statusSummary = json["data"]!["orderStatusSummary"]!.AsArray();
-        Assert.Equal(7, statusSummary.Count);
+        Assert.Equal(8, statusSummary.Count);
         Assert.Equal(5, GetStatusCount(statusSummary, OrderStatus.Pending));
         Assert.Equal(1, GetStatusCount(statusSummary, OrderStatus.Completed));
         Assert.Equal(0, GetStatusCount(statusSummary, OrderStatus.Cancelled));
@@ -131,7 +131,7 @@ public sealed class AdminDashboardIntegrationTests(ApiIntegrationTestFixture fix
         Assert.Equal(0, json["data"]!["newOrders"]!.GetValue<int>());
         Assert.Equal(5, json["data"]!["lowStockThreshold"]!.GetValue<int>());
         Assert.Empty(json["data"]!["lowStockVariants"]!.AsArray());
-        Assert.Equal(7, json["data"]!["orderStatusSummary"]!.AsArray().Count);
+        Assert.Equal(8, json["data"]!["orderStatusSummary"]!.AsArray().Count);
         Assert.All(
             json["data"]!["orderStatusSummary"]!.AsArray(),
             item => Assert.Equal(0, item!["count"]!.GetValue<int>()));

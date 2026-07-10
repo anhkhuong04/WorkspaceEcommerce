@@ -8,6 +8,8 @@ public sealed record CustomerOrderListItemDto(
     decimal TotalAmount,
     OrderStatus Status,
     PaymentMethod PaymentMethod,
+    PaymentStatus PaymentStatus,
+    DateTimeOffset? PaidAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     int ItemCount);

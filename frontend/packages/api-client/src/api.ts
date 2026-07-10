@@ -39,6 +39,7 @@ import type {
   LoyaltyTransactionListRequest,
   OrderLookupRequest,
   OrderLookupResponse,
+  PaymentResultDto,
   PagedResult,
   ProductListRequest,
   StorefrontBannerDto,
@@ -102,6 +103,8 @@ export function createStorefrontApi(client: ApiClient) {
     getShippingQuote: (request: GetShippingQuoteRequest) =>
       client.post<GetShippingQuoteResponse, GetShippingQuoteRequest>("/api/checkout/shipping-quote", request),
     lookupOrder: (request: OrderLookupRequest) => client.get<OrderLookupResponse>(`/api/orders/lookup${buildQuery(request)}`),
+    getPaymentResult: (orderCode: string, phone?: string | null) =>
+      client.get<PaymentResultDto>(`/api/payments/result${buildQuery({ orderCode, phone: phone ?? "" })}`),
     registerCustomer: (request: CustomerRegisterRequest) =>
       client.post<CustomerAuthResponse, CustomerRegisterRequest>("/api/customer/auth/register", request),
     loginCustomer: (request: CustomerLoginRequest) =>

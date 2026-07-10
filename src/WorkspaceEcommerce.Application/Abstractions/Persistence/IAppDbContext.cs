@@ -5,6 +5,7 @@ using WorkspaceEcommerce.Domain.Modules.Customers;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Loyalty;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Domain.Modules.Payments;
 using WorkspaceEcommerce.Domain.Modules.Reviews;
 
 namespace WorkspaceEcommerce.Application.Abstractions.Persistence;
@@ -46,6 +47,8 @@ public interface IAppDbContext
     IQueryable<OrderItem> OrderItems { get; }
 
     IQueryable<OrderStatusHistory> OrderStatusHistories { get; }
+
+    IQueryable<PaymentTransaction> PaymentTransactions { get; }
 
     IQueryable<BlogPost> BlogPosts { get; }
 

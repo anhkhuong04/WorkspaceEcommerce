@@ -6,4 +6,5 @@ export * from "./coupons";
 export * from "./customer";
 export * from "./loyalty";
 export * from "./orders";
+export * from "./payments";
 export * from "./blogs";

@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.Extensions.Logging;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
+using WorkspaceEcommerce.Application.Abstractions.Payments;
 using WorkspaceEcommerce.Application.Common.Localization;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Abstractions.Shipment;
@@ -9,6 +10,7 @@ using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Domain.Modules.Payments;
 using CartAggregate = WorkspaceEcommerce.Domain.Modules.Cart.Cart;
 
 namespace WorkspaceEcommerce.Application.Modules.Ordering;
@@ -18,6 +20,7 @@ internal sealed class CheckoutService(
     ICurrentCustomerContext currentCustomer,
     ICurrentLanguageProvider languageProvider,
     IShipmentService shipmentService,
+    IVNPayPaymentService vnPayPaymentService,
     ILogger<CheckoutService> logger,
     IValidator<CheckoutRequest> validator,
     IValidator<ValidateCheckoutCouponRequest> couponValidator) : ICheckoutService
@@ -142,8 +145,36 @@ internal sealed class CheckoutService(
         }
 
         Order? order = null;
+        PaymentTransaction? paymentTransaction = null;
+        string? paymentUrl = null;
         Result<CheckoutResponse>? failure = null;
         IReadOnlyCollection<CheckoutItemSnapshot>? snapshots = null;
+        ShippingQuoteResponse? preCheckoutShippingQuote = null;
+
+        if (request.PaymentMethod == PaymentMethod.VNPay)
+        {
+            var quoteSnapshotsResult = await BuildItemSnapshotsAsync(cart, cancellationToken);
+            if (quoteSnapshotsResult.IsFailure)
+            {
+                return ToCheckoutFailure(quoteSnapshotsResult);
+            }
+
+            try
+            {
+                preCheckoutShippingQuote = await GetShippingQuoteForCheckoutAsync(
+                    externalOrderId: null,
+                    request,
+                    quoteSnapshotsResult.Value!,
+                    codAmount: 0m,
+                    cancellationToken);
+            }
+            catch (HttpRequestException ex)
+            {
+                logger.LogError(ex, "Failed to calculate shipping fee before VNPay checkout.");
+                return Result<CheckoutResponse>.Failure("Could not calculate shipping fee. Please try again.");
+            }
+        }
+
         try
         {
             await checkoutStore.ExecuteInTransactionAsync(async transactionCancellationToken =>
@@ -205,6 +236,23 @@ internal sealed class CheckoutService(
                         couponEvaluation.DiscountAmount));
                 }
 
+                if (preCheckoutShippingQuote is not null)
+                {
+                    order.SetShippingFee(preCheckoutShippingQuote.TotalFeeAmount);
+                }
+
+                if (request.PaymentMethod == PaymentMethod.VNPay)
+                {
+                    paymentTransaction = new PaymentTransaction(
+                        Guid.NewGuid(),
+                        order.Id,
+                        PaymentProvider.VNPay,
+                        order.TotalAmount,
+                        order.CurrencyCode,
+                        GeneratePaymentTxnRef(order));
+                    checkoutStore.Add(paymentTransaction);
+                }
+
                 foreach (var snapshot in snapshots)
                 {
                     snapshot.Variant.DecreaseStock(snapshot.Quantity);
@@ -226,60 +274,25 @@ internal sealed class CheckoutService(
             return failure;
         }
 
-        // After order saved, calculate shipping fee and create shipment in MiniLogistics
-        try
+        if (request.PaymentMethod == PaymentMethod.VNPay)
         {
-            // Use saved item snapshots for parcel
-            var parcelForShipment = AggregateParcel(snapshots!);
-
-            // Use the structured address fields if available
-            var deliveryAddress = new ShippingAddress
+            paymentUrl = vnPayPaymentService.CreatePaymentUrl(new VNPayCreatePaymentUrlRequest
             {
-                Street = !string.IsNullOrWhiteSpace(request.ShippingStreet) ? request.ShippingStreet : request.ShippingAddress,
-                Ward = request.ShippingWard,
-                Province = request.ShippingProvince
-            };
-
-            var isCod = request.PaymentMethod == PaymentMethod.Cod;
-            var codAmount = isCod ? order!.TotalAmount : 0m;
-
-            var quoteResponse = await shipmentService.GetShippingQuoteAsync(new ShippingQuoteRequest
-            {
-                ExternalOrderId = order!.OrderCode,
-                DeliveryAddress = deliveryAddress,
-                Parcel = parcelForShipment,
-                GoodsValueAmount = order.Subtotal,
-                CodAmount = codAmount
-            }, cancellationToken);
-
-            order.SetShippingFee(quoteResponse.TotalFeeAmount);
-
-            var shipmentResponse = await shipmentService.CreateShipmentAsync(new CreateShipmentRequest
-            {
-                ExternalOrderId = order.OrderCode,
-                Receiver = new ShipmentContact
-                {
-                    Name = order.CustomerName,
-                    Phone = order.CustomerPhone
-                },
-                DeliveryAddress = deliveryAddress,
-                Parcel = parcelForShipment,
-                GoodsValueAmount = order.Subtotal,
-                CodAmount = codAmount,
-                Note = order.Note
-            }, order.OrderCode, cancellationToken);
-
-            order.UpdateShipmentInfo(shipmentResponse.TrackingCode, shipmentResponse.ShipmentId);
-
-            checkoutStore.Update(order);
-            await checkoutStore.SaveChangesAsync(cancellationToken);
+                TxnRef = paymentTransaction!.TxnRef,
+                Amount = paymentTransaction.Amount,
+                OrderInfo = $"Pay order {order!.OrderCode}",
+                IpAddress = NormalizeClientIpAddress(request.ClientIpAddress)
+            });
         }
-        catch (HttpRequestException ex)
+        else
         {
-            logger.LogWarning(ex, "MiniLogistics shipment creation failed for order {OrderCode}. Order was placed without shipment.", order!.OrderCode);
+            await TryCreateShipmentAsync(order!, request, snapshots!, cancellationToken);
         }
 
-        return Result<CheckoutResponse>.Success(new CheckoutResponse(ToDto(order!)));
+        return Result<CheckoutResponse>.Success(new CheckoutResponse(
+            ToDto(order!),
+            PaymentRequired: paymentUrl is not null,
+            PaymentUrl: paymentUrl));
     }
 
     private async Task<Result<IReadOnlyCollection<CheckoutItemSnapshot>>> BuildItemSnapshotsAsync(
@@ -415,6 +428,10 @@ internal sealed class CheckoutService(
             request.PaymentMethod,
             currencyCode,
             exchangeRate);
+        order.SetShippingAddressDetails(
+            request.ShippingStreet,
+            request.ShippingWard,
+            request.ShippingProvince);
 
         foreach (var snapshot in snapshots)
         {
@@ -433,6 +450,86 @@ internal sealed class CheckoutService(
         return order;
     }
 
+    private async Task TryCreateShipmentAsync(
+        Order order,
+        CheckoutRequest request,
+        IReadOnlyCollection<CheckoutItemSnapshot> snapshots,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var codAmount = order.PaymentMethod == PaymentMethod.Cod ? order.TotalAmount : 0m;
+            await TryApplyShippingQuoteAsync(
+                order,
+                request,
+                snapshots,
+                codAmount,
+                cancellationToken);
+
+            var shipmentResponse = await shipmentService.CreateShipmentAsync(new CreateShipmentRequest
+            {
+                ExternalOrderId = order.OrderCode,
+                Receiver = new ShipmentContact
+                {
+                    Name = order.CustomerName,
+                    Phone = order.CustomerPhone
+                },
+                DeliveryAddress = BuildDeliveryAddress(order, request),
+                Parcel = AggregateParcel(snapshots),
+                GoodsValueAmount = order.Subtotal,
+                CodAmount = codAmount,
+                Note = order.Note
+            }, order.OrderCode, cancellationToken);
+
+            order.UpdateShipmentInfo(shipmentResponse.TrackingCode, shipmentResponse.ShipmentId);
+
+            checkoutStore.Update(order);
+            await checkoutStore.SaveChangesAsync(cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning(ex, "MiniLogistics shipment creation failed for order {OrderCode}. Order was placed without shipment.", order.OrderCode);
+        }
+    }
+
+    private async Task<ShippingQuoteResponse> TryApplyShippingQuoteAsync(
+        Order order,
+        CheckoutRequest request,
+        IReadOnlyCollection<CheckoutItemSnapshot> snapshots,
+        decimal codAmount,
+        CancellationToken cancellationToken)
+    {
+        var quoteResponse = await shipmentService.GetShippingQuoteAsync(new ShippingQuoteRequest
+        {
+            ExternalOrderId = order.OrderCode,
+            DeliveryAddress = BuildDeliveryAddress(order, request),
+            Parcel = AggregateParcel(snapshots),
+            GoodsValueAmount = order.Subtotal,
+            CodAmount = codAmount
+        }, cancellationToken);
+
+        order.SetShippingFee(quoteResponse.TotalFeeAmount);
+
+        return quoteResponse;
+    }
+
+    private async Task<ShippingQuoteResponse> GetShippingQuoteForCheckoutAsync(
+        string? externalOrderId,
+        CheckoutRequest request,
+        IReadOnlyCollection<CheckoutItemSnapshot> snapshots,
+        decimal codAmount,
+        CancellationToken cancellationToken)
+    {
+        return await shipmentService.GetShippingQuoteAsync(new ShippingQuoteRequest
+        {
+            ExternalOrderId = externalOrderId,
+            DeliveryAddress = BuildDeliveryAddress(request),
+            Parcel = AggregateParcel(snapshots),
+            GoodsValueAmount = snapshots.Sum(snapshot => snapshot.LineTotal),
+            CodAmount = codAmount
+        }, cancellationToken);
+    }
+
     private async Task<string> GenerateOrderCodeAsync(CancellationToken cancellationToken)
     {
         for (var attempt = 0; attempt < 5; attempt++)
@@ -445,6 +542,44 @@ internal sealed class CheckoutService(
         }
 
         throw new DomainException("Could not generate a unique order code.");
+    }
+
+    private static string GeneratePaymentTxnRef(Order order)
+    {
+        return $"{order.OrderCode}-{Guid.NewGuid():N}"[..32].ToUpperInvariant();
+    }
+
+    private static ShippingAddress BuildDeliveryAddress(Order order, CheckoutRequest request)
+    {
+        return BuildDeliveryAddress(
+            request,
+            fallbackStreet: order.ShippingAddress);
+    }
+
+    private static ShippingAddress BuildDeliveryAddress(CheckoutRequest request)
+    {
+        return BuildDeliveryAddress(
+            request,
+            fallbackStreet: request.ShippingAddress);
+    }
+
+    private static ShippingAddress BuildDeliveryAddress(CheckoutRequest request, string fallbackStreet)
+    {
+        return new ShippingAddress
+        {
+            Street = !string.IsNullOrWhiteSpace(request.ShippingStreet)
+                ? request.ShippingStreet
+                : fallbackStreet,
+            Ward = request.ShippingWard,
+            Province = request.ShippingProvince
+        };
+    }
+
+    private static string NormalizeClientIpAddress(string? clientIpAddress)
+    {
+        return string.IsNullOrWhiteSpace(clientIpAddress)
+            ? "127.0.0.1"
+            : clientIpAddress.Trim();
     }
 
     private static OrderDto ToDto(Order order)
@@ -467,6 +602,8 @@ internal sealed class CheckoutService(
             order.TotalAmount,
             order.Status,
             order.PaymentMethod,
+            order.PaymentStatus,
+            order.PaidAt,
             order.CreatedAt,
             order.UpdatedAt,
             order.TrackingCode,

@@ -1178,11 +1178,21 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("order_code");
 
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at");
+
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("payment_method");
+
+                    b.Property<string>("PaymentStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("payment_status");
 
                     b.Property<Guid?>("ShipmentId")
                         .HasColumnType("uuid")
@@ -1198,6 +1208,21 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("shipping_fee");
+
+                    b.Property<string>("ShippingProvince")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("shipping_province");
+
+                    b.Property<string>("ShippingStreet")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("shipping_street");
+
+                    b.Property<string>("ShippingWard")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("shipping_ward");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1238,6 +1263,9 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrderCode")
                         .IsUnique()
                         .HasDatabaseName("ux_orders_order_code");
+
+                    b.HasIndex("PaymentStatus")
+                        .HasDatabaseName("ix_orders_payment_status");
 
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_orders_status");
@@ -1339,6 +1367,89 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_order_status_history_order_id");
 
                     b.ToTable("order_status_history", "ordering");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Payments.PaymentTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<string>("GatewayResponseCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("gateway_response_code");
+
+                    b.Property<string>("GatewayResponseMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("gateway_response_message");
+
+                    b.Property<string>("GatewayTransactionNo")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("gateway_transaction_no");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<DateTimeOffset?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("RawResponse")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("raw_response");
+
+                    b.Property<string>("SecureHash")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("secure_hash");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TxnRef")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("txn_ref");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_payment_transactions_order_id");
+
+                    b.HasIndex("TxnRef")
+                        .IsUnique()
+                        .HasDatabaseName("ux_payment_transactions_txn_ref");
+
+                    b.ToTable("payment_transactions", "payments");
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Reviews.Review", b =>
@@ -1582,6 +1693,15 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .WithMany("StatusHistory")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Payments.PaymentTransaction", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Ordering.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

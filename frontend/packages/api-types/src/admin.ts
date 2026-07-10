@@ -1,5 +1,5 @@
 import type { PaginationRequest } from "./common";
-import type { OrderStatus, PaymentMethod, OrderItemDto } from "./orders";
+import type { OrderStatus, PaymentMethod, PaymentStatus, OrderItemDto } from "./orders";
 import type { CouponDiscountType, CouponSource } from "./coupons";
 
 export interface AdminLoginRequest {
@@ -124,6 +124,8 @@ export interface AdminOrderListItemDto {
   totalAmount: number;
   status: OrderStatus;
   paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  paidAt: string | null;
   createdAt: string;
   updatedAt: string;
   itemCount: number;

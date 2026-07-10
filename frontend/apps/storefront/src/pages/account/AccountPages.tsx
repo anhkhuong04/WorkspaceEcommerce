@@ -10,9 +10,10 @@ import type {
   LoyaltyTransactionDto,
   LoyaltyTransactionType,
   OrderStatus,
+  PaymentStatus,
   RedeemLoyaltyPointsResponse
 } from "@workspace-ecommerce/api-types";
-import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod } from "@workspace-ecommerce/shared-utils";
+import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -39,6 +40,14 @@ const statusStyles: Record<OrderStatus, string> = {
   5: "bg-red-100 text-red-800",
   6: "bg-slate-100 text-slate-600",
   7: "bg-orange-100 text-orange-800"
+};
+
+const paymentStatusStyles: Record<PaymentStatus, string> = {
+  0: "bg-slate-100 text-slate-700",
+  1: "bg-blue-100 text-blue-800",
+  2: "bg-emerald-100 text-emerald-800",
+  3: "bg-red-100 text-red-800",
+  4: "bg-slate-100 text-slate-700"
 };
 
 const loyaltyVoucherAmountPerPoint = 1000;
@@ -633,6 +642,7 @@ function OrderDetail({ order }: { order: CustomerOrderDto }) {
                 {order.note ? <InfoBlock label="Note" value={order.note} /> : null}
                 {order.couponCodeSnapshot ? <InfoBlock label="Coupon" value={formatCouponSnapshot(order)} /> : null}
                 <InfoBlock label="Payment" value={formatPaymentMethod(order.paymentMethod)} />
+                <InfoBlock label="Payment status" value={formatPaymentStatus(order.paymentStatus)} />
               </div>
             </section>
 
@@ -760,6 +770,7 @@ function OrderList({ orders }: { orders: CustomerOrderListItemDto[] }) {
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-mono text-base font-black text-slate-950">{order.orderCode}</p>
               <StatusBadge status={order.status} />
+              <PaymentStatusBadge status={order.paymentStatus} />
             </div>
             <p className="ui-body mt-1 text-slate-500">
               {formatDate(order.createdAt)} - {order.itemCount} item{order.itemCount === 1 ? "" : "s"} - {formatPaymentMethod(order.paymentMethod)}
@@ -779,6 +790,14 @@ function StatusBadge({ status }: { status: OrderStatus }) {
   return (
     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${statusStyles[status] ?? "bg-slate-100 text-slate-600"}`}>
       {formatOrderStatus(status)}
+    </span>
+  );
+}
+
+function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
+  return (
+    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${paymentStatusStyles[status] ?? "bg-slate-100 text-slate-600"}`}>
+      {formatPaymentStatus(status)}
     </span>
   );
 }

@@ -1,6 +1,6 @@
 ﻿import { zodResolver } from "@hookform/resolvers/zod";
-import type { OrderDto } from "@workspace-ecommerce/api-types";
-import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod } from "@workspace-ecommerce/shared-utils";
+import type { OrderDto, PaymentStatus } from "@workspace-ecommerce/api-types";
+import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
@@ -24,6 +24,14 @@ const statusStyles: Record<number, string> = {
   4: "bg-emerald-100 text-emerald-800",
   5: "bg-red-100 text-red-800",
   6: "bg-slate-100 text-slate-600"
+};
+
+const paymentStatusStyles: Record<PaymentStatus, string> = {
+  0: "bg-slate-100 text-slate-700",
+  1: "bg-blue-100 text-blue-800",
+  2: "bg-emerald-100 text-emerald-800",
+  3: "bg-red-100 text-red-800",
+  4: "bg-slate-100 text-slate-700"
 };
 
 export function OrderLookupPage() {
@@ -154,7 +162,15 @@ export function OrderLookupPage() {
               <SideInfoRow label="Shipping address" value={result.shippingAddress} />
               {result.note && <SideInfoRow label="Note" value={result.note} />}
               {result.couponCodeSnapshot && <SideInfoRow label="Coupon" value={formatCouponSnapshot(result)} />}
-              <div className="mt-2 border-t border-slate-200 pt-3"><SideInfoRow label="Payment" value={formatPaymentMethod(result.paymentMethod)} /></div>
+              <div className="mt-2 grid gap-3 border-t border-slate-200 pt-3">
+                <SideInfoRow label="Payment" value={formatPaymentMethod(result.paymentMethod)} />
+                <div className="grid gap-0.5">
+                  <span className="ui-caption uppercase tracking-[0.14em] text-slate-400">Payment status</span>
+                  <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-black ${paymentStatusStyles[result.paymentStatus]}`}>
+                    {formatPaymentStatus(result.paymentStatus)}
+                  </span>
+                </div>
+              </div>
             </aside>
           </div>
         </section>

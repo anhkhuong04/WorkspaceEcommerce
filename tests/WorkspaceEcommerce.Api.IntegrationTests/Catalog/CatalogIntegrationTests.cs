@@ -15,7 +15,7 @@ public sealed class CatalogIntegrationTests(ApiIntegrationTestFixture fixture)
         client.UseBearerToken(await client.LoginAsAdminAsync());
         using var createResponse = await client.PostAsJsonAsync("/api/admin/categories", new
         {
-            name = "Temporary",
+            name = new Dictionary<string, string> { ["en"] = "Temporary", ["vi"] = "Tam thoi" },
             slug = "temporary",
             sortOrder = 1,
             isActive = true
@@ -112,7 +112,7 @@ public sealed class CatalogIntegrationTests(ApiIntegrationTestFixture fixture)
         client.UseBearerToken(await client.LoginAsAdminAsync());
         var request = new
         {
-            name = "Desks",
+            name = new Dictionary<string, string> { ["en"] = "Desks", ["vi"] = "Ban lam viec" },
             slug = "desks",
             sortOrder = 1,
             isActive = true

@@ -3,6 +3,7 @@ using WorkspaceEcommerce.Domain.Modules.Cart;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Domain.Modules.Payments;
 
 namespace WorkspaceEcommerce.Application.Tests.Common.Fakes;
 
@@ -16,10 +17,13 @@ internal sealed class FakeCheckoutStore : ICheckoutStore
     private readonly List<CouponProductTarget> _couponProductTargets = [];
     private readonly List<CouponRedemption> _couponRedemptions = [];
     private readonly List<Order> _orders = [];
+    private readonly List<PaymentTransaction> _paymentTransactions = [];
 
     public IReadOnlyCollection<Cart> Carts => _carts;
 
     public IReadOnlyCollection<Order> Orders => _orders;
+
+    public IReadOnlyCollection<PaymentTransaction> PaymentTransactions => _paymentTransactions;
 
     public IReadOnlyCollection<Coupon> Coupons => _coupons;
 
@@ -152,6 +156,11 @@ internal sealed class FakeCheckoutStore : ICheckoutStore
         _orders.AddRange(orders);
     }
 
+    public void Seed(params PaymentTransaction[] paymentTransactions)
+    {
+        _paymentTransactions.AddRange(paymentTransactions);
+    }
+
     public void Add<TEntity>(TEntity entity)
         where TEntity : class
     {
@@ -223,6 +232,11 @@ internal sealed class FakeCheckoutStore : ICheckoutStore
         if (typeof(TEntity) == typeof(Order))
         {
             return (List<TEntity>)(object)_orders;
+        }
+
+        if (typeof(TEntity) == typeof(PaymentTransaction))
+        {
+            return (List<TEntity>)(object)_paymentTransactions;
         }
 
         throw new InvalidOperationException($"Unsupported entity type '{typeof(TEntity).Name}'.");

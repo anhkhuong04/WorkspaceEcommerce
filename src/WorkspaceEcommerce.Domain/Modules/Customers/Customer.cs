@@ -30,7 +30,7 @@ public sealed class Customer : Entity
     }
 
     // EF Core parameterless constructor
-    private Customer() : base(Guid.Empty) { }
+    private Customer() { }
 
     public string FullName { get; private set; } = default!;
 

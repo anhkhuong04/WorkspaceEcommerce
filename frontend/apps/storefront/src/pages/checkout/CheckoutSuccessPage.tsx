@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { OrderDto } from "@workspace-ecommerce/api-types";
-import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod } from "@workspace-ecommerce/shared-utils";
+import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
@@ -95,6 +95,7 @@ export function CheckoutSuccessPage() {
               <InfoRow label="Status" value={formatOrderStatus(order.status)} />
               <InfoRow label="Created" value={formatDate(order.createdAt)} />
               <InfoRow label="Payment" value={formatPaymentMethod(order.paymentMethod)} />
+              <InfoRow label="Payment status" value={formatPaymentStatus(order.paymentStatus)} />
               {order.couponCodeSnapshot ? <InfoRow label="Coupon" value={formatCouponSnapshot(order)} mono /> : null}
               <InfoRow label="Recipient" value={order.customerName} />
               <InfoRow label="Phone" value={order.customerPhone} />

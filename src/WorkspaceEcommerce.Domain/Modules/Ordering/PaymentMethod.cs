@@ -3,5 +3,6 @@ namespace WorkspaceEcommerce.Domain.Modules.Ordering;
 public enum PaymentMethod
 {
     Cod = 0,
-    ManualBankTransfer = 1
+    ManualBankTransfer = 1,
+    VNPay = 2
 }

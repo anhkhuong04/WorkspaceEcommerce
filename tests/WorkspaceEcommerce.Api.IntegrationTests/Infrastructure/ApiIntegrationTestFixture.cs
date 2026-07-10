@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
+using WorkspaceEcommerce.Application.Abstractions.Payments;
 using WorkspaceEcommerce.Application.Abstractions.Shipment;
 using WorkspaceEcommerce.Infrastructure.Persistence;
 
@@ -19,7 +20,8 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         "Jwt__Issuer",
         "Jwt__Audience",
         "Jwt__SigningKey",
-        "Jwt__AccessTokenMinutes"
+        "Jwt__AccessTokenMinutes",
+        "Storefront__BaseUrl"
     ];
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
@@ -41,6 +43,16 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         return _factory.CreateClient();
     }
 
+    public HttpClient CreateClient(WebApplicationFactoryClientOptions options)
+    {
+        if (_factory is null)
+        {
+            throw new InvalidOperationException("The API test factory has not been initialized.");
+        }
+
+        return _factory.CreateClient(options);
+    }
+
     public async Task ResetDatabaseAsync()
     {
         await using var scope = CreateScope();
@@ -49,6 +61,7 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         await dbContext.Database.ExecuteSqlRawAsync(
             """
             TRUNCATE TABLE
+                payments.payment_transactions,
                 loyalty.loyalty_transactions,
                 loyalty.customer_loyalty_accounts,
                 promotions.coupon_redemptions,
@@ -63,6 +76,7 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
                 ordering.orders,
                 cart.cart_items,
                 cart.carts,
+                customer.login_history,
                 customer.customers,
                 catalog.product_specifications,
                 catalog.product_images,
@@ -140,6 +154,7 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("Jwt__Audience", "WorkspaceEcommerce.Admin.IntegrationTests");
         Environment.SetEnvironmentVariable("Jwt__SigningKey", "integration-test-signing-key-32-bytes-minimum");
         Environment.SetEnvironmentVariable("Jwt__AccessTokenMinutes", "60");
+        Environment.SetEnvironmentVariable("Storefront__BaseUrl", "http://localhost:5173");
     }
 
     private void RestoreRuntimeConfiguration()
@@ -159,7 +174,64 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
             {
                 services.RemoveAll<IShipmentService>();
                 services.AddScoped<IShipmentService, FakeIntegrationShipmentService>();
+                services.RemoveAll<IVNPayPaymentService>();
+                services.AddSingleton<IVNPayPaymentService, FakeIntegrationVNPayPaymentService>();
             });
+        }
+    }
+
+    private sealed class FakeIntegrationVNPayPaymentService : IVNPayPaymentService
+    {
+        public string CreatePaymentUrl(VNPayCreatePaymentUrlRequest request)
+        {
+            return $"https://vnpay.integration.test/pay?vnp_TxnRef={Uri.EscapeDataString(request.TxnRef)}";
+        }
+
+        public VNPayCallbackVerificationResult VerifyCallback(
+            IReadOnlyDictionary<string, string?> parameters)
+        {
+            parameters.TryGetValue("vnp_SecureHash", out var secureHash);
+
+            return new VNPayCallbackVerificationResult(
+                string.Equals(secureHash, "valid-hash", StringComparison.Ordinal),
+                GetValue(parameters, "vnp_TxnRef"),
+                TryParseGatewayAmount(GetValue(parameters, "vnp_Amount")),
+                GetValue(parameters, "vnp_ResponseCode"),
+                GetValue(parameters, "vnp_TransactionStatus"),
+                GetValue(parameters, "vnp_TransactionNo"),
+                secureHash,
+                GetValue(parameters, "vnp_OrderInfo"),
+                parameters);
+        }
+
+        public VNPayPaymentOutcome GetPaymentOutcome(string? responseCode, string? transactionStatus)
+        {
+            if (responseCode == "00" && (string.IsNullOrWhiteSpace(transactionStatus) || transactionStatus == "00"))
+            {
+                return VNPayPaymentOutcome.Success;
+            }
+
+            return responseCode == "24"
+                ? VNPayPaymentOutcome.Cancelled
+                : VNPayPaymentOutcome.Failed;
+        }
+
+        private static string? GetValue(IReadOnlyDictionary<string, string?> parameters, string key)
+        {
+            return parameters.TryGetValue(key, out var value)
+                ? string.IsNullOrWhiteSpace(value) ? null : value.Trim()
+                : null;
+        }
+
+        private static decimal? TryParseGatewayAmount(string? value)
+        {
+            return decimal.TryParse(
+                value,
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var amount)
+                ? amount / 100m
+                : null;
         }
     }
 

@@ -21,7 +21,7 @@ const checkoutSchema = z.object({
   ward: z.string().min(1, "Please select a ward/commune."),
   city: z.string().min(1, "Please select a province/city."),
   note: z.string().optional(),
-  paymentMethod: z.enum(["0", "1"])
+  paymentMethod: z.enum(["0", "1", "2"])
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
@@ -185,10 +185,15 @@ export function CheckoutPage() {
         shippingProvince: findProvinceByCode(values.city)?.name ?? "",
         note: formatOrderNote(values),
         couponCode: appliedCoupon?.couponCode ?? null,
-        paymentMethod: Number(values.paymentMethod) as 0 | 1
+        paymentMethod: Number(values.paymentMethod) as 0 | 1 | 2
       }),
     onSuccess: (response) => {
       resetCartSession();
+      if (response.paymentRequired && response.paymentUrl) {
+        window.location.assign(response.paymentUrl);
+        return;
+      }
+
       const query = new URLSearchParams({
         orderCode: response.order.orderCode,
         phone: response.order.customerPhone
@@ -315,9 +320,10 @@ export function CheckoutPage() {
 
               <section className="rounded-lg bg-white p-5 shadow-sm sm:p-6">
                 <h2 className="mb-4 text-lg font-black text-slate-950">Payment Method</h2>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-3">
                   <PaymentOption value="0" label="COD" description="Pay on delivery" register={register("paymentMethod")} />
                   <PaymentOption value="1" label="Bank Transfer" description="Verify manually after placement" register={register("paymentMethod")} />
+                  <PaymentOption value="2" label="VNPay" description="Pay online via sandbox gateway" register={register("paymentMethod")} />
                 </div>
                 {isManualTransfer ? <ManualTransferNotice /> : null}
               </section>
@@ -407,7 +413,7 @@ function PaymentOption({
   description: string;
   label: string;
   register: ReturnType<typeof useForm<CheckoutFormValues>>["register"] extends (name: "paymentMethod") => infer R ? R : never;
-  value: "0" | "1";
+  value: "0" | "1" | "2";
 }) {
   return (
     <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4 transition has-[:checked]:border-slate-950 has-[:checked]:bg-slate-50">
@@ -464,14 +470,18 @@ function OrderSummary({
   onCouponCodeChange: (value: string) => void;
   onRemoveCoupon: () => void;
   onUpdateQuantity: (itemId: string, quantity: number) => void;
-  paymentMethod: "0" | "1";
+  paymentMethod: "0" | "1" | "2";
   subtotal: number;
   totalAmount: number;
   shippingFee: number;
   isShippingQuoteLoading: boolean;
   isAddressComplete: boolean;
 }) {
-  const submitLabel = paymentMethod === "1" ? "Place order and get transfer info" : "Place order (COD)";
+  const submitLabel = paymentMethod === "1"
+    ? "Place order and get transfer info"
+    : paymentMethod === "2"
+      ? "Continue to VNPay"
+      : "Place order (COD)";
 
   return (
     <aside className="lg:sticky lg:top-28">

@@ -47,7 +47,7 @@ public sealed class CheckoutRequestValidator : AbstractValidator<CheckoutRequest
 
         RuleFor(request => request.PaymentMethod)
             .IsInEnum()
-            .Must(method => method is PaymentMethod.Cod or PaymentMethod.ManualBankTransfer)
+            .Must(method => method is PaymentMethod.Cod or PaymentMethod.ManualBankTransfer or PaymentMethod.VNPay)
             .WithMessage("Payment method is not supported.");
     }
 

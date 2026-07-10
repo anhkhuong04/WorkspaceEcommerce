@@ -23,6 +23,16 @@ services:
       MiniLogistics__BaseUrl: ${MiniLogistics__BaseUrl:-http://host.docker.internal:5221/api/v1/partner}
       MiniLogistics__ApiKey: ${MiniLogistics__ApiKey:-ml_demo_partner_key_123456}
       MiniLogistics__WebhookSecret: ${MiniLogistics__WebhookSecret:-minilogistics_webhook_secret_dev}
+      Storefront__BaseUrl: ${Storefront__BaseUrl:-http://localhost:5173}
+      Payment__VNPay__TmnCode: ${Payment__VNPay__TmnCode:-DEMO}
+      Payment__VNPay__HashSecret: ${Payment__VNPay__HashSecret:-DEMO_SECRET}
+      Payment__VNPay__PaymentUrl: ${Payment__VNPay__PaymentUrl:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+      Payment__VNPay__ReturnUrl: ${Payment__VNPay__ReturnUrl:-http://localhost:5080/api/payments/vnpay/return}
+      Payment__VNPay__IpnUrl: ${Payment__VNPay__IpnUrl:-http://localhost:5080/api/payments/vnpay/ipn}
+      Payment__VNPay__Version: ${Payment__VNPay__Version:-2.1.0}
+      Payment__VNPay__Command: ${Payment__VNPay__Command:-pay}
+      Payment__VNPay__Locale: ${Payment__VNPay__Locale:-vn}
+      Payment__VNPay__CurrCode: ${Payment__VNPay__CurrCode:-VND}
     ports:
       - "${API_PORT:-5080}:8080"
       - "${API_HTTPS_PORT:-5443}:8443"

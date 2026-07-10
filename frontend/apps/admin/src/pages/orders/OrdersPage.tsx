@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AdminOrderDto, AdminOrderListRequest, OrderStatus } from "@workspace-ecommerce/api-types";
-import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod } from "@workspace-ecommerce/shared-utils";
+import type { AdminOrderDto, AdminOrderListRequest, OrderStatus, PaymentStatus } from "@workspace-ecommerce/api-types";
+import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -22,9 +22,14 @@ const statusSchema = z.object({
 type StatusFormValues = z.infer<typeof statusSchema>;
 
 const statusTones: Record<OrderStatus, "green" | "red" | "blue" | "orange" | "slate"> = { 0: "orange", 1: "slate", 2: "blue", 3: "blue", 4: "green", 5: "orange", 6: "red", 7: "slate" };
+const paymentStatusTones: Record<PaymentStatus, "green" | "red" | "blue" | "orange" | "slate"> = { 0: "slate", 1: "blue", 2: "green", 3: "red", 4: "slate" };
 
 function orderStatusPill(status: OrderStatus) {
   return <Pill tone={statusTones[status]}>{formatOrderStatus(status)}</Pill>;
+}
+
+function paymentStatusPill(status: PaymentStatus) {
+  return <Pill tone={paymentStatusTones[status]}>{formatPaymentStatus(status)}</Pill>;
 }
 
 function toStatusRequest(values: StatusFormValues) {
@@ -113,9 +118,9 @@ export function OrdersPage() {
           <div className="grid gap-3">{[0, 1, 2].map((item) => <div key={item} className="h-14 animate-pulse rounded-2xl bg-slate-100" />)}</div>
         ) : ordersQuery.data?.items.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-left text-sm">
+            <table className="w-full min-w-[1120px] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-slate-500">
-                <tr className="border-b border-slate-100"><th className="py-3 pr-4">Code</th><th className="py-3 pr-4">Customer</th><th className="py-3 pr-4">Phone</th><th className="py-3 pr-4">Items</th><th className="py-3 pr-4">Total</th><th className="py-3 pr-4">Status</th><th className="py-3 pr-4">Payment</th><th className="py-3 pr-4">Created</th><th className="py-3 pr-4">Actions</th></tr>
+                <tr className="border-b border-slate-100"><th className="py-3 pr-4">Code</th><th className="py-3 pr-4">Customer</th><th className="py-3 pr-4">Phone</th><th className="py-3 pr-4">Items</th><th className="py-3 pr-4">Total</th><th className="py-3 pr-4">Status</th><th className="py-3 pr-4">Payment</th><th className="py-3 pr-4">Payment status</th><th className="py-3 pr-4">Created</th><th className="py-3 pr-4">Actions</th></tr>
               </thead>
               <tbody>
                 {ordersQuery.data.items.map((item) => (
@@ -127,6 +132,7 @@ export function OrdersPage() {
                     <td className="py-3 pr-4">{formatMoney(item.totalAmount)}</td>
                     <td className="py-3 pr-4">{orderStatusPill(item.status)}</td>
                     <td className="py-3 pr-4">{formatPaymentMethod(item.paymentMethod)}</td>
+                    <td className="py-3 pr-4">{paymentStatusPill(item.paymentStatus)}</td>
                     <td className="py-3 pr-4">{formatDate(item.createdAt)}</td>
                     <td className="py-3 pr-4"><Button type="button" onClick={() => setSelectedOrderId(item.id)}>View</Button></td>
                   </tr>
@@ -157,6 +163,8 @@ export function OrdersPage() {
               <div className="grid gap-3 text-sm sm:grid-cols-2">
                 <Info label="Status" value={orderStatusPill(order.status)} />
                 <Info label="Payment" value={formatPaymentMethod(order.paymentMethod)} />
+                <Info label="Payment status" value={paymentStatusPill(order.paymentStatus)} />
+                <Info label="Paid at" value={order.paidAt ? formatDate(order.paidAt) : "-"} />
                 <Info label="Customer" value={order.customerName} />
                 <Info label="Phone" value={order.customerPhone} />
                 <Info label="Email" value={order.customerEmail ?? "-"} />

@@ -1,259 +1,312 @@
-# Task - News/Blogs Feature
+# Project Task Board
 
-Ngay cap nhat: 2026-06-29
+Ngay cap nhat: 2026-07-10
 
-## Muc tieu
+## Task Active - Order -> Checkout -> Payment VNPay
 
-Hoan thien tinh nang dang bai News/Blogs lien quan den san pham:
+Ngay bat dau: 2026-07-10
 
-1. Admin: Tao, sua, xoa, dang/go bai viet; xem va xoa comment.
-2. Storefront: Xem danh sach bai viet da dang, xem chi tiet bai viet kem san pham lien quan, va gui binh luan.
+## Muc Tieu
 
-## Quyet dinh MVP
+Hoan thien flow Order -> Checkout -> Payment cho demo portfolio:
 
-- Toan bo table cua blogs se nam trong schema `content`.
-- Bai viet can slug doc nhat de lam URL dep.
-- San pham lien quan duoc chon trong Admin va hien thi duoi dang card o cuoi bai viet.
-- Binh luan se tu dong duoc duyet (`IsApproved = true` mac dinh) de de demo, nhung Admin co the xoa bat ky comment nao.
-- Ho tro ca guest comment va authenticated customer comment.
+1. Giu flow COD va Manual Bank Transfer hien co.
+2. Them thanh toan online VNPay Sandbox.
+3. Tach trang thai thanh toan khoi trang thai xu ly/giao hang cua order.
+4. Dam bao VNPay return/IPN verify secure hash va idempotent.
+5. Chi tao shipment cho VNPay sau khi payment thanh cong.
+6. Cap nhat storefront checkout de redirect sang VNPay va hien ket qua thanh toan.
 
-## Tích Hợp MiniLogistics Shipment - Tasks
+## Quyet Dinh MVP
 
-## Phase 1: Domain & Infrastructure Backend
+- Them `PaymentMethod.VNPay = 2`.
+- Them `PaymentStatus` tren `Order`: `Unpaid`, `Pending`, `Paid`, `Failed`, `Cancelled`.
+- COD va Manual Bank Transfer tao order nhu hien tai, payment status ban dau:
+  - COD: `Unpaid`.
+  - Manual Bank Transfer: `Pending`.
+- VNPay checkout tao order + payment transaction + payment url, frontend redirect sang VNPay.
+- VNPay success moi mark `PaymentStatus.Paid`.
+- VNPay failed/cancel mark `PaymentStatus.Failed` hoac `Cancelled`, khong auto restore stock trong v1.
+- Shipment:
+  - COD/Manual: giu flow tao shipment sau checkout nhu hien tai.
+  - VNPay: tao shipment sau khi payment success.
+- Khong lam refund VNPay trong task nay.
+- Khong lam reconciliation/background job trong v1.
+- Khong them outbox pattern trong v1, nhung payment handling phai idempotent.
+- Tat ca VNPay config doc tu options/env, khong hardcode secret.
 
-- [x] 1.1 Thêm WeightKg, LengthCm, WidthCm, HeightCm vào `ProductVariant`
-- [x] 1.2 Cập nhật `ProductVariantConfiguration` EF
-- [x] 1.3 Thêm TrackingCode, ShipmentId vào `Order` entity + method SetShippingFee, UpdateShipmentInfo
-- [x] 1.4 Cập nhật `OrderConfiguration` EF
-- [x] 1.5 Tạo EF Migration `AddShipmentFields`
+## Phan Tich Flow Hien Tai
 
-## Phase 2: Application Layer
+- `CheckoutService.CheckoutAsync` dang tao order, reserve coupon, tru stock, xoa cart trong transaction.
+- Sau transaction, service goi MiniLogistics de tinh shipping fee va tao shipment.
+- `Order` hien chi co `OrderStatus`, chua co `PaymentStatus`.
+- `PaymentMethod` hien chi co `Cod` va `ManualBankTransfer`.
+- `CheckoutResponse` hien chi tra `OrderDto`, chua co `PaymentUrl`/payment action.
+- Frontend checkout submit xong luon navigate `/checkout/success`, chua co branch redirect gateway.
+- MiniLogistics webhook co the chuyen order den `Completed`; loyalty earn dang trigger khi admin update order sang `Completed`, chua trigger tu webhook.
 
-- [x] 2.1 Tạo `IMiniLogisticsClient` interface + DTOs
-- [x] 2.2 Tạo `MiniLogisticsClient` implementation
-- [x] 2.3 Tạo `MiniLogisticsOptions` config class
-- [x] 2.4 Đăng ký DI trong `Infrastructure/DependencyInjection.cs`
-- [x] 2.5 Cập nhật `appsettings.json` / `appsettings.Development.json`
-- [x] 2.6 Cập nhật `docker-compose.yml` env vars
-- [x] 2.7 Tạo `ShippingQuoteRequest/Response` DTOs
-- [x] 2.8 Cập nhật `ICheckoutService` + `CheckoutService` (thêm GetShippingQuoteAsync, tích hợp shipment vào checkout)
+## Phase 0: Spec Alignment & Design Guardrails
 
-## Phase 3: API Controllers
-
-- [x] 3.1 Thêm endpoint `POST /api/checkout/shipping-quote` vào `CheckoutController`
-- [x] 3.2 Tạo `MiniLogisticsWebhookController` (webhook endpoint)
-
-## Phase 4: Frontend
-
-- [x] 4.1 Thêm `ShippingQuoteRequest/Response` types vào `api-types`
-- [x] 4.2 Thêm `getShippingQuote` method vào `api-client`
-- [x] 4.3 Cập nhật `CheckoutPage.tsx` (auto-call shipping quote, hiện phí ship)
-
-## Phase 5: Seed Data & Migration
-
-- [x] 5.1 Cập nhật `DemoDataSeeder` thêm weight/dimensions cho variants
-- [x] 5.2 Build + migrate + test (Fix typecheck frontend, unit tests, integration tests - All passed!)
-
-## Cac Phase Trien Khai (News/Blogs)
-
-- [x] **P1: Domain & Persistence**
-  - [x] Tao entity `BlogPost.cs`, `BlogPostRelatedProduct.cs`, `BlogComment.cs` trong Domain.
-  - [x] Viet configurations map sang schema `content`.
-  - [x] Cap nhat `AppDbContext` va `IAppDbContext`.
-  - [x] Tao migration EF Core `AddBlogSchema` va run migration.
-  - [x] Viet model configuration tests.
-
-- [x] **P2: Application Module**
-  - [x] Tao folder `Modules/Blogs` trong Application.
-  - [x] DTO/request/validators cho Admin va Storefront.
-  - [x] `AdminBlogService` (CRUD posts, fetch/delete comments).
-  - [x] `StorefrontBlogService` (list posts, get post detail, submit comment).
-
-- [x] **P3: Web API Controllers**
-  - [x] Controller `Admin/BlogsController.cs` (CRUD posts, status toggle, manage comments).
-  - [x] Controller `BlogsController.cs` (Storefront listing, detail, comment submission).
-
-- [x] **P4: Frontend Shared Types & Client**
-  - [x] Cap nhat `api-types` voi blogs/comments types.
-  - [x] Cap nhat `api-client` voi blogs admin/storefront methods.
-
-- [x] **P5: Admin UI**
-  - [x] Them nav item va route `/blogs` trong Admin portal.
-  - [x] `BlogListPage.tsx` (danh sach posts, status toggle, actions).
-  - [x] `BlogEditorPage.tsx` (edit details, markdown/text content editor, related products picker).
-  - [x] Tab comment moderation trong editor.
-
-- [x] **P6: Storefront UI**
-  - [x] Link route `/news` vao header item "News".
-  - [x] `BlogListPage.tsx` (danh sach posts grid/cards).
-  - [x] `BlogDetailPage.tsx` (noi dung post, list related products, comment section).
-
-- [x] **P7: Verification & Testing**
-  - [x] Viet unit/domain tests cho blogs/comments.
-  - [x] Viet API integration tests cho admin/storefront blog flows.
-  - [x] Chay typecheck va build tren ca storefront va admin.
-
----
-
-# Task - Customer Loyalty Program
-
-Ngay cap nhat: 2026-07-09
-
-## Muc tieu
-
-Trien khai tinh nang Khach hang than thiet cho khach hang da dang nhap:
-
-1. Tu dong tich diem khi don hang cua customer chuyen sang `Completed`.
-2. Tu dong nang hang thanh vien dua tren tong diem da tich luy.
-3. Cho customer xem so du diem, hang hien tai, quyen loi hang va lich su giao dich diem.
-4. Cho customer doi diem lay voucher giam gia customer-scoped de dung trong checkout.
-5. Dam bao idempotency cho earn theo order va concurrency cho redeem.
-
-## Quyet dinh MVP
-
-- Guest order khong tich diem trong version dau. Chi order co `CustomerId` moi duoc earn.
-- Diem earn tinh theo gia tri hang hoa da thanh toan, khong tinh shipping: `floor((Subtotal - DiscountAmount) * ExchangeRate / Loyalty:MoneyPerPoint)`.
-- Default `Loyalty:MoneyPerPoint = 10000`.
-- `CurrentPoints` la so du kha dung; `TotalPointsEarned` chi tang, khong giam khi redeem.
-- Tier benefit trong version dau la display-only. Chua auto-apply tier discount/free shipping vao checkout.
-- Redeem diem tao coupon/voucher trong schema `promotions`, gan voi customer va source loyalty.
-- Loyalty voucher la fixed-amount coupon, gioi han 1 lan dung, het han sau 30 ngay.
-- Idempotency earn enforce bang unique partial index cho transaction type `Earn` theo `OrderId`.
-- Khong them domain event/outbox full trong version dau. `AdminOrderService` se goi application service khi status chuyen sang `Completed`.
-- Neu order da `Completed` bi `Returned` sau do, version dau khong tu dong tru diem; ghi nhan limitation.
-
-## Phase 0: Spec Alignment
-
-- [x] 0.1 Cap nhat `docs/loyalty-program-spec.md` theo cac quyet dinh MVP o tren.
-- [x] 0.2 Ghi ro guest order khong earn points.
-- [x] 0.3 Ghi ro formula tinh diem, currency/exchange-rate, subtotal/discount/shipping handling.
-- [x] 0.4 Ghi ro tier benefits display-only trong v1.
-- [x] 0.5 Ghi ro loyalty voucher duoc build tren coupon hien co, can customer-scoped fields.
-- [x] 0.6 Sua idempotency index thanh partial unique index chi ap dung cho Earn transaction.
+- [x] 0.1 Cap nhat `task.md` voi plan VNPay MVP va cac quyet dinh tren.
+- [x] 0.2 Neu co file spec payment/order checkout rieng, tao/cap nhat spec ngan trong `docs/features`.
+- [x] 0.3 Xac nhan convention VNPay amount: gateway amount = VND amount * 100.
+- [x] 0.4 Chot return URL va IPN URL:
+  - Return URL cho browser redirect ve storefront/backend.
+  - IPN URL cho server-to-server callback.
+- [x] 0.5 Chot frontend URL sau payment:
+  - Success: `/checkout/payment-result?status=success&orderCode=...`
+  - Failed/cancel: `/checkout/payment-result?status=failed&orderCode=...`
 
 ## Phase 1: Domain Model
 
-- [x] 1.1 Tao module domain `Loyalty` gom `CustomerLoyaltyAccount`, `LoyaltyTransaction`, `LoyaltyTier`.
-- [x] 1.2 Tao enum `LoyaltyTierType` va `LoyaltyTransactionType`.
-- [x] 1.3 Implement domain methods:
-  - `EarnPoints(points, orderId, description)`.
-  - `RedeemPoints(points, voucherId, description)`.
-  - `TryEvaluateTierUpgrade(tierDefinitions)`.
-- [x] 1.4 Validate domain rules: points > 0, khong am balance, order id bat buoc voi Earn, voucher id bat buoc voi Redeem.
-- [x] 1.5 Them domain tests cho earn, redeem, tier upgrade, duplicate guards trong aggregate neu can.
+- [x] 1.1 Them enum `PaymentStatus` vao domain ordering/payment.
+- [x] 1.2 Mo rong `PaymentMethod` them `VNPay = 2`.
+- [x] 1.3 Them property payment vao `Order`:
+  - `PaymentStatus`.
+  - `PaidAt` nullable neu can hien thi/audit.
+- [x] 1.4 Them domain methods tren `Order`:
+  - `MarkPaymentPending()`.
+  - `MarkPaymentPaid(paidAt)`.
+  - `MarkPaymentFailed()`.
+  - `MarkPaymentCancelled()`.
+- [x] 1.5 Validate domain rules:
+  - Paid khong duoc chuyen lai Pending.
+  - Failed/Cancelled khong duoc overwrite Paid.
+  - COD/Manual/VNPay initial status duoc set dung tai checkout.
+- [x] 1.6 Tao entity `PaymentTransaction`.
+- [x] 1.7 Tao enum:
+  - `PaymentProvider` (`VNPay`).
+  - `PaymentTransactionStatus` (`Pending`, `Success`, `Failed`, `Cancelled`).
+- [x] 1.8 `PaymentTransaction` fields MVP:
+  - `Id`, `OrderId`, `Provider`, `Status`.
+  - `Amount`, `CurrencyCode`.
+  - `TxnRef` unique.
+  - `GatewayTransactionNo` nullable.
+  - `GatewayResponseCode` nullable.
+  - `GatewayResponseMessage` nullable.
+  - `SecureHash` nullable.
+  - `RawResponse` nullable.
+  - `CreatedAt`, `ProcessedAt`.
+- [x] 1.9 Domain tests cho payment status va transaction state changes.
 
 ## Phase 2: Persistence & Migration
 
-- [x] 2.1 Them DbSet/IQueryable loyalty vao `IAppDbContext` va `AppDbContext`.
-- [x] 2.2 Tao EF configurations cho `CustomerLoyaltyAccount`, `LoyaltyTransaction`, `LoyaltyTier`.
-- [x] 2.3 Dat loyalty tables trong schema `loyalty`.
-- [x] 2.4 Cau hinh relationship:
-  - `CustomerLoyaltyAccount.CustomerId` unique FK den customer.
-  - `LoyaltyTransaction.CustomerLoyaltyAccountId` FK den account.
-  - `LoyaltyTransaction.OrderId` optional FK den order.
-- [x] 2.5 Cau hinh optimistic concurrency cho account, uu tien PostgreSQL `xmin` neu phu hop voi repo.
-- [x] 2.6 Them unique partial index cho Earn transaction: unique `order_id` where `type = Earn` and `order_id is not null`.
-- [x] 2.7 Seed default tiers: Bronze, Silver, Gold, Platinum.
-- [x] 2.8 Tao EF migration `AddLoyaltySchema`.
-- [x] 2.9 Viet infrastructure configuration tests cho loyalty model.
+- [x] 2.1 Them `PaymentTransactions` vao `IAppDbContext` va `AppDbContext`.
+- [x] 2.2 Cap nhat `OrderConfiguration` map `PaymentStatus`, `PaidAt`.
+- [x] 2.3 Tao `PaymentTransactionConfiguration`.
+- [x] 2.4 Dat payment table trong schema `payments`.
+- [x] 2.5 Cau hinh FK `payment_transactions.order_id -> ordering.orders.id`.
+- [x] 2.6 Them unique index:
+  - `ux_payment_transactions_txn_ref`.
+  - optional `ix_payment_transactions_order_id`.
+- [x] 2.7 Tao migration `AddPaymentSchema`.
+- [x] 2.8 Cap nhat model configuration tests.
 
-## Phase 3: Coupon/Voucher Extension
+## Phase 3: VNPay Infrastructure
 
-- [x] 3.1 Mo rong `Coupon` de ho tro loyalty voucher:
-  - `CustomerId` nullable.
-  - `Source` hoac `CouponSource` enum (`Admin`, `Loyalty`).
-  - optional `CreatedByLoyaltyTransactionId` neu can audit nguoc.
-- [x] 3.2 Cap nhat `CouponConfiguration`, migration va DTO lien quan.
-- [x] 3.3 Cap nhat checkout coupon evaluation de customer-scoped coupon chi dung duoc boi dung customer.
-- [x] 3.4 Dinh nghia loyalty voucher code format, vi du `LOYAL-{shortId}`.
-- [x] 3.5 Dinh nghia redeem conversion: `discountAmount = points * Loyalty:VoucherAmountPerPoint`.
-- [x] 3.6 Default `Loyalty:VoucherAmountPerPoint = 1000`.
-- [x] 3.7 Viet tests cho customer-scoped coupon availability va checkout validation.
+- [x] 3.1 Tao abstraction `IVNPayPaymentService` hoac `IPaymentGatewayClient`.
+- [x] 3.2 Tao `VNPayOptions`:
+  - `TmnCode`.
+  - `HashSecret`.
+  - `PaymentUrl`.
+  - `ReturnUrl`.
+  - `IpnUrl`.
+  - `Version`.
+  - `Command`.
+  - `Locale`.
+  - `CurrCode`.
+- [x] 3.3 Dang ky options va DI trong Infrastructure/API.
+- [x] 3.4 Implement VNPay payment URL builder.
+- [x] 3.5 Implement secure hash generation HMAC-SHA512 theo sorted query params.
+- [x] 3.6 Implement secure hash verification cho return/IPN.
+- [x] 3.7 Them helper map VNPay response code:
+  - `00` success.
+  - user cancel/failed codes -> failed/cancelled theo mapping MVP.
+- [x] 3.8 Unit tests cho:
+  - URL builder co required params.
+  - amount nhan 100.
+  - secure hash stable.
+  - verify hash reject tampered params.
 
-## Phase 4: Application Services
+## Phase 4: Checkout Application Changes
 
-- [x] 4.1 Tao `Modules/Loyalty` trong Application.
-- [x] 4.2 Tao request/response DTOs:
-  - `LoyaltyAccountDto`.
-  - `LoyaltyTransactionDto`.
-  - `LoyaltyTierDto`.
-  - `RedeemLoyaltyPointsRequest`.
-  - `RedeemLoyaltyPointsResponse`.
-- [x] 4.3 Tao validators cho transactions paging va redeem request.
-- [x] 4.4 Tao `ILoyaltyService` voi:
-  - `GetMyLoyaltyAsync`.
-  - `GetMyTransactionsAsync`.
-  - `GetTiersAsync`.
-  - `RedeemPointsAsync`.
-  - `EarnForCompletedOrderAsync`.
-- [x] 4.5 Implement `EarnForCompletedOrderAsync`:
-  - Skip neu order khong co `CustomerId`.
-  - Skip thanh cong neu transaction Earn cho order da ton tai.
-  - Tao account neu customer chua co account.
-  - Tinh points theo config.
-  - Ghi transaction Earn va update tier.
-- [x] 4.6 Implement `RedeemPointsAsync` trong transaction:
-  - Load account cua current customer.
-  - Validate balance.
-  - Tao loyalty coupon customer-scoped.
-  - Ghi transaction Redeem voi voucher id/coupon id.
-  - Save voi concurrency handling.
-- [x] 4.7 Mapping Result status: validation, unauthorized, not found, conflict.
-- [x] 4.8 Dang ky DI cho loyalty services va options.
+- [x] 4.1 Mo rong `CheckoutRequestValidator` chap nhan `PaymentMethod.VNPay`.
+- [x] 4.2 Mo rong `CheckoutResponse`:
+  - `Order`.
+  - `PaymentUrl` nullable.
+  - `PaymentRequired` bool hoac `NextAction`.
+- [x] 4.3 Refactor `CheckoutService` tach cac buoc:
+  - Build snapshots.
+  - Evaluate coupon.
+  - Create order.
+  - Reserve stock/coupon.
+  - Create shipment.
+- [x] 4.4 Trong transaction checkout:
+  - COD: `PaymentStatus.Unpaid`.
+  - Manual: `PaymentStatus.Pending`.
+  - VNPay: `PaymentStatus.Pending`, tao `PaymentTransaction.Pending`.
+- [x] 4.5 VNPay checkout tra `PaymentUrl` sau khi order/payment transaction save thanh cong.
+- [x] 4.6 Chi tao shipment ngay cho COD/Manual.
+- [x] 4.7 Khong tao shipment trong `CheckoutAsync` cho VNPay truoc khi payment success.
+- [x] 4.8 Dam bao coupon reservation/stock tru van duoc thuc hien o checkout de tranh oversell trong demo v1.
+- [x] 4.9 Application tests:
+  - COD checkout khong co payment URL.
+  - Manual checkout khong co payment URL.
+  - VNPay checkout co payment URL va payment transaction pending.
+  - VNPay checkout khong tao shipment truoc payment success.
 
-## Phase 5: Order Integration
+## Phase 5: Payment Application Service
 
-- [x] 5.1 Mo rong `AdminOrderService` de nhan `ILoyaltyService`.
-- [x] 5.2 Khi `UpdateStatusAsync` chuyen status thanh `Completed`, goi `EarnForCompletedOrderAsync` sau khi order status/history save thanh cong.
-- [x] 5.3 Dam bao loyalty earn failure duplicate khong lam fail update order.
-- [x] 5.4 Neu loyalty earn gap loi he thong that su, tra conflict/failure hay log-only can quyet dinh theo implementation; uu tien khong lam mat trang thai order da save.
-- [x] 5.5 Viet tests cho update order status to `Completed` trigger earn.
-- [x] 5.6 Viet tests duplicate earn khong cong diem lan 2.
+- [x] 5.1 Tao module `Modules/Payments`.
+- [x] 5.2 Tao DTO/request:
+  - `VNPayReturnRequest` hoac parse query model.
+  - `PaymentResultDto`.
+  - `PaymentTransactionDto` neu can.
+- [x] 5.3 Tao `IPaymentService` voi:
+  - `HandleVNPayReturnAsync`.
+  - `HandleVNPayIpnAsync`.
+  - `GetPaymentResultAsync(orderCode, phone?)` neu can cho frontend.
+- [x] 5.4 Implement return/IPN handling:
+  - Verify secure hash truoc.
+  - Tim transaction theo `vnp_TxnRef`.
+  - Neu transaction da terminal -> tra success idempotent.
+  - Neu success -> mark transaction success, order paid.
+  - Neu failed/cancel -> mark transaction failed/cancelled, order failed/cancelled payment.
+- [x] 5.5 Sau VNPay success, tao shipment cho order neu chua co `ShipmentId`.
+- [x] 5.6 Payment success khong auto chuyen `OrderStatus` sang `Confirmed` trong MVP, tru khi can chot lai.
+- [x] 5.7 Catch shipment failure sau payment success: payment van paid, log warning, order giu pending shipment.
+- [x] 5.8 Tests:
+  - Success return mark paid.
+  - Duplicate success return khong tao shipment lan 2.
+  - Failed return mark failed.
+  - Tampered hash bi reject.
+  - Unknown txn ref not found.
 
-## Phase 6: API
+## Phase 6: API Endpoints
 
-- [x] 6.1 Tao `LoyaltyController` cho storefront/customer endpoints.
-- [x] 6.2 Implement `GET /api/loyalty/me` yeu cau customer auth.
-- [x] 6.3 Implement `GET /api/loyalty/me/transactions?page=1&pageSize=20` yeu cau customer auth.
-- [x] 6.4 Implement `POST /api/loyalty/me/redeem` yeu cau customer auth.
-- [x] 6.5 Implement `GET /api/loyalty/tiers` public.
-- [x] 6.6 Dung response wrapper hien co va authorization policy/role hien co.
-- [x] 6.7 Viet API integration tests cho endpoints loyalty.
+- [x] 6.1 Tao `PaymentsController`.
+- [x] 6.2 Implement `GET /api/payments/vnpay/return`.
+- [x] 6.3 Implement `GET` hoac `POST /api/payments/vnpay/ipn` theo VNPay sandbox yeu cau.
+- [x] 6.4 Return endpoint:
+  - Xu ly payment.
+  - Redirect ve storefront payment result page hoac tra API response, chot theo Phase 0.
+- [x] 6.5 IPN endpoint:
+  - Tra response format VNPay mong doi.
+  - Idempotent voi duplicate callback.
+- [x] 6.6 Them response wrapper/HTTP status phu hop voi pattern hien co.
+- [x] 6.7 API integration tests cho return/IPN.
 
 ## Phase 7: Frontend Shared Types & Client
 
-- [x] 7.1 Them loyalty types vao `frontend/packages/api-types`.
-- [x] 7.2 Them loyalty methods vao `frontend/packages/api-client`.
-- [x] 7.3 Cap nhat storefront API service neu app dang dung wrapper rieng.
-- [x] 7.4 Chay typecheck shared packages.
+- [x] 7.1 Cap nhat `PaymentMethod` type thanh `0 | 1 | 2`.
+- [x] 7.2 Them `PaymentStatus` type.
+- [x] 7.3 Cap nhat `OrderDto` co `paymentStatus`, `paidAt`.
+- [x] 7.4 Cap nhat `CheckoutResponse` co `paymentUrl`/`paymentRequired`.
+- [x] 7.5 Cap nhat `formatPaymentMethod`, them label VNPay.
+- [x] 7.6 Them `formatPaymentStatus` neu can hien thi.
+- [x] 7.7 Cap nhat api-client neu them endpoint payment result.
+- [x] 7.8 Chay typecheck shared packages.
 
 ## Phase 8: Storefront UI
 
-- [x] 8.1 Them loyalty section/page trong account area.
-- [x] 8.2 Hien thi current points, total earned, current tier, next tier progress.
-- [x] 8.3 Hien thi tier benefits table/list tu `GET /api/loyalty/tiers`.
-- [x] 8.4 Hien thi transaction history co pagination co ban.
-- [x] 8.5 Them redeem form:
-  - Nhap so diem.
-  - Preview discount amount.
-  - Submit redeem.
-  - Hien voucher code sau khi tao.
-- [x] 8.6 Dam bao UI chi hien cho customer da dang nhap.
-- [x] 8.7 Khong build admin UI quan ly tier trong v1.
+- [x] 8.1 Them payment option VNPay tren checkout page.
+- [x] 8.2 Khi checkout response co `paymentUrl`, redirect browser sang VNPay.
+- [x] 8.3 Giu COD/Manual flow di thang `/checkout/success`.
+- [x] 8.4 Tao `PaymentResultPage` hoac mo rong checkout success page:
+  - Loading/lookup payment result.
+  - Success paid.
+  - Failed/cancelled.
+  - Link order lookup.
+- [x] 8.5 Hien `PaymentStatus` trong checkout success/order lookup/account orders.
+- [x] 8.6 Dam bao manual transfer panel chi hien voi `ManualBankTransfer`.
+- [x] 8.7 Chay storefront typecheck/build.
 
-## Phase 9: Verification
+## Phase 9: Admin UI
 
-- [x] 9.1 Chay unit tests Application/Domain lien quan loyalty.
-- [x] 9.2 Chay Infrastructure tests cho EF configuration/migration model.
-- [x] 9.3 Chay API integration tests lien quan order completed, loyalty, coupon checkout.
-- [x] 9.4 Chay backend build/test solution.
-- [x] 9.5 Chay frontend typecheck/build cho storefront va shared packages.
-- [x] 9.6 Test manual flow:
-  - Customer login.
-  - Checkout order.
-  - Admin chuyen order den `Completed`.
-  - Customer thay diem tang.
-  - Customer redeem voucher.
-  - Customer dung voucher loyalty trong checkout tiep theo.
-  - Verified bang API integration test `LoyaltyManualFlow_CheckoutCompleteEarnRedeemAndUseVoucher`.
-  - Note: full API integration suite hien con 5 loi ngoai pham vi loyalty/order/coupon checkout o dashboard/catalog/customer tests.
+- [x] 9.1 Cap nhat admin order list/detail hien payment method + payment status.
+- [x] 9.2 Them filter payment status neu UI hien co phu hop, khong bat buoc v1.
+- [x] 9.3 Manual bank transfer:
+  - Giu admin update order status nhu hien tai.
+  - Neu can, them action mark payment paid cho manual transfer o phase rieng.
+- [x] 9.4 Chay admin typecheck/build.
+
+## Phase 10: Verification
+
+- [x] 10.1 Chay domain/application tests payment + checkout.
+- [x] 10.2 Chay infrastructure tests migration/model config.
+- [x] 10.3 Chay API integration tests checkout + VNPay return/IPN.
+- [x] 10.4 Chay backend build/test solution.
+- [x] 10.5 Chay frontend typecheck/build.
+- [ ] 10.6 Manual demo flow:
+  - COD checkout -> order success.
+  - Manual checkout -> transfer info.
+  - VNPay checkout -> redirect sandbox.
+  - VNPay success -> payment paid -> shipment created.
+  - VNPay failed/cancel -> payment failed/cancelled -> no shipment.
+  - Duplicate VNPay callback -> khong doi/trung side effect.
+  - Ghi chu 2026-07-10: Chua chay manual browser/VNPay sandbox vi can sandbox credentials va runtime config thuc. Automated tests da cover COD checkout, VNPay return/IPN success-failed-cancelled-duplicate va shipment sau payment success.
+
+## Da Hoan Thanh Gan Day
+
+### Customer Loyalty Program
+
+Trang thai: Done
+
+- Tu dong tich diem khi order customer chuyen sang `Completed`.
+- Quan ly account diem, tier, transaction history.
+- Customer redeem diem thanh loyalty voucher customer-scoped.
+- Tich hop checkout coupon validation cho voucher theo customer.
+- Them API, frontend storefront account page, shared api types/client.
+- Verification da chay cho flow loyalty chinh.
+
+Ghi chu:
+
+- Guest order khong tich diem.
+- Diem earn: `floor((Subtotal - DiscountAmount) * ExchangeRate / Loyalty:MoneyPerPoint)`.
+- Default `Loyalty:MoneyPerPoint = 10000`.
+- Default `Loyalty:VoucherAmountPerPoint = 1000`.
+- Tier benefits hien la display-only.
+- Order da `Completed` roi bi `Returned` chua tu dong tru diem trong v1.
+
+### MiniLogistics Shipment Integration
+
+Trang thai: Done
+
+- Them dimensions/weight cho product variants.
+- Them shipping quote vao checkout.
+- Luu tracking code/shipment id tren order.
+- Them MiniLogistics client, config va webhook endpoint.
+- Cap nhat frontend checkout hien phi ship.
+
+### News/Blogs Feature
+
+Trang thai: Done
+
+- Admin CRUD blog posts, publish/unpublish, related products, comment moderation.
+- Storefront list/detail news va comment submission.
+- Them schema `content`, API, frontend shared client/types va UI.
+
+## Tam Hoan
+
+### Return/Refund
+
+Ly do tam hoan:
+
+- Spec yeu cau VNPay Refund API va `PaymentTransaction`, nhung code hien tai chua co payment gateway/payment transaction module.
+- Spec dung `Delivered`/`DeliveredAt`, trong khi order flow hien tai dung `Completed`.
+- Can thay endpoint return hien tai dang doi thang order sang `Returned` bang return request workflow rieng.
+- Loyalty hien khong cho balance am, trong khi refund adjustment co the can diem am tam thoi.
+
+Khi quay lai task nay, can chot:
+
+- V1 manual refund truoc hay bat buoc VNPay.
+- Dung `Completed` hay them `Delivered`/`DeliveredAt`.
+- Co cho partial return va nhieu return request/order khong.
+- Refund co tinh shipping/coupon allocation khong.
+- Loyalty adjustment co duoc lam balance am khong.
+
+## Known Verification Notes
+
+- Full backend solution tests pass ngay 2026-07-10: Application 251, Infrastructure 147, API integration 46.
+- Frontend workspace typecheck/build pass ngay 2026-07-10.
+- Con lai manual VNPay sandbox/browser flow can chay khi co sandbox credentials va backend/storefront runtime config that.

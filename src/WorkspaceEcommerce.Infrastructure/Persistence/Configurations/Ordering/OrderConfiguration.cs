@@ -45,6 +45,18 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasMaxLength(1000)
             .IsRequired();
 
+        builder.Property(order => order.ShippingStreet)
+            .HasColumnName("shipping_street")
+            .HasMaxLength(250);
+
+        builder.Property(order => order.ShippingWard)
+            .HasColumnName("shipping_ward")
+            .HasMaxLength(100);
+
+        builder.Property(order => order.ShippingProvince)
+            .HasColumnName("shipping_province")
+            .HasMaxLength(100);
+
         builder.Property(order => order.Note)
             .HasColumnName("note")
             .HasMaxLength(1000);
@@ -92,6 +104,15 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasMaxLength(50)
             .IsRequired();
 
+        builder.Property(order => order.PaymentStatus)
+            .HasColumnName("payment_status")
+            .HasConversion<string>()
+            .HasMaxLength(50)
+            .IsRequired();
+
+        builder.Property(order => order.PaidAt)
+            .HasColumnName("paid_at");
+
         builder.Property(order => order.CurrencyCode)
             .HasColumnName("currency_code")
             .HasMaxLength(10)
@@ -132,6 +153,9 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.HasIndex(order => order.Status)
             .HasDatabaseName("ix_orders_status");
+
+        builder.HasIndex(order => order.PaymentStatus)
+            .HasDatabaseName("ix_orders_payment_status");
 
         builder.HasOne<Customer>()
             .WithMany()

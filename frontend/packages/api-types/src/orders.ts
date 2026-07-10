@@ -1,4 +1,5 @@
-export type PaymentMethod = 0 | 1;
+export type PaymentMethod = 0 | 1 | 2;
+export type PaymentStatus = 0 | 1 | 2 | 3 | 4;
 export type OrderStatus = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export interface CheckoutRequest {
@@ -13,6 +14,7 @@ export interface CheckoutRequest {
   note?: string | null;
   couponCode?: string | null;
   paymentMethod: PaymentMethod;
+  clientIpAddress?: string | null;
 }
 
 export interface GetShippingQuoteRequest {
@@ -33,6 +35,8 @@ export interface GetShippingQuoteResponse {
 
 export interface CheckoutResponse {
   order: OrderDto;
+  paymentRequired: boolean;
+  paymentUrl: string | null;
 }
 
 export interface ValidateCheckoutCouponRequest {
@@ -78,6 +82,8 @@ export interface OrderDto {
   totalAmount: number;
   status: OrderStatus;
   paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  paidAt: string | null;
   createdAt: string;
   updatedAt: string;
   trackingCode?: string | null;
