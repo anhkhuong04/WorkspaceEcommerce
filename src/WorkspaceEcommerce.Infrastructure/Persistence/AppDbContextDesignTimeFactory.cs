@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Npgsql;
 
 namespace WorkspaceEcommerce.Infrastructure.Persistence;
 
@@ -15,8 +16,11 @@ internal sealed class AppDbContextDesignTimeFactory : IDesignTimeDbContextFactor
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
             ?? "Host=localhost;Port=5432;Database=workspace_ecommerce_dev;Username=workspace_ecommerce;Password=hPedxEKW9iTNqu3k6laongMYLCj540FV";
 
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+        dataSourceBuilder.EnableDynamicJson();
+
         var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-        optionsBuilder.UseNpgsql(connectionString);
+        optionsBuilder.UseNpgsql(dataSourceBuilder.Build());
 
         return new AppDbContext(optionsBuilder.Options);
     }

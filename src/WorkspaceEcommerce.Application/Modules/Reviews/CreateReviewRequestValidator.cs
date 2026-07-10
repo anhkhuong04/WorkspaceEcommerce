@@ -2,7 +2,7 @@ using FluentValidation;
 
 namespace WorkspaceEcommerce.Application.Modules.Reviews;
 
-internal sealed class CreateReviewRequestValidator : AbstractValidator<CreateReviewRequest>
+public sealed class CreateReviewRequestValidator : AbstractValidator<CreateReviewRequest>
 {
     public CreateReviewRequestValidator()
     {

@@ -11,25 +11,22 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AlterColumn<LocalizedText>(
-                name: "name",
-                schema: "catalog",
-                table: "products",
-                type: "jsonb",
-                nullable: false,
-                oldClrType: typeof(string),
-                oldType: "character varying(250)",
-                oldMaxLength: 250);
+            migrationBuilder.Sql(
+                """
+                ALTER TABLE catalog.products
+                ALTER COLUMN name TYPE jsonb
+                USING jsonb_build_object('en', name);
+                """);
 
-            migrationBuilder.AlterColumn<LocalizedText>(
-                name: "description",
-                schema: "catalog",
-                table: "products",
-                type: "jsonb",
-                nullable: true,
-                oldClrType: typeof(string),
-                oldType: "text",
-                oldNullable: true);
+            migrationBuilder.Sql(
+                """
+                ALTER TABLE catalog.products
+                ALTER COLUMN description TYPE jsonb
+                USING CASE
+                    WHEN description IS NULL THEN NULL
+                    ELSE jsonb_build_object('en', description)
+                END;
+                """);
 
             migrationBuilder.AddColumn<string>(
                 name: "currency_code",
@@ -50,15 +47,12 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                 nullable: false,
                 defaultValue: 0m);
 
-            migrationBuilder.AlterColumn<LocalizedText>(
-                name: "name",
-                schema: "catalog",
-                table: "categories",
-                type: "jsonb",
-                nullable: false,
-                oldClrType: typeof(string),
-                oldType: "character varying(200)",
-                oldMaxLength: 200);
+            migrationBuilder.Sql(
+                """
+                ALTER TABLE catalog.categories
+                ALTER COLUMN name TYPE jsonb
+                USING jsonb_build_object('en', name);
+                """);
         }
 
         /// <inheritdoc />
@@ -74,35 +68,29 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                 schema: "ordering",
                 table: "orders");
 
-            migrationBuilder.AlterColumn<string>(
-                name: "name",
-                schema: "catalog",
-                table: "products",
-                type: "character varying(250)",
-                maxLength: 250,
-                nullable: false,
-                oldClrType: typeof(LocalizedText),
-                oldType: "jsonb");
+            migrationBuilder.Sql(
+                """
+                ALTER TABLE catalog.products
+                ALTER COLUMN name TYPE character varying(250)
+                USING COALESCE(name->>'en', name->>'vi', '');
+                """);
 
-            migrationBuilder.AlterColumn<string>(
-                name: "description",
-                schema: "catalog",
-                table: "products",
-                type: "text",
-                nullable: true,
-                oldClrType: typeof(LocalizedText),
-                oldType: "jsonb",
-                oldNullable: true);
+            migrationBuilder.Sql(
+                """
+                ALTER TABLE catalog.products
+                ALTER COLUMN description TYPE text
+                USING CASE
+                    WHEN description IS NULL THEN NULL
+                    ELSE COALESCE(description->>'en', description->>'vi')
+                END;
+                """);
 
-            migrationBuilder.AlterColumn<string>(
-                name: "name",
-                schema: "catalog",
-                table: "categories",
-                type: "character varying(200)",
-                maxLength: 200,
-                nullable: false,
-                oldClrType: typeof(LocalizedText),
-                oldType: "jsonb");
+            migrationBuilder.Sql(
+                """
+                ALTER TABLE catalog.categories
+                ALTER COLUMN name TYPE character varying(200)
+                USING COALESCE(name->>'en', name->>'vi', '');
+                """);
         }
     }
 }

@@ -1,6 +1,8 @@
 using FluentValidation;
+using Microsoft.Extensions.Logging;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Modules.Loyalty;
 using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
@@ -9,7 +11,9 @@ namespace WorkspaceEcommerce.Application.Modules.Ordering;
 internal sealed class AdminOrderService(
     IAppDbContext dbContext,
     IValidator<AdminOrderListRequest> listValidator,
-    IValidator<UpdateOrderStatusRequest> updateStatusValidator) : IAdminOrderService
+    IValidator<UpdateOrderStatusRequest> updateStatusValidator,
+    ILoyaltyService loyaltyService,
+    ILogger<AdminOrderService> logger) : IAdminOrderService
 {
     public async Task<Result<PagedResult<AdminOrderListItemDto>>> GetOrdersAsync(
         AdminOrderListRequest request,
@@ -97,11 +101,35 @@ internal sealed class AdminOrderService(
             dbContext.Add(history);
             await dbContext.SaveChangesAsync(cancellationToken);
 
+            if (request.Status == OrderStatus.Completed)
+            {
+                await TryEarnLoyaltyPointsAsync(order.Id, cancellationToken);
+            }
+
             return Result<AdminOrderDto>.Success(ToDetailDto(order));
         }
         catch (DomainException exception)
         {
             return Result<AdminOrderDto>.Conflict(exception.Message);
+        }
+    }
+
+    private async Task TryEarnLoyaltyPointsAsync(Guid orderId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await loyaltyService.EarnForCompletedOrderAsync(orderId, cancellationToken);
+            if (result.IsFailure)
+            {
+                logger.LogWarning(
+                    "Could not earn loyalty points for completed order {OrderId}: {Errors}",
+                    orderId,
+                    string.Join("; ", result.Errors));
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogError(exception, "Failed to earn loyalty points for completed order {OrderId}", orderId);
         }
     }
 

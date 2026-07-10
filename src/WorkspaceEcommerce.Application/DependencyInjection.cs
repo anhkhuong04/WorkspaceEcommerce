@@ -13,6 +13,7 @@ using WorkspaceEcommerce.Application.Modules.Customers.Addresses;
 using WorkspaceEcommerce.Application.Modules.Customers.Authentication;
 using WorkspaceEcommerce.Application.Modules.Customers.Orders;
 using WorkspaceEcommerce.Application.Modules.Customers.Profile;
+using WorkspaceEcommerce.Application.Modules.Loyalty;
 using WorkspaceEcommerce.Application.Modules.Ordering;
 using WorkspaceEcommerce.Application.Modules.Reviews;
 
@@ -39,6 +40,7 @@ public static class DependencyInjection
         services.AddScoped<IStorefrontOrderLookupService, StorefrontOrderLookupService>();
         services.AddScoped<IAdminOrderService, AdminOrderService>();
         services.AddScoped<IAdminCouponService, AdminCouponService>();
+        services.AddScoped<ILoyaltyService, LoyaltyService>();
         services.AddScoped<IAdminBlogService, AdminBlogService>();
         services.AddScoped<IStorefrontBlogService, StorefrontBlogService>();
         services.AddScoped<IReviewService, ReviewService>();

@@ -358,6 +358,12 @@ internal sealed class CheckoutService(
                 : Result<CheckoutCouponEvaluation>.Validation(availabilityResult.Errors);
         }
 
+        var customerEligibilityResult = ValidateCouponCustomerEligibility(coupon, currentCustomer.CustomerId);
+        if (customerEligibilityResult.IsFailure)
+        {
+            return Result<CheckoutCouponEvaluation>.Validation(customerEligibilityResult.Errors);
+        }
+
         var productTargetIds = await checkoutStore.FindCouponProductTargetIdsAsync(coupon.Id, cancellationToken);
         var productTargetSet = productTargetIds.ToHashSet();
         var eligibleSubtotal = snapshots
@@ -528,6 +534,20 @@ internal sealed class CheckoutService(
         }
 
         return Result.Success();
+    }
+
+    private static Result ValidateCouponCustomerEligibility(Coupon coupon, Guid? customerId)
+    {
+        try
+        {
+            coupon.ValidateCustomerEligibility(customerId);
+
+            return Result.Success();
+        }
+        catch (DomainException exception)
+        {
+            return Result.Validation([exception.Message]);
+        }
     }
 
     private static bool IsUsageLimitReached(Coupon coupon)

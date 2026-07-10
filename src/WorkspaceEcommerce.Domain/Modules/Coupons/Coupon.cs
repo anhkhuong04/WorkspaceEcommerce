@@ -4,6 +4,8 @@ namespace WorkspaceEcommerce.Domain.Modules.Coupons;
 
 public sealed class Coupon : Entity
 {
+    public const string LoyaltyVoucherCodePrefix = "LOYAL-";
+
     private readonly List<CouponProductTarget> _productTargets = [];
 
     public Coupon(
@@ -18,7 +20,9 @@ public sealed class Coupon : Entity
         DateTimeOffset? startsAt,
         DateTimeOffset? endsAt,
         int? usageLimit,
-        bool isActive = true)
+        bool isActive = true,
+        Guid? customerId = null,
+        CouponSource source = CouponSource.Admin)
         : base(id)
     {
         Code = NormalizeCode(code);
@@ -32,10 +36,49 @@ public sealed class Coupon : Entity
         EndsAt = endsAt;
         ValidateEffectiveWindow(StartsAt, EndsAt);
         UsageLimit = ValidateUsageLimit(usageLimit);
+        CustomerId = NormalizeCustomerId(customerId);
+        Source = source;
+        ValidateSourceRules(Source, CustomerId, Code, DiscountType, UsageLimit);
         UsedCount = 0;
         IsActive = isActive;
         CreatedAt = DateTimeOffset.UtcNow;
         UpdatedAt = CreatedAt;
+    }
+
+    public static Coupon CreateLoyaltyVoucher(
+        Guid id,
+        Guid customerId,
+        string code,
+        string name,
+        decimal discountAmount,
+        DateTimeOffset startsAt,
+        DateTimeOffset endsAt)
+    {
+        return new Coupon(
+            id,
+            code,
+            name,
+            description: null,
+            CouponDiscountType.FixedAmount,
+            discountAmount,
+            maxDiscountAmount: null,
+            minimumSubtotal: null,
+            startsAt,
+            endsAt,
+            usageLimit: 1,
+            isActive: true,
+            customerId,
+            CouponSource.Loyalty);
+    }
+
+    public static string FormatLoyaltyVoucherCode(Guid voucherId)
+    {
+        if (voucherId == Guid.Empty)
+        {
+            throw new DomainException("Loyalty voucher id cannot be empty.");
+        }
+
+        return $"{LoyaltyVoucherCodePrefix}{voucherId:N}"[..16].ToUpperInvariant();
     }
 
     public string Code { get; private set; }
@@ -57,6 +100,10 @@ public sealed class Coupon : Entity
     public DateTimeOffset? EndsAt { get; private set; }
 
     public int? UsageLimit { get; private set; }
+
+    public Guid? CustomerId { get; private set; }
+
+    public CouponSource Source { get; private set; }
 
     public int UsedCount { get; private set; }
 
@@ -180,6 +227,19 @@ public sealed class Coupon : Entity
         }
     }
 
+    public void ValidateCustomerEligibility(Guid? customerId)
+    {
+        if (CustomerId is null)
+        {
+            return;
+        }
+
+        if (customerId is null || customerId.Value != CustomerId.Value)
+        {
+            throw new DomainException("Coupon is restricted to another customer.");
+        }
+    }
+
     public decimal CalculateDiscount(decimal eligibleSubtotal)
     {
         if (eligibleSubtotal <= 0m)
@@ -258,6 +318,47 @@ public sealed class Coupon : Entity
         }
 
         return usageLimit;
+    }
+
+    private static Guid? NormalizeCustomerId(Guid? customerId)
+    {
+        if (customerId == Guid.Empty)
+        {
+            throw new DomainException("Coupon customer id cannot be empty.");
+        }
+
+        return customerId;
+    }
+
+    private static void ValidateSourceRules(
+        CouponSource source,
+        Guid? customerId,
+        string code,
+        CouponDiscountType discountType,
+        int? usageLimit)
+    {
+        if (source == CouponSource.Loyalty)
+        {
+            if (customerId is null)
+            {
+                throw new DomainException("Loyalty coupon customer id is required.");
+            }
+
+            if (!code.StartsWith(LoyaltyVoucherCodePrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new DomainException("Loyalty coupon code must use the LOYAL- prefix.");
+            }
+
+            if (discountType != CouponDiscountType.FixedAmount)
+            {
+                throw new DomainException("Loyalty coupon must use fixed amount discount.");
+            }
+
+            if (usageLimit != 1)
+            {
+                throw new DomainException("Loyalty coupon usage limit must be one.");
+            }
+        }
     }
 
     private static void ValidateEffectiveWindow(DateTimeOffset? startsAt, DateTimeOffset? endsAt)

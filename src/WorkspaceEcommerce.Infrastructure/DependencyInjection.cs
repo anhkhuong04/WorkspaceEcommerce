@@ -1,11 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Abstractions.Seeding;
 using WorkspaceEcommerce.Application.Abstractions.Shipment;
 using WorkspaceEcommerce.Application.Modules.Admin.Dashboard;
+using WorkspaceEcommerce.Application.Modules.Loyalty;
 using WorkspaceEcommerce.Infrastructure.Authentication;
 using WorkspaceEcommerce.Infrastructure.Configuration;
 using WorkspaceEcommerce.Infrastructure.Persistence;
@@ -27,8 +29,15 @@ public static class DependencyInjection
         var adminAuthOptions = configuration.GetValidatedAdminAuthOptions();
         var jwtOptions = configuration.GetValidatedJwtOptions();
 
-        services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(connectionString));
+        services.AddSingleton(_ =>
+        {
+            var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+            dataSourceBuilder.EnableDynamicJson();
+
+            return dataSourceBuilder.Build();
+        });
+        services.AddDbContext<AppDbContext>((provider, options) =>
+            options.UseNpgsql(provider.GetRequiredService<NpgsqlDataSource>()));
         services.AddScoped<IAppDbContext>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddScoped<IAdminDashboardQuery, EfAdminDashboardQuery>();
         services.AddScoped<ICartStore>(provider => provider.GetRequiredService<AppDbContext>());
@@ -36,6 +45,7 @@ public static class DependencyInjection
         services.AddScoped<IDemoDataSeeder, DemoDataSeeder>();
         services.AddSingleton(adminAuthOptions);
         services.AddSingleton(jwtOptions);
+        services.AddSingleton(configuration.GetSection(LoyaltyOptions.SectionName).Get<LoyaltyOptions>() ?? new LoyaltyOptions());
         services.AddSingleton<IAdminCredentialValidator, ConfiguredAdminCredentialValidator>();
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();

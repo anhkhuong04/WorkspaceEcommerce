@@ -4,5 +4,6 @@ export * from "./catalog";
 export * from "./common";
 export * from "./coupons";
 export * from "./customer";
+export * from "./loyalty";
 export * from "./orders";
 export * from "./blogs";

@@ -209,6 +209,64 @@ public sealed class CheckoutServiceTests
     }
 
     [Fact]
+    public async Task ValidateCouponAsync_CustomerScopedCouponForGuest_ReturnsValidation()
+    {
+        var store = new FakeCheckoutStore();
+        var variant = SeedVisibleVariant(store);
+        SeedCart(store, variant.Id);
+        store.Seed(CreateLoyaltyCoupon(Guid.NewGuid()));
+        var service = CreateService(store);
+
+        var result = await service.ValidateCouponAsync(new ValidateCheckoutCouponRequest
+        {
+            SessionId = "session-1",
+            CouponCode = "LOYAL-ABC1234567"
+        });
+
+        Assert.Equal(ResultStatus.Validation, result.Status);
+        Assert.Contains("Coupon is restricted to another customer.", result.Errors);
+    }
+
+    [Fact]
+    public async Task ValidateCouponAsync_CustomerScopedCouponForDifferentCustomer_ReturnsValidation()
+    {
+        var store = new FakeCheckoutStore();
+        var variant = SeedVisibleVariant(store);
+        SeedCart(store, variant.Id);
+        store.Seed(CreateLoyaltyCoupon(Guid.NewGuid()));
+        var service = CreateService(store, Guid.NewGuid());
+
+        var result = await service.ValidateCouponAsync(new ValidateCheckoutCouponRequest
+        {
+            SessionId = "session-1",
+            CouponCode = "LOYAL-ABC1234567"
+        });
+
+        Assert.Equal(ResultStatus.Validation, result.Status);
+        Assert.Contains("Coupon is restricted to another customer.", result.Errors);
+    }
+
+    [Fact]
+    public async Task CheckoutAsync_CustomerScopedCouponForOwner_AppliesDiscount()
+    {
+        var customerId = Guid.NewGuid();
+        var store = new FakeCheckoutStore();
+        var variant = SeedVisibleVariant(store);
+        SeedCart(store, variant.Id, quantity: 2, unitPriceSnapshot: 100m);
+        var coupon = CreateLoyaltyCoupon(customerId);
+        store.Seed(coupon);
+        var service = CreateService(store, customerId);
+
+        var result = await service.CheckoutAsync(CreateRequest(couponCode: "LOYAL-ABC1234567"));
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal(coupon.Id, result.Value.Order.CouponId);
+        Assert.Equal(100m, result.Value.Order.DiscountAmount);
+        Assert.Equal(customerId, store.CouponRedemptions.Single().CustomerId);
+    }
+
+    [Fact]
     public async Task CheckoutAsync_WithCoupon_AppliesDiscountStoresSnapshotAndCreatesRedemption()
     {
         var store = new FakeCheckoutStore();
@@ -346,6 +404,18 @@ public sealed class CheckoutServiceTests
             null,
             null,
             usageLimit);
+    }
+
+    private static Coupon CreateLoyaltyCoupon(Guid customerId)
+    {
+        return Coupon.CreateLoyaltyVoucher(
+            Guid.NewGuid(),
+            customerId,
+            "LOYAL-ABC1234567",
+            "Loyalty voucher",
+            100m,
+            DateTimeOffset.UtcNow.AddDays(-1),
+            DateTimeOffset.UtcNow.AddDays(30));
     }
 
     private sealed class StubCurrentCustomerContext(Guid? customerId) : ICurrentCustomerContext

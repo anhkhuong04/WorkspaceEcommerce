@@ -14,6 +14,8 @@ public sealed record AdminCouponDto(
     DateTimeOffset? StartsAt,
     DateTimeOffset? EndsAt,
     int? UsageLimit,
+    Guid? CustomerId,
+    CouponSource Source,
     int UsedCount,
     int RedemptionCount,
     bool IsActive,

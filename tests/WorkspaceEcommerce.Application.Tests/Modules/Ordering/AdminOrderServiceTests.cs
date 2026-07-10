@@ -1,6 +1,10 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Modules.Loyalty;
 using WorkspaceEcommerce.Application.Modules.Ordering;
 using WorkspaceEcommerce.Application.Tests.Common.Fakes;
+using WorkspaceEcommerce.Domain.Modules.Loyalty;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Application.Tests.Modules.Ordering;
@@ -101,6 +105,71 @@ public sealed class AdminOrderServiceTests
     }
 
     [Fact]
+    public async Task UpdateStatusAsync_ToCompleted_EarnsLoyaltyPointsAfterStatusSave()
+    {
+        var customerId = Guid.NewGuid();
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(CreateDefaultTiers());
+        var order = CreateOrder("ORD-20260608-0001", "0900000001", "Nguyen Van A", customerId);
+        order.AddItem(Guid.NewGuid(), Guid.NewGuid(), "Standing Desk", "DESK-001", 150000m, 1, false);
+        MoveToShipping(order);
+        dbContext.Seed(order);
+        var service = CreateService(dbContext, CreateLoyaltyService(dbContext));
+
+        var result = await service.UpdateStatusAsync(
+            order.Id,
+            new UpdateOrderStatusRequest
+            {
+                Status = OrderStatus.Completed,
+                Note = "Delivered"
+            },
+            "admin@example.com");
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal(OrderStatus.Completed, result.Value.Status);
+        Assert.Equal(2, dbContext.SaveChangesCallCount);
+        var account = Assert.Single(dbContext.CustomerLoyaltyAccounts);
+        Assert.Equal(customerId, account.CustomerId);
+        Assert.Equal(15, account.CurrentPoints);
+        Assert.Equal(15, account.TotalPointsEarned);
+        var transaction = Assert.Single(dbContext.LoyaltyTransactions);
+        Assert.Equal(LoyaltyTransactionType.Earn, transaction.Type);
+        Assert.Equal(order.Id, transaction.OrderId);
+        Assert.Equal(15, transaction.Points);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_ToCompleted_WhenEarnAlreadyExists_DoesNotAddPointsAgain()
+    {
+        var customerId = Guid.NewGuid();
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(CreateDefaultTiers());
+        var order = CreateOrder("ORD-20260608-0001", "0900000001", "Nguyen Van A", customerId);
+        order.AddItem(Guid.NewGuid(), Guid.NewGuid(), "Standing Desk", "DESK-001", 150000m, 1, false);
+        MoveToShipping(order);
+        var account = new CustomerLoyaltyAccount(Guid.NewGuid(), customerId);
+        account.EarnPoints(15, order.Id, "Existing earn.");
+        dbContext.Seed(order);
+        dbContext.Seed(account);
+        var service = CreateService(dbContext, CreateLoyaltyService(dbContext));
+
+        var result = await service.UpdateStatusAsync(
+            order.Id,
+            new UpdateOrderStatusRequest { Status = OrderStatus.Completed },
+            "admin@example.com");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, dbContext.SaveChangesCallCount);
+        Assert.Equal(15, account.CurrentPoints);
+        Assert.Equal(15, account.TotalPointsEarned);
+        Assert.Single(dbContext.LoyaltyTransactions);
+        Assert.Single(dbContext.LoyaltyTransactions.Where(transaction =>
+            transaction.Type == LoyaltyTransactionType.Earn &&
+            transaction.OrderId == order.Id));
+    }
+
+    [Fact]
     public async Task UpdateStatusAsync_InvalidTransition_ReturnsConflict()
     {
         var dbContext = new FakeAppDbContext();
@@ -150,20 +219,32 @@ public sealed class AdminOrderServiceTests
         Assert.Contains(result.Errors, error => error.Contains("Status", StringComparison.Ordinal));
     }
 
-    private static AdminOrderService CreateService(FakeAppDbContext dbContext)
+    private static AdminOrderService CreateService(FakeAppDbContext dbContext, ILoyaltyService? loyaltyService = null)
     {
         return new AdminOrderService(
             dbContext,
             new AdminOrderListRequestValidator(),
-            new UpdateOrderStatusRequestValidator());
+            new UpdateOrderStatusRequestValidator(),
+            loyaltyService ?? new StubLoyaltyService(),
+            NullLogger<AdminOrderService>.Instance);
     }
 
-    private static Order CreateOrder(string orderCode, string phone, string customerName)
+    private static LoyaltyService CreateLoyaltyService(FakeAppDbContext dbContext)
+    {
+        return new LoyaltyService(
+            dbContext,
+            new StubCurrentCustomerContext(),
+            new LoyaltyOptions(),
+            new LoyaltyTransactionListRequestValidator(),
+            new RedeemLoyaltyPointsRequestValidator());
+    }
+
+    private static Order CreateOrder(string orderCode, string phone, string customerName, Guid? customerId = null)
     {
         return new Order(
             Guid.NewGuid(),
             orderCode,
-            null,
+            customerId,
             customerName,
             phone,
             "customer@example.com",
@@ -172,5 +253,63 @@ public sealed class AdminOrderServiceTests
             PaymentMethod.Cod,
             "USD",
             1m);
+    }
+
+    private static void MoveToShipping(Order order)
+    {
+        order.RecordCreated(Guid.NewGuid(), "Created by checkout.", changedBy: null);
+        order.ChangeStatus(Guid.NewGuid(), OrderStatus.Confirmed, null, "admin@example.com");
+        order.ChangeStatus(Guid.NewGuid(), OrderStatus.Processing, null, "admin@example.com");
+        order.ChangeStatus(Guid.NewGuid(), OrderStatus.Shipping, null, "admin@example.com");
+    }
+
+    private static LoyaltyTier[] CreateDefaultTiers()
+    {
+        return
+        [
+            new LoyaltyTier(Guid.NewGuid(), LoyaltyTierType.Bronze, 0, 0m, false),
+            new LoyaltyTier(Guid.NewGuid(), LoyaltyTierType.Silver, 500, 3m, false),
+            new LoyaltyTier(Guid.NewGuid(), LoyaltyTierType.Gold, 2000, 5m, true),
+            new LoyaltyTier(Guid.NewGuid(), LoyaltyTierType.Platinum, 5000, 10m, true)
+        ];
+    }
+
+    private sealed class StubLoyaltyService : ILoyaltyService
+    {
+        public Task<Result<LoyaltyAccountDto>> GetMyLoyaltyAsync(CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<Result<PagedResult<LoyaltyTransactionDto>>> GetMyTransactionsAsync(
+            LoyaltyTransactionListRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<Result<IReadOnlyCollection<LoyaltyTierDto>>> GetTiersAsync(CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<Result<RedeemLoyaltyPointsResponse>> RedeemPointsAsync(
+            RedeemLoyaltyPointsRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<Result> EarnForCompletedOrderAsync(Guid orderId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(Result.Success());
+        }
+    }
+
+    private sealed class StubCurrentCustomerContext : ICurrentCustomerContext
+    {
+        public Guid? CustomerId => null;
+
+        public string? Email => null;
     }
 }

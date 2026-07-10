@@ -3,6 +3,7 @@ using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Content;
 using WorkspaceEcommerce.Domain.Modules.Customers;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
+using WorkspaceEcommerce.Domain.Modules.Loyalty;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Reviews;
 
@@ -34,6 +35,12 @@ public interface IAppDbContext
 
     IQueryable<CouponRedemption> CouponRedemptions { get; }
 
+    IQueryable<CustomerLoyaltyAccount> CustomerLoyaltyAccounts { get; }
+
+    IQueryable<LoyaltyTransaction> LoyaltyTransactions { get; }
+
+    IQueryable<LoyaltyTier> LoyaltyTiers { get; }
+
     IQueryable<Order> Orders { get; }
 
     IQueryable<OrderItem> OrderItems { get; }
@@ -56,6 +63,8 @@ public interface IAppDbContext
 
     void Remove<TEntity>(TEntity entity)
         where TEntity : class;
+
+    Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

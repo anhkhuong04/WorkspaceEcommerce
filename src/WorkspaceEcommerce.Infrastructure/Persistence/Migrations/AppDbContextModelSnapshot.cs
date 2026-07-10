@@ -569,6 +569,10 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
@@ -609,6 +613,14 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(250)")
                         .HasColumnName("name");
 
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Admin")
+                        .HasColumnName("source");
+
                     b.Property<DateTimeOffset?>("StartsAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("starts_at");
@@ -631,11 +643,17 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_coupons_code");
 
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("ix_coupons_customer_id");
+
                     b.HasIndex("EndsAt")
                         .HasDatabaseName("ix_coupons_ends_at");
 
                     b.HasIndex("IsActive")
                         .HasDatabaseName("ix_coupons_is_active");
+
+                    b.HasIndex("Source")
+                        .HasDatabaseName("ix_coupons_source");
 
                     b.HasIndex("StartsAt")
                         .HasDatabaseName("ix_coupons_starts_at");
@@ -914,6 +932,178 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_login_history_login_time");
 
                     b.ToTable("login_history", "customer");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Loyalty.CustomerLoyaltyAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("CurrentPoints")
+                        .HasColumnType("integer")
+                        .HasColumnName("current_points");
+
+                    b.Property<string>("CurrentTier")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("current_tier");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateTimeOffset>("TierUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("tier_updated_at");
+
+                    b.Property<int>("TotalPointsEarned")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_points_earned");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_customer_loyalty_accounts_customer_id");
+
+                    b.ToTable("customer_loyalty_accounts", "loyalty");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Loyalty.LoyaltyTier", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("DiscountPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("discount_percent");
+
+                    b.Property<bool>("FreeShippingEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("free_shipping_enabled");
+
+                    b.Property<int>("MinTotalPointsEarned")
+                        .HasColumnType("integer")
+                        .HasColumnName("min_total_points_earned");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Type")
+                        .IsUnique()
+                        .HasDatabaseName("ux_loyalty_tiers_type");
+
+                    b.ToTable("loyalty_tiers", "loyalty");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("8d12c98b-10ce-4aac-8904-000000000001"),
+                            DiscountPercent = 0m,
+                            FreeShippingEnabled = false,
+                            MinTotalPointsEarned = 0,
+                            Type = "Bronze"
+                        },
+                        new
+                        {
+                            Id = new Guid("8d12c98b-10ce-4aac-8904-000000000002"),
+                            DiscountPercent = 3m,
+                            FreeShippingEnabled = false,
+                            MinTotalPointsEarned = 500,
+                            Type = "Silver"
+                        },
+                        new
+                        {
+                            Id = new Guid("8d12c98b-10ce-4aac-8904-000000000003"),
+                            DiscountPercent = 5m,
+                            FreeShippingEnabled = true,
+                            MinTotalPointsEarned = 2000,
+                            Type = "Gold"
+                        },
+                        new
+                        {
+                            Id = new Guid("8d12c98b-10ce-4aac-8904-000000000004"),
+                            DiscountPercent = 10m,
+                            FreeShippingEnabled = true,
+                            MinTotalPointsEarned = 5000,
+                            Type = "Platinum"
+                        });
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Loyalty.LoyaltyTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("BalanceAfter")
+                        .HasColumnType("integer")
+                        .HasColumnName("balance_after");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CustomerLoyaltyAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_loyalty_account_id");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("integer")
+                        .HasColumnName("points");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("type");
+
+                    b.Property<Guid?>("VoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("voucher_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_loyalty_transactions_created_at");
+
+                    b.HasIndex("CustomerLoyaltyAccountId")
+                        .HasDatabaseName("ix_loyalty_transactions_account_id");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_loyalty_transactions_earn_order")
+                        .HasFilter("\"type\" = 'Earn' AND order_id IS NOT NULL");
+
+                    b.HasIndex("VoucherId")
+                        .HasDatabaseName("ix_loyalty_transactions_voucher_id");
+
+                    b.ToTable("loyalty_transactions", "loyalty");
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.Order", b =>
@@ -1287,6 +1477,14 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Coupons.Coupon", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Coupons.CouponProductTarget", b =>
                 {
                     b.HasOne("WorkspaceEcommerce.Domain.Modules.Coupons.Coupon", null)
@@ -1320,6 +1518,34 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Loyalty.CustomerLoyaltyAccount", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Loyalty.LoyaltyTransaction", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Loyalty.CustomerLoyaltyAccount", null)
+                        .WithMany("Transactions")
+                        .HasForeignKey("CustomerLoyaltyAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Ordering.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Coupons.Coupon", null)
+                        .WithMany()
+                        .HasForeignKey("VoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.Order", b =>
@@ -1376,6 +1602,11 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Coupons.Coupon", b =>
                 {
                     b.Navigation("ProductTargets");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Loyalty.CustomerLoyaltyAccount", b =>
+                {
+                    b.Navigation("Transactions");
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.Order", b =>

@@ -83,12 +83,35 @@ public sealed class CouponModelConfigurationTests
         Assert.Equal("discount_type", property.GetColumnName());
     }
 
+    [Fact]
+    public void CouponSource_IsStoredAsString()
+    {
+        var property = GetEntityType(typeof(Coupon)).FindProperty(nameof(Coupon.Source));
+
+        Assert.NotNull(property);
+        Assert.Equal("character varying(50)", property.GetColumnType());
+        Assert.Equal("source", property.GetColumnName());
+    }
+
+    [Theory]
+    [InlineData(nameof(Coupon.CustomerId), "ix_coupons_customer_id")]
+    [InlineData(nameof(Coupon.Source), "ix_coupons_source")]
+    public void CouponLoyaltyFields_HaveIndexes(string propertyName, string databaseName)
+    {
+        var metadata = GetEntityType(typeof(Coupon));
+        var index = GetIndex(metadata, propertyName);
+
+        Assert.False(index.IsUnique);
+        Assert.Equal(databaseName, index.GetDatabaseName());
+    }
+
     [Theory]
     [InlineData(typeof(CouponProductTarget), typeof(Coupon), nameof(CouponProductTarget.CouponId), DeleteBehavior.Cascade)]
     [InlineData(typeof(CouponProductTarget), typeof(Product), nameof(CouponProductTarget.ProductId), DeleteBehavior.Restrict)]
     [InlineData(typeof(CouponRedemption), typeof(Coupon), nameof(CouponRedemption.CouponId), DeleteBehavior.Restrict)]
     [InlineData(typeof(CouponRedemption), typeof(Order), nameof(CouponRedemption.OrderId), DeleteBehavior.Restrict)]
     [InlineData(typeof(CouponRedemption), typeof(Customer), nameof(CouponRedemption.CustomerId), DeleteBehavior.Restrict)]
+    [InlineData(typeof(Coupon), typeof(Customer), nameof(Coupon.CustomerId), DeleteBehavior.Restrict)]
     public void CouponRelationships_HaveExpectedDeleteBehavior(
         Type dependentType,
         Type principalType,

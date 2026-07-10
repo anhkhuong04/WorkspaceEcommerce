@@ -4,7 +4,13 @@ import type {
   CustomerOrderDto,
   CustomerOrderListItemDto,
   CustomerOrderStatusHistoryDto,
-  OrderStatus
+  LoyaltyAccountDto,
+  LoyaltyTierDto,
+  LoyaltyTierType,
+  LoyaltyTransactionDto,
+  LoyaltyTransactionType,
+  OrderStatus,
+  RedeemLoyaltyPointsResponse
 } from "@workspace-ecommerce/api-types";
 import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod } from "@workspace-ecommerce/shared-utils";
 import type { ReactNode } from "react";
@@ -33,6 +39,16 @@ const statusStyles: Record<OrderStatus, string> = {
   5: "bg-red-100 text-red-800",
   6: "bg-slate-100 text-slate-600",
   7: "bg-orange-100 text-orange-800"
+};
+
+const loyaltyVoucherAmountPerPoint = 1000;
+const loyaltyTransactionsPageSize = 10;
+
+const tierStyles: Record<LoyaltyTierType, string> = {
+  0: "bg-slate-100 text-slate-700",
+  1: "bg-zinc-100 text-zinc-700",
+  2: "bg-amber-100 text-amber-800",
+  3: "bg-cyan-100 text-cyan-800"
 };
 
 export function AccountOverviewPage() {
@@ -228,6 +244,159 @@ export function AccountOrdersPage() {
   );
 }
 
+export function AccountLoyaltyPage() {
+  const queryClient = useQueryClient();
+  const [transactionPage, setTransactionPage] = useState(1);
+  const [pointsInput, setPointsInput] = useState("");
+  const [voucher, setVoucher] = useState<RedeemLoyaltyPointsResponse | null>(null);
+
+  const accountQuery = useQuery({
+    queryKey: ["customer", "loyalty", "account"],
+    queryFn: () => storefrontApi.getMyLoyalty()
+  });
+  const tiersQuery = useQuery({
+    queryKey: ["loyalty", "tiers"],
+    queryFn: () => storefrontApi.getLoyaltyTiers()
+  });
+  const transactionsQuery = useQuery({
+    queryKey: ["customer", "loyalty", "transactions", transactionPage],
+    queryFn: () => storefrontApi.getLoyaltyTransactions({ page: transactionPage, pageSize: loyaltyTransactionsPageSize })
+  });
+
+  const account = accountQuery.data ?? null;
+  const tiers = tiersQuery.data ?? [];
+  const redeemPoints = parsePositiveInt(pointsInput);
+  const previewDiscount = redeemPoints * loyaltyVoucherAmountPerPoint;
+  const canRedeem = Boolean(account && redeemPoints > 0 && redeemPoints <= account.currentPoints);
+
+  const redeemMutation = useMutation({
+    mutationFn: (points: number) => storefrontApi.redeemLoyaltyPoints({ points }),
+    onSuccess: (response) => {
+      setVoucher(response);
+      setPointsInput("");
+      setTransactionPage(1);
+      void queryClient.invalidateQueries({ queryKey: ["customer", "loyalty"] });
+    },
+    onError: () => setVoucher(null)
+  });
+
+  return (
+    <AccountShell>
+      <div className="grid gap-6">
+        <section className="ui-card border border-slate-100 p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="ui-caption uppercase tracking-[0.18em] text-[var(--brand)]">Loyalty</p>
+              <h2 className="ui-h2 mt-2 text-slate-950">Membership wallet</h2>
+            </div>
+            {account ? <TierBadge tier={account.currentTier} /> : null}
+          </div>
+
+          {accountQuery.isLoading ? <StateMessage>Loading loyalty account...</StateMessage> : null}
+          {accountQuery.error ? <StateMessage tone="error">{getApiErrorMessage(accountQuery.error)}</StateMessage> : null}
+          {account ? <LoyaltyAccountSummary account={account} tiers={tiers} /> : null}
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <section className="ui-card border border-slate-100 p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="ui-caption uppercase tracking-[0.18em] text-[var(--brand)]">Tiers</p>
+                <h2 className="ui-h2 mt-2 text-slate-950">Benefits</h2>
+              </div>
+              {tiers.length ? <span className="ui-caption rounded-full bg-slate-100 px-3 py-1 text-slate-600">{tiers.length} levels</span> : null}
+            </div>
+
+            {tiersQuery.isLoading ? <StateMessage>Loading tiers...</StateMessage> : null}
+            {tiersQuery.error ? <StateMessage tone="error">{getApiErrorMessage(tiersQuery.error)}</StateMessage> : null}
+            {!tiersQuery.isLoading && !tiersQuery.error ? <TierBenefitsTable tiers={tiers} currentTier={account?.currentTier ?? 0} /> : null}
+          </section>
+
+          <section className="ui-card border border-slate-100 p-6">
+            <p className="ui-caption uppercase tracking-[0.18em] text-[var(--brand)]">Redeem</p>
+            <h2 className="ui-h2 mt-2 text-slate-950">Create voucher</h2>
+
+            <div className="mt-5 grid gap-4">
+              <FormField label="Points to redeem">
+                <input
+                  inputMode="numeric"
+                  min={1}
+                  max={account?.currentPoints ?? undefined}
+                  value={pointsInput}
+                  onChange={(event) => setPointsInput(event.target.value.replace(/\D/g, ""))}
+                  className={fieldClassName(false)}
+                  placeholder="100"
+                />
+              </FormField>
+
+              <div className="rounded-[var(--radius-card)] border border-slate-100 bg-slate-50 p-4">
+                <InfoBlock label="Voucher value" value={previewDiscount > 0 ? formatVoucherAmount(previewDiscount) : "-"} />
+                <div className="mt-3">
+                  <InfoBlock label="Remaining points" value={account ? String(Math.max(0, account.currentPoints - redeemPoints)) : "-"} />
+                </div>
+              </div>
+
+              {redeemPoints > 0 && account && redeemPoints > account.currentPoints ? (
+                <div className="ui-control rounded-[var(--radius-card)] bg-amber-50 px-4 py-3 text-amber-800">You do not have enough points for this voucher.</div>
+              ) : null}
+              {redeemMutation.error ? <div className="ui-control rounded-[var(--radius-card)] bg-red-50 px-4 py-3 text-red-700">{getApiErrorMessage(redeemMutation.error)}</div> : null}
+              {voucher ? <RedeemedVoucher voucher={voucher} /> : null}
+
+              <button
+                type="button"
+                disabled={!canRedeem || redeemMutation.isPending}
+                onClick={() => redeemMutation.mutate(redeemPoints)}
+                className="ui-control h-11 rounded-[var(--radius-control)] bg-slate-950 px-5 text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {redeemMutation.isPending ? "Creating..." : "Redeem points"}
+              </button>
+            </div>
+          </section>
+        </section>
+
+        <section className="ui-card border border-slate-100 p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="ui-caption uppercase tracking-[0.18em] text-[var(--brand)]">History</p>
+              <h2 className="ui-h2 mt-2 text-slate-950">Point transactions</h2>
+            </div>
+            {transactionsQuery.data ? <span className="ui-caption rounded-full bg-slate-100 px-3 py-1 text-slate-600">{transactionsQuery.data.totalCount} total</span> : null}
+          </div>
+
+          {transactionsQuery.isLoading ? <StateMessage>Loading transactions...</StateMessage> : null}
+          {transactionsQuery.error ? <StateMessage tone="error">{getApiErrorMessage(transactionsQuery.error)}</StateMessage> : null}
+          {!transactionsQuery.isLoading && !transactionsQuery.error ? (
+            <LoyaltyTransactionList transactions={transactionsQuery.data?.items ?? []} />
+          ) : null}
+          {transactionsQuery.data ? (
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+              <span className="ui-caption text-slate-500">Page {transactionsQuery.data.pageNumber} of {transactionsQuery.data.totalPages || 1}</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={!transactionsQuery.data.hasPreviousPage}
+                  onClick={() => setTransactionPage((page) => Math.max(1, page - 1))}
+                  className="ui-control h-10 rounded-[var(--radius-control)] border border-slate-200 px-4 text-slate-700 transition hover:border-slate-950 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={!transactionsQuery.data.hasNextPage}
+                  onClick={() => setTransactionPage((page) => page + 1)}
+                  className="ui-control h-10 rounded-[var(--radius-control)] border border-slate-200 px-4 text-slate-700 transition hover:border-slate-950 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </section>
+      </div>
+    </AccountShell>
+  );
+}
+
 export function AccountOrderDetailPage() {
   const { id } = useParams();
   const orderQuery = useQuery({
@@ -269,6 +438,7 @@ function AccountShell({ children }: { children: ReactNode }) {
             <AccountNavLink to="/account" end>Overview</AccountNavLink>
             <AccountNavLink to="/account/profile">Profile</AccountNavLink>
             <AccountNavLink to="/account/orders">Orders</AccountNavLink>
+            <AccountNavLink to="/account/loyalty">Loyalty</AccountNavLink>
           </nav>
           <button type="button" onClick={handleSignOut} className="ui-control mt-4 flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] border border-slate-200 text-slate-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700">
             Sign out
@@ -294,6 +464,142 @@ function AccountNavLink({ children, end = false, to }: { children: ReactNode; en
     >
       {children}
     </NavLink>
+  );
+}
+
+function LoyaltyAccountSummary({ account, tiers }: { account: LoyaltyAccountDto; tiers: LoyaltyTierDto[] }) {
+  const currentTier = tiers.find((tier) => tier.type === account.currentTier);
+  const nextTier = account.nextTier === null ? null : tiers.find((tier) => tier.type === account.nextTier) ?? null;
+  const currentTierFloor = currentTier?.minTotalPointsEarned ?? 0;
+  const nextTierFloor = nextTier?.minTotalPointsEarned ?? null;
+  const progress =
+    nextTierFloor === null
+      ? 100
+      : clampPercent(((account.totalPointsEarned - currentTierFloor) / Math.max(1, nextTierFloor - currentTierFloor)) * 100);
+
+  return (
+    <div className="mt-6 grid gap-6">
+      <section className="grid gap-4 md:grid-cols-4">
+        <MetricCard label="Current points" value={account.currentPoints.toLocaleString("en-US")} />
+        <MetricCard label="Total earned" value={account.totalPointsEarned.toLocaleString("en-US")} />
+        <MetricCard label="Tier discount" value={`${account.discountPercent}%`} />
+        <MetricCard label="Free shipping" value={account.freeShippingEnabled ? "Enabled" : "No"} />
+      </section>
+
+      <section className="rounded-[var(--radius-card)] border border-slate-100 bg-slate-50 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="ui-caption uppercase tracking-[0.18em] text-slate-400">Tier progress</p>
+            <p className="mt-1 text-lg font-black text-slate-950">
+              {nextTier ? `${account.pointsToNextTier?.toLocaleString("en-US") ?? 0} points to ${formatTierType(nextTier.type)}` : "Top tier reached"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <TierBadge tier={account.currentTier} />
+            {nextTier ? <span className="text-slate-400">to</span> : null}
+            {nextTier ? <TierBadge tier={nextTier.type} /> : null}
+          </div>
+        </div>
+        <div className="mt-4 h-3 overflow-hidden rounded-full bg-white">
+          <div className="h-full rounded-full bg-slate-950 transition-all" style={{ width: `${progress}%` }} />
+        </div>
+        <div className="mt-2 flex justify-between text-xs font-bold text-slate-500">
+          <span>{currentTierFloor.toLocaleString("en-US")} pts</span>
+          <span>{nextTierFloor === null ? `${account.totalPointsEarned.toLocaleString("en-US")} pts` : `${nextTierFloor.toLocaleString("en-US")} pts`}</span>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function TierBenefitsTable({ currentTier, tiers }: { currentTier: LoyaltyTierType; tiers: LoyaltyTierDto[] }) {
+  if (tiers.length === 0) {
+    return <StateMessage>No tiers configured.</StateMessage>;
+  }
+
+  return (
+    <div className="mt-5 overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+            <th className="pb-3 pr-4">Tier</th>
+            <th className="pb-3 pr-4 text-right">Minimum points</th>
+            <th className="pb-3 pr-4 text-right">Discount</th>
+            <th className="pb-3 text-right">Free shipping</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {tiers
+            .slice()
+            .sort((left, right) => left.minTotalPointsEarned - right.minTotalPointsEarned)
+            .map((tier) => (
+              <tr key={tier.id} className={tier.type === currentTier ? "bg-slate-50" : undefined}>
+                <td className="py-3 pr-4">
+                  <TierBadge tier={tier.type} />
+                </td>
+                <td className="py-3 pr-4 text-right font-bold text-slate-700">{tier.minTotalPointsEarned.toLocaleString("en-US")}</td>
+                <td className="py-3 pr-4 text-right font-bold text-slate-700">{tier.discountPercent}%</td>
+                <td className="py-3 text-right font-bold text-slate-700">{tier.freeShippingEnabled ? "Yes" : "No"}</td>
+              </tr>
+            ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function LoyaltyTransactionList({ transactions }: { transactions: LoyaltyTransactionDto[] }) {
+  if (transactions.length === 0) {
+    return (
+      <div className="mt-5 rounded-[var(--radius-card)] border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
+        <h3 className="ui-h3 text-slate-950">No loyalty transactions yet</h3>
+        <p className="ui-body mx-auto mt-2 max-w-xl text-slate-500">Completed account orders and redeemed vouchers will appear here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-5 grid gap-3">
+      {transactions.map((transaction) => (
+        <div key={transaction.id} className="grid gap-3 rounded-[var(--radius-card)] border border-slate-100 bg-slate-50 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${transaction.points >= 0 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                {formatLoyaltyTransactionType(transaction.type)}
+              </span>
+              {transaction.orderId ? <span className="ui-caption font-mono text-slate-400">Order {formatShortId(transaction.orderId)}</span> : null}
+              {transaction.voucherId ? <span className="ui-caption font-mono text-slate-400">Voucher {formatShortId(transaction.voucherId)}</span> : null}
+            </div>
+            <p className="mt-2 text-sm font-bold text-slate-950">{transaction.description}</p>
+            <p className="ui-caption mt-1 text-slate-400">{formatDate(transaction.createdAt)}</p>
+          </div>
+          <div className="text-left sm:text-right">
+            <p className={`text-lg font-black ${transaction.points >= 0 ? "text-emerald-700" : "text-rose-700"}`}>{formatPoints(transaction.points)}</p>
+            <p className="ui-caption text-slate-400">Balance {transaction.balanceAfter.toLocaleString("en-US")}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RedeemedVoucher({ voucher }: { voucher: RedeemLoyaltyPointsResponse }) {
+  return (
+    <div className="rounded-[var(--radius-card)] border border-emerald-100 bg-emerald-50 p-4">
+      <p className="ui-caption uppercase tracking-[0.14em] text-emerald-700">Voucher created</p>
+      <p className="mt-1 font-mono text-lg font-black text-emerald-950">{voucher.voucherCode}</p>
+      <p className="ui-body mt-1 text-emerald-800">
+        {formatVoucherAmount(voucher.discountAmount)} off, expires {formatDate(voucher.expiresAt)}.
+      </p>
+    </div>
+  );
+}
+
+function TierBadge({ tier }: { tier: LoyaltyTierType }) {
+  return (
+    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${tierStyles[tier]}`}>
+      {formatTierType(tier)}
+    </span>
   );
 }
 
@@ -546,6 +852,53 @@ function fieldClassName(hasError: boolean): string {
   return `h-11 w-full rounded-[var(--radius-control)] border px-4 text-sm font-semibold text-slate-950 outline-none transition focus:ring-2 focus:ring-[var(--brand)]/20 ${
     hasError ? "border-red-400 bg-red-50" : "border-slate-200 bg-white focus:border-[var(--brand)]"
   }`;
+}
+
+function parsePositiveInt(value: string): number {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function clampPercent(value: number): number {
+  return Math.min(100, Math.max(0, value));
+}
+
+function formatTierType(tier: LoyaltyTierType): string {
+  const labels: Record<LoyaltyTierType, string> = {
+    0: "Bronze",
+    1: "Silver",
+    2: "Gold",
+    3: "Platinum"
+  };
+
+  return labels[tier] ?? "Tier";
+}
+
+function formatLoyaltyTransactionType(type: LoyaltyTransactionType): string {
+  const labels: Record<LoyaltyTransactionType, string> = {
+    0: "Earn",
+    1: "Redeem",
+    2: "Adjust"
+  };
+
+  return labels[type] ?? "Transaction";
+}
+
+function formatPoints(points: number): string {
+  return `${points > 0 ? "+" : ""}${points.toLocaleString("en-US")} pts`;
+}
+
+function formatShortId(value: string): string {
+  return value.replaceAll("-", "").slice(0, 8).toUpperCase();
+}
+
+function formatVoucherAmount(value: number): string {
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0
+  }).format(value);
 }
 
 function formatOptionalDate(value: string | null | undefined): string {

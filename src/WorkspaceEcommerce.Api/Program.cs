@@ -6,11 +6,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using WorkspaceEcommerce.Api.Authentication;
 using WorkspaceEcommerce.Api.Common;
+using WorkspaceEcommerce.Api.Localization;
 using WorkspaceEcommerce.Api.Hubs;
 using WorkspaceEcommerce.Api.Middleware;
 using WorkspaceEcommerce.Application;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Seeding;
+using WorkspaceEcommerce.Application.Common.Localization;
 using WorkspaceEcommerce.Infrastructure;
 using WorkspaceEcommerce.Infrastructure.Configuration;
 
@@ -73,6 +75,7 @@ builder.Services
 builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentCustomerContext, CurrentCustomerContext>();
+builder.Services.AddScoped<ICurrentLanguageProvider, CurrentLanguageProvider>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(

@@ -132,6 +132,72 @@ public sealed class CouponDomainTests
         Assert.Equal("Coupon product target must be unique within a coupon.", exception.Message);
     }
 
+    [Fact]
+    public void CreateLoyaltyVoucher_CreatesCustomerScopedFixedOneUseCoupon()
+    {
+        var customerId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+        var code = Coupon.FormatLoyaltyVoucherCode(voucherId);
+        var startsAt = DateTimeOffset.UtcNow;
+        var endsAt = startsAt.AddDays(30);
+
+        var coupon = Coupon.CreateLoyaltyVoucher(
+            voucherId,
+            customerId,
+            code,
+            "Loyalty voucher",
+            100000m,
+            startsAt,
+            endsAt);
+
+        Assert.StartsWith(Coupon.LoyaltyVoucherCodePrefix, coupon.Code, StringComparison.Ordinal);
+        Assert.Equal(customerId, coupon.CustomerId);
+        Assert.Equal(CouponSource.Loyalty, coupon.Source);
+        Assert.Equal(CouponDiscountType.FixedAmount, coupon.DiscountType);
+        Assert.Equal(100000m, coupon.DiscountValue);
+        Assert.Equal(1, coupon.UsageLimit);
+        Assert.True(coupon.IsActive);
+    }
+
+    [Fact]
+    public void ValidateCustomerEligibility_RejectsDifferentCustomer()
+    {
+        var coupon = Coupon.CreateLoyaltyVoucher(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Coupon.FormatLoyaltyVoucherCode(Guid.NewGuid()),
+            "Loyalty voucher",
+            100000m,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow.AddDays(30));
+
+        var exception = Assert.Throws<DomainException>(() =>
+            coupon.ValidateCustomerEligibility(Guid.NewGuid()));
+
+        Assert.Equal("Coupon is restricted to another customer.", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateCustomerEligibility_AllowsPublicCouponForGuest()
+    {
+        var coupon = CreateCoupon();
+
+        coupon.ValidateCustomerEligibility(null);
+
+        Assert.Null(coupon.CustomerId);
+        Assert.Equal(CouponSource.Admin, coupon.Source);
+    }
+
+    [Fact]
+    public void FormatLoyaltyVoucherCode_UsesLoyaltyPrefix()
+    {
+        var code = Coupon.FormatLoyaltyVoucherCode(Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"));
+
+        Assert.StartsWith(Coupon.LoyaltyVoucherCodePrefix, code, StringComparison.Ordinal);
+        Assert.Equal(16, code.Length);
+        Assert.Equal(code.ToUpperInvariant(), code);
+    }
+
     private static Coupon CreateCoupon(
         string code = "SAVE10",
         CouponDiscountType discountType = CouponDiscountType.Percentage,

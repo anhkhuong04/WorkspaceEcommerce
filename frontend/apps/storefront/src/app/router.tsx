@@ -2,6 +2,7 @@ import { createBrowserRouter } from "react-router-dom";
 import { StorefrontLayout } from "../components/layout/StorefrontLayout";
 import { CustomerProtectedRoute } from "../features/customer-auth/CustomerProtectedRoute";
 import {
+  AccountLoyaltyPage,
   AccountOrderDetailPage,
   AccountOrdersPage,
   AccountOverviewPage,
@@ -68,6 +69,14 @@ export const router = createBrowserRouter([
         element: (
           <CustomerProtectedRoute>
             <AccountOrdersPage />
+          </CustomerProtectedRoute>
+        )
+      },
+      {
+        path: "account/loyalty",
+        element: (
+          <CustomerProtectedRoute>
+            <AccountLoyaltyPage />
           </CustomerProtectedRoute>
         )
       },

@@ -6,6 +6,7 @@ using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Content;
 using WorkspaceEcommerce.Domain.Modules.Customers;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
+using WorkspaceEcommerce.Domain.Modules.Loyalty;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Reviews;
 
@@ -48,6 +49,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<CouponRedemption> CouponRedemptions => Set<CouponRedemption>();
 
+    public DbSet<CustomerLoyaltyAccount> CustomerLoyaltyAccounts => Set<CustomerLoyaltyAccount>();
+
+    public DbSet<LoyaltyTransaction> LoyaltyTransactions => Set<LoyaltyTransaction>();
+
+    public DbSet<LoyaltyTier> LoyaltyTiers => Set<LoyaltyTier>();
+
     public DbSet<BlogPost> BlogPosts => Set<BlogPost>();
 
     public DbSet<BlogPostRelatedProduct> BlogPostRelatedProducts => Set<BlogPostRelatedProduct>();
@@ -80,6 +87,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     IQueryable<CouponRedemption> IAppDbContext.CouponRedemptions => CouponRedemptions;
 
+    IQueryable<CustomerLoyaltyAccount> IAppDbContext.CustomerLoyaltyAccounts => CustomerLoyaltyAccounts;
+
+    IQueryable<LoyaltyTransaction> IAppDbContext.LoyaltyTransactions => LoyaltyTransactions;
+
+    IQueryable<LoyaltyTier> IAppDbContext.LoyaltyTiers => LoyaltyTiers;
+
     IQueryable<Order> IAppDbContext.Orders => Orders;
 
     IQueryable<OrderItem> IAppDbContext.OrderItems => OrderItems;
@@ -93,6 +106,18 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     IQueryable<BlogComment> IAppDbContext.BlogComments => BlogComments;
 
     IQueryable<Review> IAppDbContext.Reviews => Reviews;
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new PersistenceConcurrencyException("A concurrency conflict occurred while saving changes.", exception);
+        }
+    }
 
     async Task<Cart?> ICartStore.FindCartBySessionIdAsync(
         string sessionId,
@@ -206,6 +231,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     }
 
     async Task ICheckoutStore.ExecuteInTransactionAsync(
+        Func<CancellationToken, Task> operation,
+        CancellationToken cancellationToken)
+    {
+        await ExecuteInTransactionCoreAsync(operation, cancellationToken);
+    }
+
+    async Task IAppDbContext.ExecuteInTransactionAsync(
+        Func<CancellationToken, Task> operation,
+        CancellationToken cancellationToken)
+    {
+        await ExecuteInTransactionCoreAsync(operation, cancellationToken);
+    }
+
+    private async Task ExecuteInTransactionCoreAsync(
         Func<CancellationToken, Task> operation,
         CancellationToken cancellationToken)
     {

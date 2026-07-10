@@ -340,6 +340,8 @@ internal sealed class AdminCouponService(
             coupon.StartsAt,
             coupon.EndsAt,
             coupon.UsageLimit,
+            coupon.CustomerId,
+            coupon.Source,
             coupon.UsedCount,
             redemptionCount,
             coupon.IsActive,

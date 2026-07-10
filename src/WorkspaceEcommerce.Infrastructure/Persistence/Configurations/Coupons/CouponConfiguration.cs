@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
+using WorkspaceEcommerce.Domain.Modules.Customers;
 
 namespace WorkspaceEcommerce.Infrastructure.Persistence.Configurations.Coupons;
 
@@ -58,6 +59,16 @@ internal sealed class CouponConfiguration : IEntityTypeConfiguration<Coupon>
         builder.Property(coupon => coupon.UsageLimit)
             .HasColumnName("usage_limit");
 
+        builder.Property(coupon => coupon.CustomerId)
+            .HasColumnName("customer_id");
+
+        builder.Property(coupon => coupon.Source)
+            .HasColumnName("source")
+            .HasConversion<string>()
+            .HasMaxLength(50)
+            .IsRequired()
+            .HasDefaultValue(CouponSource.Admin);
+
         builder.Property(coupon => coupon.UsedCount)
             .HasColumnName("used_count")
             .IsRequired();
@@ -86,6 +97,17 @@ internal sealed class CouponConfiguration : IEntityTypeConfiguration<Coupon>
 
         builder.HasIndex(coupon => coupon.EndsAt)
             .HasDatabaseName("ix_coupons_ends_at");
+
+        builder.HasIndex(coupon => coupon.CustomerId)
+            .HasDatabaseName("ix_coupons_customer_id");
+
+        builder.HasIndex(coupon => coupon.Source)
+            .HasDatabaseName("ix_coupons_source");
+
+        builder.HasOne<Customer>()
+            .WithMany()
+            .HasForeignKey(coupon => coupon.CustomerId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(coupon => coupon.ProductTargets)
             .WithOne()

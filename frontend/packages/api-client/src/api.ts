@@ -33,6 +33,10 @@ import type {
   CustomerProfileDto,
   CustomerRegisterRequest,
   CustomerGoogleLoginRequest,
+  LoyaltyAccountDto,
+  LoyaltyTierDto,
+  LoyaltyTransactionDto,
+  LoyaltyTransactionListRequest,
   OrderLookupRequest,
   OrderLookupResponse,
   PagedResult,
@@ -57,7 +61,9 @@ import type {
   ProductReviewSummaryDto,
   AdminReviewListItemDto,
   CreateReviewRequest,
-  ReviewDto
+  ReviewDto,
+  RedeemLoyaltyPointsRequest,
+  RedeemLoyaltyPointsResponse
 } from "@workspace-ecommerce/api-types";
 import { ApiClient } from "./httpClient";
 
@@ -108,6 +114,12 @@ export function createStorefrontApi(client: ApiClient) {
     getCustomerOrders: (request: CustomerOrderListRequest = {}) =>
       client.get<PagedResult<CustomerOrderListItemDto>>(`/api/customer/orders${buildQuery(request)}`),
     getCustomerOrder: (id: string) => client.get<CustomerOrderDto>(`/api/customer/orders/${id}`),
+    getMyLoyalty: () => client.get<LoyaltyAccountDto>("/api/loyalty/me"),
+    getLoyaltyTransactions: (request: LoyaltyTransactionListRequest = {}) =>
+      client.get<PagedResult<LoyaltyTransactionDto>>(`/api/loyalty/me/transactions${buildQuery(request)}`),
+    redeemLoyaltyPoints: (request: RedeemLoyaltyPointsRequest) =>
+      client.post<RedeemLoyaltyPointsResponse, RedeemLoyaltyPointsRequest>("/api/loyalty/me/redeem", request),
+    getLoyaltyTiers: () => client.get<LoyaltyTierDto[]>("/api/loyalty/tiers"),
     getBlogPosts: () => client.get<StorefrontBlogPostDto[]>("/api/blog-posts"),
     getBlogPost: (slug: string) => client.get<StorefrontBlogPostDto>(`/api/blog-posts/${slug}`),
     submitBlogComment: (slug: string, request: CreateCommentRequest) =>

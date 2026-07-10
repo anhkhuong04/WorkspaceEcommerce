@@ -1,6 +1,6 @@
 import type { PaginationRequest } from "./common";
 import type { OrderStatus, PaymentMethod, OrderItemDto } from "./orders";
-import type { CouponDiscountType } from "./coupons";
+import type { CouponDiscountType, CouponSource } from "./coupons";
 
 export interface AdminLoginRequest {
   email: string;
@@ -176,6 +176,8 @@ export interface AdminCouponDto {
   startsAt: string | null;
   endsAt: string | null;
   usageLimit: number | null;
+  customerId: string | null;
+  source: CouponSource;
   usedCount: number;
   redemptionCount: number;
   isActive: boolean;
@@ -287,4 +289,3 @@ export interface CreateReviewRequest {
   rating: number;
   comment?: string | null;
 }
-

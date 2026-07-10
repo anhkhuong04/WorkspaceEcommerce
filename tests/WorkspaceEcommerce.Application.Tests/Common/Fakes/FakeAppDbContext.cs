@@ -4,6 +4,7 @@ using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Content;
 using WorkspaceEcommerce.Domain.Modules.Customers;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
+using WorkspaceEcommerce.Domain.Modules.Loyalty;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Reviews;
 
@@ -21,6 +22,9 @@ internal sealed class FakeAppDbContext : IAppDbContext
     private readonly List<Coupon> _coupons = [];
     private readonly List<CouponProductTarget> _couponProductTargets = [];
     private readonly List<CouponRedemption> _couponRedemptions = [];
+    private readonly List<CustomerLoyaltyAccount> _customerLoyaltyAccounts = [];
+    private readonly List<LoyaltyTransaction> _loyaltyTransactions = [];
+    private readonly List<LoyaltyTier> _loyaltyTiers = [];
     private readonly List<Order> _orders = [];
     private readonly List<OrderItem> _orderItems = [];
     private readonly List<OrderStatusHistory> _orderStatusHistories = [];
@@ -51,6 +55,12 @@ internal sealed class FakeAppDbContext : IAppDbContext
 
     public IQueryable<CouponRedemption> CouponRedemptions => _couponRedemptions.AsQueryable();
 
+    public IQueryable<CustomerLoyaltyAccount> CustomerLoyaltyAccounts => _customerLoyaltyAccounts.AsQueryable();
+
+    public IQueryable<LoyaltyTransaction> LoyaltyTransactions => _loyaltyTransactions.AsQueryable();
+
+    public IQueryable<LoyaltyTier> LoyaltyTiers => _loyaltyTiers.AsQueryable();
+
     public IQueryable<Order> Orders => _orders.AsQueryable();
 
     public IQueryable<OrderItem> OrderItems => _orderItems.AsQueryable();
@@ -70,6 +80,8 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public IQueryable<CustomerLoginHistory> CustomerLoginHistories => _customerLoginHistories.AsQueryable();
 
     public int SaveChangesCallCount { get; private set; }
+
+    public int TransactionCallCount { get; private set; }
 
     public void Seed(params Category[] categories)
     {
@@ -120,6 +132,22 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public void Seed(params CouponRedemption[] couponRedemptions)
     {
         _couponRedemptions.AddRange(couponRedemptions);
+    }
+
+    public void Seed(params CustomerLoyaltyAccount[] customerLoyaltyAccounts)
+    {
+        _customerLoyaltyAccounts.AddRange(customerLoyaltyAccounts);
+        _loyaltyTransactions.AddRange(customerLoyaltyAccounts.SelectMany(account => account.Transactions));
+    }
+
+    public void Seed(params LoyaltyTransaction[] loyaltyTransactions)
+    {
+        _loyaltyTransactions.AddRange(loyaltyTransactions);
+    }
+
+    public void Seed(params LoyaltyTier[] loyaltyTiers)
+    {
+        _loyaltyTiers.AddRange(loyaltyTiers);
     }
 
     public void Seed(params Order[] orders)
@@ -189,6 +217,16 @@ internal sealed class FakeAppDbContext : IAppDbContext
         return Task.FromResult(1);
     }
 
+    public async Task ExecuteInTransactionAsync(
+        Func<CancellationToken, Task> operation,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        TransactionCallCount++;
+
+        await operation(cancellationToken);
+    }
+
     private List<TEntity> GetSet<TEntity>()
         where TEntity : class
     {
@@ -240,6 +278,21 @@ internal sealed class FakeAppDbContext : IAppDbContext
         if (typeof(TEntity) == typeof(CouponRedemption))
         {
             return (List<TEntity>)(object)_couponRedemptions;
+        }
+
+        if (typeof(TEntity) == typeof(CustomerLoyaltyAccount))
+        {
+            return (List<TEntity>)(object)_customerLoyaltyAccounts;
+        }
+
+        if (typeof(TEntity) == typeof(LoyaltyTransaction))
+        {
+            return (List<TEntity>)(object)_loyaltyTransactions;
+        }
+
+        if (typeof(TEntity) == typeof(LoyaltyTier))
+        {
+            return (List<TEntity>)(object)_loyaltyTiers;
         }
 
         if (typeof(TEntity) == typeof(Order))
