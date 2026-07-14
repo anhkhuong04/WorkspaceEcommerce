@@ -1,4 +1,4 @@
-﻿# Build results
+# Build results
 [Bb]in/
 [Oo]bj/
 
@@ -46,3 +46,10 @@ appsettings.*.Local.json
 
 # Local HTTPS development certificates
 .certs/
+
+# Workspace & Temp
+.agent/
+.tmp/
+startup.md
+task.md
+overview.md
