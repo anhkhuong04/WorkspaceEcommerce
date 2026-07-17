@@ -59,4 +59,55 @@ public sealed class OrdersController(IAdminOrderService orderService) : Controll
 
         return this.ToApiResponse(result);
     }
+
+    [HttpPost("api/admin/orders/import/preview")]
+    [RequestSizeLimit(5 * 1024 * 1024)]
+    [ProducesResponseType(typeof(ApiResponse<AdminOrderImportPreviewDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> PreviewImport(
+        [FromForm] IFormFile? file,
+        CancellationToken cancellationToken)
+    {
+        if (file is null)
+        {
+            return this.ToApiResponse(
+                WorkspaceEcommerce.Application.Common.Models.Result<AdminOrderImportPreviewDto>.Validation(["Import file is required."]));
+        }
+
+        await using var stream = file.OpenReadStream();
+        var result = await orderService.PreviewImportAsync(stream, file.FileName, cancellationToken);
+
+        return this.ToApiResponse(result);
+    }
+
+    [HttpPost("api/admin/orders/import/commit")]
+    [RequestSizeLimit(5 * 1024 * 1024)]
+    [ProducesResponseType(typeof(ApiResponse<AdminOrderImportCommitResultDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CommitImport(
+        [FromForm] IFormFile? file,
+        CancellationToken cancellationToken)
+    {
+        if (file is null)
+        {
+            return this.ToApiResponse(
+                WorkspaceEcommerce.Application.Common.Models.Result<AdminOrderImportCommitResultDto>.Validation(["Import file is required."]),
+                StatusCodes.Status201Created);
+        }
+
+        var changedBy = User.FindFirstValue(ClaimTypes.Name) ??
+            User.FindFirstValue(ClaimTypes.Email) ??
+            User.Identity?.Name;
+        await using var stream = file.OpenReadStream();
+        var result = await orderService.CommitImportAsync(stream, file.FileName, changedBy, cancellationToken);
+
+        return this.ToApiResponse(result, StatusCodes.Status201Created);
+    }
 }

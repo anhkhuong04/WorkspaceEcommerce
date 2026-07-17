@@ -211,12 +211,8 @@ export function LoginPage() {
   }
 
   return (
-    <section className="min-h-screen bg-[#fafafa] text-slate-950 lg:grid lg:h-screen lg:min-h-[720px] lg:grid-cols-[45%_55%] lg:overflow-hidden">
-      <div className="hidden h-full overflow-hidden border-r border-slate-200 lg:block">
-        <img src="/demo/login-page.png" alt="WorkspaceEcom office" className="h-full w-full object-fill" />
-      </div>
-
-      <div className="flex min-h-screen items-center justify-center px-5 py-6 sm:px-10 lg:min-h-0 lg:px-[4vw] lg:py-5">
+    <section className="min-h-screen bg-[#fafafa] text-slate-950">
+      <div className="flex min-h-screen items-center justify-center px-5 py-6 sm:px-10 lg:px-[4vw] lg:py-8">
         <div className="w-full max-w-[660px]">
           <div className="rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-[0_14px_45px_rgba(0,0,0,0.07)] sm:px-9 lg:px-10 lg:py-7">
             <div className="mb-6 grid grid-cols-2 border-b border-slate-200" role="tablist" aria-label="Account access">

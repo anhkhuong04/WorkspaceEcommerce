@@ -2,6 +2,7 @@ import type { AdminProductDto, AdminProductImageDto } from "@workspace-ecommerce
 import { Controller } from "react-hook-form";
 import type { UseFormReturn } from "react-hook-form";
 import { Button, Field, Modal, TextInput } from "../../../components/ui/AdminUi";
+import { ImagePickerField } from "../../../components/media/ImagePickerField";
 import type { ImageFormValues } from "../productTypes";
 
 interface ImageModalProps {
@@ -29,7 +30,7 @@ export function ImageModal({ open, imageProduct, editingImage, form, isPending, 
       )}
     >
       <form className="grid gap-4" noValidate>
-        <Controller control={form.control} name="imageUrl" render={({ field, fieldState }) => <Field label="Image URL" error={fieldState.error?.message}><TextInput {...field} placeholder="https://example.test/product.jpg" /></Field>} />
+        <Controller control={form.control} name="imageUrl" render={({ field, fieldState }) => <ImagePickerField label="Image" value={field.value} folder="products" error={fieldState.error?.message} placeholder="https://example.test/product.jpg" onChange={field.onChange} />} />
         <Controller control={form.control} name="altText" render={({ field, fieldState }) => <Field label="Alt text" error={fieldState.error?.message}><TextInput {...field} placeholder="Standing desk front view" /></Field>} />
         <Controller control={form.control} name="sortOrder" render={({ field, fieldState }) => <Field label="Sort order" error={fieldState.error?.message}><TextInput type="number" value={field.value} onChange={(event) => field.onChange(Number(event.target.value))} /></Field>} />
       </form>

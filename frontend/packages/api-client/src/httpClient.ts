@@ -33,6 +33,13 @@ export class ApiClient {
     });
   }
 
+  postForm<TResponse>(path: string, body: FormData): Promise<TResponse> {
+    return this.send<TResponse>(path, {
+      method: "POST",
+      body
+    });
+  }
+
   put<TResponse, TBody>(path: string, body: TBody): Promise<TResponse> {
     return this.send<TResponse>(path, {
       method: "PUT",
@@ -55,7 +62,7 @@ export class ApiClient {
     const headers = new Headers(init.headers);
     headers.set("Accept", "application/json");
 
-    if (init.body) {
+    if (init.body && !(init.body instanceof FormData)) {
       headers.set("Content-Type", "application/json");
     }
 

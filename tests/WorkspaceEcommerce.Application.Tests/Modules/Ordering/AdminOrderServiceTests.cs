@@ -226,6 +226,7 @@ public sealed class AdminOrderServiceTests
             new AdminOrderListRequestValidator(),
             new UpdateOrderStatusRequestValidator(),
             loyaltyService ?? new StubLoyaltyService(),
+            new StubCurrentLanguageProvider(),
             NullLogger<AdminOrderService>.Instance);
     }
 
@@ -311,5 +312,10 @@ public sealed class AdminOrderServiceTests
         public Guid? CustomerId => null;
 
         public string? Email => null;
+    }
+
+    private sealed class StubCurrentLanguageProvider : WorkspaceEcommerce.Application.Common.Localization.ICurrentLanguageProvider
+    {
+        public string CurrentLanguage => "en";
     }
 }

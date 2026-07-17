@@ -2,6 +2,7 @@ import type { BlogCommentDto, AdminBlogPostDto, AdminProductDto } from "@workspa
 import type { UseFormReturn } from "react-hook-form";
 import { Controller } from "react-hook-form";
 import { Button, Field, Modal, TextInput, Toggle } from "../../../components/ui/AdminUi";
+import { ImagePickerField } from "../../../components/media/ImagePickerField";
 import type { BlogPostFormValues } from "../blogTypes";
 
 type BlogPostModalProps = {
@@ -125,9 +126,7 @@ function BlogPostDetailsForm({
           control={form.control}
           name="imageUrl"
           render={({ field, fieldState }) => (
-            <Field label="Cover Image URL" error={fieldState.error?.message}>
-              <TextInput {...field} placeholder="https://images.unsplash.com/... or /images/..." />
-            </Field>
+            <ImagePickerField label="Cover image" value={field.value ?? ""} folder="blogs" error={fieldState.error?.message} placeholder="https://images.unsplash.com/... or /images/..." onChange={field.onChange} />
           )}
         />
       </div>

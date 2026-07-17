@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
+import { ImagePickerField } from "../../components/media/ImagePickerField";
 import { Button, ConfirmDialog, EmptyState, Field, Modal, Notice, Pill, TextInput, Toggle } from "../../components/ui/AdminUi";
 import { useAdminBanners } from "../../hooks/queries/useAdminBanners";
 import { adminApi } from "../../services/api/adminApi";
@@ -170,7 +171,7 @@ export function BannersPage() {
       >
         <form className="grid gap-4" noValidate>
           <Controller control={form.control} name="title" render={({ field, fieldState }) => <Field label="Title" error={fieldState.error?.message}><TextInput {...field} placeholder="Ergonomic workspace sale" /></Field>} />
-          <Controller control={form.control} name="imageUrl" render={({ field, fieldState }) => <Field label="Image URL" error={fieldState.error?.message}><TextInput {...field} placeholder="/demo/banners/workspace-hero.webp" /></Field>} />
+          <Controller control={form.control} name="imageUrl" render={({ field, fieldState }) => <ImagePickerField label="Image" value={field.value} folder="banners" error={fieldState.error?.message} placeholder="/demo/banners/workspace-hero.webp" onChange={field.onChange} />} />
           <Controller control={form.control} name="linkUrl" render={({ field, fieldState }) => <Field label="Link URL" error={fieldState.error?.message}><TextInput {...field} placeholder="/products" /></Field>} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Controller control={form.control} name="sortOrder" render={({ field, fieldState }) => <Field label="Sort order" error={fieldState.error?.message}><TextInput type="number" min={0} value={field.value} onChange={(event) => field.onChange(Number(event.target.value))} /></Field>} />

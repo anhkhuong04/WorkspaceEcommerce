@@ -17,4 +17,15 @@ public interface IAdminOrderService
         UpdateOrderStatusRequest request,
         string? changedBy,
         CancellationToken cancellationToken = default);
+
+    Task<Result<AdminOrderImportPreviewDto>> PreviewImportAsync(
+        Stream content,
+        string fileName,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<AdminOrderImportCommitResultDto>> CommitImportAsync(
+        Stream content,
+        string fileName,
+        string? changedBy,
+        CancellationToken cancellationToken = default);
 }

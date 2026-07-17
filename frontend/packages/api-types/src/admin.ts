@@ -14,6 +14,13 @@ export interface AdminLoginResponse {
   email: string;
 }
 
+export interface MediaUploadResult {
+  url: string;
+  fileName: string;
+  contentType: string;
+  size: number;
+}
+
 export interface AdminCategoryDto {
   id: string;
   parentId: string | null;
@@ -158,6 +165,34 @@ export interface AdminOrderDto extends AdminOrderListItemDto {
 export interface UpdateOrderStatusRequest {
   status: OrderStatus;
   note?: string | null;
+}
+
+export interface AdminOrderImportRowResultDto {
+  rowNumber: number;
+  externalOrderCode: string;
+  sku: string;
+  quantity: number | null;
+  isValid: boolean;
+  errors: string[];
+}
+
+export interface AdminOrderImportPreviewDto {
+  totalRows: number;
+  validRows: number;
+  errorRows: number;
+  rows: AdminOrderImportRowResultDto[];
+}
+
+export interface AdminOrderImportCreatedOrderDto {
+  id: string;
+  orderCode: string;
+  externalOrderCode: string;
+}
+
+export interface AdminOrderImportCommitResultDto {
+  createdOrders: number;
+  orders: AdminOrderImportCreatedOrderDto[];
+  preview: AdminOrderImportPreviewDto;
 }
 
 export interface AdminCouponListRequest extends PaginationRequest {

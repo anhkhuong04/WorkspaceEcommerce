@@ -10,7 +10,10 @@ import type {
   AdminDashboardDto,
   AdminLoginRequest,
   AdminLoginResponse,
+  MediaUploadResult,
   AdminOrderDto,
+  AdminOrderImportCommitResultDto,
+  AdminOrderImportPreviewDto,
   AdminOrderListItemDto,
   AdminOrderListRequest,
   AdminProductDto,
@@ -137,6 +140,12 @@ export function createStorefrontApi(client: ApiClient) {
 export function createAdminApi(client: ApiClient) {
   return {
     login: (request: AdminLoginRequest) => client.post<AdminLoginResponse, AdminLoginRequest>("/api/admin/auth/login", request),
+    uploadMedia: (file: File, folder: string) => {
+      const formData = new FormData();
+      formData.set("file", file);
+      formData.set("folder", folder);
+      return client.postForm<MediaUploadResult>("/api/admin/media", formData);
+    },
     getCategories: () => client.get<AdminCategoryDto[]>("/api/admin/categories"),
     createCategory: (request: AdminCategoryUpsertRequest) =>
       client.post<AdminCategoryDto, AdminCategoryUpsertRequest>("/api/admin/categories", request),
@@ -169,6 +178,16 @@ export function createAdminApi(client: ApiClient) {
     getOrder: (id: string) => client.get<AdminOrderDto>(`/api/admin/orders/${id}`),
     updateOrderStatus: (id: string, request: UpdateOrderStatusRequest) =>
       client.put<AdminOrderDto, UpdateOrderStatusRequest>(`/api/admin/orders/${id}/status`, request),
+    previewOrderImport: (file: File) => {
+      const formData = new FormData();
+      formData.set("file", file);
+      return client.postForm<AdminOrderImportPreviewDto>("/api/admin/orders/import/preview", formData);
+    },
+    commitOrderImport: (file: File) => {
+      const formData = new FormData();
+      formData.set("file", file);
+      return client.postForm<AdminOrderImportCommitResultDto>("/api/admin/orders/import/commit", formData);
+    },
     getCoupons: (request: AdminCouponListRequest = {}) =>
       client.get<PagedResult<AdminCouponDto>>(`/api/admin/coupons${buildQuery(request)}`),
     getCoupon: (id: string) => client.get<AdminCouponDto>(`/api/admin/coupons/${id}`),

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { StorefrontCategoryDto } from "@workspace-ecommerce/api-types";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
@@ -35,6 +35,10 @@ function StorefrontLayoutContent() {
   const hideHeader = location.pathname === "/login";
 
   const [isHovered, setIsHovered] = useState(false);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [location.pathname, location.search]);
 
   const isHeaderSolid = !isHome || isHovered;
 

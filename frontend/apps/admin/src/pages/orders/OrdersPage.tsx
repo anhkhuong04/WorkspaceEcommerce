@@ -12,6 +12,7 @@ import { Button, Drawer, EmptyState, Field, Notice, Pill, SelectInput, TextArea,
 import { useAdminOrder, useAdminOrders } from "../../hooks/queries/useAdminOrders";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
+import { OrderImportModal } from "./components/OrderImportModal";
 import { OrdersTable } from "./components/OrdersTable";
 
 const orderStatuses: OrderStatus[] = [0, 1, 2, 3, 4, 5, 6, 7];
@@ -53,6 +54,7 @@ export function OrdersPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const pageNumber = parsePageNumber(searchParams.get("page"));
   const statusFilter = parseOrderStatus(searchParams.get("status"));
   const searchFilter = searchParams.get("search")?.trim() || undefined;
@@ -103,7 +105,11 @@ export function OrdersPage() {
 
   return (
     <div className="admin-page-grid">
-      <AdminPageHeader title="Orders" description="Review orders, inspect order snapshots, render status history, and move orders through MVP transitions." />
+      <AdminPageHeader
+        title="Orders"
+        description="Review orders, inspect order snapshots, render status history, and move orders through MVP transitions."
+        actions={<Button type="button" variant="primary" onClick={() => setIsImportModalOpen(true)}>Import orders</Button>}
+      />
       {notice ? <Notice type={notice.type} title={notice.message} /> : null}
       {ordersQuery.isError ? <Notice type="error" title="Orders could not be loaded">{getApiErrorMessage(ordersQuery.error)}</Notice> : null}
 
@@ -189,6 +195,19 @@ export function OrdersPage() {
           </div>
         ) : null}
       </Drawer>
+
+      <OrderImportModal
+        open={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImported={async (result) => {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
+            queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] })
+          ]);
+          setIsImportModalOpen(false);
+          setNotice({ type: "success", message: `${result.createdOrders} order(s) imported.` });
+        }}
+      />
     </div>
   );
 }

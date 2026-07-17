@@ -36,7 +36,6 @@ Tài liệu này mô tả các chức năng dành cho khách hàng truy cập we
 
 ### Đặt hàng (Checkout)
 
-- Hỗ trợ tính năng mua hàng không cần đăng nhập (Guest Checkout).
 - Điền thông tin giao hàng: Họ tên, Số điện thoại, Email, Địa chỉ, và Ghi chú thêm.
 - Chọn phương thức thanh toán:
   - Thanh toán khi nhận hàng (COD).

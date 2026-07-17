@@ -5,8 +5,10 @@ using WorkspaceEcommerce.Api.Common;
 using WorkspaceEcommerce.Api.Extensions;
 using WorkspaceEcommerce.Api.Health;
 using WorkspaceEcommerce.Api.Localization;
+using WorkspaceEcommerce.Api.Media;
 using WorkspaceEcommerce.Api.Hubs;
 using WorkspaceEcommerce.Api.Middleware;
+using WorkspaceEcommerce.Application.Abstractions.Media;
 using WorkspaceEcommerce.Application;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Seeding;
@@ -49,6 +51,7 @@ builder.Services
         tags: ["ready"]);
 builder.Services.AddSignalR();
 builder.Services.AddScoped<WorkspaceEcommerce.Application.Abstractions.Notifications.INotificationService, WorkspaceEcommerce.Api.Hubs.SignalRNotificationService>();
+builder.Services.AddSingleton<IMediaStorageService, LocalMediaStorageService>();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -77,6 +80,7 @@ else
 }
 
 app.UseSecurityHeaders();
+app.UseStaticFiles();
 app.UseCors(CorsExtensions.FrontendCorsPolicy);
 app.UseRateLimiter();
 app.UseAuthentication();
