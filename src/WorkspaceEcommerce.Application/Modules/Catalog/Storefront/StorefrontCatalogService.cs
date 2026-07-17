@@ -1,120 +1,183 @@
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
-using WorkspaceEcommerce.Application.Common.Models;
-using WorkspaceEcommerce.Domain.Modules.Catalog;
-
 using WorkspaceEcommerce.Application.Common.Localization;
+using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
+using WorkspaceEcommerce.Domain.Modules.Catalog;
 
 namespace WorkspaceEcommerce.Application.Modules.Catalog.Storefront;
 
-internal sealed class StorefrontCatalogService(IAppDbContext dbContext, ICurrentLanguageProvider languageProvider) : IStorefrontCatalogService
+internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, ICurrentLanguageProvider languageProvider) : IStorefrontCatalogService
 {
-    public Task<Result<IReadOnlyCollection<StorefrontCategoryDto>>> GetCategoriesAsync(
+    public async Task<Result<IReadOnlyCollection<StorefrontCategoryDto>>> GetCategoriesAsync(
         CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var categories = dbContext.Categories
+        var categories = await catalogStore.Categories
             .Where(category => category.IsActive)
             .OrderBy(category => category.SortOrder)
             .ThenBy(category => category.Slug)
-            .ToArray();
+            .ToArrayAsyncSafe(cancellationToken);
 
-        return Task.FromResult(
-            Result<IReadOnlyCollection<StorefrontCategoryDto>>.Success(BuildCategoryTree(categories, languageProvider.CurrentLanguage)));
+        return Result<IReadOnlyCollection<StorefrontCategoryDto>>.Success(
+            BuildCategoryTree(categories, languageProvider.CurrentLanguage));
     }
 
-    public Task<Result<PagedResult<StorefrontProductListItemDto>>> GetProductsAsync(
+    public async Task<Result<PagedResult<StorefrontProductListItemDto>>> GetProductsAsync(
         ProductListRequest request,
         CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
+        var currentLanguage = languageProvider.CurrentLanguage;
         var normalizedCategorySlug = NormalizeOptional(request.CategorySlug);
         var normalizedSearch = NormalizeOptional(request.Search);
-        var activeCategoriesById = dbContext.Categories
-            .Where(category => category.IsActive)
-            .ToDictionary(category => category.Id);
-        var activeVariantsByProductId = dbContext.ProductVariants
-            .Where(variant => variant.IsActive)
-            .ToLookup(variant => variant.ProductId);
-        var imagesByProductId = dbContext.ProductImages
-            .OrderBy(image => image.SortOrder)
-            .ToLookup(image => image.ProductId);
+        var query =
+            from product in catalogStore.Products
+            join category in catalogStore.Categories on product.CategoryId equals category.Id
+            where product.IsActive && category.IsActive
+            select new ProductCatalogRow(product, category);
 
-        var products = dbContext.Products
-            .Where(product => product.IsActive)
-            .ToArray()
-            .Where(product => activeCategoriesById.ContainsKey(product.CategoryId))
-            .Where(product => normalizedCategorySlug is null || activeCategoriesById[product.CategoryId].Slug == normalizedCategorySlug)
-            .Where(product => normalizedSearch is null || product.Name.Get(languageProvider.CurrentLanguage).Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase))
-            .Where(product => MatchesPriceFilter(activeVariantsByProductId[product.Id], request.MinPrice, request.MaxPrice))
-            .Where(product => MatchesStockFilter(activeVariantsByProductId[product.Id], request.InStock));
+        if (normalizedCategorySlug is not null)
+        {
+            query = query.Where(row => row.Category.Slug == normalizedCategorySlug);
+        }
 
-        var sortedProducts = ApplyProductSorting(products, request.SortBy, activeVariantsByProductId, languageProvider.CurrentLanguage)
-            .ToArray();
+        if (normalizedSearch is not null)
+        {
+            query = query.Where(row =>
+                row.Product.Slug.Contains(normalizedSearch) ||
+                (row.Product.Name.ContainsKey(currentLanguage) && row.Product.Name[currentLanguage].ToLower().Contains(normalizedSearch)) ||
+                (row.Product.Name.ContainsKey("en") && row.Product.Name["en"].ToLower().Contains(normalizedSearch)));
+        }
 
-        var pageNumber = request.NormalizedPageNumber;
-        var pageSize = request.NormalizedPageSize;
-        var items = sortedProducts
+        if (request.MinPrice is not null || request.MaxPrice is not null)
+        {
+            query = query.Where(row => catalogStore.ProductVariants.Any(variant =>
+                variant.ProductId == row.Product.Id &&
+                variant.IsActive &&
+                (request.MinPrice == null || variant.Price >= request.MinPrice.Value) &&
+                (request.MaxPrice == null || variant.Price <= request.MaxPrice.Value)));
+        }
+
+        if (request.InStock is not null)
+        {
+            query = request.InStock.Value
+                ? query.Where(row => catalogStore.ProductVariants.Any(variant =>
+                    variant.ProductId == row.Product.Id &&
+                    variant.IsActive &&
+                    variant.StockQuantity > 0))
+                : query.Where(row => !catalogStore.ProductVariants.Any(variant =>
+                    variant.ProductId == row.Product.Id &&
+                    variant.IsActive &&
+                    variant.StockQuantity > 0));
+        }
+
+        var totalCount = await query.CountAsyncSafe(cancellationToken);
+        var rows = await ApplyProductSorting(query, request.SortBy, currentLanguage)
             .Skip(request.Skip)
-            .Take(pageSize)
-            .Select(product => ToListItemDto(
-                product,
-                activeCategoriesById[product.CategoryId],
-                activeVariantsByProductId[product.Id],
-                imagesByProductId[product.Id].FirstOrDefault(),
-                languageProvider.CurrentLanguage))
+            .Take(request.NormalizedPageSize)
+            .ToArrayAsyncSafe(cancellationToken);
+        var productIds = rows.Select(row => row.Product.Id).ToArray();
+        var activeVariantsByProductId = (await catalogStore.ProductVariants
+            .Where(variant => productIds.Contains(variant.ProductId) && variant.IsActive)
+            .OrderBy(variant => variant.Sku)
+            .ToArrayAsyncSafe(cancellationToken))
+            .ToLookup(variant => variant.ProductId);
+        var imagesByProductId = (await catalogStore.ProductImages
+            .Where(image => productIds.Contains(image.ProductId))
+            .OrderBy(image => image.SortOrder)
+            .ThenBy(image => image.ImageUrl)
+            .ToArrayAsyncSafe(cancellationToken))
+            .ToLookup(image => image.ProductId);
+        var items = rows
+            .Select(row => ToListItemDto(
+                row.Product,
+                row.Category,
+                activeVariantsByProductId[row.Product.Id],
+                imagesByProductId[row.Product.Id].FirstOrDefault(),
+                currentLanguage))
             .ToArray();
 
-        var page = new PagedResult<StorefrontProductListItemDto>(
-            items,
-            pageNumber,
-            pageSize,
-            sortedProducts.Length);
-
-        return Task.FromResult(Result<PagedResult<StorefrontProductListItemDto>>.Success(page));
+        return Result<PagedResult<StorefrontProductListItemDto>>.Success(
+            new PagedResult<StorefrontProductListItemDto>(
+                items,
+                request.NormalizedPageNumber,
+                request.NormalizedPageSize,
+                totalCount));
     }
 
-    public Task<Result<StorefrontProductDetailDto>> GetProductBySlugAsync(
+    public async Task<Result<StorefrontProductDetailDto>> GetProductBySlugAsync(
         string slug,
         CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
         var normalizedSlug = NormalizeRequired(slug);
-        var product = dbContext.Products.FirstOrDefault(existing =>
-            existing.IsActive && existing.Slug == normalizedSlug);
+        var product = await catalogStore.Products
+            .Where(existing => existing.IsActive && existing.Slug == normalizedSlug)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
         if (product is null)
         {
-            return Task.FromResult(Result<StorefrontProductDetailDto>.NotFound("Product was not found."));
+            return Result<StorefrontProductDetailDto>.NotFound("Product was not found.");
         }
 
-        var category = dbContext.Categories.FirstOrDefault(existing =>
-            existing.Id == product.CategoryId && existing.IsActive);
+        var category = await catalogStore.Categories
+            .Where(existing => existing.Id == product.CategoryId && existing.IsActive)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
         if (category is null)
         {
-            return Task.FromResult(Result<StorefrontProductDetailDto>.NotFound("Product was not found."));
+            return Result<StorefrontProductDetailDto>.NotFound("Product was not found.");
         }
 
-        var variants = dbContext.ProductVariants
+        var variants = await catalogStore.ProductVariants
             .Where(variant => variant.ProductId == product.Id && variant.IsActive)
             .OrderBy(variant => variant.Sku)
-            .ToArray();
-        var images = dbContext.ProductImages
+            .ToArrayAsyncSafe(cancellationToken);
+        var images = await catalogStore.ProductImages
             .Where(image => image.ProductId == product.Id)
             .OrderBy(image => image.SortOrder)
             .ThenBy(image => image.ImageUrl)
-            .ToArray();
-        var specifications = dbContext.ProductSpecifications
+            .ToArrayAsyncSafe(cancellationToken);
+        var specifications = await catalogStore.ProductSpecifications
             .Where(specification => specification.ProductId == product.Id)
             .OrderBy(specification => specification.SortOrder)
             .ThenBy(specification => specification.Name)
-            .ToArray();
+            .ToArrayAsyncSafe(cancellationToken);
 
-        return Task.FromResult(Result<StorefrontProductDetailDto>.Success(
-            ToDetailDto(product, category, variants, images, specifications, languageProvider.CurrentLanguage)));
+        return Result<StorefrontProductDetailDto>.Success(
+            ToDetailDto(product, category, variants, images, specifications, languageProvider.CurrentLanguage));
+    }
+
+    private IQueryable<ProductCatalogRow> ApplyProductSorting(
+        IQueryable<ProductCatalogRow> products,
+        string? sortBy,
+        string currentLanguage)
+    {
+        var normalizedSortBy = NormalizeOptional(sortBy) ?? "name-asc";
+
+        return normalizedSortBy switch
+        {
+            "price-asc" => products
+                .OrderBy(row => !catalogStore.ProductVariants.Any(variant => variant.ProductId == row.Product.Id && variant.IsActive))
+                .ThenBy(row => catalogStore.ProductVariants
+                    .Where(variant => variant.ProductId == row.Product.Id && variant.IsActive)
+                    .Select(variant => (decimal?)variant.Price)
+                    .Min())
+                .ThenBy(row => row.Product.Name.ContainsKey(currentLanguage) ? row.Product.Name[currentLanguage] : row.Product.Slug)
+                .ThenBy(row => row.Product.Slug),
+            "price-desc" => products
+                .OrderBy(row => !catalogStore.ProductVariants.Any(variant => variant.ProductId == row.Product.Id && variant.IsActive))
+                .ThenByDescending(row => catalogStore.ProductVariants
+                    .Where(variant => variant.ProductId == row.Product.Id && variant.IsActive)
+                    .Select(variant => (decimal?)variant.Price)
+                    .Min())
+                .ThenBy(row => row.Product.Name.ContainsKey(currentLanguage) ? row.Product.Name[currentLanguage] : row.Product.Slug)
+                .ThenBy(row => row.Product.Slug),
+            "updated-desc" => products
+                .OrderByDescending(row => row.Product.UpdatedAt)
+                .ThenBy(row => row.Product.Name.ContainsKey(currentLanguage) ? row.Product.Name[currentLanguage] : row.Product.Slug)
+                .ThenBy(row => row.Product.Slug),
+            _ => products
+                .OrderBy(row => row.Product.Name.ContainsKey(currentLanguage) ? row.Product.Name[currentLanguage] : row.Product.Slug)
+                .ThenBy(row => row.Product.Slug)
+        };
     }
 
     private static IReadOnlyCollection<StorefrontCategoryDto> BuildCategoryTree(IReadOnlyCollection<Category> categories, string currentLanguage)
@@ -127,7 +190,8 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext, ICurrent
 
     private static IReadOnlyCollection<StorefrontCategoryDto> BuildChildren(
         Guid parentId,
-        IReadOnlyCollection<Category> categories, string currentLanguage)
+        IReadOnlyCollection<Category> categories,
+        string currentLanguage)
     {
         return categories
             .Where(category => category.ParentId == parentId)
@@ -139,7 +203,8 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext, ICurrent
 
     private static StorefrontCategoryDto ToCategoryDto(
         Category category,
-        IReadOnlyCollection<StorefrontCategoryDto> children, string currentLanguage)
+        IReadOnlyCollection<StorefrontCategoryDto> children,
+        string currentLanguage)
     {
         return new StorefrontCategoryDto(
             category.Id,
@@ -154,7 +219,8 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext, ICurrent
         Product product,
         Category category,
         IEnumerable<ProductVariant> activeVariants,
-        ProductImage? primaryImage, string currentLanguage)
+        ProductImage? primaryImage,
+        string currentLanguage)
     {
         var variants = activeVariants.ToArray();
         decimal? minPrice = variants.Length == 0
@@ -187,7 +253,8 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext, ICurrent
         Category category,
         IEnumerable<ProductVariant> activeVariants,
         IEnumerable<ProductImage> images,
-        IEnumerable<ProductSpecification> specifications, string currentLanguage)
+        IEnumerable<ProductSpecification> specifications,
+        string currentLanguage)
     {
         return new StorefrontProductDetailDto(
             product.Id,
@@ -234,72 +301,6 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext, ICurrent
             specification.SortOrder);
     }
 
-    private static bool MatchesPriceFilter(
-        IEnumerable<ProductVariant> activeVariants,
-        decimal? minPrice,
-        decimal? maxPrice)
-    {
-        var variants = activeVariants.ToArray();
-        if (minPrice is null && maxPrice is null)
-        {
-            return true;
-        }
-
-        return variants.Any(variant =>
-            (minPrice is null || variant.Price >= minPrice.Value) &&
-            (maxPrice is null || variant.Price <= maxPrice.Value));
-    }
-
-    private static bool MatchesStockFilter(IEnumerable<ProductVariant> activeVariants, bool? inStock)
-    {
-        if (inStock is null)
-        {
-            return true;
-        }
-
-        return inStock.Value
-            ? activeVariants.Any(variant => variant.StockQuantity > 0)
-            : activeVariants.All(variant => variant.StockQuantity <= 0);
-    }
-
-    private static IEnumerable<Product> ApplyProductSorting(
-        IEnumerable<Product> products,
-        string? sortBy,
-        ILookup<Guid, ProductVariant> activeVariantsByProductId,
-        string currentLanguage)
-    {
-        var normalizedSortBy = NormalizeOptional(sortBy) ?? "name-asc";
-
-        return normalizedSortBy switch
-        {
-            "price-asc" => products
-                .OrderBy(product => GetMinPrice(activeVariantsByProductId[product.Id]) is null)
-                .ThenBy(product => GetMinPrice(activeVariantsByProductId[product.Id]))
-                .ThenBy(product => product.Name.Get(currentLanguage))
-                .ThenBy(product => product.Slug),
-            "price-desc" => products
-                .OrderBy(product => GetMinPrice(activeVariantsByProductId[product.Id]) is null)
-                .ThenByDescending(product => GetMinPrice(activeVariantsByProductId[product.Id]))
-                .ThenBy(product => product.Name.Get(currentLanguage))
-                .ThenBy(product => product.Slug),
-            "updated-desc" => products
-                .OrderByDescending(product => product.UpdatedAt)
-                .ThenBy(product => product.Name.Get(currentLanguage))
-                .ThenBy(product => product.Slug),
-            _ => products
-                .OrderBy(product => product.Name.Get(currentLanguage))
-                .ThenBy(product => product.Slug)
-        };
-    }
-
-    private static decimal? GetMinPrice(IEnumerable<ProductVariant> activeVariants)
-    {
-        var variants = activeVariants.ToArray();
-        return variants.Length == 0
-            ? null
-            : variants.Min(variant => variant.Price);
-    }
-
     private static string? NormalizeOptional(string? value)
     {
         return string.IsNullOrWhiteSpace(value)
@@ -311,4 +312,6 @@ internal sealed class StorefrontCatalogService(IAppDbContext dbContext, ICurrent
     {
         return value.Trim().ToLowerInvariant();
     }
+
+    private sealed record ProductCatalogRow(Product Product, Category Category);
 }

@@ -1,11 +1,12 @@
 ﻿import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { AdminCategoryDto, AdminCategoryUpsertRequest } from "@workspace-ecommerce/api-types";
 import { useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
 import { Button, ConfirmDialog, EmptyState, Field, Modal, Notice, Pill, SelectInput, TextInput, Toggle } from "../../components/ui/AdminUi";
+import { useAdminCategories } from "../../hooks/queries/useAdminCategories";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
 
@@ -55,7 +56,7 @@ function toRequest(values: CategoryFormValues): AdminCategoryUpsertRequest {
 
 export function CategoriesPage() {
   const queryClient = useQueryClient();
-  const categoriesQuery = useQuery({ queryKey: ["admin-categories"], queryFn: adminApi.getCategories });
+  const categoriesQuery = useAdminCategories();
   const [editingCategory, setEditingCategory] = useState<AdminCategoryDto | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AdminCategoryDto | null>(null);

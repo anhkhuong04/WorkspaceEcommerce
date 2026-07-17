@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { AdminOrderDto, AdminOrderListRequest, OrderStatus, PaymentStatus } from "@workspace-ecommerce/api-types";
 import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
 import type { ReactNode } from "react";
@@ -9,8 +9,10 @@ import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
 import { Button, Drawer, EmptyState, Field, Notice, Pill, SelectInput, TextArea, TextInput } from "../../components/ui/AdminUi";
+import { useAdminOrder, useAdminOrders } from "../../hooks/queries/useAdminOrders";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
+import { OrdersTable } from "./components/OrdersTable";
 
 const orderStatuses: OrderStatus[] = [0, 1, 2, 3, 4, 5, 6, 7];
 const nextStatusesByStatus: Record<OrderStatus, OrderStatus[]> = { 0: [1, 6], 1: [2], 2: [3], 3: [4, 5], 4: [7], 5: [3, 6], 6: [], 7: [] };
@@ -56,8 +58,8 @@ export function OrdersPage() {
   const searchFilter = searchParams.get("search")?.trim() || undefined;
   const request = useMemo<AdminOrderListRequest>(() => ({ pageNumber, pageSize: 8, status: statusFilter, search: searchFilter }), [pageNumber, searchFilter, statusFilter]);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const ordersQuery = useQuery({ queryKey: ["admin-orders", request], queryFn: () => adminApi.getOrders(request) });
-  const orderQuery = useQuery({ queryKey: ["admin-order", selectedOrderId], queryFn: () => adminApi.getOrder(selectedOrderId ?? ""), enabled: selectedOrderId !== null });
+  const ordersQuery = useAdminOrders(request);
+  const orderQuery = useAdminOrder(selectedOrderId);
   const order = orderQuery.data;
   const nextStatuses = useMemo(() => order ? nextStatusesByStatus[order.status] : [], [order]);
 
@@ -114,33 +116,11 @@ export function OrdersPage() {
           </SelectInput>
         </div>
 
-        {ordersQuery.isLoading ? (
-          <div className="grid gap-3">{[0, 1, 2].map((item) => <div key={item} className="h-14 animate-pulse rounded-2xl bg-slate-100" />)}</div>
-        ) : ordersQuery.data?.items.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1120px] text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-slate-500">
-                <tr className="border-b border-slate-100"><th className="py-3 pr-4">Code</th><th className="py-3 pr-4">Customer</th><th className="py-3 pr-4">Phone</th><th className="py-3 pr-4">Items</th><th className="py-3 pr-4">Total</th><th className="py-3 pr-4">Status</th><th className="py-3 pr-4">Payment</th><th className="py-3 pr-4">Payment status</th><th className="py-3 pr-4">Created</th><th className="py-3 pr-4">Actions</th></tr>
-              </thead>
-              <tbody>
-                {ordersQuery.data.items.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-100 last:border-0">
-                    <td className="py-3 pr-4 font-bold">{item.orderCode}</td>
-                    <td className="py-3 pr-4">{item.customerName}</td>
-                    <td className="py-3 pr-4">{item.customerPhone}</td>
-                    <td className="py-3 pr-4">{item.itemCount}</td>
-                    <td className="py-3 pr-4">{formatMoney(item.totalAmount)}</td>
-                    <td className="py-3 pr-4">{orderStatusPill(item.status)}</td>
-                    <td className="py-3 pr-4">{formatPaymentMethod(item.paymentMethod)}</td>
-                    <td className="py-3 pr-4">{paymentStatusPill(item.paymentStatus)}</td>
-                    <td className="py-3 pr-4">{formatDate(item.createdAt)}</td>
-                    <td className="py-3 pr-4"><Button type="button" onClick={() => setSelectedOrderId(item.id)}>View</Button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : <EmptyState>No orders found</EmptyState>}
+        <OrdersTable
+          orders={ordersQuery.data?.items ?? []}
+          isLoading={ordersQuery.isLoading}
+          onView={setSelectedOrderId}
+        />
 
         {ordersQuery.data ? (
           <div className="mt-4 flex items-center justify-between text-sm font-semibold text-slate-500">

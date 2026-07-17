@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { VIETNAM_ADMINISTRATIVE_UNITS } from "../../data/vietnamAdministrativeUnits";
+import { VIETNAM_ADMINISTRATIVE_UNITS } from "../../constants/vietnamAdministrativeUnits";
 import { useStorefrontCart } from "../../features/cart/StorefrontCartContext";
 import { useCustomerAuth } from "../../features/customer-auth/useCustomerAuth";
 import { buildManualTransferContent } from "../../features/checkout/manualTransfer";

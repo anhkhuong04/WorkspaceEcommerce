@@ -39,6 +39,7 @@ import type {
   LoyaltyTransactionListRequest,
   OrderLookupRequest,
   OrderLookupResponse,
+  PaginationRequest,
   PaymentResultDto,
   PagedResult,
   ProductListRequest,
@@ -142,7 +143,8 @@ export function createAdminApi(client: ApiClient) {
     updateCategory: (id: string, request: AdminCategoryUpsertRequest) =>
       client.put<AdminCategoryDto, AdminCategoryUpsertRequest>(`/api/admin/categories/${id}`, request),
     deleteCategory: (id: string) => client.delete<AdminCategoryDto>(`/api/admin/categories/${id}`),
-    getProducts: () => client.get<AdminProductDto[]>("/api/admin/products"),
+    getProducts: (request: PaginationRequest = {}) =>
+      client.get<PagedResult<AdminProductDto>>(`/api/admin/products${buildQuery(request)}`),
     createProduct: (request: AdminProductUpsertRequest) =>
       client.post<AdminProductDto, AdminProductUpsertRequest>("/api/admin/products", request),
     updateProduct: (id: string, request: AdminProductUpsertRequest) =>
@@ -151,7 +153,7 @@ export function createAdminApi(client: ApiClient) {
     createProductVariant: (productId: string, request: AdminProductVariantUpsertRequest) =>
       client.post<AdminProductVariantDto, AdminProductVariantUpsertRequest>(`/api/admin/products/${productId}/variants`, request),
     updateProductVariant: (id: string, request: AdminProductVariantUpsertRequest) =>
-      client.put<AdminProductVariantDto, AdminProductVariantUpsertRequest>(`/api/admin/variants/${id}`, request),
+      client.put<AdminProductVariantDto, AdminProductVariantUpsertRequest>(`/api/admin/product-variants/${id}`, request),
     createProductImage: (productId: string, request: AdminProductImageUpsertRequest) =>
       client.post<AdminProductImageDto, AdminProductImageUpsertRequest>(`/api/admin/products/${productId}/images`, request),
     updateProductImage: (id: string, request: AdminProductImageUpsertRequest) =>

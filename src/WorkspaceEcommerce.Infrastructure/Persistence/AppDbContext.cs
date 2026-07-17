@@ -66,15 +66,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<Review> Reviews => Set<Review>();
 
-    IQueryable<Category> IAppDbContext.Categories => Categories;
+    IQueryable<Category> ICatalogReadStore.Categories => Categories;
 
-    IQueryable<Product> IAppDbContext.Products => Products;
+    IQueryable<Product> ICatalogReadStore.Products => Products;
 
-    IQueryable<ProductVariant> IAppDbContext.ProductVariants => ProductVariants;
+    IQueryable<ProductVariant> ICatalogReadStore.ProductVariants => ProductVariants;
 
-    IQueryable<ProductImage> IAppDbContext.ProductImages => ProductImages;
+    IQueryable<ProductImage> ICatalogReadStore.ProductImages => ProductImages;
 
-    IQueryable<ProductSpecification> IAppDbContext.ProductSpecifications => ProductSpecifications;
+    IQueryable<ProductSpecification> ICatalogReadStore.ProductSpecifications => ProductSpecifications;
 
     IQueryable<Banner> IAppDbContext.Banners => Banners;
 
@@ -90,17 +90,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     IQueryable<CouponRedemption> IAppDbContext.CouponRedemptions => CouponRedemptions;
 
-    IQueryable<CustomerLoyaltyAccount> IAppDbContext.CustomerLoyaltyAccounts => CustomerLoyaltyAccounts;
+    IQueryable<CustomerLoyaltyAccount> ILoyaltyReadStore.CustomerLoyaltyAccounts => CustomerLoyaltyAccounts;
 
-    IQueryable<LoyaltyTransaction> IAppDbContext.LoyaltyTransactions => LoyaltyTransactions;
+    IQueryable<LoyaltyTransaction> ILoyaltyReadStore.LoyaltyTransactions => LoyaltyTransactions;
 
-    IQueryable<LoyaltyTier> IAppDbContext.LoyaltyTiers => LoyaltyTiers;
+    IQueryable<LoyaltyTier> ILoyaltyReadStore.LoyaltyTiers => LoyaltyTiers;
 
-    IQueryable<Order> IAppDbContext.Orders => Orders;
+    IQueryable<Order> IOrderReadStore.Orders => Orders;
 
-    IQueryable<OrderItem> IAppDbContext.OrderItems => OrderItems;
+    IQueryable<OrderItem> IOrderReadStore.OrderItems => OrderItems;
 
-    IQueryable<OrderStatusHistory> IAppDbContext.OrderStatusHistories => OrderStatusHistories;
+    IQueryable<OrderStatusHistory> IOrderReadStore.OrderStatusHistories => OrderStatusHistories;
 
     IQueryable<PaymentTransaction> IAppDbContext.PaymentTransactions => PaymentTransactions;
 
@@ -242,7 +242,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         await ExecuteInTransactionCoreAsync(operation, cancellationToken);
     }
 
-    async Task IAppDbContext.ExecuteInTransactionAsync(
+    async Task IAppWriteStore.ExecuteInTransactionAsync(
         Func<CancellationToken, Task> operation,
         CancellationToken cancellationToken)
     {
@@ -260,19 +260,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         await transaction.CommitAsync(cancellationToken);
     }
 
-    void IAppDbContext.Add<TEntity>(TEntity entity)
+    void IAppWriteStore.Add<TEntity>(TEntity entity)
         where TEntity : class
     {
         Set<TEntity>().Add(entity);
     }
 
-    void IAppDbContext.Update<TEntity>(TEntity entity)
+    void IAppWriteStore.Update<TEntity>(TEntity entity)
         where TEntity : class
     {
         Set<TEntity>().Update(entity);
     }
 
-    void IAppDbContext.Remove<TEntity>(TEntity entity)
+    void IAppWriteStore.Remove<TEntity>(TEntity entity)
         where TEntity : class
     {
         Set<TEntity>().Remove(entity);

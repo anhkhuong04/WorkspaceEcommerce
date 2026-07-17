@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using WorkspaceEcommerce.Api.Common;
 using WorkspaceEcommerce.Api.Extensions;
+using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Catalog.Products;
 
 namespace WorkspaceEcommerce.Api.Controllers.Admin;
@@ -9,15 +10,21 @@ namespace WorkspaceEcommerce.Api.Controllers.Admin;
 [ApiController]
 [Authorize(Roles = "Admin")]
 [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
-public sealed class ProductsController(IAdminProductService productService) : ControllerBase
+public sealed class ProductsController(
+    IAdminProductService productService,
+    IAdminProductVariantService variantService,
+    IAdminProductImageService imageService,
+    IAdminProductSpecificationService specificationService) : ControllerBase
 {
     [HttpGet("api/admin/products")]
-    [ProducesResponseType(typeof(ApiResponse<IReadOnlyCollection<AdminProductDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<AdminProductDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetProducts(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetProducts(
+        [FromQuery] PaginationRequest request,
+        CancellationToken cancellationToken)
     {
-        var result = await productService.GetProductsAsync(cancellationToken);
+        var result = await productService.GetProductsAsync(request, cancellationToken);
 
         return this.ToApiResponse(result);
     }
@@ -79,12 +86,12 @@ public sealed class ProductsController(IAdminProductService productService) : Co
         [FromBody] CreateProductVariantRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await productService.CreateVariantAsync(id, request, cancellationToken);
+        var result = await variantService.CreateVariantAsync(id, request, cancellationToken);
 
         return this.ToApiResponse(result, StatusCodes.Status201Created);
     }
 
-    [HttpPut("api/admin/variants/{id:guid}")]
+    [HttpPut("api/admin/product-variants/{id:guid}")]
     [ProducesResponseType(typeof(ApiResponse<AdminProductVariantDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
@@ -96,7 +103,7 @@ public sealed class ProductsController(IAdminProductService productService) : Co
         [FromBody] UpdateProductVariantRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await productService.UpdateVariantAsync(id, request, cancellationToken);
+        var result = await variantService.UpdateVariantAsync(id, request, cancellationToken);
 
         return this.ToApiResponse(result);
     }
@@ -112,7 +119,7 @@ public sealed class ProductsController(IAdminProductService productService) : Co
         [FromBody] CreateProductImageRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await productService.CreateImageAsync(id, request, cancellationToken);
+        var result = await imageService.CreateImageAsync(id, request, cancellationToken);
 
         return this.ToApiResponse(result, StatusCodes.Status201Created);
     }
@@ -128,7 +135,7 @@ public sealed class ProductsController(IAdminProductService productService) : Co
         [FromBody] UpdateProductImageRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await productService.UpdateImageAsync(id, request, cancellationToken);
+        var result = await imageService.UpdateImageAsync(id, request, cancellationToken);
 
         return this.ToApiResponse(result);
     }
@@ -142,7 +149,7 @@ public sealed class ProductsController(IAdminProductService productService) : Co
         Guid id,
         CancellationToken cancellationToken)
     {
-        var result = await productService.DeleteImageAsync(id, cancellationToken);
+        var result = await imageService.DeleteImageAsync(id, cancellationToken);
 
         return this.ToApiResponse(result);
     }
@@ -158,7 +165,7 @@ public sealed class ProductsController(IAdminProductService productService) : Co
         [FromBody] CreateProductSpecificationRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await productService.CreateSpecificationAsync(id, request, cancellationToken);
+        var result = await specificationService.CreateSpecificationAsync(id, request, cancellationToken);
 
         return this.ToApiResponse(result, StatusCodes.Status201Created);
     }
@@ -174,7 +181,7 @@ public sealed class ProductsController(IAdminProductService productService) : Co
         [FromBody] UpdateProductSpecificationRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await productService.UpdateSpecificationAsync(id, request, cancellationToken);
+        var result = await specificationService.UpdateSpecificationAsync(id, request, cancellationToken);
 
         return this.ToApiResponse(result);
     }
@@ -188,7 +195,7 @@ public sealed class ProductsController(IAdminProductService productService) : Co
         Guid id,
         CancellationToken cancellationToken)
     {
-        var result = await productService.DeleteSpecificationAsync(id, cancellationToken);
+        var result = await specificationService.DeleteSpecificationAsync(id, cancellationToken);
 
         return this.ToApiResponse(result);
     }

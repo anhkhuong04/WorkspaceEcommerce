@@ -288,11 +288,11 @@ public sealed class AdminProductServiceTests
         dbContext.Seed(variant);
         var service = CreateService(dbContext);
 
-        var result = await service.GetProductsAsync();
+        var result = await service.GetProductsAsync(new PaginationRequest());
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
-        var dto = Assert.Single(result.Value);
+        var dto = Assert.Single(result.Value.Items);
         Assert.Equal("Desks", dto.CategoryName);
         Assert.Single(dto.Variants);
         Assert.Empty(dto.Images);
@@ -313,11 +313,11 @@ public sealed class AdminProductServiceTests
         dbContext.Seed(specification);
         var service = CreateService(dbContext);
 
-        var result = await service.GetProductsAsync();
+        var result = await service.GetProductsAsync(new PaginationRequest());
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
-        var dto = Assert.Single(result.Value);
+        var dto = Assert.Single(result.Value.Items);
         Assert.Equal("https://example.test/desk.jpg", Assert.Single(dto.Images).ImageUrl);
         Assert.Equal("Material", Assert.Single(dto.Specifications).Name);
     }
@@ -462,18 +462,102 @@ public sealed class AdminProductServiceTests
         Assert.Equal(1, dbContext.SaveChangesCallCount);
     }
 
-    private static AdminProductService CreateService(FakeAppDbContext dbContext)
+    private static AdminProductServiceHarness CreateService(FakeAppDbContext dbContext)
     {
-        return new AdminProductService(
-            dbContext,
-            new CreateProductRequestValidator(),
-            new UpdateProductRequestValidator(),
-            new CreateProductVariantRequestValidator(),
-            new UpdateProductVariantRequestValidator(),
-            new CreateProductImageRequestValidator(),
-            new UpdateProductImageRequestValidator(),
-            new CreateProductSpecificationRequestValidator(),
-            new UpdateProductSpecificationRequestValidator());
+        return new AdminProductServiceHarness(dbContext);
+    }
+
+    private sealed class AdminProductServiceHarness
+    {
+        private readonly AdminProductService _productService;
+        private readonly AdminProductVariantService _variantService;
+        private readonly AdminProductImageService _imageService;
+        private readonly AdminProductSpecificationService _specificationService;
+
+        public AdminProductServiceHarness(FakeAppDbContext dbContext)
+        {
+            _productService = new AdminProductService(
+                dbContext,
+                dbContext,
+                dbContext,
+                new CreateProductRequestValidator(),
+                new UpdateProductRequestValidator());
+            _variantService = new AdminProductVariantService(
+                dbContext,
+                dbContext,
+                new CreateProductVariantRequestValidator(),
+                new UpdateProductVariantRequestValidator());
+            _imageService = new AdminProductImageService(
+                dbContext,
+                dbContext,
+                new CreateProductImageRequestValidator(),
+                new UpdateProductImageRequestValidator());
+            _specificationService = new AdminProductSpecificationService(
+                dbContext,
+                dbContext,
+                new CreateProductSpecificationRequestValidator(),
+                new UpdateProductSpecificationRequestValidator());
+        }
+
+        public Task<Result<PagedResult<AdminProductDto>>> GetProductsAsync(PaginationRequest request)
+        {
+            return _productService.GetProductsAsync(request);
+        }
+
+        public Task<Result<AdminProductDto>> CreateProductAsync(CreateProductRequest request)
+        {
+            return _productService.CreateProductAsync(request);
+        }
+
+        public Task<Result<AdminProductDto>> UpdateProductAsync(Guid id, UpdateProductRequest request)
+        {
+            return _productService.UpdateProductAsync(id, request);
+        }
+
+        public Task<Result<AdminProductDto>> DeleteProductAsync(Guid id)
+        {
+            return _productService.DeleteProductAsync(id);
+        }
+
+        public Task<Result<AdminProductVariantDto>> CreateVariantAsync(Guid productId, CreateProductVariantRequest request)
+        {
+            return _variantService.CreateVariantAsync(productId, request);
+        }
+
+        public Task<Result<AdminProductVariantDto>> UpdateVariantAsync(Guid id, UpdateProductVariantRequest request)
+        {
+            return _variantService.UpdateVariantAsync(id, request);
+        }
+
+        public Task<Result<AdminProductImageDto>> CreateImageAsync(Guid productId, CreateProductImageRequest request)
+        {
+            return _imageService.CreateImageAsync(productId, request);
+        }
+
+        public Task<Result<AdminProductImageDto>> UpdateImageAsync(Guid id, UpdateProductImageRequest request)
+        {
+            return _imageService.UpdateImageAsync(id, request);
+        }
+
+        public Task<Result<AdminProductImageDto>> DeleteImageAsync(Guid id)
+        {
+            return _imageService.DeleteImageAsync(id);
+        }
+
+        public Task<Result<AdminProductSpecificationDto>> CreateSpecificationAsync(Guid productId, CreateProductSpecificationRequest request)
+        {
+            return _specificationService.CreateSpecificationAsync(productId, request);
+        }
+
+        public Task<Result<AdminProductSpecificationDto>> UpdateSpecificationAsync(Guid id, UpdateProductSpecificationRequest request)
+        {
+            return _specificationService.UpdateSpecificationAsync(id, request);
+        }
+
+        public Task<Result<AdminProductSpecificationDto>> DeleteSpecificationAsync(Guid id)
+        {
+            return _specificationService.DeleteSpecificationAsync(id);
+        }
     }
 
     private static Category CreateCategory(string name = "Desks")

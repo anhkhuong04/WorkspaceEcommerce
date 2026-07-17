@@ -1,11 +1,12 @@
 ﻿import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { AdminBannerDto, AdminBannerUpsertRequest } from "@workspace-ecommerce/api-types";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
 import { Button, ConfirmDialog, EmptyState, Field, Modal, Notice, Pill, TextInput, Toggle } from "../../components/ui/AdminUi";
+import { useAdminBanners } from "../../hooks/queries/useAdminBanners";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
 
@@ -49,7 +50,7 @@ function toRequest(values: BannerFormValues): AdminBannerUpsertRequest {
 
 export function BannersPage() {
   const queryClient = useQueryClient();
-  const bannersQuery = useQuery({ queryKey: ["admin-banners"], queryFn: adminApi.getBanners });
+  const bannersQuery = useAdminBanners();
   const [editingBanner, setEditingBanner] = useState<AdminBannerDto | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AdminBannerDto | null>(null);

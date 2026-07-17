@@ -41,6 +41,10 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>((provider, options) =>
             options.UseNpgsql(provider.GetRequiredService<NpgsqlDataSource>()));
         services.AddScoped<IAppDbContext>(provider => provider.GetRequiredService<AppDbContext>());
+        services.AddScoped<ICatalogReadStore>(provider => provider.GetRequiredService<AppDbContext>());
+        services.AddScoped<IOrderReadStore>(provider => provider.GetRequiredService<AppDbContext>());
+        services.AddScoped<ILoyaltyReadStore>(provider => provider.GetRequiredService<AppDbContext>());
+        services.AddScoped<IAppWriteStore>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddScoped<IAdminDashboardQuery, EfAdminDashboardQuery>();
         services.AddScoped<ICartStore>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddScoped<ICheckoutStore>(provider => provider.GetRequiredService<AppDbContext>());

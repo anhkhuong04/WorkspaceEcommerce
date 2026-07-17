@@ -10,18 +10,8 @@ using WorkspaceEcommerce.Domain.Modules.Reviews;
 
 namespace WorkspaceEcommerce.Application.Abstractions.Persistence;
 
-public interface IAppDbContext
+public interface IAppDbContext : ICatalogReadStore, IOrderReadStore, ILoyaltyReadStore, IAppWriteStore
 {
-    IQueryable<Category> Categories { get; }
-
-    IQueryable<Product> Products { get; }
-
-    IQueryable<ProductVariant> ProductVariants { get; }
-
-    IQueryable<ProductImage> ProductImages { get; }
-
-    IQueryable<ProductSpecification> ProductSpecifications { get; }
-
     IQueryable<Banner> Banners { get; }
 
     IQueryable<Customer> Customers { get; }
@@ -36,18 +26,6 @@ public interface IAppDbContext
 
     IQueryable<CouponRedemption> CouponRedemptions { get; }
 
-    IQueryable<CustomerLoyaltyAccount> CustomerLoyaltyAccounts { get; }
-
-    IQueryable<LoyaltyTransaction> LoyaltyTransactions { get; }
-
-    IQueryable<LoyaltyTier> LoyaltyTiers { get; }
-
-    IQueryable<Order> Orders { get; }
-
-    IQueryable<OrderItem> OrderItems { get; }
-
-    IQueryable<OrderStatusHistory> OrderStatusHistories { get; }
-
     IQueryable<PaymentTransaction> PaymentTransactions { get; }
 
     IQueryable<BlogPost> BlogPosts { get; }
@@ -58,16 +36,4 @@ public interface IAppDbContext
 
     IQueryable<Review> Reviews { get; }
 
-    void Add<TEntity>(TEntity entity)
-        where TEntity : class;
-
-    void Update<TEntity>(TEntity entity)
-        where TEntity : class;
-
-    void Remove<TEntity>(TEntity entity)
-        where TEntity : class;
-
-    Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default);
-
-    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

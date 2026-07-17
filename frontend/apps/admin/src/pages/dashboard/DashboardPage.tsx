@@ -1,8 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
 import { formatDate } from "@workspace-ecommerce/shared-utils";
 import { useNavigate } from "react-router-dom";
 import { Notice } from "../../components/ui/AdminUi";
-import { adminApi } from "../../services/api/adminApi";
+import { useAdminDashboard } from "../../hooks/queries/useAdminDashboard";
 import { getApiErrorMessage } from "../../services/api/errors";
 import {
   DashboardHero,
@@ -15,10 +14,7 @@ import {
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const dashboardQuery = useQuery({
-    queryKey: ["admin-dashboard"],
-    queryFn: adminApi.getDashboard
-  });
+  const dashboardQuery = useAdminDashboard();
   const dashboard = dashboardQuery.data;
   const lastUpdated = dashboardQuery.dataUpdatedAt > 0
     ? formatDate(new Date(dashboardQuery.dataUpdatedAt))

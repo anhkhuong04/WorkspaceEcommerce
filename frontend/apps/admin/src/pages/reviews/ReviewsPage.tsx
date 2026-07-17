@@ -1,8 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { AdminReviewListItemDto } from "@workspace-ecommerce/api-types";
 import { useState } from "react";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
 import { Button, ConfirmDialog, EmptyState, Notice } from "../../components/ui/AdminUi";
+import { useAdminReviews } from "../../hooks/queries/useAdminReviews";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
 
@@ -30,10 +31,7 @@ export function ReviewsPage() {
   const [deleteTarget, setDeleteTarget] = useState<AdminReviewListItemDto | null>(null);
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  const reviewsQuery = useQuery({
-    queryKey: ["admin-reviews", page],
-    queryFn: () => adminApi.getReviews(page, 20)
-  });
+  const reviewsQuery = useAdminReviews(page, 20);
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => adminApi.deleteReview(id),

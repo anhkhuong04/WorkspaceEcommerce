@@ -1,6 +1,7 @@
 ﻿using FluentValidation;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Domain.Modules.Content;
 
 namespace WorkspaceEcommerce.Application.Modules.Content.Banners;
@@ -10,18 +11,24 @@ internal sealed class AdminBannerService(
     IValidator<CreateBannerRequest> createValidator,
     IValidator<UpdateBannerRequest> updateValidator) : IAdminBannerService
 {
-    public Task<Result<IReadOnlyCollection<AdminBannerDto>>> GetBannersAsync(
+    public async Task<Result<IReadOnlyCollection<AdminBannerDto>>> GetBannersAsync(
         CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var banners = dbContext.Banners
+        var banners = await dbContext.Banners
             .OrderBy(banner => banner.SortOrder)
             .ThenBy(banner => banner.Title)
-            .Select(ToDto)
-            .ToArray();
+            .Select(banner => new AdminBannerDto(
+                banner.Id,
+                banner.Title,
+                banner.ImageUrl,
+                banner.LinkUrl,
+                banner.SortOrder,
+                banner.IsActive,
+                banner.CreatedAt,
+                banner.UpdatedAt))
+            .ToArrayAsyncSafe(cancellationToken);
 
-        return Task.FromResult(Result<IReadOnlyCollection<AdminBannerDto>>.Success(banners));
+        return Result<IReadOnlyCollection<AdminBannerDto>>.Success(banners);
     }
 
     public async Task<Result<AdminBannerDto>> CreateBannerAsync(

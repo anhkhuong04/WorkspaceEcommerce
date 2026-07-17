@@ -1,6 +1,7 @@
 using FluentValidation;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 
@@ -11,19 +12,17 @@ internal sealed class AdminCategoryService(
     IValidator<CreateCategoryRequest> createValidator,
     IValidator<UpdateCategoryRequest> updateValidator) : IAdminCategoryService
 {
-    public Task<Result<IReadOnlyCollection<AdminCategoryDto>>> GetCategoriesAsync(
+    public async Task<Result<IReadOnlyCollection<AdminCategoryDto>>> GetCategoriesAsync(
         CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var categories = dbContext.Categories
+        var categories = await dbContext.Categories
             .OrderBy(category => category.SortOrder)
             .ThenBy(category => category.Slug)
-            .ToArray();
+            .ToArrayAsyncSafe(cancellationToken);
 
         var tree = BuildTree(categories);
 
-        return Task.FromResult(Result<IReadOnlyCollection<AdminCategoryDto>>.Success(tree));
+        return Result<IReadOnlyCollection<AdminCategoryDto>>.Success(tree);
     }
 
     public async Task<Result<AdminCategoryDto>> CreateCategoryAsync(

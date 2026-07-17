@@ -1,11 +1,9 @@
-using System.Net.Mime;
-using System.Text;
-using System.Text.Json;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
 using WorkspaceEcommerce.Api.Authentication;
 using WorkspaceEcommerce.Api.Common;
+using WorkspaceEcommerce.Api.Extensions;
+using WorkspaceEcommerce.Api.Health;
 using WorkspaceEcommerce.Api.Localization;
 using WorkspaceEcommerce.Api.Hubs;
 using WorkspaceEcommerce.Api.Middleware;
@@ -18,7 +16,6 @@ using WorkspaceEcommerce.Infrastructure.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 var jwtOptions = builder.Configuration.GetValidatedJwtOptions();
-const string LocalFrontendCorsPolicy = "LocalFrontendCors";
 
 builder.Services
     .AddControllers()
@@ -37,59 +34,19 @@ builder.Services
         };
     });
 builder.Services.AddOpenApi();
-builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidIssuer = jwtOptions.Issuer,
-            ValidateAudience = true,
-            ValidAudience = jwtOptions.Audience,
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromMinutes(1)
-        };
-
-        options.Events = new JwtBearerEvents
-        {
-            OnChallenge = async context =>
-            {
-                context.HandleResponse();
-                await WriteAuthErrorAsync(
-                    context.HttpContext,
-                    StatusCodes.Status401Unauthorized,
-                    "Authentication is required.");
-            },
-            OnForbidden = async context =>
-            {
-                await WriteAuthErrorAsync(
-                    context.HttpContext,
-                    StatusCodes.Status403Forbidden,
-                    "Access is forbidden.");
-            }
-        };
-    });
+builder.Services.AddApplicationAuthentication(jwtOptions);
+builder.Services.AddApplicationInsightsTelemetry();
 builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentCustomerContext, CurrentCustomerContext>();
 builder.Services.AddScoped<ICurrentLanguageProvider, CurrentLanguageProvider>();
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy(
-        LocalFrontendCorsPolicy,
-        policy => policy
-            .WithOrigins(
-                "http://localhost:5173",
-                "http://127.0.0.1:5173",
-                "http://localhost:5174",
-                "http://127.0.0.1:5174")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials());
-});
+builder.Services.AddApplicationCors(builder.Configuration, builder.Environment);
+builder.Services.AddApplicationRateLimiter(builder.Environment);
+builder.Services
+    .AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>(
+        "postgresql",
+        tags: ["ready"]);
 builder.Services.AddSignalR();
 builder.Services.AddScoped<WorkspaceEcommerce.Application.Abstractions.Notifications.INotificationService, WorkspaceEcommerce.Api.Hubs.SignalRNotificationService>();
 builder.Services.AddApplication();
@@ -113,32 +70,28 @@ app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.UseCors(LocalFrontendCorsPolicy);
+}
+else
+{
+    app.UseHsts();
 }
 
+app.UseSecurityHeaders();
+app.UseCors(CorsExtensions.FrontendCorsPolicy);
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false
+});
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = healthCheck => healthCheck.Tags.Contains("ready")
+});
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.Run();
-
-static async Task WriteAuthErrorAsync(HttpContext context, int statusCode, string error)
-{
-    if (context.Response.HasStarted)
-    {
-        return;
-    }
-
-    context.Response.StatusCode = statusCode;
-    context.Response.ContentType = MediaTypeNames.Application.Json;
-
-    var response = ApiResponse<object>.Fail([error], context.TraceIdentifier);
-    await JsonSerializer.SerializeAsync(
-        context.Response.Body,
-        response,
-        JsonSerializerOptions.Web,
-        context.RequestAborted);
-}
 
 public partial class Program;
