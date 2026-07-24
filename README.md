@@ -78,9 +78,6 @@ The backend follows **Clean Architecture** with four layers: `Domain`, `Applicat
 #### 4. Dashboard - Tổng quan hệ thống
 ![Admin Dashboard](docs/screenshots/admin-dashboard.png)
 
-#### 5. Quản lý sản phẩm & đơn hàng
-![Admin Orders Management](docs/screenshots/admin-orders.png)
-
 ---
 
 ## Tech Stack
