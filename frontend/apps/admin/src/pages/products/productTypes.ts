@@ -10,6 +10,7 @@ import type {
   AdminProductVariantUpsertRequest
 } from "@workspace-ecommerce/api-types";
 import { z } from "zod";
+import { formatLocalizedText } from "../../utils/localizedText";
 
 export const productSchema = z.object({
   categoryId: z.string().min(1, "Category is required."),
@@ -61,11 +62,11 @@ export const imageDefaultValues: ImageFormValues = { imageUrl: "", altText: "", 
 export const specificationDefaultValues: SpecificationFormValues = { name: "", value: "", sortOrder: 1 };
 
 export function flattenCategories(categories: AdminCategoryDto[], level = 0): CategoryOption[] {
-  return categories.flatMap((category) => [{ id: category.id, label: category.name, level }, ...flattenCategories(category.children, level + 1)]);
+  return categories.flatMap((category) => [{ id: category.id, label: formatLocalizedText(category.name), level }, ...flattenCategories(category.children, level + 1)]);
 }
 
 export function toProductFormValues(product: AdminProductDto): ProductFormValues {
-  return { categoryId: product.categoryId, name: product.name, slug: product.slug, description: product.description ?? "", isFeatured: product.isFeatured, isActive: product.isActive };
+  return { categoryId: product.categoryId, name: formatLocalizedText(product.name, ""), slug: product.slug, description: formatLocalizedText(product.description, ""), isFeatured: product.isFeatured, isActive: product.isActive };
 }
 
 export function toProductRequest(values: ProductFormValues): AdminProductUpsertRequest {

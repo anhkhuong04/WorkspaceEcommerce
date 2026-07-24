@@ -8,6 +8,7 @@ import type {
 import { formatDate, formatMoney, formatOrderStatus } from "@workspace-ecommerce/shared-utils";
 import type { ReactNode } from "react";
 import { Button, EmptyState, Pill } from "../../components/ui/AdminUi";
+import { formatLocalizedText } from "../../utils/localizedText";
 
 type PillTone = "green" | "red" | "blue" | "orange" | "slate";
 
@@ -189,7 +190,7 @@ export function RecentOrdersSection({ orders, onViewOrders, onViewOrder }: Recen
               {orders.map((order) => (
                 <tr key={order.id} className="border-b border-slate-100 last:border-0">
                   <td className="px-3 py-2.5 font-black text-slate-900">{order.orderCode}</td>
-                  <td className="px-3 py-2.5 font-semibold text-slate-700">{order.customerName}</td>
+                  <td className="px-3 py-2.5 font-semibold text-slate-700">{formatLocalizedText(order.customerName)}</td>
                   <td className="px-3 py-2.5 font-bold text-slate-900">{formatMoney(order.totalAmount)}</td>
                   <td className="px-3 py-2.5"><OrderStatusPill status={order.status} /></td>
                   <td className="px-3 py-2.5 text-slate-500">{formatDate(order.createdAt)}</td>
@@ -239,7 +240,7 @@ export function LowStockSection({ threshold, variants, onViewProducts, onViewVar
 
                 return (
                   <tr key={variant.variantId} className="border-b border-slate-100 last:border-0">
-                    <td className="px-3 py-2.5 font-black text-slate-900">{variant.productName}</td>
+                    <td className="px-3 py-2.5 font-black text-slate-900">{formatLocalizedText(variant.productName)}</td>
                     <td className="px-3 py-2.5 font-semibold text-slate-600">{variant.sku}</td>
                     <td className="px-3 py-2.5 text-slate-600">{variant.variantName}</td>
                     <td className="px-3 py-2.5">

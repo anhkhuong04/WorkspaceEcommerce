@@ -9,6 +9,7 @@ import { Button, ConfirmDialog, EmptyState, Field, Modal, Notice, Pill, SelectIn
 import { useAdminCategories } from "../../hooks/queries/useAdminCategories";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
+import { formatLocalizedText } from "../../utils/localizedText";
 
 const categorySchema = z.object({
   parentId: z.string().nullable(),
@@ -26,7 +27,7 @@ type CategoryRow = AdminCategoryDto & { level: number };
 const defaultValues: CategoryFormValues = { parentId: null, name: "", slug: "", sortOrder: 0, isActive: true };
 
 function flattenCategories(categories: AdminCategoryDto[], level = 0): CategoryOption[] {
-  return categories.flatMap((category) => [{ id: category.id, label: category.name, level }, ...flattenCategories(category.children, level + 1)]);
+  return categories.flatMap((category) => [{ id: category.id, label: formatLocalizedText(category.name), level }, ...flattenCategories(category.children, level + 1)]);
 }
 
 function flattenRows(categories: AdminCategoryDto[], level = 0): CategoryRow[] {
@@ -47,7 +48,7 @@ function findCategory(categories: AdminCategoryDto[], id: string): AdminCategory
 }
 
 function toFormValues(category: AdminCategoryDto): CategoryFormValues {
-  return { parentId: category.parentId, name: category.name, slug: category.slug, sortOrder: category.sortOrder, isActive: category.isActive };
+  return { parentId: category.parentId, name: formatLocalizedText(category.name, ""), slug: category.slug, sortOrder: category.sortOrder, isActive: category.isActive };
 }
 
 function toRequest(values: CategoryFormValues): AdminCategoryUpsertRequest {
@@ -137,7 +138,7 @@ export function CategoriesPage() {
               <tbody>
                 {rows.map((category) => (
                   <tr key={category.id} className="border-b border-slate-100 last:border-0">
-                    <td className="py-3 pr-4 font-bold text-slate-900"><span style={{ paddingLeft: category.level * 24 }}>{category.level > 0 ? "↳ " : ""}{category.name}</span></td>
+                    <td className="py-3 pr-4 font-bold text-slate-900"><span style={{ paddingLeft: category.level * 24 }}>{category.level > 0 ? "↳ " : ""}{formatLocalizedText(category.name)}</span></td>
                     <td className="py-3 pr-4 text-slate-600">{category.slug}</td>
                     <td className="py-3 pr-4 text-slate-600">{category.sortOrder}</td>
                     <td className="py-3 pr-4"><div className="flex items-center gap-3"><Toggle checked={category.isActive} disabled={toggleMutation.isPending} onChange={() => toggleMutation.mutate(category)} /><Pill tone={category.isActive ? "green" : "slate"}>{category.isActive ? "Active" : "Inactive"}</Pill></div></td>

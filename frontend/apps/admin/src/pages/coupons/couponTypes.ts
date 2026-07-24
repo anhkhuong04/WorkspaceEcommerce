@@ -1,6 +1,7 @@
 import type { AdminCouponDto, AdminCouponUpsertRequest, AdminProductDto, CouponDiscountType } from "@workspace-ecommerce/api-types";
 import { formatDate, formatMoney } from "@workspace-ecommerce/shared-utils";
 import { z } from "zod";
+import { formatLocalizedText } from "../../utils/localizedText";
 
 export type CouponTargetScope = "all" | "products";
 
@@ -155,5 +156,6 @@ export function toCouponRequest(values: CouponFormValues): AdminCouponUpsertRequ
 }
 
 export function getProductLabel(product: AdminProductDto): string {
-  return product.categoryName ? `${product.name} (${product.categoryName})` : product.name;
+  const productName = formatLocalizedText(product.name);
+  return product.categoryName ? `${productName} (${product.categoryName})` : productName;
 }

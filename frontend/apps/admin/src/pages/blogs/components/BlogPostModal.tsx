@@ -3,6 +3,7 @@ import type { UseFormReturn } from "react-hook-form";
 import { Controller } from "react-hook-form";
 import { Button, Field, Modal, TextInput, Toggle } from "../../../components/ui/AdminUi";
 import { ImagePickerField } from "../../../components/media/ImagePickerField";
+import { formatLocalizedText } from "../../../utils/localizedText";
 import type { BlogPostFormValues } from "../blogTypes";
 
 type BlogPostModalProps = {
@@ -195,7 +196,7 @@ function BlogPostDetailsForm({
                             }}
                             className="h-4.5 w-4.5 cursor-pointer rounded border-slate-300 text-slate-900 focus:ring-slate-600"
                           />
-                          <span>{product.name}</span>
+                          <span>{formatLocalizedText(product.name)}</span>
                         </label>
                       );
                     })}

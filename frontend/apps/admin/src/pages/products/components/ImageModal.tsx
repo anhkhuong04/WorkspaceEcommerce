@@ -3,6 +3,7 @@ import { Controller } from "react-hook-form";
 import type { UseFormReturn } from "react-hook-form";
 import { Button, Field, Modal, TextInput } from "../../../components/ui/AdminUi";
 import { ImagePickerField } from "../../../components/media/ImagePickerField";
+import { formatLocalizedText } from "../../../utils/localizedText";
 import type { ImageFormValues } from "../productTypes";
 
 interface ImageModalProps {
@@ -18,7 +19,7 @@ interface ImageModalProps {
 export function ImageModal({ open, imageProduct, editingImage, form, isPending, onClose, onSubmit }: ImageModalProps) {
   return (
     <Modal
-      title={editingImage ? "Edit product image" : `New image${imageProduct ? ` for ${imageProduct.name}` : ""}`}
+      title={editingImage ? "Edit product image" : `New image${imageProduct ? ` for ${formatLocalizedText(imageProduct.name)}` : ""}`}
       open={open}
       onClose={onClose}
       widthClass="max-w-2xl"

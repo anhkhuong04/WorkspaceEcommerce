@@ -7,6 +7,7 @@
 ## Table of Contents
 
 - [Architecture Overview](#architecture-overview)
+- [Demo Screenshots](#demo-screenshots)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Prerequisites](#prerequisites)
@@ -54,6 +55,31 @@
 ```
 
 The backend follows **Clean Architecture** with four layers: `Domain`, `Application`, `Infrastructure`, and `Api`. Each business capability (Catalog, Orders, Payments, Logistics) is organized as an independent module within the monolith.
+
+---
+
+## Demo Screenshots
+
+### Storefront (Khách hàng)
+
+#### 1. Home & Danh sách sản phẩm
+![Storefront Home](docs/screenshots/storefront-home.png)
+
+#### 2. Trang chi tiết sản phẩm
+![Product Detail](docs/screenshots/storefront-product-detail.png)
+
+#### 3. Giỏ hàng & Thanh toán (VNPay Demo)
+![Cart & Checkout](docs/screenshots/storefront-checkout.png)
+
+---
+
+### Admin Panel (Quản trị viên)
+
+#### 4. Dashboard - Tổng quan hệ thống
+![Admin Dashboard](docs/screenshots/admin-dashboard.png)
+
+#### 5. Quản lý sản phẩm & đơn hàng
+![Admin Orders Management](docs/screenshots/admin-orders.png)
 
 ---
 

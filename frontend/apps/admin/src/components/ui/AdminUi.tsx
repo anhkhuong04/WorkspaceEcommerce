@@ -22,10 +22,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 export function Button({ className, variant = "secondary", fullWidth = false, disabled, ...props }: ButtonProps) {
   const variants = {
-    primary: "border-slate-900 bg-slate-900 text-white hover:bg-black hover:border-black",
-    secondary: "border-slate-200 bg-white text-slate-800 hover:border-slate-400 hover:text-slate-900",
-    ghost: "border-transparent bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-    danger: "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+    primary: "border-[var(--brand)] bg-[var(--brand)] text-[var(--brand-contrast)] hover:border-black hover:bg-black",
+    secondary: "border-[var(--border)] bg-[var(--surface)] text-[var(--muted-strong)] hover:border-[var(--muted)] hover:text-[var(--ink)]",
+    ghost: "border-transparent bg-transparent text-[var(--muted-strong)] hover:bg-[var(--brand-soft)] hover:text-[var(--brand)]",
+    danger: "border-red-200 bg-[var(--danger-soft)] text-[var(--danger)] hover:bg-red-100"
   };
 
   return (
@@ -33,7 +33,7 @@ export function Button({ className, variant = "secondary", fullWidth = false, di
       {...props}
       disabled={disabled}
       className={cx(
-        "inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm font-bold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60",
+        "inline-flex items-center justify-center rounded-[var(--radius-control)] border px-4 py-2 text-sm font-bold shadow-[var(--shadow-card)] transition disabled:cursor-not-allowed disabled:opacity-60",
         variants[variant],
         fullWidth && "w-full",
         className
@@ -50,14 +50,14 @@ interface NoticeProps {
 
 export function Notice({ type = "info", title, children }: NoticeProps) {
   const styles = {
-    error: "border-red-200 bg-red-50 text-red-900",
-    warning: "border-amber-200 bg-amber-50 text-amber-900",
-    success: "border-emerald-200 bg-emerald-50 text-emerald-900",
-    info: "border-sky-200 bg-sky-50 text-sky-900"
+    error: "border-red-200 bg-[var(--danger-soft)] text-red-900",
+    warning: "border-amber-200 bg-[var(--warning-soft)] text-amber-900",
+    success: "border-emerald-200 bg-[var(--success-soft)] text-emerald-900",
+    info: "border-sky-200 bg-[var(--info-soft)] text-sky-900"
   };
 
   return (
-    <div className={cx("rounded-2xl border p-4", styles[type])}>
+    <div className={cx("rounded-[var(--radius-panel)] border p-4", styles[type])}>
       <p className="font-bold">{title}</p>
       {children ? <div className="mt-1 text-sm opacity-85">{children}</div> : null}
     </div>
@@ -152,20 +152,20 @@ export function Modal({ title, open, children, footer, widthClass = "max-w-xl", 
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4 backdrop-blur-sm" role="presentation">
       <div
         ref={dialogRef}
-        className={cx("max-h-[90vh] w-full overflow-hidden rounded-3xl bg-white shadow-2xl outline-none", widthClass)}
+        className={cx("max-h-[90vh] w-full overflow-hidden rounded-[var(--radius-shell)] bg-[var(--surface)] shadow-[var(--shadow-panel)] outline-none", widthClass)}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
       >
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h2 id={titleId} className="text-xl font-black text-slate-950">{title}</h2>
-          <button className="rounded-full px-3 py-1 text-2xl leading-none text-slate-500 hover:bg-slate-100" onClick={onClose} aria-label="Close">
+        <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-6 py-4">
+          <h2 id={titleId} className="text-xl font-black text-[var(--ink)]">{title}</h2>
+          <button className="rounded-full px-3 py-1 text-2xl leading-none text-[var(--muted)] hover:bg-[var(--brand-soft)]" onClick={onClose} aria-label="Close">
             x
           </button>
         </div>
         <div className="max-h-[calc(90vh-140px)] overflow-y-auto px-6 py-5">{children}</div>
-        {footer ? <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">{footer}</div> : null}
+        {footer ? <div className="flex justify-end gap-3 border-t border-[var(--border-soft)] px-6 py-4">{footer}</div> : null}
       </div>
     </div>
   );
@@ -297,14 +297,14 @@ export function Drawer({ title, open, children, widthClass = "max-w-3xl", onClos
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/45 backdrop-blur-sm" role="presentation">
       <aside
         ref={drawerRef}
-        className={cx("h-full w-full overflow-y-auto bg-white p-6 shadow-2xl outline-none", widthClass)}
+        className={cx("h-full w-full overflow-y-auto bg-[var(--surface)] p-6 shadow-[var(--shadow-panel)] outline-none", widthClass)}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
       >
         <div className="mb-5 flex items-center justify-between gap-4">
-          <h2 id={titleId} className="text-2xl font-black text-slate-950">{title}</h2>
+          <h2 id={titleId} className="text-2xl font-black text-[var(--ink)]">{title}</h2>
           <Button type="button" onClick={onClose}>Close</Button>
         </div>
         {children}
@@ -322,7 +322,7 @@ interface FieldProps {
 export function Field({ label, error, children }: FieldProps) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-sm font-bold text-slate-700">{label}</span>
+      <span className="mb-1.5 block text-sm font-bold text-[var(--muted-strong)]">{label}</span>
       {children}
       {error ? <span className="mt-1 block text-sm font-semibold text-red-600" role="alert">{error}</span> : null}
     </label>
@@ -330,15 +330,15 @@ export function Field({ label, error, children }: FieldProps) {
 }
 
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cx("w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-100 disabled:bg-slate-100", props.className)} />;
+  return <input {...props} className={cx("w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--muted)] focus:ring-4 focus:ring-[var(--brand-soft)] disabled:bg-[var(--brand-soft)]", props.className)} />;
 }
 
 export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={cx("w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-100 disabled:bg-slate-100", props.className)} />;
+  return <textarea {...props} className={cx("w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--muted)] focus:ring-4 focus:ring-[var(--brand-soft)] disabled:bg-[var(--brand-soft)]", props.className)} />;
 }
 
 export function SelectInput(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={cx("w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-100 disabled:bg-slate-100", props.className)} />;
+  return <select {...props} className={cx("w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--muted)] focus:ring-4 focus:ring-[var(--brand-soft)] disabled:bg-[var(--brand-soft)]", props.className)} />;
 }
 
 interface ToggleProps {
@@ -356,7 +356,7 @@ export function Toggle({ checked, disabled, label = "Toggle setting", onChange }
       onClick={() => onChange(!checked)}
       className={cx(
         "relative h-6 w-11 rounded-full transition disabled:opacity-60",
-        checked ? "bg-slate-900" : "bg-slate-300"
+        checked ? "bg-[var(--brand)]" : "bg-slate-300"
       )}
       aria-pressed={checked}
       aria-label={label}
@@ -384,5 +384,5 @@ export function Pill({ children, tone = "slate" }: PillProps) {
 }
 
 export function EmptyState({ children }: { children: ReactNode }) {
-  return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-500">{children}</div>;
+  return <div className="rounded-[var(--radius-panel)] border border-dashed border-[var(--border)] bg-[var(--brand-soft)] p-8 text-center text-sm font-semibold text-[var(--muted)]">{children}</div>;
 }

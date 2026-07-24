@@ -3,6 +3,7 @@ import { formatMoney } from "@workspace-ecommerce/shared-utils";
 import { Fragment } from "react";
 import { Button, EmptyState, Pill, Toggle } from "../../../components/ui/AdminUi";
 import { cx } from "../../../components/ui/cx";
+import { formatLocalizedText } from "../../../utils/localizedText";
 
 interface ProductTableProps {
   products: AdminProductDto[];
@@ -78,10 +79,10 @@ export function ProductTable({
                 <Fragment key={product.id}>
                   <tr id={`product-${product.id}`} className={cx("border-b border-slate-100 transition-colors", targetProduct?.id === product.id && "bg-slate-50")}>
                     <td className="py-3 pr-4">
-                      <button type="button" className="mr-2 rounded font-black text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-600 focus-visible:ring-offset-2" onClick={() => onToggleExpanded(product.id)} aria-label={`${isProductExpanded(product.id) ? "Collapse" : "Expand"} ${product.name}`}>
+                      <button type="button" className="mr-2 rounded font-black text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-600 focus-visible:ring-offset-2" onClick={() => onToggleExpanded(product.id)} aria-label={`${isProductExpanded(product.id) ? "Collapse" : "Expand"} ${formatLocalizedText(product.name)}`}>
                         {isProductExpanded(product.id) ? "-" : "+"}
                       </button>
-                      <span className="font-bold text-slate-900">{product.name}</span>
+                      <span className="font-bold text-slate-900">{formatLocalizedText(product.name)}</span>
                       <p className="mt-0.5 text-xs text-slate-500">{product.slug}</p>
                     </td>
                     <td className="py-3 pr-4 text-slate-600">{product.categoryName ?? "-"}</td>

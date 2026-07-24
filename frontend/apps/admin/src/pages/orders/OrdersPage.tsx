@@ -12,6 +12,7 @@ import { Button, Drawer, EmptyState, Field, Notice, Pill, SelectInput, TextArea,
 import { useAdminOrder, useAdminOrders } from "../../hooks/queries/useAdminOrders";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
+import { formatLocalizedText } from "../../utils/localizedText";
 import { OrderImportModal } from "./components/OrderImportModal";
 import { OrdersTable } from "./components/OrdersTable";
 
@@ -151,7 +152,7 @@ export function OrdersPage() {
                 <Info label="Payment" value={formatPaymentMethod(order.paymentMethod)} />
                 <Info label="Payment status" value={paymentStatusPill(order.paymentStatus)} />
                 <Info label="Paid at" value={order.paidAt ? formatDate(order.paidAt) : "-"} />
-                <Info label="Customer" value={order.customerName} />
+                <Info label="Customer" value={formatLocalizedText(order.customerName)} />
                 <Info label="Phone" value={order.customerPhone} />
                 <Info label="Email" value={order.customerEmail ?? "-"} />
                 <Info label="Created" value={formatDate(order.createdAt)} />
@@ -170,7 +171,7 @@ export function OrdersPage() {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[680px] text-left text-sm">
                   <thead className="text-xs uppercase tracking-wide text-slate-500"><tr><th className="py-2 pr-3">Product</th><th className="py-2 pr-3">SKU</th><th className="py-2 pr-3">Price</th><th className="py-2 pr-3">Qty</th><th className="py-2 pr-3">Line</th><th className="py-2 pr-3">Install</th></tr></thead>
-                  <tbody>{order.items.map((item) => <tr key={item.id} className="border-t border-slate-100"><td className="py-2 pr-3">{item.productNameSnapshot}</td><td className="py-2 pr-3">{item.skuSnapshot}</td><td className="py-2 pr-3">{formatMoney(item.unitPrice)}</td><td className="py-2 pr-3">{item.quantity}</td><td className="py-2 pr-3">{formatMoney(item.lineTotal)}</td><td className="py-2 pr-3"><Pill tone={item.requiresInstallation ? "blue" : "slate"}>{item.requiresInstallation ? "Required" : "None"}</Pill></td></tr>)}</tbody>
+                  <tbody>{order.items.map((item) => <tr key={item.id} className="border-t border-slate-100"><td className="py-2 pr-3">{formatLocalizedText(item.productNameSnapshot)}</td><td className="py-2 pr-3">{item.skuSnapshot}</td><td className="py-2 pr-3">{formatMoney(item.unitPrice)}</td><td className="py-2 pr-3">{item.quantity}</td><td className="py-2 pr-3">{formatMoney(item.lineTotal)}</td><td className="py-2 pr-3"><Pill tone={item.requiresInstallation ? "blue" : "slate"}>{item.requiresInstallation ? "Required" : "None"}</Pill></td></tr>)}</tbody>
                 </table>
               </div>
             </section>
@@ -221,5 +222,5 @@ function formatDiscountLabel(order: AdminOrderDto): string {
 }
 
 function formatCouponSnapshot(order: AdminOrderDto): string {
-  return order.couponNameSnapshot ? `${order.couponCodeSnapshot} - ${order.couponNameSnapshot}` : order.couponCodeSnapshot ?? "";
+  return order.couponNameSnapshot ? `${order.couponCodeSnapshot} - ${formatLocalizedText(order.couponNameSnapshot)}` : order.couponCodeSnapshot ?? "";
 }

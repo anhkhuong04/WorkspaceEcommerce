@@ -7,6 +7,7 @@ import { useStorefrontCart } from "../../features/cart/StorefrontCartContext";
 import { useCustomerAuth } from "../../features/customer-auth/useCustomerAuth";
 import { storefrontApi } from "../../services/api/storefrontApi";
 import { StorefrontFooter } from "./StorefrontFooter";
+import { StorefrontSearchOverlay } from "./StorefrontSearchOverlay";
 
 const navItems = [
   { to: "/products", label: "Products", hasDropdown: true },
@@ -35,6 +36,7 @@ function StorefrontLayoutContent() {
   const hideHeader = location.pathname === "/login";
 
   const [isHovered, setIsHovered] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -120,8 +122,9 @@ function StorefrontLayoutContent() {
             </div>
 
             <div className={`flex shrink-0 items-center gap-3 sm:gap-5 lg:gap-8 transition-colors duration-300 ${iconColorClass}`}>
-              <NavLink
-                to="/products"
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(true)}
                 className={`grid h-10 w-10 place-items-center rounded-full transition ${isHeaderSolid ? "hover:bg-slate-100" : "hover:bg-white/20"}`}
                 aria-label="Search"
               >
@@ -129,7 +132,7 @@ function StorefrontLayoutContent() {
                   <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="2" />
                   <path d="m16 16 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
-              </NavLink>
+              </button>
 
               <NavLink
                 to={isAuthenticated ? "/account" : "/login"}
@@ -167,6 +170,7 @@ function StorefrontLayoutContent() {
         <Outlet />
       </main>
       {hideHeader ? null : <StorefrontFooter />}
+      <StorefrontSearchOverlay isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </div>
   );
 }

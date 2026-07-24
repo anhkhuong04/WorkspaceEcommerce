@@ -30,11 +30,13 @@ export function AdminLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f7f6] text-slate-900 lg:grid lg:grid-cols-[264px_1fr]">
-      <aside className="border-b border-slate-200 bg-white px-4 py-4 lg:min-h-screen lg:border-b-0 lg:border-r">
-        <div className="flex h-12 items-center gap-3 px-2 text-lg font-black text-slate-950">
-          <span className="grid h-9 w-9 place-items-center rounded-2xl bg-slate-900 text-white">W</span>
-          Workspace Admin
+    <div className="min-h-screen bg-[var(--surface-soft)] text-[var(--ink)] lg:grid lg:grid-cols-[264px_1fr]">
+      <aside className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-4 lg:min-h-screen lg:border-b-0 lg:border-r">
+        <div className="flex h-12 items-center gap-3 px-2">
+          <img src="/demo/logo.svg" alt="WorkspaceEcom" className="h-auto w-[164px]" />
+          <span className="rounded-[var(--radius-control)] bg-[var(--brand-soft)] px-2 py-1 text-xs font-bold uppercase tracking-wide text-[var(--muted-strong)]">
+            Admin
+          </span>
         </div>
         <nav className="mt-5 flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible" aria-label="Admin navigation">
           {menuItems.map((item) => (
@@ -43,17 +45,17 @@ export function AdminLayout() {
               to={item.to}
               end={item.to === "/"}
               className={({ isActive }) => cx(
-                "flex min-w-fit items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2",
+                "flex min-w-fit items-center gap-3 rounded-[var(--radius-panel)] px-3 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] focus-visible:ring-offset-2",
                 isActive
-                  ? "bg-slate-100 text-slate-900 shadow-sm ring-1 ring-slate-200"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+                  ? "bg-[var(--brand-soft)] text-[var(--brand)] shadow-sm ring-1 ring-[var(--border)]"
+                  : "text-[var(--muted-strong)] hover:bg-[var(--brand-soft)] hover:text-[var(--brand)]"
               )}
             >
               {({ isActive }) => (
                 <>
                   <span className={cx(
-                    "grid h-8 w-8 place-items-center rounded-xl ring-1 transition",
-                    isActive ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-500 ring-slate-200"
+                    "grid h-8 w-8 place-items-center rounded-[var(--radius-card)] ring-1 transition",
+                    isActive ? "bg-[var(--brand)] text-[var(--brand-contrast)] ring-[var(--brand)]" : "bg-[var(--surface)] text-[var(--muted)] ring-[var(--border)]"
                   )}>
                     <AdminNavIcon name={item.icon} />
                   </span>
@@ -66,13 +68,13 @@ export function AdminLayout() {
       </aside>
 
       <div className="min-w-0">
-        <header className="flex flex-col gap-3 border-b border-slate-200 bg-white/90 px-6 py-4 backdrop-blur lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:py-0">
+        <header className="flex flex-col gap-3 border-b border-[var(--border)] bg-[var(--surface)]/90 px-6 py-4 backdrop-blur lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:py-0">
           <div>
-            <p className="font-black text-slate-900">Operations console</p>
-            <p className="text-xs font-semibold text-slate-500">Tailwind admin portal for MVP operations</p>
+            <p className="font-black text-[var(--ink)]">Operations console</p>
+            <p className="text-xs font-semibold text-[var(--muted)]">WorkspaceEcom admin portal for MVP operations</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-slate-500">{session?.email}</span>
+            <span className="text-sm font-semibold text-[var(--muted)]">{session?.email}</span>
             <Button onClick={handleLogout}>Logout</Button>
           </div>
         </header>

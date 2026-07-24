@@ -2,6 +2,7 @@ import type { AdminProductDto, AdminProductVariantDto } from "@workspace-ecommer
 import { Controller } from "react-hook-form";
 import type { UseFormReturn } from "react-hook-form";
 import { Button, Field, Modal, TextInput, Toggle } from "../../../components/ui/AdminUi";
+import { formatLocalizedText } from "../../../utils/localizedText";
 import type { VariantFormValues } from "../productTypes";
 
 interface VariantModalProps {
@@ -17,7 +18,7 @@ interface VariantModalProps {
 export function VariantModal({ open, variantProduct, editingVariant, form, isPending, onClose, onSubmit }: VariantModalProps) {
   return (
     <Modal
-      title={editingVariant ? "Edit variant" : `New SKU${variantProduct ? ` for ${variantProduct.name}` : ""}`}
+      title={editingVariant ? "Edit variant" : `New SKU${variantProduct ? ` for ${formatLocalizedText(variantProduct.name)}` : ""}`}
       open={open}
       onClose={onClose}
       widthClass="max-w-3xl"

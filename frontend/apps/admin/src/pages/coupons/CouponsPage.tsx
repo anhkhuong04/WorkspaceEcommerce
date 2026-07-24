@@ -10,6 +10,7 @@ import { useAdminCoupons } from "../../hooks/queries/useAdminCoupons";
 import { useAdminProducts } from "../../hooks/queries/useAdminProducts";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
+import { formatLocalizedText } from "../../utils/localizedText";
 import { CouponFilters } from "./components/CouponFilters";
 import { CouponModal } from "./components/CouponModal";
 import { CouponsTable } from "./components/CouponsTable";
@@ -57,7 +58,7 @@ export function CouponsPage() {
     if (!normalizedSearch) return products;
 
     return products.filter((product) =>
-      product.name.toLowerCase().includes(normalizedSearch) ||
+      formatLocalizedText(product.name, "").toLowerCase().includes(normalizedSearch) ||
       product.slug.toLowerCase().includes(normalizedSearch) ||
       (product.categoryName ?? "").toLowerCase().includes(normalizedSearch)
     );

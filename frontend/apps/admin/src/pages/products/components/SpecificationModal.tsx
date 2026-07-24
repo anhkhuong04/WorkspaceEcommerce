@@ -2,6 +2,7 @@ import type { AdminProductDto, AdminProductSpecificationDto } from "@workspace-e
 import { Controller } from "react-hook-form";
 import type { UseFormReturn } from "react-hook-form";
 import { Button, Field, Modal, TextInput } from "../../../components/ui/AdminUi";
+import { formatLocalizedText } from "../../../utils/localizedText";
 import type { SpecificationFormValues } from "../productTypes";
 
 interface SpecificationModalProps {
@@ -17,7 +18,7 @@ interface SpecificationModalProps {
 export function SpecificationModal({ open, specificationProduct, editingSpecification, form, isPending, onClose, onSubmit }: SpecificationModalProps) {
   return (
     <Modal
-      title={editingSpecification ? "Edit specification" : `New specification${specificationProduct ? ` for ${specificationProduct.name}` : ""}`}
+      title={editingSpecification ? "Edit specification" : `New specification${specificationProduct ? ` for ${formatLocalizedText(specificationProduct.name)}` : ""}`}
       open={open}
       onClose={onClose}
       widthClass="max-w-2xl"
