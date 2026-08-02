@@ -5,13 +5,16 @@ using WorkspaceEcommerce.Api.Common;
 using WorkspaceEcommerce.Api.Extensions;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Ordering;
+using WorkspaceEcommerce.Application.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Api.Controllers.Admin;
 
 [ApiController]
 [Authorize(Roles = "Admin")]
 [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
-public sealed class OrdersController(IAdminOrderService orderService) : ControllerBase
+public sealed class OrdersController(
+    IAdminOrderService orderService,
+    IOrderShipmentService shipmentService) : ControllerBase
 {
     [HttpGet("api/admin/orders")]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<AdminOrderListItemDto>>), StatusCodes.Status200OK)]
@@ -37,6 +40,45 @@ public sealed class OrdersController(IAdminOrderService orderService) : Controll
     {
         var result = await orderService.GetOrderByIdAsync(id, cancellationToken);
 
+        return this.ToApiResponse(result);
+    }
+
+    [HttpGet("api/admin/orders/{id:guid}/shipment")]
+    [ProducesResponseType(typeof(ApiResponse<ShipmentTrackingDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetShipment(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await shipmentService.GetAdminTrackingAsync(id, cancellationToken);
+        return this.ToApiResponse(result);
+    }
+
+    [HttpPost("api/admin/orders/{id:guid}/shipment/refresh")]
+    [ProducesResponseType(typeof(ApiResponse<ShipmentTrackingDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RefreshShipment(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await shipmentService.RefreshAsync(id, cancellationToken);
+        return this.ToApiResponse(result);
+    }
+
+    [HttpPost("api/admin/orders/{id:guid}/shipment/retry")]
+    [ProducesResponseType(typeof(ApiResponse<ShipmentTrackingDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RetryShipment(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await shipmentService.RetryCreateAsync(id, cancellationToken);
+        return this.ToApiResponse(result);
+    }
+
+    [HttpPost("api/admin/orders/{id:guid}/shipment/cancel")]
+    [ProducesResponseType(typeof(ApiResponse<ShipmentTrackingDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CancelShipment(
+        Guid id,
+        [FromBody] CancelShipmentRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await shipmentService.CancelAsync(id, request.Reason, cancellationToken);
         return this.ToApiResponse(result);
     }
 
@@ -111,3 +153,5 @@ public sealed class OrdersController(IAdminOrderService orderService) : Controll
         return this.ToApiResponse(result, StatusCodes.Status201Created);
     }
 }
+
+public sealed record CancelShipmentRequest(string Reason = "Order cancelled by admin.");

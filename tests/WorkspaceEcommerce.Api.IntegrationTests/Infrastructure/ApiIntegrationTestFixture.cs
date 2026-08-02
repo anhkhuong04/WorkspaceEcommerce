@@ -21,7 +21,9 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         "Jwt__Audience",
         "Jwt__SigningKey",
         "Jwt__AccessTokenMinutes",
-        "Storefront__BaseUrl"
+        "Storefront__BaseUrl",
+        "MiniLogistics__WebhookSecret",
+        "MiniLogistics__CommandWorkerIntervalSeconds"
     ];
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
@@ -61,6 +63,10 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         await dbContext.Database.ExecuteSqlRawAsync(
             """
             TRUNCATE TABLE
+                shipping.shipment_timeline_entries,
+                shipping.shipment_event_inbox,
+                shipping.shipment_command_outbox,
+                shipping.order_shipments,
                 payments.payment_transactions,
                 loyalty.loyalty_transactions,
                 loyalty.customer_loyalty_accounts,
@@ -155,6 +161,8 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("Jwt__SigningKey", "integration-test-signing-key-32-bytes-minimum");
         Environment.SetEnvironmentVariable("Jwt__AccessTokenMinutes", "60");
         Environment.SetEnvironmentVariable("Storefront__BaseUrl", "http://localhost:5173");
+        Environment.SetEnvironmentVariable("MiniLogistics__WebhookSecret", "integration-webhook-secret");
+        Environment.SetEnvironmentVariable("MiniLogistics__CommandWorkerIntervalSeconds", "3600");
     }
 
     private void RestoreRuntimeConfiguration()
@@ -256,7 +264,7 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
             {
                 ShipmentId = Guid.NewGuid(),
                 ExternalOrderId = request.ExternalOrderId,
-                TrackingCode = "ML-MOCK-INT",
+                TrackingCode = $"ML-MOCK-{request.ExternalOrderId}",
                 Status = "PendingPickup",
                 ShippingFeeAmount = 0m,
                 Currency = "VND"
@@ -272,6 +280,17 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
                 Status = "PendingPickup",
                 ShippingFeeAmount = 0m,
                 Timeline = []
+            });
+        }
+
+        public Task<TrackingResponse> CancelShipmentAsync(string trackingCode, string reason, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new TrackingResponse
+            {
+                TrackingCode = trackingCode,
+                ExternalOrderId = "ECOM-1001",
+                Status = "Cancelled",
+                Currency = "VND"
             });
         }
     }

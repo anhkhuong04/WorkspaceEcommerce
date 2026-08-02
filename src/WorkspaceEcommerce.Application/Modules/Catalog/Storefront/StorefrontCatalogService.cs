@@ -32,7 +32,7 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
             from product in catalogStore.Products
             join category in catalogStore.Categories on product.CategoryId equals category.Id
             where product.IsActive && category.IsActive
-            select new ProductCatalogRow(product, category);
+            select new ProductCatalogRow { Product = product, Category = category };
 
         if (normalizedCategorySlug is not null)
         {
@@ -41,10 +41,7 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
 
         if (normalizedSearch is not null)
         {
-            query = query.Where(row =>
-                row.Product.Slug.Contains(normalizedSearch) ||
-                (row.Product.Name.ContainsKey(currentLanguage) && row.Product.Name[currentLanguage].ToLower().Contains(normalizedSearch)) ||
-                (row.Product.Name.ContainsKey("en") && row.Product.Name["en"].ToLower().Contains(normalizedSearch)));
+            query = query.Where(row => row.Product.Slug.Contains(normalizedSearch));
         }
 
         if (request.MinPrice is not null || request.MaxPrice is not null)
@@ -70,7 +67,7 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
         }
 
         var totalCount = await query.CountAsyncSafe(cancellationToken);
-        var rows = await ApplyProductSorting(query, request.SortBy, currentLanguage)
+        var rows = await ApplyProductSorting(query, request.SortBy)
             .Skip(request.Skip)
             .Take(request.NormalizedPageSize)
             .ToArrayAsyncSafe(cancellationToken);
@@ -147,8 +144,7 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
 
     private IQueryable<ProductCatalogRow> ApplyProductSorting(
         IQueryable<ProductCatalogRow> products,
-        string? sortBy,
-        string currentLanguage)
+        string? sortBy)
     {
         var normalizedSortBy = NormalizeOptional(sortBy) ?? "name-asc";
 
@@ -160,7 +156,6 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
                     .Where(variant => variant.ProductId == row.Product.Id && variant.IsActive)
                     .Select(variant => (decimal?)variant.Price)
                     .Min())
-                .ThenBy(row => row.Product.Name.ContainsKey(currentLanguage) ? row.Product.Name[currentLanguage] : row.Product.Slug)
                 .ThenBy(row => row.Product.Slug),
             "price-desc" => products
                 .OrderBy(row => !catalogStore.ProductVariants.Any(variant => variant.ProductId == row.Product.Id && variant.IsActive))
@@ -168,15 +163,12 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
                     .Where(variant => variant.ProductId == row.Product.Id && variant.IsActive)
                     .Select(variant => (decimal?)variant.Price)
                     .Min())
-                .ThenBy(row => row.Product.Name.ContainsKey(currentLanguage) ? row.Product.Name[currentLanguage] : row.Product.Slug)
                 .ThenBy(row => row.Product.Slug),
             "updated-desc" => products
                 .OrderByDescending(row => row.Product.UpdatedAt)
-                .ThenBy(row => row.Product.Name.ContainsKey(currentLanguage) ? row.Product.Name[currentLanguage] : row.Product.Slug)
                 .ThenBy(row => row.Product.Slug),
             _ => products
-                .OrderBy(row => row.Product.Name.ContainsKey(currentLanguage) ? row.Product.Name[currentLanguage] : row.Product.Slug)
-                .ThenBy(row => row.Product.Slug)
+                .OrderBy(row => row.Product.Slug)
         };
     }
 
@@ -313,5 +305,10 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
         return value.Trim().ToLowerInvariant();
     }
 
-    private sealed record ProductCatalogRow(Product Product, Category Category);
+    private sealed class ProductCatalogRow
+    {
+        public required Product Product { get; init; }
+
+        public required Category Category { get; init; }
+    }
 }

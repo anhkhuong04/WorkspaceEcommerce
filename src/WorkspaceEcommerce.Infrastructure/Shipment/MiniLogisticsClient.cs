@@ -10,8 +10,10 @@ namespace WorkspaceEcommerce.Infrastructure.Shipment;
 internal sealed class MiniLogisticsClient(
     HttpClient httpClient,
     IOptions<MiniLogisticsOptions> options,
+    MiniLogisticsFailureGate failureGate,
     ILogger<MiniLogisticsClient> logger) : IShipmentService
 {
+    private readonly MiniLogisticsOptions clientOptions = options.Value;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -47,10 +49,12 @@ internal sealed class MiniLogisticsClient(
 
         logger.LogInformation("Requesting shipping quote for external order {ExternalOrderId}", request.ExternalOrderId);
 
-        var response = await httpClient.PostAsJsonAsync(
-            "shipping/quote",
-            payload,
-            JsonOptions,
+        using var response = await SendWithRetryAsync(
+            () => new HttpRequestMessage(HttpMethod.Post, "shipping/quote")
+            {
+                Content = JsonContent.Create(payload, options: JsonOptions)
+            },
+            "shipping quote",
             cancellationToken);
 
         await EnsureSuccessOrThrowAsync(response, "shipping quote", cancellationToken);
@@ -97,11 +101,15 @@ internal sealed class MiniLogisticsClient(
 
         logger.LogInformation("Creating shipment for external order {ExternalOrderId}", request.ExternalOrderId);
 
-        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "shipments");
-        httpRequest.Content = JsonContent.Create(payload, options: JsonOptions);
-        httpRequest.Headers.Add("Idempotency-Key", idempotencyKey);
-
-        var response = await httpClient.SendAsync(httpRequest, cancellationToken);
+        using var response = await SendWithRetryAsync(() =>
+        {
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, "shipments")
+            {
+                Content = JsonContent.Create(payload, options: JsonOptions)
+            };
+            httpRequest.Headers.Add("Idempotency-Key", idempotencyKey);
+            return httpRequest;
+        }, "create shipment", cancellationToken);
 
         await EnsureSuccessOrThrowAsync(response, "create shipment", cancellationToken);
 
@@ -116,8 +124,11 @@ internal sealed class MiniLogisticsClient(
     {
         logger.LogInformation("Fetching tracking for {TrackingCode}", trackingCode);
 
-        var response = await httpClient.GetAsync(
-            $"shipments/{Uri.EscapeDataString(trackingCode)}",
+        using var response = await SendWithRetryAsync(
+            () => new HttpRequestMessage(
+                HttpMethod.Get,
+                $"shipments/{Uri.EscapeDataString(trackingCode)}"),
+            "tracking",
             cancellationToken);
 
         await EnsureSuccessOrThrowAsync(response, "tracking", cancellationToken);
@@ -125,6 +136,140 @@ internal sealed class MiniLogisticsClient(
         var result = await response.Content.ReadFromJsonAsync<TrackingResponse>(JsonOptions, cancellationToken);
 
         return result ?? throw new InvalidOperationException("MiniLogistics returned null tracking response.");
+    }
+
+    public async Task<TrackingResponse> CancelShipmentAsync(
+        string trackingCode,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        logger.LogInformation("Cancelling shipment {TrackingCode}", trackingCode);
+
+        using var response = await SendWithRetryAsync(
+            () => new HttpRequestMessage(
+                HttpMethod.Post,
+                $"shipments/{Uri.EscapeDataString(trackingCode)}/cancel")
+            {
+                Content = JsonContent.Create(new { Reason = reason }, options: JsonOptions)
+            },
+            "cancel shipment",
+            cancellationToken);
+
+        await EnsureSuccessOrThrowAsync(response, "cancel shipment", cancellationToken);
+
+        var result = await response.Content.ReadFromJsonAsync<TrackingResponse>(JsonOptions, cancellationToken);
+        return result ?? throw new InvalidOperationException("MiniLogistics returned null cancel shipment response.");
+    }
+
+    private async Task<HttpResponseMessage> SendWithRetryAsync(
+        Func<HttpRequestMessage> requestFactory,
+        string operationName,
+        CancellationToken cancellationToken)
+    {
+        failureGate.ThrowIfOpen(operationName);
+        var maxAttempts = Math.Max(1, clientOptions.MaxRetryAttempts + 1);
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            using var request = requestFactory();
+            using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutSource.CancelAfter(TimeSpan.FromSeconds(Math.Max(1, clientOptions.OperationTimeoutSeconds)));
+
+            try
+            {
+                var response = await httpClient.SendAsync(request, timeoutSource.Token);
+                if (response.IsSuccessStatusCode)
+                {
+                    failureGate.RecordSuccess();
+                    return response;
+                }
+
+                if (!IsTransient(response.StatusCode))
+                {
+                    failureGate.RecordSuccess();
+                    return response;
+                }
+
+                if (attempt == maxAttempts)
+                {
+                    failureGate.RecordTransientFailure();
+                    return response;
+                }
+
+                var delay = GetRetryDelay(response, attempt);
+                logger.LogWarning(
+                    "MiniLogistics {Operation} returned transient status {StatusCode}; retry {Attempt}/{MaxAttempts} in {DelayMs} ms",
+                    operationName,
+                    (int)response.StatusCode,
+                    attempt,
+                    maxAttempts - 1,
+                    delay.TotalMilliseconds);
+                response.Dispose();
+                await Task.Delay(delay, cancellationToken);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && attempt < maxAttempts)
+            {
+                var delay = GetRetryDelay(response: null, attempt);
+                logger.LogWarning(
+                    "MiniLogistics {Operation} timed out; retry {Attempt}/{MaxAttempts} in {DelayMs} ms",
+                    operationName,
+                    attempt,
+                    maxAttempts - 1,
+                    delay.TotalMilliseconds);
+                await Task.Delay(delay, cancellationToken);
+            }
+            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                failureGate.RecordTransientFailure();
+                throw new HttpRequestException(
+                    $"MiniLogistics {operationName} timed out after {clientOptions.OperationTimeoutSeconds} seconds.",
+                    ex);
+            }
+            catch (HttpRequestException) when (attempt < maxAttempts)
+            {
+                var delay = GetRetryDelay(response: null, attempt);
+                logger.LogWarning(
+                    "MiniLogistics {Operation} failed transiently; retry {Attempt}/{MaxAttempts} in {DelayMs} ms",
+                    operationName,
+                    attempt,
+                    maxAttempts - 1,
+                    delay.TotalMilliseconds);
+                await Task.Delay(delay, cancellationToken);
+            }
+            catch (HttpRequestException)
+            {
+                failureGate.RecordTransientFailure();
+                throw;
+            }
+        }
+
+        throw new HttpRequestException($"MiniLogistics {operationName} failed after all retry attempts.");
+    }
+
+    private TimeSpan GetRetryDelay(HttpResponseMessage? response, int attempt)
+    {
+        var retryAfter = response?.Headers.RetryAfter;
+        if (retryAfter?.Delta is { } delta)
+        {
+            return delta;
+        }
+
+        if (retryAfter?.Date is { } date)
+        {
+            return date > DateTimeOffset.UtcNow
+                ? date - DateTimeOffset.UtcNow
+                : TimeSpan.Zero;
+        }
+
+        var baseDelay = Math.Max(1, clientOptions.RetryBaseDelayMilliseconds);
+        return TimeSpan.FromMilliseconds(baseDelay * Math.Pow(2, attempt - 1));
+    }
+
+    private static bool IsTransient(System.Net.HttpStatusCode statusCode)
+    {
+        var numericStatus = (int)statusCode;
+        return statusCode is System.Net.HttpStatusCode.RequestTimeout or System.Net.HttpStatusCode.TooManyRequests
+            || numericStatus >= 500;
     }
 
     private async Task EnsureSuccessOrThrowAsync(
@@ -137,15 +282,13 @@ internal sealed class MiniLogisticsClient(
             return;
         }
 
-        var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
         logger.LogError(
-            "MiniLogistics {Operation} failed with status {StatusCode}: {ErrorBody}",
+            "MiniLogistics {Operation} failed with status {StatusCode}",
             operationName,
-            (int)response.StatusCode,
-            errorBody);
+            (int)response.StatusCode);
 
         throw new HttpRequestException(
-            $"MiniLogistics {operationName} failed with status {(int)response.StatusCode}: {errorBody}",
+            $"MiniLogistics {operationName} failed with status {(int)response.StatusCode}.",
             null,
             response.StatusCode);
     }

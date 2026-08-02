@@ -1,15 +1,11 @@
-using System.IO;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using WorkspaceEcommerce.Application.Abstractions.Persistence;
-using WorkspaceEcommerce.Domain.Common;
-using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Modules.Shipments;
 using WorkspaceEcommerce.Infrastructure.Shipment;
 
 namespace WorkspaceEcommerce.Api.Controllers.Webhooks;
@@ -17,194 +13,145 @@ namespace WorkspaceEcommerce.Api.Controllers.Webhooks;
 [ApiController]
 [Route("api/webhooks/minilogistics")]
 public sealed class MiniLogisticsWebhookController(
-    IAppDbContext dbContext,
+    IShipmentWebhookService webhookService,
     IOptions<MiniLogisticsOptions> options,
+    TimeProvider timeProvider,
     ILogger<MiniLogisticsWebhookController> logger) : ControllerBase
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [HttpPost]
+    [RequestSizeLimit(64 * 1024)]
     public async Task<IActionResult> HandleWebhook(CancellationToken cancellationToken)
     {
-        var request = HttpContext.Request;
-
-        // 1. Extract headers
-        if (!request.Headers.TryGetValue("X-MiniLogistics-Signature", out var signatureHeader) ||
-            !request.Headers.TryGetValue("X-MiniLogistics-Timestamp", out var timestampHeader))
+        if (!Request.Headers.TryGetValue("X-MiniLogistics-Signature", out var signatureHeader) ||
+            !Request.Headers.TryGetValue("X-MiniLogistics-Timestamp", out var timestampHeader))
         {
-            logger.LogWarning("Webhook missing signature or timestamp headers.");
+            ShipmentIntegrationMetrics.RecordWebhookReject();
+            logger.LogWarning("MiniLogistics webhook is missing security headers");
             return BadRequest("Missing required security headers.");
         }
 
-        // 2. Read raw body for signature verification
-        using var reader = new StreamReader(request.Body);
-        var rawBody = await reader.ReadToEndAsync(cancellationToken);
-
-        // 3. Verify Signature
-        var secret = options.Value.WebhookSecret;
-        if (!VerifySignature(timestampHeader.ToString(), signatureHeader.ToString(), rawBody, secret))
+        var timestampText = timestampHeader.ToString();
+        if (!TryValidateTimestamp(timestampText, out var timestamp))
         {
-            logger.LogWarning("Webhook signature verification failed.");
+            ShipmentIntegrationMetrics.RecordWebhookReject();
+            logger.LogWarning("MiniLogistics webhook timestamp is invalid or outside the allowed window");
+            return Unauthorized("Invalid webhook timestamp.");
+        }
+
+        using var reader = new StreamReader(Request.Body, Encoding.UTF8);
+        var rawBody = await reader.ReadToEndAsync(cancellationToken);
+        if (!VerifySignature(timestampText, signatureHeader.ToString(), rawBody, options.Value.WebhookSecret))
+        {
+            ShipmentIntegrationMetrics.RecordWebhookReject();
+            logger.LogWarning("MiniLogistics webhook signature verification failed");
             return Unauthorized("Invalid signature.");
         }
 
-        // 4. Deserialize Payload
-        MiniLogisticsWebhookPayload? payload;
+        string? eventName;
         try
         {
-            payload = JsonSerializer.Deserialize<MiniLogisticsWebhookPayload>(rawBody, JsonOptions);
+            using var document = JsonDocument.Parse(rawBody);
+            eventName = document.RootElement.TryGetProperty("event", out var eventProperty)
+                ? eventProperty.GetString()
+                : null;
         }
-        catch (JsonException ex)
+        catch (JsonException)
         {
-            logger.LogError(ex, "Failed to deserialize webhook payload.");
+            ShipmentIntegrationMetrics.RecordWebhookReject();
             return BadRequest("Invalid JSON payload.");
         }
 
-        if (payload is null)
-        {
-            return BadRequest("Payload cannot be null.");
-        }
-
-        logger.LogInformation(
-            "Received MiniLogistics webhook event {Event} for order {ExternalOrderId} with status {Status}",
-            payload.Event,
-            payload.ExternalOrderId,
-            payload.Status);
-
-        if (payload.Event == "webhook.test")
+        if (string.Equals(eventName, ShipmentProviderContract.WebhookTestEvent, StringComparison.Ordinal))
         {
             return Ok(new { message = "Test event received successfully." });
         }
 
-        if (payload.Event != "shipment.status_changed")
+        if (eventName is not (ShipmentProviderContract.ShipmentCreatedEvent or ShipmentProviderContract.ShipmentStatusChangedEvent))
         {
-            logger.LogWarning("Unsupported webhook event: {Event}", payload.Event);
-            return Ok(); // Acknowledge to prevent retries for unsupported events
+            logger.LogInformation("Acknowledging unsupported MiniLogistics webhook event {Event}", eventName);
+            return Ok();
         }
 
-        // 5. Update Order Status
-        var order = await dbContext.Orders
-            .FirstOrDefaultAsync(o => o.OrderCode == payload.ExternalOrderId, cancellationToken);
-
-        if (order is null)
+        if (Request.Headers.TryGetValue("X-MiniLogistics-Event", out var eventHeader) &&
+            !string.Equals(eventHeader.ToString(), eventName, StringComparison.Ordinal))
         {
-            logger.LogWarning("Order {OrderCode} not found for webhook tracking code {TrackingCode}", payload.ExternalOrderId, payload.TrackingCode);
-            return NotFound("Order not found.");
+            ShipmentIntegrationMetrics.RecordWebhookReject();
+            return BadRequest("Webhook event header does not match payload.");
         }
 
-        var targetStatus = MapMiniLogisticsStatus(payload.Status);
-        if (targetStatus is null)
-        {
-            logger.LogWarning("Unsupported shipment status: {Status}", payload.Status);
-            return Ok(); // Acknowledge to prevent retries
-        }
-
+        ShipmentWebhookPayload? payload;
         try
         {
-            TransitionOrder(order, targetStatus.Value, $"MiniLogistics status: {payload.Status}", dbContext);
-            await dbContext.SaveChangesAsync(cancellationToken);
+            payload = JsonSerializer.Deserialize<ShipmentWebhookPayload>(rawBody, JsonOptions);
         }
-        catch (DomainException ex)
+        catch (JsonException)
         {
-            logger.LogError(ex, "Failed to transition order {OrderCode} to {TargetStatus}", order.OrderCode, targetStatus);
-            return Conflict(ex.Message);
+            ShipmentIntegrationMetrics.RecordWebhookReject();
+            return BadRequest("Invalid shipment webhook payload.");
         }
 
-        return Ok();
+        if (payload is null)
+        {
+            ShipmentIntegrationMetrics.RecordWebhookReject();
+            return BadRequest("Webhook payload is required.");
+        }
+
+        logger.LogInformation(
+            "Received MiniLogistics event {EventId} for order {OrderCode}, tracking {TrackingCode}, status {ProviderStatus}",
+            payload.EventId,
+            payload.ExternalOrderId,
+            payload.TrackingCode,
+            payload.Status);
+
+        var result = await webhookService.HandleAsync(payload, cancellationToken);
+        if (result.IsSuccess)
+        {
+            return Ok(new { duplicate = result.Value!.IsDuplicate });
+        }
+
+        ShipmentIntegrationMetrics.RecordWebhookReject();
+
+        return result.Status switch
+        {
+            ResultStatus.Validation => BadRequest(result.FirstError),
+            ResultStatus.NotFound => NotFound(result.FirstError),
+            ResultStatus.Conflict => Conflict(result.FirstError),
+            _ => StatusCode(StatusCodes.Status500InternalServerError, result.FirstError)
+        };
     }
 
-    private bool VerifySignature(string timestamp, string signatureHeader, string body, string secret)
+    private bool TryValidateTimestamp(string timestampText, out DateTimeOffset timestamp)
     {
-        if (string.IsNullOrWhiteSpace(timestamp) || string.IsNullOrWhiteSpace(signatureHeader) || string.IsNullOrWhiteSpace(secret))
+        if (!DateTimeOffset.TryParse(
+                timestampText,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out timestamp))
         {
             return false;
         }
 
-        var payload = timestamp + "." + body;
-        var secretBytes = Encoding.UTF8.GetBytes(secret);
-        var payloadBytes = Encoding.UTF8.GetBytes(payload);
-
-        using var hmac = new HMACSHA256(secretBytes);
-        var hashBytes = hmac.ComputeHash(payloadBytes);
-        var hashHex = Convert.ToHexString(hashBytes).ToLowerInvariant();
-
-        var expectedSignature = "sha256=" + hashHex;
-        return CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(expectedSignature),
-            Encoding.UTF8.GetBytes(signatureHeader));
+        var tolerance = TimeSpan.FromSeconds(Math.Max(1, options.Value.WebhookToleranceSeconds));
+        return (timeProvider.GetUtcNow() - timestamp).Duration() <= tolerance;
     }
 
-    private static OrderStatus? MapMiniLogisticsStatus(string miniLogisticsStatus)
+    private static bool VerifySignature(string timestamp, string signature, string body, string secret)
     {
-        return miniLogisticsStatus switch
+        if (string.IsNullOrWhiteSpace(timestamp) ||
+            string.IsNullOrWhiteSpace(signature) ||
+            string.IsNullOrWhiteSpace(secret))
         {
-            "PendingPickup" => OrderStatus.Confirmed,
-            "InTransit" => OrderStatus.Shipping,
-            "OutForDelivery" => OrderStatus.Shipping,
-            "Delivered" => OrderStatus.Completed,
-            "FailedDelivery" => OrderStatus.FailedDelivery,
-            "Returned" => OrderStatus.FailedDelivery,
-            "Cancelled" => OrderStatus.Cancelled,
-            _ => null
-        };
-    }
-
-    private void TransitionOrder(Order order, OrderStatus targetStatus, string? note, IAppDbContext dbContext)
-    {
-        if (order.Status == targetStatus)
-        {
-            return;
+            return false;
         }
 
-        // Try to transition directly first
-        try
-        {
-            var history = order.ChangeStatus(Guid.NewGuid(), targetStatus, note, "MiniLogistics Webhook");
-            dbContext.Add(history);
-            return;
-        }
-        catch (DomainException)
-        {
-            // If direct transition fails, attempt step-by-step transition
-        }
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes($"{timestamp}.{body}"));
+        var expected = Encoding.ASCII.GetBytes($"sha256={Convert.ToHexString(hash).ToLowerInvariant()}");
+        var supplied = Encoding.ASCII.GetBytes(signature.Trim());
 
-        var current = order.Status;
-        if (current == OrderStatus.Pending && (targetStatus == OrderStatus.Shipping || targetStatus == OrderStatus.Completed))
-        {
-            var history1 = order.ChangeStatus(Guid.NewGuid(), OrderStatus.Confirmed, "Confirmed via webhook status change.", "MiniLogistics Webhook");
-            dbContext.Add(history1);
-            current = OrderStatus.Confirmed;
-        }
-
-        if (current == OrderStatus.Confirmed && (targetStatus == OrderStatus.Shipping || targetStatus == OrderStatus.Completed))
-        {
-            var history2 = order.ChangeStatus(Guid.NewGuid(), OrderStatus.Processing, "Processing via webhook status change.", "MiniLogistics Webhook");
-            dbContext.Add(history2);
-            current = OrderStatus.Processing;
-        }
-
-        if (current == OrderStatus.Processing && (targetStatus == OrderStatus.Shipping || targetStatus == OrderStatus.Completed))
-        {
-            var history3 = order.ChangeStatus(Guid.NewGuid(), OrderStatus.Shipping, "Shipped via webhook status change.", "MiniLogistics Webhook");
-            dbContext.Add(history3);
-            current = OrderStatus.Shipping;
-        }
-
-        if (current == OrderStatus.Shipping && targetStatus == OrderStatus.Completed)
-        {
-            var history4 = order.ChangeStatus(Guid.NewGuid(), OrderStatus.Completed, "Delivered via webhook.", "MiniLogistics Webhook");
-            dbContext.Add(history4);
-        }
+        return expected.Length == supplied.Length &&
+            CryptographicOperations.FixedTimeEquals(expected, supplied);
     }
 }
-
-public sealed record MiniLogisticsWebhookPayload(
-    Guid EventId,
-    string Event,
-    string TrackingCode,
-    string ExternalOrderId,
-    string Status,
-    DateTimeOffset ChangedAtUtc);

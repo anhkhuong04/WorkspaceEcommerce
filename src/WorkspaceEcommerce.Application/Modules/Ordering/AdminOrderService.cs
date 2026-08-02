@@ -4,6 +4,7 @@ using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Localization;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Loyalty;
+using WorkspaceEcommerce.Application.Modules.Shipments;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
@@ -16,7 +17,8 @@ internal sealed class AdminOrderService(
     IValidator<UpdateOrderStatusRequest> updateStatusValidator,
     ILoyaltyService loyaltyService,
     ICurrentLanguageProvider languageProvider,
-    ILogger<AdminOrderService> logger) : IAdminOrderService
+    ILogger<AdminOrderService> logger,
+    IOrderShipmentService? shipmentService = null) : IAdminOrderService
 {
     public async Task<Result<PagedResult<AdminOrderListItemDto>>> GetOrdersAsync(
         AdminOrderListRequest request,
@@ -31,31 +33,47 @@ internal sealed class AdminOrderService(
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var normalizedSearch = NormalizeOptional(request.Search);
+        var normalizedSearch = NormalizeOptional(request.Search)?.ToLowerInvariant();
         var status = request.Status;
-        var orders = dbContext.Orders
-            .Where(order => !status.HasValue || order.Status == status.Value)
-            .ToArray()
-            .Where(order => normalizedSearch is null || MatchesSearch(order, normalizedSearch))
-            .OrderByDescending(order => order.CreatedAt)
-            .ThenByDescending(order => order.OrderCode)
-            .ToArray();
+        var query = dbContext.Orders
+            .Where(order => !status.HasValue || order.Status == status.Value);
+        if (normalizedSearch is not null)
+        {
+            query = query.Where(order =>
+                order.OrderCode.ToLower().Contains(normalizedSearch) ||
+                order.CustomerName.ToLower().Contains(normalizedSearch) ||
+                order.CustomerPhone.ToLower().Contains(normalizedSearch) ||
+                (order.TrackingCode != null && order.TrackingCode.ToLower().Contains(normalizedSearch)));
+        }
 
-        var itemCountsByOrderId = dbContext.OrderItems
-            .GroupBy(item => item.OrderId)
-            .ToDictionary(group => group.Key, group => group.Count());
+        var totalCount = query.Count();
         var pageNumber = request.NormalizedPageNumber;
         var pageSize = request.NormalizedPageSize;
-        var items = orders
+        var orders = query
+            .OrderByDescending(order => order.CreatedAt)
+            .ThenByDescending(order => order.OrderCode)
             .Skip(request.Skip)
             .Take(pageSize)
-            .Select(order => ToListItemDto(order, itemCountsByOrderId.GetValueOrDefault(order.Id)))
+            .ToArray();
+        var orderIds = orders.Select(order => order.Id).ToArray();
+        var itemCountsByOrderId = dbContext.OrderItems
+            .Where(item => orderIds.Contains(item.OrderId))
+            .GroupBy(item => item.OrderId)
+            .ToDictionary(group => group.Key, group => group.Count());
+        var shipmentStatusesByOrderId = dbContext.OrderShipments
+            .Where(shipment => orderIds.Contains(shipment.OrderId))
+            .ToDictionary(shipment => shipment.OrderId, shipment => shipment.ProviderStatus);
+        var items = orders
+            .Select(order => ToListItemDto(
+                order,
+                itemCountsByOrderId.GetValueOrDefault(order.Id),
+                shipmentStatusesByOrderId.GetValueOrDefault(order.Id)))
             .ToArray();
         var page = new PagedResult<AdminOrderListItemDto>(
             items,
             pageNumber,
             pageSize,
-            orders.Length);
+            totalCount);
 
         return Result<PagedResult<AdminOrderListItemDto>>.Success(page);
     }
@@ -107,6 +125,16 @@ internal sealed class AdminOrderService(
             if (request.Status == OrderStatus.Completed)
             {
                 await TryEarnLoyaltyPointsAsync(order.Id, cancellationToken);
+            }
+
+            if (request.Status == OrderStatus.Cancelled &&
+                !string.IsNullOrWhiteSpace(order.TrackingCode) &&
+                shipmentService is not null)
+            {
+                await shipmentService.QueueCancelAsync(
+                    order.Id,
+                    request.Note ?? "Order cancelled by admin.",
+                    cancellationToken);
             }
 
             return Result<AdminOrderDto>.Success(ToDetailDto(order));
@@ -595,7 +623,7 @@ internal sealed class AdminOrderService(
             statusHistory.Select(ToStatusHistoryDto).ToArray());
     }
 
-    private static AdminOrderListItemDto ToListItemDto(Order order, int itemCount)
+    private static AdminOrderListItemDto ToListItemDto(Order order, int itemCount, string? shipmentStatus = null)
     {
         return new AdminOrderListItemDto(
             order.Id,
@@ -609,7 +637,9 @@ internal sealed class AdminOrderService(
             order.PaidAt,
             order.CreatedAt,
             order.UpdatedAt,
-            itemCount);
+            itemCount,
+            order.TrackingCode,
+            shipmentStatus);
     }
 
     private static OrderItemDto ToItemDto(OrderItem item)
@@ -634,13 +664,6 @@ internal sealed class AdminOrderService(
             history.Note,
             history.ChangedBy,
             history.ChangedAt);
-    }
-
-    private static bool MatchesSearch(Order order, string search)
-    {
-        return order.OrderCode.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-            order.CustomerName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-            order.CustomerPhone.Contains(search, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? NormalizeOptional(string? value)

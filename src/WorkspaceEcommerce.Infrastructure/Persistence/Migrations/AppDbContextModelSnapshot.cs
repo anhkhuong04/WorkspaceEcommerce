@@ -1270,6 +1270,11 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_orders_status");
 
+                    b.HasIndex("TrackingCode")
+                        .IsUnique()
+                        .HasDatabaseName("ux_orders_tracking_code")
+                        .HasFilter("tracking_code IS NOT NULL");
+
                     b.ToTable("orders", "ordering");
                 });
 
@@ -1497,6 +1502,248 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                     b.ToTable("reviews", "catalog");
                 });
 
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.OrderShipment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("currency");
+
+                    b.Property<DateTimeOffset>("LastEventAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_event_at_utc");
+
+                    b.Property<DateTimeOffset>("LastSyncedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_synced_at_utc");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("provider");
+
+                    b.Property<Guid>("ProviderShipmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("provider_shipment_id");
+
+                    b.Property<string>("ProviderStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("provider_status");
+
+                    b.Property<decimal>("ShippingFeeAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("shipping_fee_amount");
+
+                    b.Property<string>("TrackingCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("tracking_code");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_order_shipments_order_id");
+
+                    b.HasIndex("ProviderStatus")
+                        .HasDatabaseName("ix_order_shipments_provider_status");
+
+                    b.HasIndex("TrackingCode")
+                        .IsUnique()
+                        .HasDatabaseName("ux_order_shipments_tracking_code");
+
+                    b.HasIndex("Provider", "ProviderShipmentId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_order_shipments_provider_shipment_id");
+
+                    b.ToTable("order_shipments", "shipping");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShipmentCommandOutbox", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<string>("CommandType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("command_type");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at_utc");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset>("NextAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at_utc");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("reason");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompletedAtUtc", "NextAttemptAtUtc")
+                        .HasDatabaseName("ix_shipment_command_outbox_due");
+
+                    b.HasIndex("OrderId", "CommandType")
+                        .IsUnique()
+                        .HasDatabaseName("ux_shipment_command_outbox_active_order_type")
+                        .HasFilter("completed_at_utc IS NULL");
+
+                    b.ToTable("shipment_command_outbox", "shipping");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShipmentEventInbox", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<DateTimeOffset>("ChangedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at_utc");
+
+                    b.Property<string>("EventName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("event_name");
+
+                    b.Property<string>("ExternalOrderId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("external_order_id");
+
+                    b.Property<DateTimeOffset?>("ProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at_utc");
+
+                    b.Property<string>("ProcessingError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("processing_error");
+
+                    b.Property<string>("ProviderStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("provider_status");
+
+                    b.Property<DateTimeOffset>("ReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at_utc");
+
+                    b.Property<string>("TrackingCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("tracking_code");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReceivedAtUtc")
+                        .HasDatabaseName("ix_shipment_event_inbox_received_at_utc");
+
+                    b.ToTable("shipment_event_inbox", "shipping");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShipmentTimelineEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("ChangedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at_utc");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("OrderShipmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_shipment_id");
+
+                    b.Property<Guid?>("ProviderEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("provider_event_id");
+
+                    b.Property<string>("ProviderStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("provider_status");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("source");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProviderEventId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_shipment_timeline_provider_event_id")
+                        .HasFilter("provider_event_id IS NOT NULL");
+
+                    b.HasIndex("OrderShipmentId", "ChangedAtUtc", "ProviderStatus")
+                        .IsUnique()
+                        .HasDatabaseName("ux_shipment_timeline_state_time");
+
+                    b.ToTable("shipment_timeline_entries", "shipping");
+                });
+
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Blogs.BlogComment", b =>
                 {
                     b.HasOne("WorkspaceEcommerce.Domain.Modules.Blogs.BlogPost", null)
@@ -1702,6 +1949,33 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.OrderShipment", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Ordering.Order", null)
+                        .WithOne()
+                        .HasForeignKey("WorkspaceEcommerce.Domain.Modules.Shipments.OrderShipment", "OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShipmentCommandOutbox", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Ordering.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShipmentTimelineEntry", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Shipments.OrderShipment", null)
+                        .WithMany()
+                        .HasForeignKey("OrderShipmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

@@ -68,7 +68,8 @@ import type {
   CreateReviewRequest,
   ReviewDto,
   RedeemLoyaltyPointsRequest,
-  RedeemLoyaltyPointsResponse
+  RedeemLoyaltyPointsResponse,
+  ShipmentTrackingDto
 } from "@workspace-ecommerce/api-types";
 import { ApiClient } from "./httpClient";
 
@@ -107,6 +108,8 @@ export function createStorefrontApi(client: ApiClient) {
     getShippingQuote: (request: GetShippingQuoteRequest) =>
       client.post<GetShippingQuoteResponse, GetShippingQuoteRequest>("/api/checkout/shipping-quote", request),
     lookupOrder: (request: OrderLookupRequest) => client.get<OrderLookupResponse>(`/api/orders/lookup${buildQuery(request)}`),
+    lookupOrderTracking: (request: OrderLookupRequest) =>
+      client.get<ShipmentTrackingDto>(`/api/orders/lookup/tracking${buildQuery(request)}`),
     getPaymentResult: (orderCode: string, phone?: string | null) =>
       client.get<PaymentResultDto>(`/api/payments/result${buildQuery({ orderCode, phone: phone ?? "" })}`),
     registerCustomer: (request: CustomerRegisterRequest) =>
@@ -121,6 +124,7 @@ export function createStorefrontApi(client: ApiClient) {
     getCustomerOrders: (request: CustomerOrderListRequest = {}) =>
       client.get<PagedResult<CustomerOrderListItemDto>>(`/api/customer/orders${buildQuery(request)}`),
     getCustomerOrder: (id: string) => client.get<CustomerOrderDto>(`/api/customer/orders/${id}`),
+    getCustomerOrderTracking: (id: string) => client.get<ShipmentTrackingDto>(`/api/customer/orders/${id}/tracking`),
     getMyLoyalty: () => client.get<LoyaltyAccountDto>("/api/loyalty/me"),
     getLoyaltyTransactions: (request: LoyaltyTransactionListRequest = {}) =>
       client.get<PagedResult<LoyaltyTransactionDto>>(`/api/loyalty/me/transactions${buildQuery(request)}`),
@@ -178,6 +182,11 @@ export function createAdminApi(client: ApiClient) {
     getOrder: (id: string) => client.get<AdminOrderDto>(`/api/admin/orders/${id}`),
     updateOrderStatus: (id: string, request: UpdateOrderStatusRequest) =>
       client.put<AdminOrderDto, UpdateOrderStatusRequest>(`/api/admin/orders/${id}/status`, request),
+    getOrderShipment: (id: string) => client.get<ShipmentTrackingDto>(`/api/admin/orders/${id}/shipment`),
+    refreshOrderShipment: (id: string) => client.post<ShipmentTrackingDto, void>(`/api/admin/orders/${id}/shipment/refresh`, undefined),
+    retryOrderShipment: (id: string) => client.post<ShipmentTrackingDto, void>(`/api/admin/orders/${id}/shipment/retry`, undefined),
+    cancelOrderShipment: (id: string, reason: string) =>
+      client.post<ShipmentTrackingDto, { reason: string }>(`/api/admin/orders/${id}/shipment/cancel`, { reason }),
     previewOrderImport: (file: File) => {
       const formData = new FormData();
       formData.set("file", file);

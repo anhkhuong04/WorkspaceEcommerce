@@ -10,6 +10,7 @@ using WorkspaceEcommerce.Domain.Modules.Loyalty;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Payments;
 using WorkspaceEcommerce.Domain.Modules.Reviews;
+using WorkspaceEcommerce.Domain.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Infrastructure.Persistence;
 
@@ -25,6 +26,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
 
     public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
+
+    public DbSet<OrderShipment> OrderShipments => Set<OrderShipment>();
+
+    public DbSet<ShipmentTimelineEntry> ShipmentTimelineEntries => Set<ShipmentTimelineEntry>();
+
+    public DbSet<ShipmentEventInbox> ShipmentEventInbox => Set<ShipmentEventInbox>();
+
+    public DbSet<ShipmentCommandOutbox> ShipmentCommandOutbox => Set<ShipmentCommandOutbox>();
 
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
 
@@ -101,6 +110,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     IQueryable<OrderItem> IOrderReadStore.OrderItems => OrderItems;
 
     IQueryable<OrderStatusHistory> IOrderReadStore.OrderStatusHistories => OrderStatusHistories;
+
+    IQueryable<OrderShipment> IOrderReadStore.OrderShipments => OrderShipments;
+
+    IQueryable<ShipmentTimelineEntry> IOrderReadStore.ShipmentTimelineEntries => ShipmentTimelineEntries;
+
+    IQueryable<ShipmentEventInbox> IOrderReadStore.ShipmentEventInbox => ShipmentEventInbox;
+
+    IQueryable<ShipmentCommandOutbox> IOrderReadStore.ShipmentCommandOutbox => ShipmentCommandOutbox;
 
     IQueryable<PaymentTransaction> IAppDbContext.PaymentTransactions => PaymentTransactions;
 

@@ -14,4 +14,9 @@ public interface IShipmentService
     Task<TrackingResponse> GetTrackingAsync(
         string trackingCode,
         CancellationToken cancellationToken = default);
+
+    Task<TrackingResponse> CancelShipmentAsync(
+        string trackingCode,
+        string reason,
+        CancellationToken cancellationToken = default);
 }

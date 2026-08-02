@@ -62,13 +62,15 @@ public static class DependencyInjection
             .GetSection(MiniLogisticsOptions.SectionName)
             .Get<MiniLogisticsOptions>() ?? new MiniLogisticsOptions();
         services.Configure<MiniLogisticsOptions>(configuration.GetSection(MiniLogisticsOptions.SectionName));
+        services.AddSingleton<MiniLogisticsFailureGate>();
         services.AddHttpClient<IShipmentService, MiniLogisticsClient>(client =>
         {
             client.BaseAddress = new Uri(miniLogisticsOptions.BaseUrl.TrimEnd('/') + "/");
             client.DefaultRequestHeaders.Authorization =
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", miniLogisticsOptions.ApiKey);
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = Timeout.InfiniteTimeSpan;
         });
+        services.AddHostedService<ShipmentCommandWorker>();
 
         return services;
     }

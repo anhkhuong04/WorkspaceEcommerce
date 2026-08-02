@@ -1,11 +1,12 @@
 ﻿import { zodResolver } from "@hookform/resolvers/zod";
-import type { OrderDto, PaymentStatus } from "@workspace-ecommerce/api-types";
+import type { OrderDto, PaymentStatus, ShipmentTrackingDto } from "@workspace-ecommerce/api-types";
 import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { PageHeader } from "../../components/ui/PageHeader";
+import { ShipmentTrackingPanel } from "../../components/shipment/ShipmentTrackingPanel";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
 
@@ -37,6 +38,7 @@ const paymentStatusStyles: Record<PaymentStatus, string> = {
 export function OrderLookupPage() {
   const [searchParams] = useSearchParams();
   const [result, setResult] = useState<OrderDto | null>(null);
+  const [tracking, setTracking] = useState<ShipmentTrackingDto | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -56,10 +58,13 @@ export function OrderLookupPage() {
     setIsLoading(true);
     setLookupError(null);
     setResult(null);
+    setTracking(null);
 
     try {
       const response = await storefrontApi.lookupOrder(values);
       setResult(response.order);
+      const shipment = await storefrontApi.lookupOrderTracking(values);
+      setTracking(shipment);
     } catch (error) {
       setLookupError(getApiErrorMessage(error));
     } finally {
@@ -175,6 +180,14 @@ export function OrderLookupPage() {
           </div>
         </section>
       )}
+
+      {result && tracking ? (
+        <section className="ui-card border border-slate-100 p-6">
+          <p className="ui-caption uppercase tracking-[0.18em] text-[var(--brand)]">Shipment</p>
+          <h2 className="ui-h3 mt-2 text-slate-950">Carrier tracking</h2>
+          <div className="mt-5"><ShipmentTrackingPanel tracking={tracking} /></div>
+        </section>
+      ) : null}
     </div>
   );
 }

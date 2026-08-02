@@ -11,7 +11,8 @@ import type {
   LoyaltyTransactionType,
   OrderStatus,
   PaymentStatus,
-  RedeemLoyaltyPointsResponse
+  RedeemLoyaltyPointsResponse,
+  ShipmentTrackingDto
 } from "@workspace-ecommerce/api-types";
 import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
 import type { ReactNode } from "react";
@@ -20,6 +21,7 @@ import { useForm } from "react-hook-form";
 import { Link, NavLink, useNavigate, useParams } from "react-router-dom";
 import { z } from "zod";
 import { PageHeader } from "../../components/ui/PageHeader";
+import { ShipmentTrackingPanel } from "../../components/shipment/ShipmentTrackingPanel";
 import { useCustomerAuth } from "../../features/customer-auth/useCustomerAuth";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
@@ -413,13 +415,18 @@ export function AccountOrderDetailPage() {
     queryFn: () => storefrontApi.getCustomerOrder(id ?? ""),
     enabled: Boolean(id)
   });
+  const trackingQuery = useQuery({
+    queryKey: ["customer", "order", id, "tracking"],
+    queryFn: () => storefrontApi.getCustomerOrderTracking(id ?? ""),
+    enabled: Boolean(id)
+  });
 
   return (
     <AccountShell>
       {!id ? <StateMessage tone="error">Missing order id.</StateMessage> : null}
       {orderQuery.isLoading ? <StateMessage>Loading order...</StateMessage> : null}
       {orderQuery.error ? <StateMessage tone="error">{getApiErrorMessage(orderQuery.error)}</StateMessage> : null}
-      {orderQuery.data ? <OrderDetail order={orderQuery.data} /> : null}
+      {orderQuery.data ? <OrderDetail order={orderQuery.data} tracking={trackingQuery.data ?? null} /> : null}
     </AccountShell>
   );
 }
@@ -612,7 +619,7 @@ function TierBadge({ tier }: { tier: LoyaltyTierType }) {
   );
 }
 
-function OrderDetail({ order }: { order: CustomerOrderDto }) {
+function OrderDetail({ order, tracking }: { order: CustomerOrderDto; tracking: ShipmentTrackingDto | null }) {
   return (
     <div className="grid gap-6">
       <section className="ui-card border border-slate-100 p-6">
@@ -657,6 +664,13 @@ function OrderDetail({ order }: { order: CustomerOrderDto }) {
           </aside>
         </div>
       </section>
+      {tracking ? (
+        <section className="ui-card border border-slate-100 p-6">
+          <p className="ui-caption uppercase tracking-[0.18em] text-[var(--brand)]">Shipment</p>
+          <h2 className="ui-h3 mt-2 text-slate-950">Carrier tracking</h2>
+          <div className="mt-5"><ShipmentTrackingPanel tracking={tracking} /></div>
+        </section>
+      ) : null}
     </div>
   );
 }

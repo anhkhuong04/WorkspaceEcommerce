@@ -16,3 +16,11 @@ export function useAdminOrder(orderId: string | null) {
     enabled: orderId !== null
   });
 }
+
+export function useAdminOrderShipment(orderId: string | null) {
+  return useQuery({
+    queryKey: ["admin-order-shipment", orderId],
+    queryFn: () => adminApi.getOrderShipment(orderId ?? ""),
+    enabled: orderId !== null
+  });
+}

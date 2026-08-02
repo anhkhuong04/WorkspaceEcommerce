@@ -99,3 +99,30 @@ export interface OrderLookupRequest {
 export interface OrderLookupResponse {
   order: OrderDto;
 }
+
+export interface ShipmentTimelineEntryDto {
+  id: string;
+  providerStatus: string;
+  note: string | null;
+  changedAtUtc: string;
+  source: string;
+}
+
+export interface ShipmentTrackingDto {
+  orderId: string;
+  orderCode: string;
+  orderStatus: OrderStatus;
+  shipmentId: string | null;
+  trackingCode: string | null;
+  provider: string | null;
+  providerStatus: string | null;
+  shippingFeeAmount: number | null;
+  currency: string | null;
+  lastSyncedAtUtc: string | null;
+  lastEventAtUtc: string | null;
+  canRetry: boolean;
+  canRefresh: boolean;
+  canCancel: boolean;
+  lastCommandError: string | null;
+  timeline: ShipmentTimelineEntryDto[];
+}

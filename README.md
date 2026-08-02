@@ -306,8 +306,13 @@ Full reference for all variables in `.env.example`:
 | `Jwt__SigningKey`                | —                                                 | ✅       | JWT signing secret (min. 32 bytes)     |
 | `Jwt__AccessTokenMinutes`        | `60`                                              |          | Token expiry in minutes                |
 | `MiniLogistics__BaseUrl`         | `http://host.docker.internal:5221/api/v1/partner` |          | MiniLogistics API base URL             |
-| `MiniLogistics__ApiKey`          | `ml_demo_partner_key_123456`                      |          | MiniLogistics API key                  |
+| `MiniLogistics__ApiKey`          | `ml_test_demo_partner_key_123456`                 |          | Sandbox MiniLogistics API key          |
 | `MiniLogistics__WebhookSecret`   | `minilogistics_webhook_secret_dev`                |          | Webhook verification secret            |
+| `MiniLogistics__OperationTimeoutSeconds` | `10`                                     |          | Timeout for each provider attempt      |
+| `MiniLogistics__MaxRetryAttempts` | `2`                                               |          | Transient retries per operation        |
+| `MiniLogistics__CircuitBreakerFailureThreshold` | `5`                                  |          | Failures before opening provider gate  |
+| `MiniLogistics__CircuitBreakerBreakSeconds` | `30`                                       |          | Provider gate open duration            |
+| `MiniLogistics__CommandWorkerIntervalSeconds` | `15`                                      |          | Shipment outbox polling interval       |
 | `Payment__VNPay__TmnCode`        | `DEMO`                                            |          | VNPay terminal code                    |
 | `Payment__VNPay__HashSecret`     | `DEMO_SECRET`                                     |          | VNPay hash secret                      |
 

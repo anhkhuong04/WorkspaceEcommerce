@@ -21,8 +21,15 @@ services:
       Jwt__SigningKey: ${Jwt__SigningKey:?Set Jwt__SigningKey in .env}
       Jwt__AccessTokenMinutes: ${Jwt__AccessTokenMinutes:-60}
       MiniLogistics__BaseUrl: ${MiniLogistics__BaseUrl:-http://host.docker.internal:5221/api/v1/partner}
-      MiniLogistics__ApiKey: ${MiniLogistics__ApiKey:-ml_demo_partner_key_123456}
+      MiniLogistics__ApiKey: ${MiniLogistics__ApiKey:-ml_test_demo_partner_key_123456}
       MiniLogistics__WebhookSecret: ${MiniLogistics__WebhookSecret:-minilogistics_webhook_secret_dev}
+      MiniLogistics__WebhookToleranceSeconds: ${MiniLogistics__WebhookToleranceSeconds:-300}
+      MiniLogistics__OperationTimeoutSeconds: ${MiniLogistics__OperationTimeoutSeconds:-10}
+      MiniLogistics__MaxRetryAttempts: ${MiniLogistics__MaxRetryAttempts:-2}
+      MiniLogistics__RetryBaseDelayMilliseconds: ${MiniLogistics__RetryBaseDelayMilliseconds:-250}
+      MiniLogistics__CircuitBreakerFailureThreshold: ${MiniLogistics__CircuitBreakerFailureThreshold:-5}
+      MiniLogistics__CircuitBreakerBreakSeconds: ${MiniLogistics__CircuitBreakerBreakSeconds:-30}
+      MiniLogistics__CommandWorkerIntervalSeconds: ${MiniLogistics__CommandWorkerIntervalSeconds:-15}
       Storefront__BaseUrl: ${Storefront__BaseUrl:-http://localhost:5173}
       Payment__VNPay__TmnCode: ${Payment__VNPay__TmnCode:-DEMO}
       Payment__VNPay__HashSecret: ${Payment__VNPay__HashSecret:-DEMO_SECRET}

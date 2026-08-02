@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { AdminOrderDto, AdminOrderListRequest, OrderStatus, PaymentStatus } from "@workspace-ecommerce/api-types";
+import type { AdminOrderDto, AdminOrderListRequest, OrderStatus, PaymentStatus, ShipmentTrackingDto } from "@workspace-ecommerce/api-types";
 import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -9,7 +9,7 @@ import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
 import { Button, Drawer, EmptyState, Field, Notice, Pill, SelectInput, TextArea, TextInput } from "../../components/ui/AdminUi";
-import { useAdminOrder, useAdminOrders } from "../../hooks/queries/useAdminOrders";
+import { useAdminOrder, useAdminOrders, useAdminOrderShipment } from "../../hooks/queries/useAdminOrders";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { formatLocalizedText } from "../../utils/localizedText";
@@ -63,6 +63,7 @@ export function OrdersPage() {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const ordersQuery = useAdminOrders(request);
   const orderQuery = useAdminOrder(selectedOrderId);
+  const shipmentQuery = useAdminOrderShipment(selectedOrderId);
   const order = orderQuery.data;
   const nextStatuses = useMemo(() => order ? nextStatusesByStatus[order.status] : [], [order]);
 
@@ -83,6 +84,46 @@ export function OrdersPage() {
       queryClient.setQueryData(["admin-order", selectedOrderId], updatedOrder);
       await Promise.all([queryClient.invalidateQueries({ queryKey: ["admin-orders"] }), queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] })]);
       setNotice({ type: "success", message: "Order status updated." });
+    },
+    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
+  });
+
+  const refreshShipmentMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedOrderId) throw new Error("Order is required.");
+      return adminApi.refreshOrderShipment(selectedOrderId);
+    },
+    onSuccess: (shipment) => {
+      queryClient.setQueryData(["admin-order-shipment", selectedOrderId], shipment);
+      setNotice({ type: "success", message: "Shipment tracking refreshed." });
+    },
+    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
+  });
+
+  const retryShipmentMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedOrderId) throw new Error("Order is required.");
+      return adminApi.retryOrderShipment(selectedOrderId);
+    },
+    onSuccess: async (shipment) => {
+      queryClient.setQueryData(["admin-order-shipment", selectedOrderId], shipment);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-order", selectedOrderId] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-orders"] })
+      ]);
+      setNotice({ type: "success", message: "Shipment created." });
+    },
+    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
+  });
+
+  const cancelShipmentMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedOrderId) throw new Error("Order is required.");
+      return adminApi.cancelOrderShipment(selectedOrderId, "Order cancelled by admin.");
+    },
+    onSuccess: (shipment) => {
+      queryClient.setQueryData(["admin-order-shipment", selectedOrderId], shipment);
+      setNotice({ type: "success", message: shipment.providerStatus === "Cancelled" ? "Shipment cancelled." : "Shipment cancellation queued." });
     },
     onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
   });
@@ -167,6 +208,22 @@ export function OrdersPage() {
             </section>
 
             <section className="rounded-3xl border border-slate-200 p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-lg font-black">Shipment</h3>
+                {shipmentQuery.data ? (
+                  <div className="flex flex-wrap gap-2">
+                    {shipmentQuery.data.canRefresh ? <Button type="button" disabled={refreshShipmentMutation.isPending} onClick={() => refreshShipmentMutation.mutate()}>{refreshShipmentMutation.isPending ? "Refreshing..." : "Refresh"}</Button> : null}
+                    {shipmentQuery.data.canRetry ? <Button type="button" variant="primary" disabled={retryShipmentMutation.isPending} onClick={() => retryShipmentMutation.mutate()}>{retryShipmentMutation.isPending ? "Retrying..." : "Retry creation"}</Button> : null}
+                    {shipmentQuery.data.canCancel ? <Button type="button" variant="danger" disabled={cancelShipmentMutation.isPending} onClick={() => { if (window.confirm("Cancel this carrier shipment?")) cancelShipmentMutation.mutate(); }}>{cancelShipmentMutation.isPending ? "Cancelling..." : "Cancel shipment"}</Button> : null}
+                  </div>
+                ) : null}
+              </div>
+              {shipmentQuery.isLoading ? <div className="h-24 animate-pulse rounded-2xl bg-slate-100" /> : null}
+              {shipmentQuery.isError ? <Notice type="error" title="Shipment could not be loaded">{getApiErrorMessage(shipmentQuery.error)}</Notice> : null}
+              {shipmentQuery.data ? <AdminShipmentPanel shipment={shipmentQuery.data} /> : null}
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 p-5">
               <h3 className="mb-3 text-lg font-black">Items</h3>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[680px] text-left text-sm">
@@ -223,4 +280,37 @@ function formatDiscountLabel(order: AdminOrderDto): string {
 
 function formatCouponSnapshot(order: AdminOrderDto): string {
   return order.couponNameSnapshot ? `${order.couponCodeSnapshot} - ${formatLocalizedText(order.couponNameSnapshot)}` : order.couponCodeSnapshot ?? "";
+}
+
+function AdminShipmentPanel({ shipment }: { shipment: ShipmentTrackingDto }) {
+  if (!shipment.trackingCode) {
+    return <EmptyState>{shipment.lastCommandError ? "Carrier is unavailable. Shipment creation is queued for retry." : "Shipment has not been created."}</EmptyState>;
+  }
+
+  return (
+    <div className="grid gap-5">
+      <div className="grid gap-3 text-sm sm:grid-cols-2">
+        <Info label="Tracking code" value={<span className="font-mono">{shipment.trackingCode}</span>} />
+        <Info label="Provider status" value={formatProviderStatus(shipment.providerStatus)} />
+        <Info label="Provider" value={shipment.provider ?? "MiniLogistics"} />
+        <Info label="Last sync" value={shipment.lastSyncedAtUtc ? formatDate(shipment.lastSyncedAtUtc) : "-"} />
+      </div>
+      {shipment.timeline.length ? (
+        <div className="grid gap-3 border-t border-slate-100 pt-4">
+          {shipment.timeline.map((entry) => (
+            <div key={entry.id} className="border-l-4 border-emerald-600 pl-4">
+              <p className="font-bold">{formatProviderStatus(entry.providerStatus)}</p>
+              <p className="text-sm text-slate-500">{formatDate(entry.changedAtUtc)}</p>
+              {entry.note ? <p className="mt-1 text-sm text-slate-700">{entry.note}</p> : null}
+            </div>
+          ))}
+        </div>
+      ) : <EmptyState>No carrier timeline events yet</EmptyState>}
+    </div>
+  );
+}
+
+function formatProviderStatus(status: string | null): string {
+  if (!status) return "Pending";
+  return status.replace(/([a-z])([A-Z])/g, "$1 $2");
 }

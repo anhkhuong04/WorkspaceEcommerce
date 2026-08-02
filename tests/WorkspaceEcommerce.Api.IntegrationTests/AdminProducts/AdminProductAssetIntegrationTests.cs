@@ -22,7 +22,7 @@ public sealed class AdminProductAssetIntegrationTests(ApiIntegrationTestFixture 
         var list = await listResponse.ReadJsonAsync();
 
         Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
-        Assert.Empty(list["data"]!.AsArray());
+        Assert.Empty(list["data"]!["items"]!.AsArray());
     }
 
     [Fact]
@@ -92,9 +92,9 @@ public sealed class AdminProductAssetIntegrationTests(ApiIntegrationTestFixture 
         var listJson = await listResponse.ReadJsonAsync();
 
         Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
-        Assert.Equal(category.Id, listJson["data"]![0]!["categoryId"]!.GetValue<Guid>());
-        Assert.Equal("https://example.test/desk-updated.jpg", listJson["data"]![0]!["images"]![0]!["imageUrl"]!.GetValue<string>());
-        Assert.Equal("Frame", listJson["data"]![0]!["specifications"]![0]!["name"]!.GetValue<string>());
+        Assert.Equal(category.Id, listJson["data"]!["items"]![0]!["categoryId"]!.GetValue<Guid>());
+        Assert.Equal("https://example.test/desk-updated.jpg", listJson["data"]!["items"]![0]!["images"]![0]!["imageUrl"]!.GetValue<string>());
+        Assert.Equal("Frame", listJson["data"]!["items"]![0]!["specifications"]![0]!["name"]!.GetValue<string>());
 
         using var deleteImageResponse = await client.DeleteAsync($"/api/admin/product-images/{imageId}");
         using var deleteSpecificationResponse = await client.DeleteAsync($"/api/admin/product-specifications/{specificationId}");
@@ -105,8 +105,8 @@ public sealed class AdminProductAssetIntegrationTests(ApiIntegrationTestFixture 
         using var listAfterDeleteResponse = await client.GetAsync("/api/admin/products");
         var listAfterDeleteJson = await listAfterDeleteResponse.ReadJsonAsync();
 
-        Assert.Empty(listAfterDeleteJson["data"]![0]!["images"]!.AsArray());
-        Assert.Empty(listAfterDeleteJson["data"]![0]!["specifications"]!.AsArray());
+        Assert.Empty(listAfterDeleteJson["data"]!["items"]![0]!["images"]!.AsArray());
+        Assert.Empty(listAfterDeleteJson["data"]!["items"]![0]!["specifications"]!.AsArray());
     }
 
     [Fact]

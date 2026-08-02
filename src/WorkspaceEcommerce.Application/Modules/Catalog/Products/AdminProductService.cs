@@ -21,8 +21,7 @@ internal sealed class AdminProductService(
         var pageNumber = request.NormalizedPageNumber;
         var pageSize = request.NormalizedPageSize;
         var productsQuery = catalogStore.Products
-            .OrderBy(product => product.Name["en"])
-            .ThenBy(product => product.Slug);
+            .OrderBy(product => product.Slug);
 
         var totalCount = await productsQuery.CountAsyncSafe(cancellationToken);
         var products = await productsQuery

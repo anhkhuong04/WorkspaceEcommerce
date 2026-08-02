@@ -4,6 +4,7 @@ using WorkspaceEcommerce.Application.Abstractions.Notifications;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Ordering;
+using WorkspaceEcommerce.Application.Modules.Shipments;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Application.Modules.Customers.Orders;
@@ -12,7 +13,8 @@ internal sealed class CustomerOrderService(
     IAppDbContext dbContext,
     ICurrentCustomerContext currentCustomer,
     INotificationService notificationService,
-    IValidator<CustomerOrderListRequest> listValidator) : ICustomerOrderService
+    IValidator<CustomerOrderListRequest> listValidator,
+    IOrderShipmentService? shipmentService = null) : ICustomerOrderService
 {
     public async Task<Result<PagedResult<CustomerOrderListItemDto>>> GetOrdersAsync(
         CustomerOrderListRequest request,
@@ -127,6 +129,11 @@ internal sealed class CustomerOrderService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(order.TrackingCode) && shipmentService is not null)
+        {
+            await shipmentService.QueueCancelAsync(order.Id, cancelNote, cancellationToken);
+        }
 
         // Send real-time notification
         await notificationService.NotifyCustomerAsync(

@@ -5,12 +5,15 @@ using WorkspaceEcommerce.Api.Extensions;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Customers.Orders;
+using WorkspaceEcommerce.Application.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Api.Controllers.Customer;
 
 [ApiController]
 [Authorize(Roles = AuthRoles.Customer)]
-public sealed class CustomerOrdersController(ICustomerOrderService customerOrderService) : ControllerBase
+public sealed class CustomerOrdersController(
+    ICustomerOrderService customerOrderService,
+    IOrderShipmentService shipmentService) : ControllerBase
 {
     [HttpGet("api/customer/orders")]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<CustomerOrderListItemDto>>), StatusCodes.Status200OK)]
@@ -37,6 +40,16 @@ public sealed class CustomerOrdersController(ICustomerOrderService customerOrder
         CancellationToken cancellationToken)
     {
         var result = await customerOrderService.GetOrderByIdAsync(id, cancellationToken);
+        return this.ToApiResponse(result);
+    }
+
+    [HttpGet("api/customer/orders/{id:guid}/tracking")]
+    [ProducesResponseType(typeof(ApiResponse<ShipmentTrackingDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetTracking(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await shipmentService.GetCustomerTrackingAsync(id, cancellationToken);
         return this.ToApiResponse(result);
     }
 

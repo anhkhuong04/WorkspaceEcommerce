@@ -157,6 +157,11 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasIndex(order => order.PaymentStatus)
             .HasDatabaseName("ix_orders_payment_status");
 
+        builder.HasIndex(order => order.TrackingCode)
+            .IsUnique()
+            .HasFilter("tracking_code IS NOT NULL")
+            .HasDatabaseName("ux_orders_tracking_code");
+
         builder.HasOne<Customer>()
             .WithMany()
             .HasForeignKey(order => order.CustomerId)

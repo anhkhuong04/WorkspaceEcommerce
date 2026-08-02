@@ -27,7 +27,7 @@ export function OrdersTable({ orders, isLoading, onView }: OrdersTableProps) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1120px] text-left text-sm">
+      <table className="w-full min-w-[1240px] text-left text-sm">
         <thead className="text-xs uppercase tracking-wide text-slate-500">
           <tr className="border-b border-slate-100">
             <th className="py-3 pr-4">Code</th>
@@ -38,6 +38,7 @@ export function OrdersTable({ orders, isLoading, onView }: OrdersTableProps) {
             <th className="py-3 pr-4">Status</th>
             <th className="py-3 pr-4">Payment</th>
             <th className="py-3 pr-4">Payment status</th>
+            <th className="py-3 pr-4">Shipment</th>
             <th className="py-3 pr-4">Created</th>
             <th className="py-3 pr-4">Actions</th>
           </tr>
@@ -53,6 +54,14 @@ export function OrdersTable({ orders, isLoading, onView }: OrdersTableProps) {
               <td className="py-3 pr-4">{orderStatusPill(item.status)}</td>
               <td className="py-3 pr-4">{formatPaymentMethod(item.paymentMethod)}</td>
               <td className="py-3 pr-4">{paymentStatusPill(item.paymentStatus)}</td>
+              <td className="py-3 pr-4">
+                {item.trackingCode ? (
+                  <div className="grid gap-0.5">
+                    <span className="font-mono text-xs font-bold text-slate-800">{item.trackingCode}</span>
+                    <span className="text-xs text-slate-500">{formatProviderStatus(item.shipmentStatus)}</span>
+                  </div>
+                ) : <span className="text-xs font-semibold text-amber-700">Pending</span>}
+              </td>
               <td className="py-3 pr-4">{formatDate(item.createdAt)}</td>
               <td className="py-3 pr-4"><Button type="button" onClick={() => onView(item.id)}>View</Button></td>
             </tr>
@@ -69,4 +78,9 @@ function orderStatusPill(status: OrderStatus) {
 
 function paymentStatusPill(status: PaymentStatus) {
   return <Pill tone={paymentStatusTones[status]}>{formatPaymentStatus(status)}</Pill>;
+}
+
+function formatProviderStatus(status: string | null | undefined): string {
+  if (!status) return "Awaiting carrier";
+  return status.replace(/([a-z])([A-Z])/g, "$1 $2");
 }

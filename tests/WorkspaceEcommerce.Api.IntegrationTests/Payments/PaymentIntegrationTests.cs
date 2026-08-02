@@ -54,7 +54,7 @@ public sealed class PaymentIntegrationTests(ApiIntegrationTestFixture fixture)
         Assert.Equal(PaymentStatus.Paid, persisted.PaymentStatus);
         Assert.NotNull(persisted.PaidAt);
         Assert.NotNull(persisted.ShipmentId);
-        Assert.Equal("ML-MOCK-INT", persisted.TrackingCode);
+        Assert.Equal($"ML-MOCK-{seed.OrderCode}", persisted.TrackingCode);
         Assert.Equal(PaymentTransactionStatus.Success, persisted.TransactionStatus);
         Assert.Equal("00", persisted.GatewayResponseCode);
     }

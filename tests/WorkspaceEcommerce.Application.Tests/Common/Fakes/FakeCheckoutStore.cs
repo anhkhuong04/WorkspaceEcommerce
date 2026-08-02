@@ -4,6 +4,7 @@ using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Payments;
+using WorkspaceEcommerce.Domain.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Application.Tests.Common.Fakes;
 
@@ -18,6 +19,9 @@ internal sealed class FakeCheckoutStore : ICheckoutStore
     private readonly List<CouponRedemption> _couponRedemptions = [];
     private readonly List<Order> _orders = [];
     private readonly List<PaymentTransaction> _paymentTransactions = [];
+    private readonly List<OrderShipment> _orderShipments = [];
+    private readonly List<ShipmentTimelineEntry> _shipmentTimelineEntries = [];
+    private readonly List<ShipmentCommandOutbox> _shipmentCommandOutbox = [];
 
     public IReadOnlyCollection<Cart> Carts => _carts;
 
@@ -30,6 +34,12 @@ internal sealed class FakeCheckoutStore : ICheckoutStore
     public IReadOnlyCollection<CouponProductTarget> CouponProductTargets => _couponProductTargets;
 
     public IReadOnlyCollection<CouponRedemption> CouponRedemptions => _couponRedemptions;
+
+    public IReadOnlyCollection<OrderShipment> OrderShipments => _orderShipments;
+
+    public IReadOnlyCollection<ShipmentTimelineEntry> ShipmentTimelineEntries => _shipmentTimelineEntries;
+
+    public IReadOnlyCollection<ShipmentCommandOutbox> ShipmentCommandOutbox => _shipmentCommandOutbox;
 
     public int SaveChangesCallCount { get; private set; }
 
@@ -237,6 +247,21 @@ internal sealed class FakeCheckoutStore : ICheckoutStore
         if (typeof(TEntity) == typeof(PaymentTransaction))
         {
             return (List<TEntity>)(object)_paymentTransactions;
+        }
+
+        if (typeof(TEntity) == typeof(OrderShipment))
+        {
+            return (List<TEntity>)(object)_orderShipments;
+        }
+
+        if (typeof(TEntity) == typeof(ShipmentTimelineEntry))
+        {
+            return (List<TEntity>)(object)_shipmentTimelineEntries;
+        }
+
+        if (typeof(TEntity) == typeof(ShipmentCommandOutbox))
+        {
+            return (List<TEntity>)(object)_shipmentCommandOutbox;
         }
 
         throw new InvalidOperationException($"Unsupported entity type '{typeof(TEntity).Name}'.");

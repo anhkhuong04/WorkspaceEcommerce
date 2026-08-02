@@ -533,6 +533,17 @@ public sealed class CheckoutServiceTests
                 Timeline = []
             });
         }
+
+        public Task<TrackingResponse> CancelShipmentAsync(string trackingCode, string reason, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new TrackingResponse
+            {
+                TrackingCode = trackingCode,
+                ExternalOrderId = "ECOM-1001",
+                Status = "Cancelled",
+                Currency = "VND"
+            });
+        }
     }
 
     private sealed class FakeVNPayPaymentService : IVNPayPaymentService

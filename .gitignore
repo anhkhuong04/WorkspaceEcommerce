@@ -51,5 +51,4 @@ appsettings.*.Local.json
 .agent/
 .tmp/
 startup.md
-task.md
 overview.md

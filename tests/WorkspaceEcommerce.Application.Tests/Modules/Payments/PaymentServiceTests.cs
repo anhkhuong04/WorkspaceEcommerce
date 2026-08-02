@@ -296,5 +296,19 @@ public sealed class PaymentServiceTests
                 Timeline = []
             });
         }
+
+        public Task<TrackingResponse> CancelShipmentAsync(
+            string trackingCode,
+            string reason,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new TrackingResponse
+            {
+                TrackingCode = trackingCode,
+                ExternalOrderId = "ORD-20260710-ABCDEF",
+                Status = "Cancelled",
+                Currency = "VND"
+            });
+        }
     }
 }

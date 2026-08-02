@@ -103,6 +103,8 @@ public sealed class TrackingResponse
 
     public decimal ShippingFeeAmount { get; init; }
 
+    public string Currency { get; init; } = "VND";
+
     public TrackingTimelineEntry[] Timeline { get; init; } = [];
 }
 

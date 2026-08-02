@@ -1,0 +1,20 @@
+{
+  "trackingCode": "ML202608020001",
+  "externalOrderId": "ORD-CONTRACT-1",
+  "status": "Delivering",
+  "codStatus": "PendingCollection",
+  "shippingFeeAmount": 53000,
+  "currency": "VND",
+  "timeline": [
+    {
+      "status": "PendingPickup",
+      "note": "Shipment created.",
+      "changedAtUtc": "2026-08-02T10:00:00Z"
+    },
+    {
+      "status": "Delivering",
+      "note": "Courier is delivering the parcel.",
+      "changedAtUtc": "2026-08-02T12:00:00Z"
+    }
+  ]
+}

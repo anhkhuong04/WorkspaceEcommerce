@@ -1,0 +1,10 @@
+{
+  "shipmentId": "11111111-1111-1111-1111-111111111111",
+  "externalOrderId": "ORD-CONTRACT-1",
+  "trackingCode": "ML202608020001",
+  "status": "PendingPickup",
+  "routeType": "InterRegion",
+  "shippingFeeAmount": 53000,
+  "currency": "VND",
+  "createdAtUtc": "2026-08-02T10:00:00Z"
+}

@@ -90,6 +90,8 @@ export interface CustomerOrderDto {
   paidAt: string | null;
   createdAt: string;
   updatedAt: string;
+  trackingCode?: string | null;
+  shipmentId?: string | null;
   items: OrderItemDto[];
   statusHistory: CustomerOrderStatusHistoryDto[];
 }

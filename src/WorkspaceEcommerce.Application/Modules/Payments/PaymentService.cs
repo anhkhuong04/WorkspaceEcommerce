@@ -7,6 +7,8 @@ using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Payments;
+using WorkspaceEcommerce.Domain.Modules.Shipments;
+using WorkspaceEcommerce.Application.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Application.Modules.Payments;
 
@@ -133,6 +135,13 @@ internal sealed class PaymentService(
 
         if (transaction.IsTerminal)
         {
+            if (transaction.Status == PaymentTransactionStatus.Success &&
+                !order.ShipmentId.HasValue &&
+                !dbContext.OrderShipments.Any(shipment => shipment.OrderId == order.Id))
+            {
+                await TryCreateShipmentAfterPaymentAsync(order, cancellationToken);
+            }
+
             return Result<PaymentResultDto>.Success(ToPaymentResultDto(
                 order,
                 transaction,
@@ -254,15 +263,67 @@ internal sealed class PaymentService(
                 Note = order.Note
             }, order.OrderCode, cancellationToken);
 
+            if (shipmentResponse.ShipmentId == Guid.Empty ||
+                string.IsNullOrWhiteSpace(shipmentResponse.TrackingCode) ||
+                !string.Equals(shipmentResponse.ExternalOrderId, order.OrderCode, StringComparison.OrdinalIgnoreCase) ||
+                !ShipmentProviderContract.IsKnownStatus(shipmentResponse.Status))
+            {
+                throw new InvalidOperationException("MiniLogistics returned an invalid shipment mapping.");
+            }
+
             order.UpdateShipmentInfo(shipmentResponse.TrackingCode, shipmentResponse.ShipmentId);
+            var now = DateTimeOffset.UtcNow;
+            var shipment = new OrderShipment(
+                Guid.NewGuid(),
+                order.Id,
+                "MiniLogistics",
+                shipmentResponse.ShipmentId,
+                shipmentResponse.TrackingCode,
+                shipmentResponse.Status,
+                shipmentResponse.ShippingFeeAmount,
+                shipmentResponse.Currency,
+                now);
             dbContext.Update(order);
+            dbContext.Add(shipment);
+            dbContext.Add(new ShipmentTimelineEntry(
+                Guid.NewGuid(),
+                shipment.Id,
+                shipmentResponse.Status,
+                "Shipment created after payment confirmation.",
+                now,
+                ShipmentTimelineSource.ShipmentCreated,
+                providerEventId: null,
+                now));
             await dbContext.SaveChangesAsync(cancellationToken);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (HttpRequestException exception) when (ShipmentProviderFailure.IsTransient(exception))
         {
+            ShipmentIntegrationMetrics.RecordCreateFailure();
             logger.LogWarning(
                 exception,
                 "Shipment creation failed after VNPay success for order {OrderCode}. Payment remains paid.",
+                order.OrderCode);
+            var pendingCommandExists = dbContext.ShipmentCommandOutbox.Any(command =>
+                command.OrderId == order.Id &&
+                command.CommandType == ShipmentCommandType.Create &&
+                command.CompletedAtUtc == null);
+            if (!pendingCommandExists)
+            {
+                dbContext.Add(new ShipmentCommandOutbox(
+                    Guid.NewGuid(),
+                    order.Id,
+                    ShipmentCommandType.Create,
+                    reason: null,
+                    DateTimeOffset.UtcNow));
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            ShipmentIntegrationMetrics.RecordCreateFailure();
+            logger.LogError(
+                exception,
+                "Shipment creation failed permanently after VNPay success for order {OrderCode}; use admin retry after correcting the request or provider contract",
                 order.OrderCode);
         }
     }

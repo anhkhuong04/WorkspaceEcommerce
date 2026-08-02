@@ -17,6 +17,7 @@ using WorkspaceEcommerce.Application.Modules.Loyalty;
 using WorkspaceEcommerce.Application.Modules.Ordering;
 using WorkspaceEcommerce.Application.Modules.Payments;
 using WorkspaceEcommerce.Application.Modules.Reviews;
+using WorkspaceEcommerce.Application.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Application;
 
@@ -24,6 +25,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        services.AddSingleton(TimeProvider.System);
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
         services.AddScoped<IAdminAuthService, AdminAuthService>();
         services.AddScoped<IAdminDashboardService, AdminDashboardService>();
@@ -50,6 +52,8 @@ public static class DependencyInjection
         services.AddScoped<IStorefrontBlogService, StorefrontBlogService>();
         services.AddScoped<IReviewService, ReviewService>();
         services.AddScoped<IAdminReviewService, AdminReviewService>();
+        services.AddScoped<IShipmentWebhookService, ShipmentWebhookService>();
+        services.AddScoped<IOrderShipmentService, OrderShipmentService>();
 
         return services;
     }

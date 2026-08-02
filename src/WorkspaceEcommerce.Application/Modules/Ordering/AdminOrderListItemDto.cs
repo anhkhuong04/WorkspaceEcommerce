@@ -14,4 +14,6 @@ public sealed record AdminOrderListItemDto(
     DateTimeOffset? PaidAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    int ItemCount);
+    int ItemCount,
+    string? TrackingCode = null,
+    string? ShipmentStatus = null);

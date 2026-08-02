@@ -136,6 +136,8 @@ export interface AdminOrderListItemDto {
   createdAt: string;
   updatedAt: string;
   itemCount: number;
+  trackingCode?: string | null;
+  shipmentStatus?: string | null;
 }
 
 export interface AdminOrderStatusHistoryDto {
@@ -158,6 +160,7 @@ export interface AdminOrderDto extends AdminOrderListItemDto {
   subtotal: number;
   shippingFee: number;
   discountAmount: number;
+  shipmentId?: string | null;
   items: OrderItemDto[];
   statusHistory: AdminOrderStatusHistoryDto[];
 }

@@ -11,7 +11,7 @@ public sealed class GetShippingQuoteRequest
     public string Province { get; init; } = string.Empty;
 }
 
-public sealed class GetShippingQuoteResponse(
+public sealed record GetShippingQuoteResponse(
     decimal TotalFeeAmount,
     decimal BaseFeeAmount,
     decimal ExtraWeightFeeAmount,

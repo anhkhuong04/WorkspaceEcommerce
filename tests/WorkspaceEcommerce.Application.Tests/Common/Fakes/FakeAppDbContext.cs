@@ -8,6 +8,7 @@ using WorkspaceEcommerce.Domain.Modules.Loyalty;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Payments;
 using WorkspaceEcommerce.Domain.Modules.Reviews;
+using WorkspaceEcommerce.Domain.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Application.Tests.Common.Fakes;
 
@@ -36,6 +37,10 @@ internal sealed class FakeAppDbContext : IAppDbContext
     private readonly List<Review> _reviews = [];
     private readonly List<CustomerAddress> _customerAddresses = [];
     private readonly List<CustomerLoginHistory> _customerLoginHistories = [];
+    private readonly List<OrderShipment> _orderShipments = [];
+    private readonly List<ShipmentTimelineEntry> _shipmentTimelineEntries = [];
+    private readonly List<ShipmentEventInbox> _shipmentEventInbox = [];
+    private readonly List<ShipmentCommandOutbox> _shipmentCommandOutbox = [];
 
     public IQueryable<Category> Categories => _categories.AsQueryable();
 
@@ -82,6 +87,14 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public IQueryable<CustomerAddress> CustomerAddresses => _customerAddresses.AsQueryable();
 
     public IQueryable<CustomerLoginHistory> CustomerLoginHistories => _customerLoginHistories.AsQueryable();
+
+    public IQueryable<OrderShipment> OrderShipments => _orderShipments.AsQueryable();
+
+    public IQueryable<ShipmentTimelineEntry> ShipmentTimelineEntries => _shipmentTimelineEntries.AsQueryable();
+
+    public IQueryable<ShipmentEventInbox> ShipmentEventInbox => _shipmentEventInbox.AsQueryable();
+
+    public IQueryable<ShipmentCommandOutbox> ShipmentCommandOutbox => _shipmentCommandOutbox.AsQueryable();
 
     public int SaveChangesCallCount { get; private set; }
 
@@ -194,6 +207,26 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public void Seed(params Review[] reviews)
     {
         _reviews.AddRange(reviews);
+    }
+
+    public void Seed(params OrderShipment[] shipments)
+    {
+        _orderShipments.AddRange(shipments);
+    }
+
+    public void Seed(params ShipmentTimelineEntry[] entries)
+    {
+        _shipmentTimelineEntries.AddRange(entries);
+    }
+
+    public void Seed(params ShipmentEventInbox[] events)
+    {
+        _shipmentEventInbox.AddRange(events);
+    }
+
+    public void Seed(params ShipmentCommandOutbox[] commands)
+    {
+        _shipmentCommandOutbox.AddRange(commands);
     }
 
     public void Add<TEntity>(TEntity entity)
@@ -352,6 +385,26 @@ internal sealed class FakeAppDbContext : IAppDbContext
         if (typeof(TEntity) == typeof(CustomerLoginHistory))
         {
             return (List<TEntity>)(object)_customerLoginHistories;
+        }
+
+        if (typeof(TEntity) == typeof(OrderShipment))
+        {
+            return (List<TEntity>)(object)_orderShipments;
+        }
+
+        if (typeof(TEntity) == typeof(ShipmentTimelineEntry))
+        {
+            return (List<TEntity>)(object)_shipmentTimelineEntries;
+        }
+
+        if (typeof(TEntity) == typeof(ShipmentEventInbox))
+        {
+            return (List<TEntity>)(object)_shipmentEventInbox;
+        }
+
+        if (typeof(TEntity) == typeof(ShipmentCommandOutbox))
+        {
+            return (List<TEntity>)(object)_shipmentCommandOutbox;
         }
 
         throw new InvalidOperationException($"Unsupported entity type '{typeof(TEntity).Name}'.");

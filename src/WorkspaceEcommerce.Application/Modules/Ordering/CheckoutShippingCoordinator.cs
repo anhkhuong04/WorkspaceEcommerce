@@ -2,7 +2,9 @@ using Microsoft.Extensions.Logging;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Abstractions.Shipment;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Modules.Shipments;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Domain.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Application.Modules.Ordering;
 
@@ -41,6 +43,7 @@ internal sealed class CheckoutShippingCoordinator(
         }
         catch (HttpRequestException ex)
         {
+            ShipmentIntegrationMetrics.RecordQuoteFailure();
             logger.LogError(ex, "Failed to get shipping quote from MiniLogistics");
             return Result<GetShippingQuoteResponse>.Failure("Could not calculate shipping fee. Please try again.");
         }
@@ -66,6 +69,7 @@ internal sealed class CheckoutShippingCoordinator(
         }
         catch (HttpRequestException ex)
         {
+            ShipmentIntegrationMetrics.RecordQuoteFailure();
             logger.LogError(ex, "Failed to calculate shipping fee before VNPay checkout.");
             return Result<ShippingQuoteResponse>.Failure("Could not calculate shipping fee. Please try again.");
         }
@@ -102,14 +106,60 @@ internal sealed class CheckoutShippingCoordinator(
                 Note = order.Note
             }, order.OrderCode, cancellationToken);
 
+            if (shipmentResponse.ShipmentId == Guid.Empty ||
+                string.IsNullOrWhiteSpace(shipmentResponse.TrackingCode) ||
+                !string.Equals(shipmentResponse.ExternalOrderId, order.OrderCode, StringComparison.OrdinalIgnoreCase) ||
+                !ShipmentProviderContract.IsKnownStatus(shipmentResponse.Status))
+            {
+                throw new InvalidOperationException("MiniLogistics returned an invalid shipment mapping.");
+            }
+
             order.UpdateShipmentInfo(shipmentResponse.TrackingCode, shipmentResponse.ShipmentId);
 
+            var now = DateTimeOffset.UtcNow;
+            var shipment = new OrderShipment(
+                Guid.NewGuid(),
+                order.Id,
+                "MiniLogistics",
+                shipmentResponse.ShipmentId,
+                shipmentResponse.TrackingCode,
+                shipmentResponse.Status,
+                shipmentResponse.ShippingFeeAmount,
+                shipmentResponse.Currency,
+                now);
+
             checkoutStore.Update(order);
+            checkoutStore.Add(shipment);
+            checkoutStore.Add(new ShipmentTimelineEntry(
+                Guid.NewGuid(),
+                shipment.Id,
+                shipmentResponse.Status,
+                "Shipment created.",
+                now,
+                ShipmentTimelineSource.ShipmentCreated,
+                providerEventId: null,
+                now));
             await checkoutStore.SaveChangesAsync(cancellationToken);
         }
-        catch (HttpRequestException ex)
+        catch (HttpRequestException ex) when (ShipmentProviderFailure.IsTransient(ex))
         {
+            ShipmentIntegrationMetrics.RecordCreateFailure();
             logger.LogWarning(ex, "MiniLogistics shipment creation failed for order {OrderCode}. Order was placed without shipment.", order.OrderCode);
+            checkoutStore.Add(new ShipmentCommandOutbox(
+                Guid.NewGuid(),
+                order.Id,
+                ShipmentCommandType.Create,
+                reason: null,
+                DateTimeOffset.UtcNow));
+            await checkoutStore.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            ShipmentIntegrationMetrics.RecordCreateFailure();
+            logger.LogError(
+                ex,
+                "MiniLogistics shipment creation failed permanently for order {OrderCode}; use admin retry after correcting the request or provider contract",
+                order.OrderCode);
         }
     }
 
