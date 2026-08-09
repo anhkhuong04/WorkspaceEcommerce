@@ -121,12 +121,8 @@ internal static class RateLimiterExtensions
 
     private static string GetRateLimitPartitionKey(HttpContext httpContext)
     {
-        var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(forwardedFor))
-        {
-            return forwardedFor.Split(',')[0].Trim();
-        }
-
+        // Use RemoteIpAddress only. UseForwardedHeaders may replace it, but only after the
+        // request passes through a configured trusted proxy; raw headers are attacker-controlled.
         return httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     }
 }

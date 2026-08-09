@@ -10,6 +10,48 @@ namespace WorkspaceEcommerce.Api.IntegrationTests.CartCheckout;
 public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTestFixture fixture)
 {
     [Fact]
+    public async Task Checkout_ConcurrentRequestsForLastUnit_ReservesStockOnlyOnce()
+    {
+        await fixture.ResetDatabaseAsync();
+        var catalog = TestData.CreateVisibleCatalog();
+        catalog.Variant.UpdateStock(1);
+        await fixture.SeedAsync(dbContext =>
+        {
+            dbContext.AddRange(catalog.Category, catalog.Product, catalog.Variant);
+
+            return Task.CompletedTask;
+        });
+
+        using var firstClient = fixture.CreateClient();
+        using var secondClient = fixture.CreateClient();
+        var firstSessionId = $"stock-lock-first-{Guid.NewGuid():N}";
+        var secondSessionId = $"stock-lock-second-{Guid.NewGuid():N}";
+        await AddCartItemAsync(firstClient, firstSessionId, catalog.Variant.Id);
+        await AddCartItemAsync(secondClient, secondSessionId, catalog.Variant.Id);
+
+        var firstCheckout = firstClient.PostAsJsonAsync("/api/checkout", CreateCheckoutRequest(firstSessionId));
+        var secondCheckout = secondClient.PostAsJsonAsync("/api/checkout", CreateCheckoutRequest(secondSessionId));
+        var responses = await Task.WhenAll(firstCheckout, secondCheckout);
+        using var firstResponse = responses[0];
+        using var secondResponse = responses[1];
+
+        Assert.Contains(responses, response => response.StatusCode == HttpStatusCode.Created);
+        Assert.Contains(responses, response => response.StatusCode == HttpStatusCode.Conflict);
+
+        var state = await fixture.ExecuteDbAsync(async dbContext => new
+        {
+            Stock = await dbContext.ProductVariants
+                .Where(variant => variant.Id == catalog.Variant.Id)
+                .Select(variant => variant.StockQuantity)
+                .SingleAsync(),
+            OrderCount = await dbContext.Orders.CountAsync()
+        });
+
+        Assert.Equal(0, state.Stock);
+        Assert.Equal(1, state.OrderCount);
+    }
+
+    [Fact]
     public async Task CartCheckoutAndOrderLookup_WithSeededCatalog_CompletesGuestOrderFlow()
     {
         await fixture.ResetDatabaseAsync();
@@ -465,4 +507,31 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
             null,
             usageLimit);
     }
+
+    private static async Task AddCartItemAsync(HttpClient client, string sessionId, Guid productVariantId)
+    {
+        using var response = await client.PostAsJsonAsync(
+            "/api/cart/items",
+            new
+            {
+                sessionId,
+                productVariantId,
+                quantity = 1
+            });
+        response.EnsureSuccessStatusCode();
+    }
+
+    private static object CreateCheckoutRequest(string sessionId) => new
+    {
+        sessionId,
+        customerName = "Nguyen Van A",
+        customerPhone = "0900000000",
+        customerEmail = "customer@example.com",
+        shippingAddress = "123 Shipping Street",
+        shippingStreet = "123 Shipping Street",
+        shippingWard = "Ward 1",
+        shippingProvince = "Ho Chi Minh",
+        note = "Concurrent stock locking verification",
+        paymentMethod = 0
+    };
 }

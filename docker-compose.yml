@@ -20,6 +20,25 @@ services:
       Jwt__Audience: ${Jwt__Audience:?Set Jwt__Audience in .env}
       Jwt__SigningKey: ${Jwt__SigningKey:?Set Jwt__SigningKey in .env}
       Jwt__AccessTokenMinutes: ${Jwt__AccessTokenMinutes:-60}
+      DataProtection__KeyRingPath: ${DataProtection__KeyRingPath:-}
+      APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING:-}
+      Cors__AllowedOrigins__0: ${Cors__AllowedOrigins__0:-}
+      Cors__AllowedOrigins__1: ${Cors__AllowedOrigins__1:-}
+      ForwardedHeaders__KnownProxies__0: ${ForwardedHeaders__KnownProxies__0:-}
+      GoogleAuth__Enabled: ${GoogleAuth__Enabled:-false}
+      GoogleAuth__AllowedClientIds__0: ${GoogleAuth__AllowedClientIds__0:-}
+      TwoFactor__Issuer: ${TwoFactor__Issuer:-WorkspaceEcommerce}
+      TwoFactor__SetupLifetimeMinutes: ${TwoFactor__SetupLifetimeMinutes:-10}
+      TwoFactor__ChallengeLifetimeMinutes: ${TwoFactor__ChallengeLifetimeMinutes:-5}
+      TwoFactor__RecoveryCodeCount: ${TwoFactor__RecoveryCodeCount:-10}
+      EmailDelivery__Provider: ${EmailDelivery__Provider:-Log}
+      EmailDelivery__SenderEmail: ${EmailDelivery__SenderEmail:-}
+      EmailDelivery__Host: ${EmailDelivery__Host:-}
+      EmailDelivery__Port: ${EmailDelivery__Port:-587}
+      EmailDelivery__EnableSsl: ${EmailDelivery__EnableSsl:-true}
+      EmailDelivery__UserName: ${EmailDelivery__UserName:-}
+      EmailDelivery__Password: ${EmailDelivery__Password:-}
+      EmailDelivery__WorkerIntervalSeconds: ${EmailDelivery__WorkerIntervalSeconds:-30}
       MediaStorage__Provider: ${MediaStorage__Provider:-Local}
       MediaStorage__PublicBaseUrl: ${MediaStorage__PublicBaseUrl:-http://localhost:5080}
       MediaStorage__Bucket: ${MediaStorage__Bucket:-}

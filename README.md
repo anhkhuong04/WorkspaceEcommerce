@@ -22,6 +22,7 @@
   - [Verify Frontend](#verify-frontend)
 - [API Reference](#api-reference)
 - [Testing](#testing)
+- [Production Release Gate](#production-release-gate)
 - [Environment Variables](#environment-variables)
 - [Contributing](#contributing)
 
@@ -284,6 +285,8 @@ When running in `Development` mode, the OpenAPI specification is available at:
 
 Import the JSON spec into [Postman](https://www.postman.com/), [Insomnia](https://insomnia.rest/), or any OpenAPI-compatible client to explore and test all endpoints.
 
+The runtime OpenAPI endpoint is development-only. The release contract, including health endpoints, customer-authentication trust boundaries, comments, and durable-media behavior, is maintained in the feature ADRs and the [production release runbook](docs/runbooks/production-release.md).
+
 ---
 
 ## Testing
@@ -300,6 +303,27 @@ Run tests with detailed output:
 ```powershell
 dotnet test WorkspaceEcommerce.slnx --logger "console;verbosity=detailed"
 ```
+
+---
+
+## Production Release Gate
+
+Run the repeatable local gates before asking the platform owner to deploy:
+
+```powershell
+./scripts/verify-prh-009-regressions.ps1
+./scripts/verify-prh-009-migrations.ps1
+./scripts/verify-prh-009-backup-restore.ps1
+./scripts/scan-tracked-runtime-secrets.ps1
+dotnet list WorkspaceEcommerce.slnx package --vulnerable --include-transitive
+Push-Location frontend
+corepack pnpm audit --prod --audit-level=high
+corepack pnpm typecheck
+corepack pnpm build
+Pop-Location
+```
+
+Do not treat those local checks as approval for production. The remaining topology, multi-instance, object-store retention, alerting, rollback, and evidence requirements are explicit go/no-go steps in the [production release runbook](docs/runbooks/production-release.md). Record the actual deployment evidence in [the PRH-009 completion report](docs/reports/prh-009-completion-report.md).
 
 ---
 
@@ -335,6 +359,8 @@ Full reference for all variables in `.env.example`:
 | `Payment__VNPay__HashSecret`     | —                                                 | ✅       | VNPay hash secret                      |
 
 > ⚠️ **Never commit your `.env` file.** It is already listed in `.gitignore`.
+
+Production additionally requires `DataProtection__KeyRingPath`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, explicit `Cors__AllowedOrigins__<n>`, S3 media storage, and SMTP delivery. If the API is behind a reverse proxy, configure only its immediate IPs in `ForwardedHeaders__KnownProxies__<n>`; do not trust caller-supplied forwarding headers. See the release runbook for the full topology verification procedure.
 
 ---
 

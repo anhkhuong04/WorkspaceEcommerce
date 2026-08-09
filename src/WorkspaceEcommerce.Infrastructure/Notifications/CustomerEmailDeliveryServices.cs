@@ -13,8 +13,7 @@ internal sealed class LoggingCustomerEmailDeliveryService(
     {
         cancellationToken.ThrowIfCancellationRequested();
         // Do not log the body: account links contain raw single-use credentials.
-        logger.LogInformation("Development email accepted for delivery. Recipient={Recipient}, Subject={Subject}",
-            message.RecipientEmail, message.Subject);
+        logger.LogInformation("Development email accepted for delivery. Subject={Subject}", message.Subject);
         return Task.CompletedTask;
     }
 }

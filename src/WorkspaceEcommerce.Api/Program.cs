@@ -25,11 +25,19 @@ if (builder.Environment.IsDevelopment())
 
 var jwtOptions = builder.Configuration.GetValidatedJwtOptions();
 var dataProtectionKeyRingPath = builder.Configuration["DataProtection:KeyRingPath"];
+var applicationInsightsConnectionString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]
+    ?? builder.Configuration["ApplicationInsights:ConnectionString"];
 
 if (builder.Environment.IsProduction() && string.IsNullOrWhiteSpace(dataProtectionKeyRingPath))
 {
     throw new InvalidOperationException(
         "Configuration 'DataProtection:KeyRingPath' is required outside Development to protect two-factor secrets with a persistent external key ring.");
+}
+
+if (builder.Environment.IsProduction() && string.IsNullOrWhiteSpace(applicationInsightsConnectionString))
+{
+    throw new InvalidOperationException(
+        "APPLICATIONINSIGHTS_CONNECTION_STRING (or ApplicationInsights:ConnectionString) is required in Production.");
 }
 
 var dataProtectionBuilder = builder.Services
@@ -65,6 +73,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentCustomerContext, CurrentCustomerContext>();
 builder.Services.AddScoped<ICurrentLanguageProvider, CurrentLanguageProvider>();
 builder.Services.AddApplicationCors(builder.Configuration, builder.Environment);
+builder.Services.AddApplicationForwardedHeaders(builder.Configuration);
 builder.Services.AddApplicationRateLimiter(builder.Environment);
 builder.Services
     .AddHealthChecks()
@@ -89,6 +98,7 @@ if (args.Any(argument => string.Equals(argument, "--seed-demo", StringComparison
     return;
 }
 
+app.UseForwardedHeaders();
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
@@ -98,6 +108,7 @@ if (app.Environment.IsDevelopment())
 else
 {
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
 
 app.UseSecurityHeaders();

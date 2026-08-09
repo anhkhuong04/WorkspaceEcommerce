@@ -55,6 +55,40 @@ public sealed class ShipmentWebhookIntegrationTests(ApiIntegrationTestFixture fi
     }
 
     [Fact]
+    public async Task Webhook_DuplicateEvent_IsIdempotent()
+    {
+        var order = CreateOrder();
+        var shipment = CreateShipment(order);
+        await fixture.SeedAsync(dbContext =>
+        {
+            dbContext.Orders.Add(order);
+            dbContext.OrderShipments.Add(shipment);
+            return Task.CompletedTask;
+        });
+        var payload = new ShipmentWebhookPayload(
+            Guid.NewGuid(),
+            ShipmentProviderContract.ShipmentStatusChangedEvent,
+            shipment.TrackingCode,
+            order.OrderCode,
+            "InTransit",
+            DateTimeOffset.UtcNow);
+        using var client = fixture.CreateClient();
+
+        using var firstResponse = await SendWebhookAsync(client, payload, DateTimeOffset.UtcNow, validSignature: true);
+        using var secondResponse = await SendWebhookAsync(client, payload, DateTimeOffset.UtcNow, validSignature: true);
+
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+        var state = await fixture.ExecuteDbAsync(dbContext => Task.FromResult(new
+        {
+            TimelineCount = dbContext.ShipmentTimelineEntries.Count(entry => entry.OrderShipmentId == shipment.Id),
+            InboxCount = dbContext.ShipmentEventInbox.Count()
+        }));
+        Assert.Equal(1, state.TimelineCount);
+        Assert.Equal(1, state.InboxCount);
+    }
+
+    [Fact]
     public async Task Webhook_InvalidSignature_ReturnsUnauthorized()
     {
         using var client = fixture.CreateClient();
