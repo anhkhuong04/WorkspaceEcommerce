@@ -31,7 +31,8 @@ public sealed class StorefrontBlogServiceTests
     public async Task GetBlogPostBySlugAsync_PublishedPost_ReturnsPost()
     {
         var post = new BlogPost(Guid.NewGuid(), "Post", "slug", "Summary", "Content", null, true);
-        var comment = new BlogComment(Guid.NewGuid(), post.Id, "Author", "author@test.com", "Nice!", true);
+        var comment = new BlogComment(Guid.NewGuid(), post.Id, "Author", "author@test.com", "Nice!");
+        comment.Approve("admin@example.com");
         var dbContext = new FakeAppDbContext();
         dbContext.Seed(post);
         dbContext.Seed(comment);
@@ -44,6 +45,28 @@ public sealed class StorefrontBlogServiceTests
         Assert.Equal(post.Id, result.Value.Id);
         Assert.Single(result.Value.Comments);
         Assert.Equal("Nice!", result.Value.Comments.First().Content);
+    }
+
+    [Fact]
+    public async Task GetBlogPostBySlugAsync_HidesPendingAndRejectedComments()
+    {
+        var post = new BlogPost(Guid.NewGuid(), "Post", "slug", "Summary", "Content", null, true);
+        var approved = new BlogComment(Guid.NewGuid(), post.Id, "Approved", "approved@test.com", "Visible");
+        var pending = new BlogComment(Guid.NewGuid(), post.Id, "Pending", "pending@test.com", "Hidden pending");
+        var rejected = new BlogComment(Guid.NewGuid(), post.Id, "Rejected", "rejected@test.com", "Hidden rejected");
+        approved.Approve("moderator@example.com");
+        rejected.Reject("moderator@example.com");
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(post);
+        dbContext.Seed(approved, pending, rejected);
+        var service = CreateService(dbContext);
+
+        var result = await service.GetBlogPostBySlugAsync("slug");
+
+        Assert.True(result.IsSuccess);
+        var comment = Assert.Single(result.Value!.Comments);
+        Assert.Equal(approved.Id, comment.Id);
+        Assert.Equal(BlogCommentModerationStatus.Approved, comment.ModerationStatus);
     }
 
     [Fact]
@@ -77,7 +100,24 @@ public sealed class StorefrontBlogServiceTests
         Assert.NotNull(result.Value);
         Assert.Single(dbContext.BlogComments);
         Assert.Equal("Great article!", dbContext.BlogComments.First().Content);
+        Assert.Equal(BlogCommentModerationStatus.Pending, dbContext.BlogComments.First().ModerationStatus);
+        Assert.DoesNotContain("Great article!", result.Value.Message, StringComparison.Ordinal);
         Assert.Equal(1, dbContext.SaveChangesCallCount);
+    }
+
+    [Fact]
+    public async Task SubmitCommentAsync_OversizedContent_IsRejectedWithoutPersistence()
+    {
+        var post = new BlogPost(Guid.NewGuid(), "Post", "slug", "Summary", "Content", null, true);
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(post);
+        var service = CreateService(dbContext);
+
+        var result = await service.SubmitCommentAsync("slug", new CreateCommentRequest(
+            "John", "john@test.com", new string('x', 2001)));
+
+        Assert.Equal(ResultStatus.Validation, result.Status);
+        Assert.Empty(dbContext.BlogComments);
     }
 
     private static StorefrontBlogService CreateService(FakeAppDbContext dbContext)

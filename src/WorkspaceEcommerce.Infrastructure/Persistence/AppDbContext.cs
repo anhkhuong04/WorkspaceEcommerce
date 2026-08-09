@@ -7,6 +7,7 @@ using WorkspaceEcommerce.Domain.Modules.Content;
 using WorkspaceEcommerce.Domain.Modules.Customers;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Loyalty;
+using WorkspaceEcommerce.Domain.Modules.Media;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Payments;
 using WorkspaceEcommerce.Domain.Modules.Reviews;
@@ -55,6 +56,18 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<CustomerLoginHistory> CustomerLoginHistories => Set<CustomerLoginHistory>();
 
+    public DbSet<CustomerTwoFactorChallenge> CustomerTwoFactorChallenges => Set<CustomerTwoFactorChallenge>();
+
+    public DbSet<CustomerTwoFactorRecoveryCode> CustomerTwoFactorRecoveryCodes => Set<CustomerTwoFactorRecoveryCode>();
+
+    public DbSet<CustomerAccountToken> CustomerAccountTokens => Set<CustomerAccountToken>();
+
+    public DbSet<CustomerRefreshTokenFamily> CustomerRefreshTokenFamilies => Set<CustomerRefreshTokenFamily>();
+
+    public DbSet<CustomerRefreshToken> CustomerRefreshTokens => Set<CustomerRefreshToken>();
+
+    public DbSet<CustomerEmailOutboxMessage> CustomerEmailOutboxMessages => Set<CustomerEmailOutboxMessage>();
+
     public DbSet<Coupon> Coupons => Set<Coupon>();
 
     public DbSet<CouponProductTarget> CouponProductTargets => Set<CouponProductTarget>();
@@ -72,6 +85,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<BlogPostRelatedProduct> BlogPostRelatedProducts => Set<BlogPostRelatedProduct>();
 
     public DbSet<BlogComment> BlogComments => Set<BlogComment>();
+
+    public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
+
+    public DbSet<MediaAssetVariant> MediaAssetVariants => Set<MediaAssetVariant>();
 
     public DbSet<Review> Reviews => Set<Review>();
 
@@ -92,6 +109,18 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     IQueryable<CustomerAddress> IAppDbContext.CustomerAddresses => CustomerAddresses;
 
     IQueryable<CustomerLoginHistory> IAppDbContext.CustomerLoginHistories => CustomerLoginHistories;
+
+    IQueryable<CustomerTwoFactorChallenge> IAppDbContext.CustomerTwoFactorChallenges => CustomerTwoFactorChallenges;
+
+    IQueryable<CustomerTwoFactorRecoveryCode> IAppDbContext.CustomerTwoFactorRecoveryCodes => CustomerTwoFactorRecoveryCodes;
+
+    IQueryable<CustomerAccountToken> IAppDbContext.CustomerAccountTokens => CustomerAccountTokens;
+
+    IQueryable<CustomerRefreshTokenFamily> IAppDbContext.CustomerRefreshTokenFamilies => CustomerRefreshTokenFamilies;
+
+    IQueryable<CustomerRefreshToken> IAppDbContext.CustomerRefreshTokens => CustomerRefreshTokens;
+
+    IQueryable<CustomerEmailOutboxMessage> IAppDbContext.CustomerEmailOutboxMessages => CustomerEmailOutboxMessages;
 
     IQueryable<Coupon> IAppDbContext.Coupons => Coupons;
 
@@ -128,6 +157,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     IQueryable<BlogComment> IAppDbContext.BlogComments => BlogComments;
 
     IQueryable<Review> IAppDbContext.Reviews => Reviews;
+
+    Task<CustomerRefreshToken?> IAppDbContext.FindCustomerRefreshTokenByHashForUpdateAsync(
+        string tokenHash,
+        CancellationToken cancellationToken) =>
+        CustomerRefreshTokens
+            .FromSqlInterpolated($"SELECT * FROM customer.refresh_tokens WHERE token_hash = {tokenHash} FOR UPDATE")
+            .FirstOrDefaultAsync(cancellationToken);
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

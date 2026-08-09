@@ -14,26 +14,77 @@ export interface CustomerLoginRequest {
 
 export interface CustomerGoogleLoginRequest {
   idToken: string;
-  googleClientId?: string;
+}
+
+export interface RequestEmailVerificationRequest {
+  email: string;
+}
+
+export interface ConfirmEmailVerificationRequest {
+  token: string;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
 }
 
 export interface CustomerAuthResponse {
-  accessToken: string;
-  tokenType: string;
-  expiresAt: string;
+  accessToken: string | null;
+  tokenType: string | null;
+  expiresAt: string | null;
   customerId: string;
   email: string;
   fullName: string;
   phoneNumber: string;
+  requiresTwoFactor: boolean;
+  twoFactorChallengeToken: string | null;
 }
 
 export interface CustomerProfileDto {
   id: string;
   fullName: string;
-  phoneNumber: string;
+  phoneNumber: string | null;
   email: string;
+  avatarUrl: string | null;
+  isEmailVerified: boolean;
+  rewardPoints: number;
+  twoFactorEnabled: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TwoFactorSetupStartResponse {
+  manualEntryKey: string;
+  provisioningUri: string;
+  expiresAt: string;
+}
+
+export interface ConfirmTwoFactorSetupRequest {
+  code: string;
+}
+
+export interface TwoFactorSetupConfirmationResponse {
+  recoveryCodes: string[];
+}
+
+export interface DisableTwoFactorRequest {
+  code?: string | null;
+  recoveryCode?: string | null;
+}
+
+export interface VerifyTwoFactorLoginRequest {
+  challengeToken: string;
+  code: string;
+}
+
+export interface VerifyTwoFactorRecoveryRequest {
+  challengeToken: string;
+  recoveryCode: string;
 }
 
 export interface UpdateCustomerProfileRequest {

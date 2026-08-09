@@ -58,16 +58,4 @@ public sealed class CustomerProfileController(ICustomerProfileService customerPr
         return this.ToApiResponse(result);
     }
 
-    [HttpPost("api/customer/me/2fa")]
-    [ProducesResponseType(typeof(ApiResponse<CustomerProfileDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> ToggleTwoFactor(
-        [FromBody] Toggle2FARequest request,
-        CancellationToken cancellationToken)
-    {
-        var result = await customerProfileService.ToggleTwoFactorAsync(request, cancellationToken);
-        return this.ToApiResponse(result);
-    }
 }

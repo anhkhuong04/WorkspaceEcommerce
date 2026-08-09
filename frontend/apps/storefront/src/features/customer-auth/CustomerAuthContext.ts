@@ -6,6 +6,7 @@ export interface CustomerAuthContextValue {
   session: CustomerSession | null;
   customer: CustomerProfileDto | null;
   isAuthenticated: boolean;
+  isReady: boolean;
   signIn: (response: CustomerAuthResponse) => void;
   updateCustomer: (profile: CustomerProfileDto) => void;
   refreshCustomer: () => Promise<CustomerProfileDto | null>;

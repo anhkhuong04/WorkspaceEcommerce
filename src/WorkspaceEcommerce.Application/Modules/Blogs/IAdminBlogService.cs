@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Domain.Modules.Blogs;
 
 namespace WorkspaceEcommerce.Application.Modules.Blogs;
 
@@ -20,7 +21,25 @@ public interface IAdminBlogService
 
     Task<Result<AdminBlogPostDto>> TogglePublishStatusAsync(Guid id, CancellationToken cancellationToken = default);
 
-    Task<Result<IReadOnlyCollection<BlogCommentDto>>> GetBlogPostCommentsAsync(Guid postId, CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyCollection<BlogCommentDto>>> GetBlogPostCommentsAsync(
+        Guid postId,
+        BlogCommentModerationStatus? status = null,
+        CancellationToken cancellationToken = default);
 
+    Task<Result<IReadOnlyCollection<BlogCommentDto>>> GetBlogCommentsAsync(
+        BlogCommentModerationStatus? status = null,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<BlogCommentDto>> ApproveCommentAsync(
+        Guid commentId,
+        string moderatorIdentity,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<BlogCommentDto>> RejectCommentAsync(
+        Guid commentId,
+        string moderatorIdentity,
+        CancellationToken cancellationToken = default);
+
+    [Obsolete("Comments are retained for audit. Use RejectCommentAsync.")]
     Task<Result<BlogCommentDto>> DeleteCommentAsync(Guid commentId, CancellationToken cancellationToken = default);
 }

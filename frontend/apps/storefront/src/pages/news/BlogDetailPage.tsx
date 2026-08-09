@@ -45,7 +45,7 @@ export function BlogDetailPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["storefront-blog-detail", slug] });
       form.reset(defaultValues);
-      setSuccessMessage("Your comment has been posted successfully.");
+      setSuccessMessage("Thank you. Your comment is awaiting moderation.");
       setErrorMessage(null);
       setTimeout(() => setSuccessMessage(null), 5000);
     },

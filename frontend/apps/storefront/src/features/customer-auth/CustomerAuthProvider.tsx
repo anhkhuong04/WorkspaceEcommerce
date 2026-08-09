@@ -19,6 +19,10 @@ function profileFromSession(session: CustomerSession): CustomerProfileDto {
     fullName: session.fullName,
     phoneNumber: session.phoneNumber,
     email: session.email,
+    avatarUrl: null,
+    isEmailVerified: false,
+    rewardPoints: 0,
+    twoFactorEnabled: false,
     createdAt: "",
     updatedAt: ""
   };
@@ -26,6 +30,7 @@ function profileFromSession(session: CustomerSession): CustomerProfileDto {
 
 export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<CustomerSession | null>(() => getCustomerSession());
+  const [isReady, setIsReady] = useState(false);
   const [customer, setCustomer] = useState<CustomerProfileDto | null>(() => {
     const initialSession = getCustomerSession();
     return initialSession ? profileFromSession(initialSession) : null;
@@ -56,10 +61,54 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     return profile;
   }, [clearSession, updateCustomer]);
 
+  const renewSession = useCallback(async () => {
+    const response = await storefrontApi.refreshCustomerSession();
+    const nextSession = saveCustomerSession(response);
+    setSession(nextSession);
+    setCustomer(profileFromSession(nextSession));
+    return nextSession;
+  }, []);
+
   useEffect(() => {
     setCustomerUnauthorizedHandler(clearSession);
     return () => setCustomerUnauthorizedHandler(null);
   }, [clearSession]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function restoreSession() {
+      try {
+        let current = getCustomerSession();
+        if (!current) {
+          current = await renewSession();
+        }
+
+        if (!active) {
+          return;
+        }
+
+        setSession(current);
+        const profile = await storefrontApi.getCustomerMe();
+        if (active) {
+          updateCustomer(profile);
+        }
+      } catch {
+        if (active) {
+          clearSession();
+        }
+      } finally {
+        if (active) {
+          setIsReady(true);
+        }
+      }
+    }
+
+    void restoreSession();
+    return () => {
+      active = false;
+    };
+  }, [clearSession, renewSession, updateCustomer]);
 
   useEffect(() => {
     if (!session) {
@@ -67,11 +116,15 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     }
 
     const expiresAt = new Date(session.expiresAt).getTime();
-    const delay = Number.isNaN(expiresAt) ? 0 : Math.max(expiresAt - Date.now(), 0);
-    const timeoutId = window.setTimeout(clearSession, Math.min(delay, 2_147_483_647));
+    // Renew one minute before expiry. If renewal fails, the normal unauthorized
+    // handler clears the short-lived in-tab access credential.
+    const delay = Number.isNaN(expiresAt) ? 0 : Math.max(expiresAt - Date.now() - 60_000, 0);
+    const timeoutId = window.setTimeout(() => {
+      void renewSession().catch(() => clearSession());
+    }, Math.min(delay, 2_147_483_647));
 
     return () => window.clearTimeout(timeoutId);
-  }, [clearSession, session]);
+  }, [clearSession, renewSession, session]);
 
   useEffect(() => {
     if (!session) {
@@ -86,6 +139,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       session,
       customer,
       isAuthenticated: session !== null,
+      isReady,
       signIn: (response) => {
         const nextSession = saveCustomerSession(response);
         setSession(nextSession);
@@ -93,9 +147,14 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       },
       updateCustomer,
       refreshCustomer,
-      signOut: clearSession
+      signOut: () => {
+        // Server revocation is best-effort because local removal is still the
+        // safe behaviour if the browser is offline.
+        void storefrontApi.logoutCustomer().catch(() => undefined);
+        clearSession();
+      }
     }),
-    [clearSession, customer, refreshCustomer, session, updateCustomer]
+    [clearSession, customer, isReady, refreshCustomer, session, updateCustomer]
   );
 
   return <CustomerAuthContext.Provider value={value}>{children}</CustomerAuthContext.Provider>;

@@ -55,14 +55,28 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<bool>("IsApproved")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_approved");
+                    b.Property<DateTimeOffset?>("ModeratedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("moderated_at");
+
+                    b.Property<string>("ModeratedBy")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("moderated_by");
+
+                    b.Property<string>("ModerationStatus")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("moderation_status");
 
                     b.HasKey("Id");
 
                     b.HasIndex("BlogPostId")
                         .HasDatabaseName("ix_blog_comments_blog_post_id");
+
+                    b.HasIndex("BlogPostId", "ModerationStatus", "CreatedAt")
+                        .HasDatabaseName("ix_blog_comments_post_moderation_created");
 
                     b.ToTable("blog_comments", "content");
                 });
@@ -785,10 +799,20 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_email_verified");
 
+                    b.Property<long?>("LastTwoFactorTimeStep")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_two_factor_time_step");
+
                     b.Property<string>("PasswordHash")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("password_hash");
+
+                    b.Property<string>("PendingTwoFactorSecret")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("pending_two_factor_secret");
 
                     b.Property<string>("PhoneNumber")
                         .HasMaxLength(50)
@@ -808,9 +832,13 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnName("two_factor_enabled");
 
                     b.Property<string>("TwoFactorSecret")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
                         .HasColumnName("two_factor_secret");
+
+                    b.Property<DateTimeOffset?>("TwoFactorSetupExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("two_factor_setup_expires_at");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -831,6 +859,55 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_customers_phone_number");
 
                     b.ToTable("customers", "customer");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Customers.CustomerAccountToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("purpose");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("token_hash");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_customer_account_tokens_token_hash");
+
+                    b.HasIndex("ExpiresAt", "ConsumedAt")
+                        .HasDatabaseName("ix_customer_account_tokens_cleanup");
+
+                    b.HasIndex("CustomerId", "Purpose", "ExpiresAt")
+                        .HasDatabaseName("ix_customer_account_tokens_customer_purpose_expiry");
+
+                    b.ToTable("account_tokens", "customer");
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Customers.CustomerAddress", b =>
@@ -893,6 +970,62 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                     b.ToTable("addresses", "customer");
                 });
 
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Customers.CustomerEmailOutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<string>("ProtectedPayload")
+                        .IsRequired()
+                        .HasMaxLength(8192)
+                        .HasColumnType("character varying(8192)")
+                        .HasColumnName("protected_payload");
+
+                    b.Property<string>("RecipientEmail")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("recipient_email");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("subject");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_customer_email_outbox_cleanup");
+
+                    b.HasIndex("SentAt", "NextAttemptAt")
+                        .HasDatabaseName("ix_customer_email_outbox_due");
+
+                    b.ToTable("email_outbox", "customer");
+                });
+
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Customers.CustomerLoginHistory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -932,6 +1065,161 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_login_history_login_time");
 
                     b.ToTable("login_history", "customer");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Customers.CustomerRefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("FamilyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("family_id");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_customer_refresh_tokens_token_hash");
+
+                    b.HasIndex("ExpiresAt", "UsedAt")
+                        .HasDatabaseName("ix_customer_refresh_tokens_cleanup");
+
+                    b.HasIndex("FamilyId", "ExpiresAt")
+                        .HasDatabaseName("ix_customer_refresh_tokens_family_expiry");
+
+                    b.ToTable("refresh_tokens", "customer");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Customers.CustomerRefreshTokenFamily", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("RevocationReason")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("revocation_reason");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId", "ExpiresAt")
+                        .HasDatabaseName("ix_customer_refresh_token_families_customer_expiry");
+
+                    b.HasIndex("RevokedAt", "ExpiresAt")
+                        .HasDatabaseName("ix_customer_refresh_token_families_cleanup");
+
+                    b.ToTable("refresh_token_families", "customer");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Customers.CustomerTwoFactorChallenge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("token_hash");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_two_factor_challenges_token_hash");
+
+                    b.HasIndex("CustomerId", "ExpiresAt")
+                        .HasDatabaseName("ix_two_factor_challenges_customer_expiry");
+
+                    b.ToTable("two_factor_challenges", "customer");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Customers.CustomerTwoFactorRecoveryCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("code_hash");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId", "UsedAt")
+                        .HasDatabaseName("ix_two_factor_recovery_codes_customer_used");
+
+                    b.ToTable("two_factor_recovery_codes", "customer");
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Loyalty.CustomerLoyaltyAccount", b =>
@@ -1104,6 +1392,147 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_loyalty_transactions_voucher_id");
 
                     b.ToTable("loyalty_transactions", "loyalty");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Media.MediaAsset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("AvailableAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("available_at");
+
+                    b.Property<string>("Checksum")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("checksum");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<string>("Folder")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("folder");
+
+                    b.Property<int>("FrameCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("frame_count");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer")
+                        .HasColumnName("height");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("object_key");
+
+                    b.Property<string>("PublicUrl")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("public_url");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer")
+                        .HasColumnName("width");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ObjectKey")
+                        .IsUnique();
+
+                    b.HasIndex("PublicUrl")
+                        .IsUnique();
+
+                    b.HasIndex("State", "CreatedAt");
+
+                    b.ToTable("media_assets", "content");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Media.MediaAssetVariant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer")
+                        .HasColumnName("height");
+
+                    b.Property<Guid>("MediaAssetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("media_asset_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("object_key");
+
+                    b.Property<string>("PublicUrl")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("public_url");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer")
+                        .HasColumnName("width");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediaAssetId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("media_asset_variants", "content");
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.Order", b =>
@@ -1878,6 +2307,33 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Customers.CustomerAccountToken", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Customers.CustomerRefreshToken", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Customers.CustomerRefreshTokenFamily", null)
+                        .WithMany()
+                        .HasForeignKey("FamilyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Customers.CustomerRefreshTokenFamily", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Loyalty.CustomerLoyaltyAccount", b =>
                 {
                     b.HasOne("WorkspaceEcommerce.Domain.Modules.Customers.Customer", null)
@@ -1904,6 +2360,15 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("VoucherId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Media.MediaAssetVariant", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Media.MediaAsset", null)
+                        .WithMany("Variants")
+                        .HasForeignKey("MediaAssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.Order", b =>
@@ -2001,6 +2466,11 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Loyalty.CustomerLoyaltyAccount", b =>
                 {
                     b.Navigation("Transactions");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Media.MediaAsset", b =>
+                {
+                    b.Navigation("Variants");
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.Order", b =>

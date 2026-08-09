@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using WorkspaceEcommerce.Api.Common;
 using WorkspaceEcommerce.Api.Extensions;
 using WorkspaceEcommerce.Application.Abstractions.Media;
@@ -36,19 +37,9 @@ public sealed class MediaController(IMediaStorageService mediaStorageService) : 
                 file.FileName,
                 file.ContentType,
                 file.Length,
-                folder),
+                folder,
+                User.FindFirst(ClaimTypes.Email)?.Value ?? User.Identity?.Name),
             cancellationToken);
-
-        if (result.IsSuccess)
-        {
-            var uploaded = result.Value!;
-            var publicUrl = uploaded.Url.StartsWith("http", StringComparison.OrdinalIgnoreCase)
-                ? uploaded.Url
-                : $"{Request.Scheme}://{Request.Host}{uploaded.Url}";
-
-            result = WorkspaceEcommerce.Application.Common.Models.Result<MediaUploadResult>.Success(
-                uploaded with { Url = publicUrl });
-        }
 
         return this.ToApiResponse(result, StatusCodes.Status201Created);
     }

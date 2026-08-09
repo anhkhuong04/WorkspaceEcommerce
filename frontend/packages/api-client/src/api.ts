@@ -36,6 +36,16 @@ import type {
   CustomerProfileDto,
   CustomerRegisterRequest,
   CustomerGoogleLoginRequest,
+  ConfirmEmailVerificationRequest,
+  ForgotPasswordRequest,
+  RequestEmailVerificationRequest,
+  ResetPasswordRequest,
+  ConfirmTwoFactorSetupRequest,
+  DisableTwoFactorRequest,
+  TwoFactorSetupConfirmationResponse,
+  TwoFactorSetupStartResponse,
+  VerifyTwoFactorLoginRequest,
+  VerifyTwoFactorRecoveryRequest,
   LoyaltyAccountDto,
   LoyaltyTierDto,
   LoyaltyTransactionDto,
@@ -60,6 +70,8 @@ import type {
   AdminBlogPostDto,
   StorefrontBlogPostDto,
   BlogCommentDto,
+  BlogCommentModerationStatus,
+  CommentSubmissionAcknowledgement,
   CreateBlogPostRequest,
   UpdateBlogPostRequest,
   CreateCommentRequest,
@@ -118,9 +130,29 @@ export function createStorefrontApi(client: ApiClient) {
       client.post<CustomerAuthResponse, CustomerLoginRequest>("/api/customer/auth/login", request),
     loginWithGoogle: (request: CustomerGoogleLoginRequest) =>
       client.post<CustomerAuthResponse, CustomerGoogleLoginRequest>("/api/customer/auth/google", request),
+    verifyTwoFactorLogin: (request: VerifyTwoFactorLoginRequest) =>
+      client.post<CustomerAuthResponse, VerifyTwoFactorLoginRequest>("/api/customer/auth/2fa/verify", request),
+    verifyTwoFactorRecovery: (request: VerifyTwoFactorRecoveryRequest) =>
+      client.post<CustomerAuthResponse, VerifyTwoFactorRecoveryRequest>("/api/customer/auth/2fa/recovery", request),
+    requestEmailVerification: (request: RequestEmailVerificationRequest) =>
+      client.post<void, RequestEmailVerificationRequest>("/api/customer/auth/email-verification/request", request),
+    confirmEmailVerification: (request: ConfirmEmailVerificationRequest) =>
+      client.post<void, ConfirmEmailVerificationRequest>("/api/customer/auth/email-verification/confirm", request),
+    forgotCustomerPassword: (request: ForgotPasswordRequest) =>
+      client.post<void, ForgotPasswordRequest>("/api/customer/auth/password/forgot", request),
+    resetCustomerPassword: (request: ResetPasswordRequest) =>
+      client.post<void, ResetPasswordRequest>("/api/customer/auth/password/reset", request),
+    refreshCustomerSession: () => client.post<CustomerAuthResponse, undefined>("/api/customer/auth/refresh", undefined),
+    logoutCustomer: () => client.post<void, undefined>("/api/customer/auth/logout", undefined),
+    logoutAllCustomerSessions: () => client.post<void, undefined>("/api/customer/auth/logout-all", undefined),
     getCustomerMe: () => client.get<CustomerProfileDto>("/api/customer/me"),
     updateCustomerMe: (request: UpdateCustomerProfileRequest) =>
       client.put<CustomerProfileDto, UpdateCustomerProfileRequest>("/api/customer/me", request),
+    startTwoFactorSetup: () => client.post<TwoFactorSetupStartResponse, void>("/api/customer/me/2fa/setup", undefined),
+    confirmTwoFactorSetup: (request: ConfirmTwoFactorSetupRequest) =>
+      client.post<TwoFactorSetupConfirmationResponse, ConfirmTwoFactorSetupRequest>("/api/customer/me/2fa/confirm", request),
+    disableTwoFactor: (request: DisableTwoFactorRequest) =>
+      client.post<void, DisableTwoFactorRequest>("/api/customer/me/2fa/disable", request),
     getCustomerOrders: (request: CustomerOrderListRequest = {}) =>
       client.get<PagedResult<CustomerOrderListItemDto>>(`/api/customer/orders${buildQuery(request)}`),
     getCustomerOrder: (id: string) => client.get<CustomerOrderDto>(`/api/customer/orders/${id}`),
@@ -134,7 +166,7 @@ export function createStorefrontApi(client: ApiClient) {
     getBlogPosts: () => client.get<StorefrontBlogPostDto[]>("/api/blog-posts"),
     getBlogPost: (slug: string) => client.get<StorefrontBlogPostDto>(`/api/blog-posts/${slug}`),
     submitBlogComment: (slug: string, request: CreateCommentRequest) =>
-      client.post<BlogCommentDto, CreateCommentRequest>(`/api/blog-posts/${slug}/comments`, request),
+      client.post<CommentSubmissionAcknowledgement, CreateCommentRequest>(`/api/blog-posts/${slug}/comments`, request),
     getProductReviews: (slug: string) => client.get<ProductReviewSummaryDto>(`/api/products/${slug}/reviews`),
     submitReview: (slug: string, request: CreateReviewRequest) =>
       client.post<ReviewDto, CreateReviewRequest>(`/api/products/${slug}/reviews`, request)
@@ -222,8 +254,12 @@ export function createAdminApi(client: ApiClient) {
       client.put<AdminBlogPostDto, UpdateBlogPostRequest>(`/api/admin/blog-posts/${id}`, request),
     deleteBlogPost: (id: string) => client.delete<AdminBlogPostDto>(`/api/admin/blog-posts/${id}`),
     toggleBlogPostPublish: (id: string) => client.post<AdminBlogPostDto, void>(`/api/admin/blog-posts/${id}/toggle-publish`, undefined),
-    getBlogPostComments: (id: string) => client.get<BlogCommentDto[]>(`/api/admin/blog-posts/${id}/comments`),
-    deleteBlogComment: (id: string) => client.delete<BlogCommentDto>(`/api/admin/blog-comments/${id}`),
+    getBlogPostComments: (id: string, status?: BlogCommentModerationStatus) =>
+      client.get<BlogCommentDto[]>(`/api/admin/blog-posts/${id}/comments${buildQuery({ status })}`),
+    getBlogComments: (status?: BlogCommentModerationStatus) =>
+      client.get<BlogCommentDto[]>(`/api/admin/blog-comments${buildQuery({ status })}`),
+    approveBlogComment: (id: string) => client.post<BlogCommentDto, undefined>(`/api/admin/blog-comments/${id}/approve`, undefined),
+    rejectBlogComment: (id: string) => client.post<BlogCommentDto, undefined>(`/api/admin/blog-comments/${id}/reject`, undefined),
     getReviews: (page = 1, pageSize = 20) => client.get<PagedResult<AdminReviewListItemDto>>(`/api/admin/reviews${buildQuery({ page, pageSize })}`),
     deleteReview: (id: string) => client.delete<void>(`/api/admin/reviews/${id}`)
   };

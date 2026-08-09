@@ -113,40 +113,6 @@ internal sealed class CustomerProfileService(
         return Task.FromResult(Result<IReadOnlyList<CustomerLoginHistoryDto>>.Success(history));
     }
 
-    public async Task<Result<CustomerProfileDto>> ToggleTwoFactorAsync(
-        Toggle2FARequest request,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var customerId = currentCustomer.CustomerId;
-        if (!customerId.HasValue)
-        {
-            return Result<CustomerProfileDto>.Unauthorized("Customer authentication is required.");
-        }
-
-        var customer = FindCustomerById(customerId.Value);
-        if (customer is null)
-        {
-            return Result<CustomerProfileDto>.NotFound("Customer was not found.");
-        }
-
-        if (request.Enable)
-        {
-            // Generate a simulated TOTP secret
-            var secret = GenerateTotpSecret();
-            customer.EnableTwoFactor(secret);
-        }
-        else
-        {
-            customer.DisableTwoFactor();
-        }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        return Result<CustomerProfileDto>.Success(ToDto(customer));
-    }
-
     private Customer? FindCustomerById(Guid customerId)
     {
         return dbContext.Customers.FirstOrDefault(customer => customer.Id == customerId);
@@ -165,13 +131,5 @@ internal sealed class CustomerProfileService(
             customer.TwoFactorEnabled,
             customer.CreatedAt,
             customer.UpdatedAt);
-    }
-
-    private static string GenerateTotpSecret()
-    {
-        // Generate a base32-encoded random secret (simulated TOTP)
-        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-        var rng = Random.Shared;
-        return new string(Enumerable.Range(0, 32).Select(_ => chars[rng.Next(chars.Length)]).ToArray());
     }
 }

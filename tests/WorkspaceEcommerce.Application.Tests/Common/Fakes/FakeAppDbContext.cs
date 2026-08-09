@@ -37,6 +37,12 @@ internal sealed class FakeAppDbContext : IAppDbContext
     private readonly List<Review> _reviews = [];
     private readonly List<CustomerAddress> _customerAddresses = [];
     private readonly List<CustomerLoginHistory> _customerLoginHistories = [];
+    private readonly List<CustomerTwoFactorChallenge> _customerTwoFactorChallenges = [];
+    private readonly List<CustomerTwoFactorRecoveryCode> _customerTwoFactorRecoveryCodes = [];
+    private readonly List<CustomerAccountToken> _customerAccountTokens = [];
+    private readonly List<CustomerRefreshTokenFamily> _customerRefreshTokenFamilies = [];
+    private readonly List<CustomerRefreshToken> _customerRefreshTokens = [];
+    private readonly List<CustomerEmailOutboxMessage> _customerEmailOutboxMessages = [];
     private readonly List<OrderShipment> _orderShipments = [];
     private readonly List<ShipmentTimelineEntry> _shipmentTimelineEntries = [];
     private readonly List<ShipmentEventInbox> _shipmentEventInbox = [];
@@ -88,6 +94,18 @@ internal sealed class FakeAppDbContext : IAppDbContext
 
     public IQueryable<CustomerLoginHistory> CustomerLoginHistories => _customerLoginHistories.AsQueryable();
 
+    public IQueryable<CustomerTwoFactorChallenge> CustomerTwoFactorChallenges => _customerTwoFactorChallenges.AsQueryable();
+
+    public IQueryable<CustomerTwoFactorRecoveryCode> CustomerTwoFactorRecoveryCodes => _customerTwoFactorRecoveryCodes.AsQueryable();
+
+    public IQueryable<CustomerAccountToken> CustomerAccountTokens => _customerAccountTokens.AsQueryable();
+
+    public IQueryable<CustomerRefreshTokenFamily> CustomerRefreshTokenFamilies => _customerRefreshTokenFamilies.AsQueryable();
+
+    public IQueryable<CustomerRefreshToken> CustomerRefreshTokens => _customerRefreshTokens.AsQueryable();
+
+    public IQueryable<CustomerEmailOutboxMessage> CustomerEmailOutboxMessages => _customerEmailOutboxMessages.AsQueryable();
+
     public IQueryable<OrderShipment> OrderShipments => _orderShipments.AsQueryable();
 
     public IQueryable<ShipmentTimelineEntry> ShipmentTimelineEntries => _shipmentTimelineEntries.AsQueryable();
@@ -95,6 +113,14 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public IQueryable<ShipmentEventInbox> ShipmentEventInbox => _shipmentEventInbox.AsQueryable();
 
     public IQueryable<ShipmentCommandOutbox> ShipmentCommandOutbox => _shipmentCommandOutbox.AsQueryable();
+
+    public Task<CustomerRefreshToken?> FindCustomerRefreshTokenByHashForUpdateAsync(
+        string tokenHash,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_customerRefreshTokens.FirstOrDefault(token => token.TokenHash == tokenHash));
+    }
 
     public int SaveChangesCallCount { get; private set; }
 
@@ -133,6 +159,36 @@ internal sealed class FakeAppDbContext : IAppDbContext
     public void Seed(params Customer[] customers)
     {
         _customers.AddRange(customers);
+    }
+
+    public void Seed(params CustomerTwoFactorChallenge[] challenges)
+    {
+        _customerTwoFactorChallenges.AddRange(challenges);
+    }
+
+    public void Seed(params CustomerTwoFactorRecoveryCode[] recoveryCodes)
+    {
+        _customerTwoFactorRecoveryCodes.AddRange(recoveryCodes);
+    }
+
+    public void Seed(params CustomerAccountToken[] tokens)
+    {
+        _customerAccountTokens.AddRange(tokens);
+    }
+
+    public void Seed(params CustomerRefreshTokenFamily[] families)
+    {
+        _customerRefreshTokenFamilies.AddRange(families);
+    }
+
+    public void Seed(params CustomerRefreshToken[] tokens)
+    {
+        _customerRefreshTokens.AddRange(tokens);
+    }
+
+    public void Seed(params CustomerEmailOutboxMessage[] messages)
+    {
+        _customerEmailOutboxMessages.AddRange(messages);
     }
 
     public void Seed(params Coupon[] coupons)
@@ -385,6 +441,36 @@ internal sealed class FakeAppDbContext : IAppDbContext
         if (typeof(TEntity) == typeof(CustomerLoginHistory))
         {
             return (List<TEntity>)(object)_customerLoginHistories;
+        }
+
+        if (typeof(TEntity) == typeof(CustomerTwoFactorChallenge))
+        {
+            return (List<TEntity>)(object)_customerTwoFactorChallenges;
+        }
+
+        if (typeof(TEntity) == typeof(CustomerTwoFactorRecoveryCode))
+        {
+            return (List<TEntity>)(object)_customerTwoFactorRecoveryCodes;
+        }
+
+        if (typeof(TEntity) == typeof(CustomerAccountToken))
+        {
+            return (List<TEntity>)(object)_customerAccountTokens;
+        }
+
+        if (typeof(TEntity) == typeof(CustomerRefreshTokenFamily))
+        {
+            return (List<TEntity>)(object)_customerRefreshTokenFamilies;
+        }
+
+        if (typeof(TEntity) == typeof(CustomerRefreshToken))
+        {
+            return (List<TEntity>)(object)_customerRefreshTokens;
+        }
+
+        if (typeof(TEntity) == typeof(CustomerEmailOutboxMessage))
+        {
+            return (List<TEntity>)(object)_customerEmailOutboxMessages;
         }
 
         if (typeof(TEntity) == typeof(OrderShipment))

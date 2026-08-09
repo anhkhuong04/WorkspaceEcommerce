@@ -74,11 +74,20 @@ export function BlogsPage() {
     onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
   });
 
-  const deleteCommentMutation = useMutation({
-    mutationFn: (commentId: string) => adminApi.deleteBlogComment(commentId),
+  const approveCommentMutation = useMutation({
+    mutationFn: (commentId: string) => adminApi.approveBlogComment(commentId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin-blog-comments", editingPost?.id] });
-      setNotice({ type: "success", message: "Comment deleted successfully." });
+      setNotice({ type: "success", message: "Comment approved successfully." });
+    },
+    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
+  });
+
+  const rejectCommentMutation = useMutation({
+    mutationFn: (commentId: string) => adminApi.rejectBlogComment(commentId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin-blog-comments", editingPost?.id] });
+      setNotice({ type: "success", message: "Comment rejected and retained for audit." });
     },
     onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
   });
@@ -147,11 +156,12 @@ export function BlogsPage() {
         comments={commentsQuery.data}
         commentsLoading={commentsQuery.isLoading}
         savePending={saveMutation.isPending}
-        deleteCommentPending={deleteCommentMutation.isPending}
+        moderationPending={approveCommentMutation.isPending || rejectCommentMutation.isPending}
         onClose={() => setIsModalOpen(false)}
         onSave={(values) => saveMutation.mutate(values)}
         onActiveTabChange={setActiveTab}
-        onDeleteComment={(commentId) => deleteCommentMutation.mutate(commentId)}
+        onApproveComment={(commentId) => approveCommentMutation.mutate(commentId)}
+        onRejectComment={(commentId) => rejectCommentMutation.mutate(commentId)}
       />
 
       <ConfirmDialog

@@ -52,6 +52,14 @@ public sealed class Customer : Entity
 
     public string? TwoFactorSecret { get; private set; }
 
+    /// <summary>Protected TOTP secret awaiting proof of authenticator enrollment.</summary>
+    public string? PendingTwoFactorSecret { get; private set; }
+
+    public DateTimeOffset? TwoFactorSetupExpiresAt { get; private set; }
+
+    /// <summary>The latest accepted TOTP time step, used to prevent code replay.</summary>
+    public long? LastTwoFactorTimeStep { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -126,16 +134,60 @@ public sealed class Customer : Entity
         Touch();
     }
 
-    public void EnableTwoFactor(string secret)
+    public void BeginTwoFactorSetup(string protectedSecret, DateTimeOffset expiresAt)
     {
-        TwoFactorSecret = Guard.Required(secret, nameof(TwoFactorSecret));
+        if (expiresAt <= DateTimeOffset.UtcNow)
+        {
+            throw new DomainException("Two-factor setup expiry must be in the future.");
+        }
+
+        PendingTwoFactorSecret = Guard.Required(protectedSecret, nameof(protectedSecret));
+        TwoFactorSetupExpiresAt = expiresAt;
+        Touch();
+    }
+
+    public void ConfirmTwoFactorSetup()
+    {
+        if (string.IsNullOrWhiteSpace(PendingTwoFactorSecret) ||
+            !TwoFactorSetupExpiresAt.HasValue ||
+            TwoFactorSetupExpiresAt.Value <= DateTimeOffset.UtcNow)
+        {
+            throw new DomainException("A valid pending two-factor setup is required.");
+        }
+
+        TwoFactorSecret = PendingTwoFactorSecret;
+        PendingTwoFactorSecret = null;
+        TwoFactorSetupExpiresAt = null;
+        LastTwoFactorTimeStep = null;
         TwoFactorEnabled = true;
         Touch();
+    }
+
+    public void CancelPendingTwoFactorSetup()
+    {
+        PendingTwoFactorSecret = null;
+        TwoFactorSetupExpiresAt = null;
+        Touch();
+    }
+
+    public bool TryUseTwoFactorTimeStep(long timeStep)
+    {
+        if (LastTwoFactorTimeStep.HasValue && timeStep <= LastTwoFactorTimeStep.Value)
+        {
+            return false;
+        }
+
+        LastTwoFactorTimeStep = timeStep;
+        Touch();
+        return true;
     }
 
     public void DisableTwoFactor()
     {
         TwoFactorSecret = null;
+        PendingTwoFactorSecret = null;
+        TwoFactorSetupExpiresAt = null;
+        LastTwoFactorTimeStep = null;
         TwoFactorEnabled = false;
         Touch();
     }

@@ -20,6 +20,22 @@ public interface IAppDbContext : ICatalogReadStore, IOrderReadStore, ILoyaltyRea
 
     IQueryable<CustomerLoginHistory> CustomerLoginHistories { get; }
 
+    IQueryable<CustomerTwoFactorChallenge> CustomerTwoFactorChallenges { get; }
+
+    IQueryable<CustomerTwoFactorRecoveryCode> CustomerTwoFactorRecoveryCodes { get; }
+
+    IQueryable<CustomerAccountToken> CustomerAccountTokens { get; }
+
+    IQueryable<CustomerRefreshTokenFamily> CustomerRefreshTokenFamilies { get; }
+
+    IQueryable<CustomerRefreshToken> CustomerRefreshTokens { get; }
+
+    IQueryable<CustomerEmailOutboxMessage> CustomerEmailOutboxMessages { get; }
+
+    Task<CustomerRefreshToken?> FindCustomerRefreshTokenByHashForUpdateAsync(
+        string tokenHash,
+        CancellationToken cancellationToken = default);
+
     IQueryable<Coupon> Coupons { get; }
 
     IQueryable<CouponProductTarget> CouponProductTargets { get; }

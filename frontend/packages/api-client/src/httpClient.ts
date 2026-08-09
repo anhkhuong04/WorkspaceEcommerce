@@ -78,7 +78,11 @@ export class ApiClient {
 
     const response = await fetch(`${this.options.baseUrl}${path}`, {
       ...init,
-      headers
+      headers,
+      // Customer refresh credentials live in an HttpOnly cookie. Sending
+      // credentials explicitly keeps the cross-origin storefront contract
+      // aligned with the API's credentialed CORS policy.
+      credentials: "include"
     });
 
     const envelope = (await response.json()) as ApiResponse<T>;

@@ -1,4 +1,4 @@
-import type { BlogCommentDto, AdminBlogPostDto, AdminProductDto } from "@workspace-ecommerce/api-types";
+import type { BlogCommentDto, BlogCommentModerationStatus, AdminBlogPostDto, AdminProductDto } from "@workspace-ecommerce/api-types";
 import type { UseFormReturn } from "react-hook-form";
 import { Controller } from "react-hook-form";
 import { Button, Field, Modal, TextInput, Toggle } from "../../../components/ui/AdminUi";
@@ -16,11 +16,12 @@ type BlogPostModalProps = {
   comments: BlogCommentDto[] | undefined;
   commentsLoading: boolean;
   savePending: boolean;
-  deleteCommentPending: boolean;
+  moderationPending: boolean;
   onClose: () => void;
   onSave: (values: BlogPostFormValues) => void;
   onActiveTabChange: (tab: "details" | "comments") => void;
-  onDeleteComment: (commentId: string) => void;
+  onApproveComment: (commentId: string) => void;
+  onRejectComment: (commentId: string) => void;
 };
 
 export function BlogPostModal({
@@ -33,11 +34,12 @@ export function BlogPostModal({
   comments,
   commentsLoading,
   savePending,
-  deleteCommentPending,
+  moderationPending,
   onClose,
   onSave,
   onActiveTabChange,
-  onDeleteComment
+  onApproveComment,
+  onRejectComment
 }: BlogPostModalProps) {
   return (
     <Modal
@@ -84,8 +86,9 @@ export function BlogPostModal({
         <BlogCommentsPanel
           comments={comments}
           commentsLoading={commentsLoading}
-          deleteCommentPending={deleteCommentPending}
-          onDeleteComment={onDeleteComment}
+          moderationPending={moderationPending}
+          onApproveComment={onApproveComment}
+          onRejectComment={onRejectComment}
         />
       )}
     </Modal>
@@ -216,13 +219,15 @@ function BlogPostDetailsForm({
 function BlogCommentsPanel({
   comments,
   commentsLoading,
-  deleteCommentPending,
-  onDeleteComment
+  moderationPending,
+  onApproveComment,
+  onRejectComment
 }: {
   comments: BlogCommentDto[] | undefined;
   commentsLoading: boolean;
-  deleteCommentPending: boolean;
-  onDeleteComment: (commentId: string) => void;
+  moderationPending: boolean;
+  onApproveComment: (commentId: string) => void;
+  onRejectComment: (commentId: string) => void;
 }) {
   if (commentsLoading) {
     return <div className="py-8 text-center text-xs text-slate-400 animate-pulse">Loading comments...</div>;
@@ -234,7 +239,14 @@ function BlogCommentsPanel({
 
   return (
     <div className="grid gap-4">
-      <h3 className="mb-1 text-sm font-bold text-slate-900">Approved Article Comments</h3>
+      <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide">
+        {([0, 1, 2] as BlogCommentModerationStatus[]).map((status) => (
+          <span key={status} className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">
+            {moderationLabel(status)}: {comments.filter((comment) => comment.moderationStatus === status).length}
+          </span>
+        ))}
+      </div>
+      <h3 className="mb-1 text-sm font-bold text-slate-900">Article Comments</h3>
       <div className="grid max-h-[360px] gap-3 overflow-y-auto pr-1">
         {comments.map((comment) => (
           <div key={comment.id} className="flex justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
@@ -243,20 +255,27 @@ function BlogCommentsPanel({
                 <span className="text-xs font-bold text-slate-800">{comment.authorName}</span>
                 <span className="text-[10px] text-slate-400">({comment.authorEmail})</span>
                 <span className="text-[10px] text-slate-400">- {new Date(comment.createdAt).toLocaleDateString()}</span>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${moderationStyle(comment.moderationStatus)}`}>
+                  {moderationLabel(comment.moderationStatus)}
+                </span>
               </div>
               <p className="break-words whitespace-pre-wrap text-xs font-medium text-slate-600">{comment.content}</p>
             </div>
-            <button
-              type="button"
-              disabled={deleteCommentPending}
-              onClick={() => onDeleteComment(comment.id)}
-              className="h-fit text-xs font-bold text-red-600 hover:text-red-800"
-            >
-              Delete
-            </button>
+            <div className="flex h-fit gap-2">
+              {comment.moderationStatus !== 1 ? <button type="button" disabled={moderationPending} onClick={() => onApproveComment(comment.id)} className="text-xs font-bold text-emerald-700 hover:text-emerald-900">Approve</button> : null}
+              {comment.moderationStatus !== 2 ? <button type="button" disabled={moderationPending} onClick={() => onRejectComment(comment.id)} className="text-xs font-bold text-red-600 hover:text-red-800">Reject</button> : null}
+            </div>
           </div>
         ))}
       </div>
     </div>
   );
+}
+
+function moderationLabel(status: BlogCommentModerationStatus): string {
+  return status === 0 ? "Pending" : status === 1 ? "Approved" : "Rejected";
+}
+
+function moderationStyle(status: BlogCommentModerationStatus): string {
+  return status === 0 ? "bg-amber-100 text-amber-800" : status === 1 ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800";
 }

@@ -84,6 +84,67 @@ public sealed class AuthenticationConfigurationValidatorTests
         Assert.Contains("valid email", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void GetValidatedGoogleAuthOptions_WhenEnabledWithoutClientIds_Throws()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["GoogleAuth:Enabled"] = "true"
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            configuration.GetValidatedGoogleAuthOptions);
+
+        Assert.Contains("client ID", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void GetValidatedGoogleAuthOptions_WhenEnabledWithAllowlist_ReturnsServerOwnedIds()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["GoogleAuth:Enabled"] = "true",
+            ["GoogleAuth:AllowedClientIds:0"] = "storefront-client.apps.googleusercontent.com",
+            ["GoogleAuth:AllowedClientIds:1"] = "staging-client.apps.googleusercontent.com"
+        });
+
+        var options = configuration.GetValidatedGoogleAuthOptions();
+
+        Assert.True(options.Enabled);
+        Assert.Equal(
+            ["storefront-client.apps.googleusercontent.com", "staging-client.apps.googleusercontent.com"],
+            options.AllowedClientIds);
+    }
+
+    [Fact]
+    public void GetValidatedGoogleAuthOptions_WhenEnabledWithPlaceholder_Throws()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["GoogleAuth:Enabled"] = "true",
+            ["GoogleAuth:AllowedClientIds:0"] = "CHANGE_ME_GOOGLE_OAUTH_CLIENT_ID"
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            configuration.GetValidatedGoogleAuthOptions);
+
+        Assert.Contains("placeholder", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void GetValidatedTwoFactorOptions_WhenChallengeLifetimeIsTooLong_Throws()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["TwoFactor:ChallengeLifetimeMinutes"] = "16"
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            configuration.GetValidatedTwoFactorOptions);
+
+        Assert.Contains("ChallengeLifetimeMinutes", exception.Message, StringComparison.Ordinal);
+    }
+
     private static IConfiguration BuildConfiguration(Dictionary<string, string?>? overrides = null)
     {
         var values = new Dictionary<string, string?>

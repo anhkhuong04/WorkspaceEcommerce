@@ -30,7 +30,7 @@ public sealed class AdminBlogServiceTests
         Assert.NotNull(result.Value);
         Assert.Equal("Test Article", result.Value.Title);
         Assert.Equal("test-article", result.Value.Slug);
-        Assert.True(result.Value.IsPublished);
+        Assert.True(result.Value!.IsPublished);
         Assert.Single(dbContext.BlogPosts);
         Assert.Equal(1, dbContext.SaveChangesCallCount);
     }
@@ -78,7 +78,7 @@ public sealed class AdminBlogServiceTests
         Assert.NotNull(result.Value);
         Assert.Equal("Updated Title", result.Value.Title);
         Assert.Equal("updated-slug", result.Value.Slug);
-        Assert.True(result.Value.IsPublished);
+        Assert.True(result.Value!.IsPublished);
         Assert.Equal(1, dbContext.SaveChangesCallCount);
     }
 
@@ -127,13 +127,64 @@ public sealed class AdminBlogServiceTests
         var result = await service.TogglePublishStatusAsync(post.Id);
 
         Assert.True(result.IsSuccess);
-        Assert.True(result.Value.IsPublished);
+        Assert.True(result.Value!.IsPublished);
         Assert.True(post.IsPublished);
 
         var secondResult = await service.TogglePublishStatusAsync(post.Id);
         Assert.True(secondResult.IsSuccess);
-        Assert.False(secondResult.Value.IsPublished);
+        Assert.False(secondResult.Value!.IsPublished);
         Assert.False(post.IsPublished);
+    }
+
+    [Fact]
+    public async Task ApproveCommentAsync_SetsModerationAuditAndMakesCommentApproved()
+    {
+        var post = new BlogPost(Guid.NewGuid(), "Title", "slug", "Summary", "Content", null, true);
+        var comment = new BlogComment(Guid.NewGuid(), post.Id, "Author", "author@example.com", "Comment");
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(post);
+        dbContext.Seed(comment);
+        var service = CreateService(dbContext);
+
+        var result = await service.ApproveCommentAsync(comment.Id, "moderator@example.com");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(BlogCommentModerationStatus.Approved, comment.ModerationStatus);
+        Assert.Equal("moderator@example.com", comment.ModeratedBy);
+        Assert.NotNull(comment.ModeratedAt);
+    }
+
+    [Fact]
+    public async Task RejectCommentAsync_PreservesCommentAsModerationRecord()
+    {
+        var post = new BlogPost(Guid.NewGuid(), "Title", "slug", "Summary", "Content", null, true);
+        var comment = new BlogComment(Guid.NewGuid(), post.Id, "Author", "author@example.com", "Comment");
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(post);
+        dbContext.Seed(comment);
+        var service = CreateService(dbContext);
+
+        var result = await service.RejectCommentAsync(comment.Id, "moderator@example.com");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(BlogCommentModerationStatus.Rejected, comment.ModerationStatus);
+        Assert.Contains(comment, dbContext.BlogComments);
+    }
+
+    [Fact]
+    public async Task ApproveCommentAsync_WithoutModeratorIdentity_ReturnsUnauthorized()
+    {
+        var post = new BlogPost(Guid.NewGuid(), "Title", "slug", "Summary", "Content", null, true);
+        var comment = new BlogComment(Guid.NewGuid(), post.Id, "Author", "author@example.com", "Comment");
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(post);
+        dbContext.Seed(comment);
+        var service = CreateService(dbContext);
+
+        var result = await service.ApproveCommentAsync(comment.Id, " ");
+
+        Assert.Equal(ResultStatus.Unauthorized, result.Status);
+        Assert.Equal(BlogCommentModerationStatus.Pending, comment.ModerationStatus);
     }
 
     private static AdminBlogService CreateService(FakeAppDbContext dbContext)

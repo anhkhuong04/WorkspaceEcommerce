@@ -14,6 +14,7 @@ import { CheckoutSuccessPage } from "../pages/checkout/CheckoutSuccessPage";
 import { PaymentResultPage } from "../pages/checkout/PaymentResultPage";
 import { HomePage } from "../pages/home/HomePage";
 import { LoginPage } from "../pages/login/LoginPage";
+import { EmailVerificationPage, PasswordResetPage } from "../pages/account-lifecycle/AccountLifecyclePages";
 import { OrderLookupPage } from "../pages/order-lookup/OrderLookupPage";
 import { ProductDetailPage } from "../pages/product-detail/ProductDetailPage";
 import { ProductListPage } from "../pages/product-list/ProductListPage";
@@ -51,6 +52,8 @@ export const router = createBrowserRouter([
       },
       { path: "checkout/payment-result", element: <PaymentResultPage /> },
       { path: "login", element: <LoginPage /> },
+      { path: "verify-email", element: <EmailVerificationPage /> },
+      { path: "reset-password", element: <PasswordResetPage /> },
       { path: "orders/lookup", element: <OrderLookupPage /> },
       {
         path: "account",

@@ -240,18 +240,45 @@ internal sealed class AdminBlogService(
 
     public Task<Result<IReadOnlyCollection<BlogCommentDto>>> GetBlogPostCommentsAsync(
         Guid postId,
+        BlogCommentModerationStatus? status = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         var comments = dbContext.BlogComments
-            .Where(c => c.BlogPostId == postId)
+            .Where(c => c.BlogPostId == postId && (!status.HasValue || c.ModerationStatus == status.Value))
             .OrderByDescending(c => c.CreatedAt)
             .Select(c => ToCommentDto(c))
             .ToArray();
 
         return Task.FromResult(Result<IReadOnlyCollection<BlogCommentDto>>.Success(comments));
     }
+
+    public Task<Result<IReadOnlyCollection<BlogCommentDto>>> GetBlogCommentsAsync(
+        BlogCommentModerationStatus? status = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var comments = dbContext.BlogComments
+            .Where(comment => !status.HasValue || comment.ModerationStatus == status.Value)
+            .OrderByDescending(comment => comment.CreatedAt)
+            .Select(ToCommentDto)
+            .ToArray();
+        return Task.FromResult(Result<IReadOnlyCollection<BlogCommentDto>>.Success(comments));
+    }
+
+    public Task<Result<BlogCommentDto>> ApproveCommentAsync(
+        Guid commentId,
+        string moderatorIdentity,
+        CancellationToken cancellationToken = default) =>
+        ModerateCommentAsync(commentId, moderatorIdentity, approve: true, cancellationToken);
+
+    public Task<Result<BlogCommentDto>> RejectCommentAsync(
+        Guid commentId,
+        string moderatorIdentity,
+        CancellationToken cancellationToken = default) =>
+        ModerateCommentAsync(commentId, moderatorIdentity, approve: false, cancellationToken);
 
     public async Task<Result<BlogCommentDto>> DeleteCommentAsync(
         Guid commentId,
@@ -265,11 +292,42 @@ internal sealed class AdminBlogService(
             return Result<BlogCommentDto>.NotFound("Comment was not found.");
         }
 
-        var dto = ToCommentDto(comment);
-        dbContext.Remove(comment);
+        comment.Reject("legacy-delete");
+        dbContext.Update(comment);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Result<BlogCommentDto>.Success(dto);
+        return Result<BlogCommentDto>.Success(ToCommentDto(comment));
+    }
+
+    private async Task<Result<BlogCommentDto>> ModerateCommentAsync(
+        Guid commentId,
+        string moderatorIdentity,
+        bool approve,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(moderatorIdentity))
+        {
+            return Result<BlogCommentDto>.Unauthorized("Moderator identity is required.");
+        }
+
+        var comment = dbContext.BlogComments.FirstOrDefault(candidate => candidate.Id == commentId);
+        if (comment is null)
+        {
+            return Result<BlogCommentDto>.NotFound("Comment was not found.");
+        }
+
+        if (approve)
+        {
+            comment.Approve(moderatorIdentity);
+        }
+        else
+        {
+            comment.Reject(moderatorIdentity);
+        }
+
+        dbContext.Update(comment);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Result<BlogCommentDto>.Success(ToCommentDto(comment));
     }
 
     private static AdminBlogPostDto ToDto(BlogPost post, IReadOnlyCollection<Guid> relatedProductIds)
@@ -296,7 +354,9 @@ internal sealed class AdminBlogService(
             comment.AuthorName,
             comment.AuthorEmail,
             comment.Content,
-            comment.IsApproved,
-            comment.CreatedAt);
+            comment.ModerationStatus,
+            comment.CreatedAt,
+            comment.ModeratedAt,
+            comment.ModeratedBy);
     }
 }

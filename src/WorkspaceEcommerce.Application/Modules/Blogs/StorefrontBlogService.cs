@@ -61,7 +61,7 @@ internal sealed class StorefrontBlogService(
         var relatedProducts = GetRelatedProducts(post.Id);
 
         var comments = dbContext.BlogComments
-            .Where(c => c.BlogPostId == post.Id && c.IsApproved)
+            .Where(c => c.BlogPostId == post.Id && c.ModerationStatus == BlogCommentModerationStatus.Approved)
             .OrderByDescending(c => c.CreatedAt)
             .Select(c => ToCommentDto(c))
             .ToList();
@@ -80,7 +80,7 @@ internal sealed class StorefrontBlogService(
         return Task.FromResult(Result<StorefrontBlogPostDto>.Success(dto));
     }
 
-    public async Task<Result<BlogCommentDto>> SubmitCommentAsync(
+    public async Task<Result<CommentSubmissionAcknowledgement>> SubmitCommentAsync(
         string slug,
         CreateCommentRequest request,
         CancellationToken cancellationToken = default)
@@ -88,7 +88,7 @@ internal sealed class StorefrontBlogService(
         var validationResult = await commentValidator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {
-            return Result<BlogCommentDto>.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
+            return Result<CommentSubmissionAcknowledgement>.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
         var normalizedSlug = slug.Trim().ToLowerInvariant();
@@ -97,7 +97,7 @@ internal sealed class StorefrontBlogService(
 
         if (post is null)
         {
-            return Result<BlogCommentDto>.NotFound("Blog post was not found.");
+            return Result<CommentSubmissionAcknowledgement>.NotFound("Blog post was not found.");
         }
 
         var comment = new BlogComment(
@@ -105,13 +105,13 @@ internal sealed class StorefrontBlogService(
             post.Id,
             request.AuthorName,
             request.AuthorEmail,
-            request.Content,
-            isApproved: true); // Auto-approve for demo simplicity
+            request.Content);
 
         dbContext.Add(comment);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Result<BlogCommentDto>.Success(ToCommentDto(comment));
+        return Result<CommentSubmissionAcknowledgement>.Success(
+            new CommentSubmissionAcknowledgement("Thank you. Your comment is awaiting moderation."));
     }
 
     private IReadOnlyCollection<StorefrontProductListItemDto> GetRelatedProducts(Guid postId)
@@ -182,7 +182,9 @@ internal sealed class StorefrontBlogService(
             comment.AuthorName,
             comment.AuthorEmail,
             comment.Content,
-            comment.IsApproved,
-            comment.CreatedAt);
+            comment.ModerationStatus,
+            comment.CreatedAt,
+            comment.ModeratedAt,
+            comment.ModeratedBy);
     }
 }

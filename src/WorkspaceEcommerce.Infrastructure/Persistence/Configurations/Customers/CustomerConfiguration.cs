@@ -59,7 +59,18 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 
         builder.Property(customer => customer.TwoFactorSecret)
             .HasColumnName("two_factor_secret")
-            .HasMaxLength(64);
+            .HasMaxLength(1024);
+
+        builder.Property(customer => customer.PendingTwoFactorSecret)
+            .HasColumnName("pending_two_factor_secret")
+            .HasMaxLength(1024);
+
+        builder.Property(customer => customer.TwoFactorSetupExpiresAt)
+            .HasColumnName("two_factor_setup_expires_at");
+
+        builder.Property(customer => customer.LastTwoFactorTimeStep)
+            .HasColumnName("last_two_factor_time_step")
+            .IsConcurrencyToken();
 
         builder.Property(customer => customer.CreatedAt)
             .HasColumnName("created_at")

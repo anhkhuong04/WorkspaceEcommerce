@@ -161,6 +161,12 @@ Copy-Item src/WorkspaceEcommerce.Api/appsettings.Local.example.json `
 `dotnet ef` requires either `ConnectionStrings__DefaultConnection` or this local settings file. It deliberately has no embedded fallback credential.
 Use the [credential rotation runbook](docs/runbooks/credential-rotation.md) when replacing any value that has previously been committed.
 
+Google sign-in is disabled by default. The storefront's `VITE_GOOGLE_CLIENT_ID` is a public browser setting used only to obtain an ID token. To enable the backend, set `GoogleAuth__Enabled=true` and configure one or more server-owned `GoogleAuth__AllowedClientIds__<n>` values. The API accepts only `{ "idToken": "..." }`; it never accepts a caller-provided audience/client ID.
+
+Customer TOTP secrets are protected with ASP.NET Core Data Protection. In Production, set `DataProtection__KeyRingPath` to an access-controlled, persistent directory mounted outside both the repository and PostgreSQL, and share that key ring across API instances. See [ADR 002](docs/adr/002-customer-totp-authentication.md) before enabling or operating 2FA.
+
+Customer verification and recovery email is delivered through a durable outbox. Development uses the metadata-only `Log` provider by default; Production rejects that provider and requires `EmailDelivery__Provider=Smtp`, `EmailDelivery__SenderEmail`, `EmailDelivery__Host`, and the SMTP credentials from a secret store. The browser receives only a short-lived access token in tab-scoped `sessionStorage`; refresh credentials are `HttpOnly` cookies. See [ADR 003](docs/adr/003-customer-account-lifecycle.md) for the retention policy, checkout decision, and deployment requirements.
+
 > **Optional:** `POSTGRES_PORT` (default `5432`) and `API_PORT` (default `5080`) can be changed if the ports are already in use.
 
 ---

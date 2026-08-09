@@ -6,8 +6,16 @@ export interface BlogCommentDto {
   authorName: string;
   authorEmail: string;
   content: string;
-  isApproved: boolean;
+  moderationStatus: BlogCommentModerationStatus;
   createdAt: string;
+  moderatedAt: string | null;
+  moderatedBy: string | null;
+}
+
+export type BlogCommentModerationStatus = 0 | 1 | 2;
+
+export interface CommentSubmissionAcknowledgement {
+  message: string;
 }
 
 export interface AdminBlogPostDto {

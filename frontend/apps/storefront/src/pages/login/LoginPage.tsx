@@ -1,9 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { GoogleLogin } from "@react-oauth/google";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
+import type { CustomerAuthResponse } from "@workspace-ecommerce/api-types";
 import { useCustomerAuth } from "../../features/customer-auth/useCustomerAuth";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
@@ -130,11 +131,16 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [twoFactorChallengeToken, setTwoFactorChallengeToken] = useState<string | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [useRecoveryCode, setUseRecoveryCode] = useState(false);
+  const [isCompletingTwoFactor, setIsCompletingTwoFactor] = useState(false);
   const { isAuthenticated, signIn } = useCustomerAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const redirectPath = getRedirectPath(location.state);
   const isRegister = mode === "register";
+  const googleLoginEnabled = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
   const {
     register,
@@ -181,8 +187,7 @@ export function LoginPage() {
             password: values.password
           });
 
-      signIn(response);
-      navigate(redirectPath, { replace: true });
+      completePrimaryAuthentication(response);
     } catch (error) {
       setApiError(getApiErrorMessage(error));
     }
@@ -192,11 +197,9 @@ export function LoginPage() {
     setApiError(null);
     try {
       const response = await storefrontApi.loginWithGoogle({
-        idToken: credential,
-        googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID
+        idToken: credential
       });
-      signIn(response);
-      navigate(redirectPath, { replace: true });
+      completePrimaryAuthentication(response);
     } catch (error) {
       setApiError(getApiErrorMessage(error));
     }
@@ -204,6 +207,49 @@ export function LoginPage() {
 
   function switchMode(nextMode: AuthMode) {
     setMode(nextMode);
+  }
+
+  function completePrimaryAuthentication(response: CustomerAuthResponse) {
+    if (response.requiresTwoFactor && response.twoFactorChallengeToken) {
+      setTwoFactorChallengeToken(response.twoFactorChallengeToken);
+      setTwoFactorCode("");
+      setUseRecoveryCode(false);
+      return;
+    }
+
+    if (!response.accessToken || !response.expiresAt) {
+      setApiError("Authentication could not be completed. Please try again.");
+      return;
+    }
+
+    signIn(response);
+    navigate(redirectPath, { replace: true });
+  }
+
+  async function submitTwoFactor(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!twoFactorChallengeToken || !twoFactorCode.trim()) {
+      return;
+    }
+
+    setApiError(null);
+    setIsCompletingTwoFactor(true);
+    try {
+      const response = useRecoveryCode
+        ? await storefrontApi.verifyTwoFactorRecovery({
+            challengeToken: twoFactorChallengeToken,
+            recoveryCode: twoFactorCode.trim()
+          })
+        : await storefrontApi.verifyTwoFactorLogin({
+            challengeToken: twoFactorChallengeToken,
+            code: twoFactorCode.trim()
+          });
+      completePrimaryAuthentication(response);
+    } catch (error) {
+      setApiError(getApiErrorMessage(error));
+    } finally {
+      setIsCompletingTwoFactor(false);
+    }
   }
 
   if (isAuthenticated) {
@@ -229,54 +275,89 @@ export function LoginPage() {
               <p className="mt-1.5 text-sm text-slate-500">{isRegister ? "Save your details and track every order from one place." : "View your orders and continue checkout faster."}</p>
             </div>
 
-            <form className="mt-5" onSubmit={handleSubmit(onSubmit)}>
-              <div className="grid gap-3.5">
-                {isRegister ? (
+            {twoFactorChallengeToken ? (
+              <form className="mt-5" onSubmit={submitTwoFactor}>
+                <p className="text-sm text-slate-500">Enter the code from your authenticator app, or use one of your saved recovery codes.</p>
+                <label className="mt-4 block">
+                  <span className="mb-1.5 block text-sm font-semibold">{useRecoveryCode ? "Recovery code" : "Authentication code"}</span>
+                  <input
+                    value={twoFactorCode}
+                    onChange={(event) => setTwoFactorCode(event.target.value)}
+                    inputMode={useRecoveryCode ? "text" : "numeric"}
+                    autoComplete="one-time-code"
+                    maxLength={useRecoveryCode ? 128 : 6}
+                    className="h-12 w-full rounded-md border border-slate-300 px-4 text-sm text-slate-950 outline-none transition focus:border-slate-950 focus:ring-1 focus:ring-slate-950"
+                  />
+                </label>
+                {apiError ? <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{apiError}</div> : null}
+                <button type="submit" disabled={isCompletingTwoFactor} className="mt-5 h-12 w-full rounded-md bg-[#111111] text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
+                  {isCompletingTwoFactor ? "Verifying..." : "Complete sign in"}
+                </button>
+                <button type="button" onClick={() => { setUseRecoveryCode((value) => !value); setTwoFactorCode(""); setApiError(null); }} className="mt-4 w-full text-sm font-semibold text-slate-700 underline underline-offset-4">
+                  {useRecoveryCode ? "Use authenticator code" : "Use a recovery code"}
+                </button>
+              </form>
+            ) : (
+              <>
+                <form className="mt-5" onSubmit={handleSubmit(onSubmit)}>
+                  <div className="grid gap-3.5">
+                    {isRegister ? (
+                      <>
+                        <TextField label="Full name" type="text" placeholder="Enter your full name" autoComplete="name" icon="user" error={errors.fullName?.message} registration={register("fullName")} />
+                        <TextField label="Phone number" type="tel" placeholder="Enter your phone number" autoComplete="tel" icon="phone" error={errors.phoneNumber?.message} registration={register("phoneNumber")} />
+                      </>
+                    ) : null}
+                    <TextField label="Email" type="email" placeholder="Enter your email" autoComplete="email" icon="mail" error={errors.email?.message} registration={register("email")} />
+                    <TextField label="Password" type="password" placeholder="Enter your password" autoComplete={isRegister ? "new-password" : "current-password"} icon="lock" error={errors.password?.message} showPassword={showPassword} onTogglePassword={() => setShowPassword((visible) => !visible)} registration={register("password")} />
+                    {isRegister ? (
+                      <TextField label="Confirm password" type="password" placeholder="Confirm your password" autoComplete="new-password" icon="lock" error={errors.confirmPassword?.message} showPassword={showConfirmPassword} onTogglePassword={() => setShowConfirmPassword((visible) => !visible)} registration={register("confirmPassword")} />
+                    ) : null}
+                  </div>
+
+                  {apiError ? <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{apiError}</div> : null}
+
+                  <button type="submit" disabled={isSubmitting} className="mt-5 h-12 w-full rounded-md bg-[#111111] text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
+                    {isSubmitting ? "Please wait..." : isRegister ? "Create account" : "Sign in"}
+                  </button>
+                  {!isRegister ? (
+                    <Link to="/reset-password" className="mt-4 block text-center text-sm font-semibold text-slate-700 underline underline-offset-4">
+                      Forgot your password?
+                    </Link>
+                  ) : null}
+                </form>
+
+                {googleLoginEnabled ? (
                   <>
-                    <TextField label="Full name" type="text" placeholder="Enter your full name" autoComplete="name" icon="user" error={errors.fullName?.message} registration={register("fullName")} />
-                    <TextField label="Phone number" type="tel" placeholder="Enter your phone number" autoComplete="tel" icon="phone" error={errors.phoneNumber?.message} registration={register("phoneNumber")} />
+                    <div className="my-5 flex items-center gap-3">
+                      <div className="h-px flex-1 bg-slate-200" />
+                      <span className="text-xs font-medium text-slate-400">or continue with</span>
+                      <div className="h-px flex-1 bg-slate-200" />
+                    </div>
+
+                    <div className="flex justify-center">
+                      <GoogleLogin
+                        onSuccess={(response) => {
+                          if (response.credential) void handleGoogleSuccess(response.credential);
+                        }}
+                        onError={() => setApiError("Google sign-in failed. Please try again.")}
+                        text={isRegister ? "signup_with" : "signin_with"}
+                        shape="rectangular"
+                        theme="outline"
+                        size="large"
+                        width="400"
+                      />
+                    </div>
                   </>
                 ) : null}
-                <TextField label="Email" type="email" placeholder="Enter your email" autoComplete="email" icon="mail" error={errors.email?.message} registration={register("email")} />
-                <TextField label="Password" type="password" placeholder="Enter your password" autoComplete={isRegister ? "new-password" : "current-password"} icon="lock" error={errors.password?.message} showPassword={showPassword} onTogglePassword={() => setShowPassword((visible) => !visible)} registration={register("password")} />
-                {isRegister ? (
-                  <TextField label="Confirm password" type="password" placeholder="Confirm your password" autoComplete="new-password" icon="lock" error={errors.confirmPassword?.message} showPassword={showConfirmPassword} onTogglePassword={() => setShowConfirmPassword((visible) => !visible)} registration={register("confirmPassword")} />
-                ) : null}
-              </div>
 
-              {apiError ? <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{apiError}</div> : null}
-
-              <button type="submit" disabled={isSubmitting} className="mt-5 h-12 w-full rounded-md bg-[#111111] text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
-                {isSubmitting ? "Please wait..." : isRegister ? "Create account" : "Sign in"}
-              </button>
-            </form>
-
-            <div className="my-5 flex items-center gap-3">
-              <div className="h-px flex-1 bg-slate-200" />
-              <span className="text-xs font-medium text-slate-400">or continue with</span>
-              <div className="h-px flex-1 bg-slate-200" />
-            </div>
-
-            <div className="flex justify-center">
-              <GoogleLogin
-                onSuccess={(response) => {
-                  if (response.credential) void handleGoogleSuccess(response.credential);
-                }}
-                onError={() => setApiError("Google sign-in failed. Please try again.")}
-                text={isRegister ? "signup_with" : "signin_with"}
-                shape="rectangular"
-                theme="outline"
-                size="large"
-                width="400"
-              />
-            </div>
-
-            <p className="mt-5 text-center text-xs text-slate-500">
-              {isRegister ? "Already have an account?" : "Do not have an account?"}{" "}
-              <button type="button" onClick={() => switchMode(isRegister ? "login" : "register")} className="font-semibold text-slate-950 underline underline-offset-4">
-                {isRegister ? "Sign in" : "Create an account"}
-              </button>
-            </p>
+                <p className="mt-5 text-center text-xs text-slate-500">
+                  {isRegister ? "Already have an account?" : "Do not have an account?"}{" "}
+                  <button type="button" onClick={() => switchMode(isRegister ? "login" : "register")} className="font-semibold text-slate-950 underline underline-offset-4">
+                    {isRegister ? "Sign in" : "Create an account"}
+                  </button>
+                </p>
+              </>
+            )}
 
             <p className="mt-5 text-center text-[11px] text-slate-400">&copy; 2026 WorkspaceEcom. All rights reserved.</p>
           </div>

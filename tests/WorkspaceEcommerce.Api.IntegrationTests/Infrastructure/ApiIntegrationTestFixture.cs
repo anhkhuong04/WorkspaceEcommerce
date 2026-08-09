@@ -23,7 +23,8 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         "Jwt__AccessTokenMinutes",
         "Storefront__BaseUrl",
         "MiniLogistics__WebhookSecret",
-        "MiniLogistics__CommandWorkerIntervalSeconds"
+        "MiniLogistics__CommandWorkerIntervalSeconds",
+        "EmailDelivery__WorkerIntervalSeconds"
     ];
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
@@ -74,6 +75,8 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
                 promotions.coupon_product_targets,
                 promotions.coupons,
                 content.banners,
+                content.media_asset_variants,
+                content.media_assets,
                 content.blog_comments,
                 content.blog_post_related_products,
                 content.blog_posts,
@@ -163,6 +166,7 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("Storefront__BaseUrl", "http://localhost:5173");
         Environment.SetEnvironmentVariable("MiniLogistics__WebhookSecret", "integration-webhook-secret");
         Environment.SetEnvironmentVariable("MiniLogistics__CommandWorkerIntervalSeconds", "3600");
+        Environment.SetEnvironmentVariable("EmailDelivery__WorkerIntervalSeconds", "3600");
     }
 
     private void RestoreRuntimeConfiguration()

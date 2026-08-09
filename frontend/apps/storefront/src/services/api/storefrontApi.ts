@@ -46,7 +46,7 @@ function parseCustomerSession(value: string | null): CustomerSession | null {
 }
 
 export function getCustomerSession(): CustomerSession | null {
-  const session = parseCustomerSession(localStorage.getItem(customerSessionKey));
+  const session = parseCustomerSession(sessionStorage.getItem(customerSessionKey));
   if (!session || isSessionExpired(session)) {
     clearCustomerSession();
     return null;
@@ -56,9 +56,13 @@ export function getCustomerSession(): CustomerSession | null {
 }
 
 export function saveCustomerSession(response: CustomerAuthResponse): CustomerSession {
+  if (!response.accessToken || !response.expiresAt) {
+    throw new Error("A completed customer authentication response is required to create a session.");
+  }
+
   const session: CustomerSession = {
     accessToken: response.accessToken,
-    tokenType: response.tokenType,
+    tokenType: response.tokenType ?? "Bearer",
     expiresAt: response.expiresAt,
     customerId: response.customerId,
     email: response.email,
@@ -66,7 +70,10 @@ export function saveCustomerSession(response: CustomerAuthResponse): CustomerSes
     phoneNumber: response.phoneNumber
   };
 
-  localStorage.setItem(customerSessionKey, JSON.stringify(session));
+  // Only the short-lived access token is visible to JavaScript and it is
+  // scoped to this browser tab. The long-lived refresh credential is an
+  // HttpOnly, SameSite cookie and is never serialised here.
+  sessionStorage.setItem(customerSessionKey, JSON.stringify(session));
   return session;
 }
 
@@ -81,15 +88,15 @@ export function updateCustomerSessionProfile(profile: CustomerProfileDto): Custo
     customerId: profile.id,
     email: profile.email,
     fullName: profile.fullName,
-    phoneNumber: profile.phoneNumber
+    phoneNumber: profile.phoneNumber ?? ""
   };
 
-  localStorage.setItem(customerSessionKey, JSON.stringify(nextSession));
+  sessionStorage.setItem(customerSessionKey, JSON.stringify(nextSession));
   return nextSession;
 }
 
 export function clearCustomerSession(): void {
-  localStorage.removeItem(customerSessionKey);
+  sessionStorage.removeItem(customerSessionKey);
 }
 
 export function getCustomerToken(): string | null {

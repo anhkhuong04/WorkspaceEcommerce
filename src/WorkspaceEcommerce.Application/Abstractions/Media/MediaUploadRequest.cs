@@ -5,4 +5,5 @@ public sealed record MediaUploadRequest(
     string OriginalFileName,
     string ContentType,
     long Length,
-    string? Folder);
+    string? Folder,
+    string? OwnerIdentity = null);

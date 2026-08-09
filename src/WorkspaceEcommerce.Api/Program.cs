@@ -1,14 +1,13 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using WorkspaceEcommerce.Api.Authentication;
 using WorkspaceEcommerce.Api.Common;
 using WorkspaceEcommerce.Api.Extensions;
 using WorkspaceEcommerce.Api.Health;
 using WorkspaceEcommerce.Api.Localization;
-using WorkspaceEcommerce.Api.Media;
 using WorkspaceEcommerce.Api.Hubs;
 using WorkspaceEcommerce.Api.Middleware;
-using WorkspaceEcommerce.Application.Abstractions.Media;
 using WorkspaceEcommerce.Application;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Seeding;
@@ -25,6 +24,22 @@ if (builder.Environment.IsDevelopment())
 }
 
 var jwtOptions = builder.Configuration.GetValidatedJwtOptions();
+var dataProtectionKeyRingPath = builder.Configuration["DataProtection:KeyRingPath"];
+
+if (builder.Environment.IsProduction() && string.IsNullOrWhiteSpace(dataProtectionKeyRingPath))
+{
+    throw new InvalidOperationException(
+        "Configuration 'DataProtection:KeyRingPath' is required outside Development to protect two-factor secrets with a persistent external key ring.");
+}
+
+var dataProtectionBuilder = builder.Services
+    .AddDataProtection()
+    .SetApplicationName("WorkspaceEcommerce");
+
+if (!string.IsNullOrWhiteSpace(dataProtectionKeyRingPath))
+{
+    dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeyRingPath));
+}
 
 builder.Services
     .AddControllers()
@@ -58,9 +73,8 @@ builder.Services
         tags: ["ready"]);
 builder.Services.AddSignalR();
 builder.Services.AddScoped<WorkspaceEcommerce.Application.Abstractions.Notifications.INotificationService, WorkspaceEcommerce.Api.Hubs.SignalRNotificationService>();
-builder.Services.AddSingleton<IMediaStorageService, LocalMediaStorageService>();
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
@@ -87,7 +101,18 @@ else
 }
 
 app.UseSecurityHeaders();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context =>
+    {
+        if (context.Context.Request.Path.StartsWithSegments("/media"))
+        {
+            context.Context.Response.ContentType = "image/webp";
+            context.Context.Response.Headers["Content-Disposition"] = "inline";
+            context.Context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        }
+    }
+});
 app.UseCors(CorsExtensions.FrontendCorsPolicy);
 app.UseRateLimiter();
 app.UseAuthentication();

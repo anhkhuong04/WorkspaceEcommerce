@@ -12,7 +12,8 @@ import type {
   OrderStatus,
   PaymentStatus,
   RedeemLoyaltyPointsResponse,
-  ShipmentTrackingDto
+  ShipmentTrackingDto,
+  TwoFactorSetupStartResponse
 } from "@workspace-ecommerce/api-types";
 import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
 import type { ReactNode } from "react";
@@ -135,9 +136,13 @@ export function AccountOverviewPage() {
 }
 
 export function AccountProfilePage() {
-  const { customer, updateCustomer } = useCustomerAuth();
+  const { customer, updateCustomer, refreshCustomer } = useCustomerAuth();
   const queryClient = useQueryClient();
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [twoFactorSetup, setTwoFactorSetup] = useState<TwoFactorSetupStartResponse | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+  const [disableCode, setDisableCode] = useState("");
   const {
     register,
     handleSubmit,
@@ -172,8 +177,37 @@ export function AccountProfilePage() {
     onError: () => setSuccessMessage(null)
   });
 
+  const startTwoFactorMutation = useMutation({
+    mutationFn: () => storefrontApi.startTwoFactorSetup(),
+    onSuccess: (setup) => {
+      setTwoFactorSetup(setup);
+      setRecoveryCodes(null);
+      setTwoFactorCode("");
+    }
+  });
+
+  const confirmTwoFactorMutation = useMutation({
+    mutationFn: () => storefrontApi.confirmTwoFactorSetup({ code: twoFactorCode.trim() }),
+    onSuccess: async (result) => {
+      setRecoveryCodes(result.recoveryCodes);
+      setTwoFactorSetup(null);
+      setTwoFactorCode("");
+      await refreshCustomer();
+    }
+  });
+
+  const disableTwoFactorMutation = useMutation({
+    mutationFn: () => storefrontApi.disableTwoFactor({ code: disableCode.trim(), recoveryCode: null }),
+    onSuccess: async () => {
+      setDisableCode("");
+      setRecoveryCodes(null);
+      await refreshCustomer();
+    }
+  });
+
   return (
     <AccountShell>
+      <div className="grid gap-6">
       <section className="ui-card border border-slate-100 p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -225,6 +259,59 @@ export function AccountProfilePage() {
           </div>
         </form>
       </section>
+      <section className="ui-card border border-slate-100 p-6">
+        <p className="ui-caption uppercase tracking-[0.18em] text-[var(--brand)]">Security</p>
+        <h2 className="ui-h2 mt-2 text-slate-950">Two-factor authentication</h2>
+        <p className="ui-body mt-2 text-slate-500">Use an authenticator app to require a second proof when you sign in.</p>
+
+        {customer?.twoFactorEnabled ? (
+          <div className="mt-5 grid gap-4">
+            <div className="rounded-[var(--radius-card)] bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">Two-factor authentication is enabled.</div>
+            <label className="block max-w-sm">
+              <span className="mb-1.5 block text-sm font-semibold">Current authenticator code</span>
+              <input value={disableCode} onChange={(event) => setDisableCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" maxLength={6} className={fieldClassName(false)} />
+            </label>
+            {disableTwoFactorMutation.error ? <div className="ui-control rounded-[var(--radius-card)] bg-red-50 px-4 py-3 text-red-700">{getApiErrorMessage(disableTwoFactorMutation.error)}</div> : null}
+            <button type="button" disabled={disableTwoFactorMutation.isPending || disableCode.trim().length !== 6} onClick={() => disableTwoFactorMutation.mutate()} className="ui-control h-11 w-fit rounded-[var(--radius-control)] border border-red-200 px-5 text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60">
+              {disableTwoFactorMutation.isPending ? "Disabling..." : "Disable two-factor authentication"}
+            </button>
+          </div>
+        ) : twoFactorSetup ? (
+          <div className="mt-5 grid gap-4">
+            <div className="rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-slate-950">Add this key to your authenticator app</p>
+              <p className="mt-2 break-all font-mono text-sm text-slate-700">{twoFactorSetup.manualEntryKey}</p>
+              <a href={twoFactorSetup.provisioningUri} className="mt-3 inline-block text-sm font-semibold text-slate-950 underline underline-offset-4">Open authenticator app</a>
+            </div>
+            <label className="block max-w-sm">
+              <span className="mb-1.5 block text-sm font-semibold">Verification code</span>
+              <input value={twoFactorCode} onChange={(event) => setTwoFactorCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" maxLength={6} className={fieldClassName(false)} />
+            </label>
+            {confirmTwoFactorMutation.error ? <div className="ui-control rounded-[var(--radius-card)] bg-red-50 px-4 py-3 text-red-700">{getApiErrorMessage(confirmTwoFactorMutation.error)}</div> : null}
+            <div className="flex flex-wrap gap-3">
+              <button type="button" disabled={confirmTwoFactorMutation.isPending || twoFactorCode.trim().length !== 6} onClick={() => confirmTwoFactorMutation.mutate()} className="ui-control h-11 rounded-[var(--radius-control)] bg-slate-950 px-5 text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
+                {confirmTwoFactorMutation.isPending ? "Confirming..." : "Confirm setup"}
+              </button>
+              <button type="button" onClick={() => { setTwoFactorSetup(null); setTwoFactorCode(""); }} className="ui-control h-11 rounded-[var(--radius-control)] border border-slate-200 px-5 text-slate-700 transition hover:border-slate-950">Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-5">
+            {startTwoFactorMutation.error ? <div className="mb-4 ui-control rounded-[var(--radius-card)] bg-red-50 px-4 py-3 text-red-700">{getApiErrorMessage(startTwoFactorMutation.error)}</div> : null}
+            <button type="button" disabled={startTwoFactorMutation.isPending} onClick={() => startTwoFactorMutation.mutate()} className="ui-control h-11 rounded-[var(--radius-control)] bg-slate-950 px-5 text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
+              {startTwoFactorMutation.isPending ? "Preparing..." : "Set up two-factor authentication"}
+            </button>
+          </div>
+        )}
+
+        {recoveryCodes ? (
+          <div className="mt-5 rounded-[var(--radius-card)] border border-amber-200 bg-amber-50 p-4 text-amber-950">
+            <p className="font-semibold">Save these recovery codes now. They will not be shown again.</p>
+            <div className="mt-3 grid gap-2 font-mono text-sm sm:grid-cols-2">{recoveryCodes.map((code) => <span key={code}>{code}</span>)}</div>
+          </div>
+        ) : null}
+      </section>
+      </div>
     </AccountShell>
   );
 }
@@ -440,6 +527,15 @@ function AccountShell({ children }: { children: ReactNode }) {
     void navigate("/", { replace: true });
   }
 
+  async function handleSignOutEverywhere() {
+    try {
+      await storefrontApi.logoutAllCustomerSessions();
+    } finally {
+      signOut();
+      await navigate("/", { replace: true });
+    }
+  }
+
   return (
     <div className="grid gap-6">
       <PageHeader
@@ -458,6 +554,9 @@ function AccountShell({ children }: { children: ReactNode }) {
           </nav>
           <button type="button" onClick={handleSignOut} className="ui-control mt-4 flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] border border-slate-200 text-slate-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700">
             Sign out
+          </button>
+          <button type="button" onClick={() => void handleSignOutEverywhere()} className="ui-control mt-2 flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] border border-red-200 text-red-700 transition hover:bg-red-50">
+            Sign out everywhere
           </button>
         </aside>
 

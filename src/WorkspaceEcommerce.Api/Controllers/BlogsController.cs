@@ -32,7 +32,7 @@ public sealed class BlogsController(IStorefrontBlogService blogService) : Contro
     }
 
     [HttpPost("api/blog-posts/{slug}/comments")]
-    [ProducesResponseType(typeof(ApiResponse<BlogCommentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<CommentSubmissionAcknowledgement>), StatusCodes.Status202Accepted)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
@@ -43,6 +43,6 @@ public sealed class BlogsController(IStorefrontBlogService blogService) : Contro
     {
         var result = await blogService.SubmitCommentAsync(slug, request, cancellationToken);
 
-        return this.ToApiResponse(result);
+        return this.ToApiResponse(result, StatusCodes.Status202Accepted);
     }
 }

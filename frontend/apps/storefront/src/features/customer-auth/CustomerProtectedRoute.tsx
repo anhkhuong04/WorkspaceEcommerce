@@ -4,7 +4,11 @@ import { useCustomerAuth } from "./useCustomerAuth";
 
 export function CustomerProtectedRoute({ children }: { children: ReactNode }) {
   const location = useLocation();
-  const { isAuthenticated } = useCustomerAuth();
+  const { isAuthenticated, isReady } = useCustomerAuth();
+
+  if (!isReady) {
+    return null;
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />;

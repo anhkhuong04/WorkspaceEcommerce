@@ -12,6 +12,9 @@ internal static class RateLimiterExtensions
         {
             var isDevelopment = environment.IsDevelopment();
             var authPermitLimit = isDevelopment ? 1_000 : 10;
+            var commentPermitLimit = isDevelopment ? 500 : 3;
+            var twoFactorVerificationPermitLimit = isDevelopment ? 500 : 5;
+            var twoFactorSetupPermitLimit = isDevelopment ? 500 : 5;
             var transactionPermitLimit = isDevelopment ? 2_000 : 60;
             var catalogPermitLimit = isDevelopment ? 5_000 : 240;
             var defaultPermitLimit = isDevelopment ? 3_000 : 120;
@@ -21,6 +24,44 @@ internal static class RateLimiterExtensions
             {
                 var path = httpContext.Request.Path.Value ?? string.Empty;
                 var partitionKey = GetRateLimitPartitionKey(httpContext);
+
+                if (path.StartsWith("/api/blog-posts/", StringComparison.OrdinalIgnoreCase) &&
+                    path.EndsWith("/comments", StringComparison.OrdinalIgnoreCase) &&
+                    HttpMethods.IsPost(httpContext.Request.Method))
+                {
+                    return RateLimitPartition.GetFixedWindowLimiter(
+                        $"blog-comment:{partitionKey}",
+                        _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = commentPermitLimit,
+                            QueueLimit = 0,
+                            Window = TimeSpan.FromMinutes(1)
+                        });
+                }
+
+                if (path.StartsWith("/api/customer/auth/2fa", StringComparison.OrdinalIgnoreCase))
+                {
+                    return RateLimitPartition.GetFixedWindowLimiter(
+                        $"two-factor-verification:{partitionKey}",
+                        _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = twoFactorVerificationPermitLimit,
+                            QueueLimit = 0,
+                            Window = TimeSpan.FromMinutes(1)
+                        });
+                }
+
+                if (path.StartsWith("/api/customer/me/2fa", StringComparison.OrdinalIgnoreCase))
+                {
+                    return RateLimitPartition.GetFixedWindowLimiter(
+                        $"two-factor-setup:{partitionKey}",
+                        _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = twoFactorSetupPermitLimit,
+                            QueueLimit = 0,
+                            Window = TimeSpan.FromMinutes(1)
+                        });
+                }
 
                 if (path.StartsWith("/api/customer/auth", StringComparison.OrdinalIgnoreCase) ||
                     path.StartsWith("/api/admin/auth", StringComparison.OrdinalIgnoreCase))

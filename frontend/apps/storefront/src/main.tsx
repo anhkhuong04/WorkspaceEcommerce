@@ -6,11 +6,12 @@ import "./styles/globals.css";
 import "./i18n";
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
+const application = (
+  <StrictMode>
+    <App />
+  </StrictMode>
+);
 
 createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <GoogleOAuthProvider clientId={googleClientId}>
-      <App />
-    </GoogleOAuthProvider>
-  </StrictMode>
+  googleClientId ? <GoogleOAuthProvider clientId={googleClientId}>{application}</GoogleOAuthProvider> : application
 );

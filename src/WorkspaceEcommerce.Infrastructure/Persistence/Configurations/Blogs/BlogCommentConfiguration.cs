@@ -35,9 +35,18 @@ internal sealed class BlogCommentConfiguration : IEntityTypeConfiguration<BlogCo
             .HasMaxLength(2000)
             .IsRequired();
 
-        builder.Property(x => x.IsApproved)
-            .HasColumnName("is_approved")
+        builder.Property(x => x.ModerationStatus)
+            .HasColumnName("moderation_status")
+            .HasConversion<string>()
+            .HasMaxLength(16)
             .IsRequired();
+
+        builder.Property(x => x.ModeratedAt)
+            .HasColumnName("moderated_at");
+
+        builder.Property(x => x.ModeratedBy)
+            .HasColumnName("moderated_by")
+            .HasMaxLength(250);
 
         builder.Property(x => x.CreatedAt)
             .HasColumnName("created_at")
@@ -45,6 +54,9 @@ internal sealed class BlogCommentConfiguration : IEntityTypeConfiguration<BlogCo
 
         builder.HasIndex(x => x.BlogPostId)
             .HasDatabaseName("ix_blog_comments_blog_post_id");
+
+        builder.HasIndex(x => new { x.BlogPostId, x.ModerationStatus, x.CreatedAt })
+            .HasDatabaseName("ix_blog_comments_post_moderation_created");
 
         builder.HasOne<BlogPost>()
             .WithMany()

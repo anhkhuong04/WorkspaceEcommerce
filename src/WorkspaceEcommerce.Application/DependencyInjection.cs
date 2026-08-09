@@ -13,6 +13,7 @@ using WorkspaceEcommerce.Application.Modules.Customers.Addresses;
 using WorkspaceEcommerce.Application.Modules.Customers.Authentication;
 using WorkspaceEcommerce.Application.Modules.Customers.Orders;
 using WorkspaceEcommerce.Application.Modules.Customers.Profile;
+using WorkspaceEcommerce.Application.Modules.Customers.TwoFactor;
 using WorkspaceEcommerce.Application.Modules.Loyalty;
 using WorkspaceEcommerce.Application.Modules.Ordering;
 using WorkspaceEcommerce.Application.Modules.Payments;
@@ -38,7 +39,10 @@ public static class DependencyInjection
         services.AddScoped<IAdminBannerService, AdminBannerService>();
         services.AddScoped<IStorefrontBannerService, StorefrontBannerService>();
         services.AddScoped<ICustomerAuthService, CustomerAuthService>();
+        services.AddScoped<ICustomerSessionService, CustomerSessionService>();
+        services.AddScoped<ICustomerAccountLifecycleService, CustomerAccountLifecycleService>();
         services.AddScoped<ICustomerProfileService, CustomerProfileService>();
+        services.AddScoped<ICustomerTwoFactorService, CustomerTwoFactorService>();
         services.AddScoped<ICustomerOrderService, CustomerOrderService>();
         services.AddScoped<ICustomerAddressService, CustomerAddressService>();
         services.AddScoped<IStorefrontCartService, StorefrontCartService>();

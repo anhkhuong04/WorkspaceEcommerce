@@ -14,8 +14,4 @@ public interface ICustomerProfileService
     Task<Result<CustomerAccountStatsDto>> GetStatsAsync(CancellationToken cancellationToken = default);
 
     Task<Result<IReadOnlyList<CustomerLoginHistoryDto>>> GetLoginHistoryAsync(CancellationToken cancellationToken = default);
-
-    Task<Result<CustomerProfileDto>> ToggleTwoFactorAsync(
-        Toggle2FARequest request,
-        CancellationToken cancellationToken = default);
 }

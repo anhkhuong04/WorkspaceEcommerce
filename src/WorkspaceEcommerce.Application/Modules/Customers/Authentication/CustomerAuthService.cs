@@ -1,9 +1,9 @@
 using FluentValidation;
-using Google.Apis.Auth;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Customers.Addresses;
+using WorkspaceEcommerce.Application.Modules.Customers.TwoFactor;
 using WorkspaceEcommerce.Domain.Modules.Customers;
 
 namespace WorkspaceEcommerce.Application.Modules.Customers.Authentication;
@@ -13,8 +13,11 @@ internal sealed class CustomerAuthService(
     IValidator<CustomerRegisterRequest> registerValidator,
     IValidator<CustomerLoginRequest> loginValidator,
     IPasswordHasher passwordHasher,
-    IJwtTokenGenerator tokenGenerator,
-    ICurrentCustomerContext currentCustomer) : ICustomerAuthService
+    ICurrentCustomerContext currentCustomer,
+    IGoogleIdTokenValidator googleIdTokenValidator,
+    ICustomerTwoFactorService twoFactorService,
+    ICustomerSessionService sessionService,
+    ICustomerAccountLifecycleService accountLifecycleService) : ICustomerAuthService
 {
     public async Task<Result<CustomerAuthResponse>> RegisterAsync(
         CustomerRegisterRequest request,
@@ -43,9 +46,9 @@ internal sealed class CustomerAuthService(
             passwordHasher.Hash(request.Password));
 
         dbContext.Add(customer);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        accountLifecycleService.QueueEmailVerification(customer);
 
-        return Result<CustomerAuthResponse>.Success(ToAuthResponse(customer));
+        return Result<CustomerAuthResponse>.Success(await sessionService.IssueAsync(customer, cancellationToken));
     }
 
     public async Task<Result<CustomerAuthResponse>> LoginAsync(
@@ -67,20 +70,18 @@ internal sealed class CustomerAuthService(
             && customer.PasswordHash is not null
             && passwordHasher.Verify(request.Password, customer.PasswordHash);
 
-        // Record login history if we have context
         if (customer is not null && !string.IsNullOrEmpty(request.IpAddress))
         {
             var rawUserAgent = string.IsNullOrWhiteSpace(request.UserAgent)
                 ? "Unknown"
                 : request.UserAgent.Trim();
             var userAgent = rawUserAgent[..Math.Min(rawUserAgent.Length, 499)];
-            var loginHistory = new CustomerLoginHistory(
+            dbContext.Add(new CustomerLoginHistory(
                 Guid.NewGuid(),
                 customer.Id,
                 request.IpAddress,
                 userAgent,
-                success);
-            dbContext.Add(loginHistory);
+                success));
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
@@ -89,7 +90,10 @@ internal sealed class CustomerAuthService(
             return Result<CustomerAuthResponse>.Unauthorized("Invalid email or password.");
         }
 
-        return Result<CustomerAuthResponse>.Success(ToAuthResponse(customer));
+        var twoFactorChallenge = await twoFactorService.CreateLoginChallengeAsync(customer, cancellationToken);
+        return twoFactorChallenge is not null
+            ? Result<CustomerAuthResponse>.Success(twoFactorChallenge)
+            : Result<CustomerAuthResponse>.Success(await sessionService.IssueAsync(customer, cancellationToken));
     }
 
     public async Task<Result> ChangePasswordAsync(
@@ -104,7 +108,7 @@ internal sealed class CustomerAuthService(
             return Result.Unauthorized("Customer authentication is required.");
         }
 
-        var customer = dbContext.Customers.FirstOrDefault(c => c.Id == customerId.Value);
+        var customer = dbContext.Customers.FirstOrDefault(candidate => candidate.Id == customerId.Value);
         if (customer is null)
         {
             return Result.NotFound("Customer was not found.");
@@ -121,7 +125,9 @@ internal sealed class CustomerAuthService(
         }
 
         customer.UpdatePasswordHash(passwordHasher.Hash(request.NewPassword));
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+        accountLifecycleService.RevokeOutstandingPasswordResetTokens(customer.Id, now);
+        await sessionService.RevokeAllAsync(customer.Id, "password_changed", cancellationToken);
 
         return Result.Success();
     }
@@ -130,66 +136,58 @@ internal sealed class CustomerAuthService(
         CustomerGoogleLoginRequest request,
         CancellationToken cancellationToken = default)
     {
-        GoogleJsonWebSignature.Payload payload;
-        try
+        var identity = await googleIdTokenValidator.ValidateAsync(request.IdToken, cancellationToken);
+        if (identity is null)
         {
-            var settings = new GoogleJsonWebSignature.ValidationSettings
-            {
-                Audience = string.IsNullOrWhiteSpace(request.GoogleClientId)
-                    ? null
-                    : [request.GoogleClientId]
-            };
-            payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, settings);
-        }
-        catch (InvalidJwtException ex)
-        {
-            return Result<CustomerAuthResponse>.Unauthorized($"Google token is invalid: {ex.Message}");
+            return Result<CustomerAuthResponse>.Unauthorized("Google authentication failed.");
         }
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var googleId = payload.Subject;
-        var email = NormalizeEmail(payload.Email);
+        var googleId = identity.Subject.Trim();
+        var email = NormalizeEmail(identity.Email);
+        var customerByGoogleId = dbContext.Customers.FirstOrDefault(customer => customer.GoogleId == googleId);
+        var customerByEmail = dbContext.Customers.FirstOrDefault(customer => customer.Email == email);
 
-        // Try to find existing customer by GoogleId or Email
-        var customer = dbContext.Customers.FirstOrDefault(c => c.GoogleId == googleId)
-                       ?? dbContext.Customers.FirstOrDefault(c => c.Email == email);
+        if (customerByGoogleId is not null &&
+            customerByEmail is not null &&
+            customerByGoogleId.Id != customerByEmail.Id)
+        {
+            return Result<CustomerAuthResponse>.Unauthorized("Google authentication failed.");
+        }
 
+        var customer = customerByGoogleId ?? customerByEmail;
         if (customer is null)
         {
-            // Create new customer from Google profile
-            var fullName = payload.Name ?? payload.Email.Split('@')[0];
+            var fullName = string.IsNullOrWhiteSpace(identity.Name)
+                ? email.Split('@')[0]
+                : identity.Name.Trim();
             customer = Customer.CreateFromGoogle(
                 Guid.NewGuid(),
                 fullName,
                 email,
                 googleId,
-                avatarUrl: payload.Picture);
-
+                identity.Picture);
             dbContext.Add(customer);
         }
-        else if (customer.GoogleId != googleId)
+        else if (customerByGoogleId is null)
         {
-            // Existing email/password account — link Google
-            customer.LinkGoogleAccount(googleId);
-            if (!string.IsNullOrEmpty(payload.Picture))
+            if (!string.IsNullOrWhiteSpace(customer.GoogleId))
             {
-                customer.UpdateAvatar(payload.Picture);
+                return Result<CustomerAuthResponse>.Unauthorized("Google authentication failed.");
+            }
+
+            customer.LinkGoogleAccount(googleId);
+            if (!string.IsNullOrWhiteSpace(identity.Picture))
+            {
+                customer.UpdateAvatar(identity.Picture);
             }
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        return Result<CustomerAuthResponse>.Success(ToAuthResponse(customer));
-    }
-
-    private CustomerAuthResponse ToAuthResponse(Customer customer)
-    {
-        return tokenGenerator.GenerateCustomerToken(
-            customer.Id,
-            customer.Email,
-            customer.FullName,
-            customer.PhoneNumber);
+        var twoFactorChallenge = await twoFactorService.CreateLoginChallengeAsync(customer, cancellationToken);
+        return twoFactorChallenge is not null
+            ? Result<CustomerAuthResponse>.Success(twoFactorChallenge)
+            : Result<CustomerAuthResponse>.Success(await sessionService.IssueAsync(customer, cancellationToken));
     }
 
     private static string NormalizeEmail(string email)

@@ -22,21 +22,19 @@ The target outcome:
 The following baseline is derived from the current source and the completed shipment report in this file. It must be re-verified before implementation begins; it is not a substitute for a fresh test run.
 
 - Backend targets .NET 10 with ASP.NET Core, EF Core, and PostgreSQL.
-- The solution contains 94 controller endpoints, 29 EF configurations, and 16 migrations.
+- The solution contains 98 controller endpoints, 31 EF configurations, and 17 migrations.
 - Core commerce flows are implemented: catalog, cart, checkout, orders, coupons, loyalty, reviews, blogs, VNPay, and MiniLogistics.
-- The documented shipment completion baseline is `476/476` passing backend tests.
+- The current hardening verification is `499/499` passing backend tests; the earlier shipment baseline was `476/476`.
 - `src` has no explicit `TODO`, `FIXME`, or `NotImplementedException` markers.
 - Known production gaps are behavioral and architectural rather than missing controller/service skeletons.
 
 ### Confirmed gaps
 
-1. `CustomerProfileService` generates a simulated TOTP secret using `Random.Shared`; login does not challenge for a second factor.
-2. Google token validation takes the OAuth audience from `CustomerGoogleLoginRequest.GoogleClientId`, which lets the caller influence server trust configuration.
-3. `AppDbContextDesignTimeFactory` contains a reusable PostgreSQL password fallback in source.
-4. `StorefrontBlogService` creates public comments with `isApproved: true`.
-5. `LocalMediaStorageService` stores files on local disk and trusts declared MIME type plus extension without decoding or signature validation.
-6. Customer auth has no refresh-token rotation, logout/revocation, password reset, or complete email-verification workflow.
-7. Several query paths use synchronous materialization or paginate after loading all matching records into memory.
+1. `AppDbContextDesignTimeFactory` previously contained a reusable PostgreSQL password fallback in source; repository remediation is complete but external credential rotation remains pending.
+2. `StorefrontBlogService` creates public comments with `isApproved: true`.
+3. `LocalMediaStorageService` stores files on local disk and trusts declared MIME type plus extension without decoding or signature validation.
+4. Customer auth has no refresh-token rotation, logout/revocation, password reset, or complete email-verification workflow.
+5. Several query paths use synchronous materialization or paginate after loading all matching records into memory.
 
 ## Scope and Guardrails
 
@@ -167,24 +165,24 @@ Acceptance criteria:
 
 #### PRH-003 - Make Google OAuth trust server-controlled
 
-- [ ] Add validated `GoogleAuthOptions` under a server-owned configuration section.
-- [ ] Support an explicit allowlist of Google client IDs if storefront environments require more than one client.
-- [ ] Remove `GoogleClientId` from the public login request contract; the request should contain only the Google ID token.
-- [ ] Validate issuer, audience, expiry, signature, subject, and verified-email status using server configuration.
-- [ ] Reject startup in production when Google login is enabled but no valid client ID is configured.
-- [ ] Prevent unsafe account linking when the token email is unverified or conflicts with an already-linked Google subject.
-- [ ] Return a generic unauthorized response without exposing Google library exception details.
-- [ ] Update frontend environment handling so the frontend client ID is used only to obtain a credential, never to configure backend validation.
-- [ ] Update API fixtures and documentation for the request contract change.
+- [x] Add validated `GoogleAuthOptions` under a server-owned configuration section.
+- [x] Support an explicit allowlist of Google client IDs if storefront environments require more than one client.
+- [x] Remove `GoogleClientId` from the public login request contract; the request contains only the Google ID token.
+- [x] Validate issuer, audience, expiry, signature, subject, and verified-email status using server configuration.
+- [x] Reject startup/configuration validation when Google login is enabled but no valid client ID is configured (therefore also in Production).
+- [x] Prevent unsafe account linking when the token email is unverified or conflicts with an already-linked Google subject.
+- [x] Return a generic unauthorized response without exposing Google library exception details.
+- [x] Update frontend environment handling so the frontend client ID is used only to obtain a credential, never to configure backend validation.
+- [x] Update API contracts and documentation for the request contract change.
 
 Required tests:
 
-- [ ] Valid token for an allowed audience succeeds.
-- [ ] Valid Google token for another audience is rejected.
-- [ ] Expired token, invalid issuer, missing subject, and unverified email are rejected.
-- [ ] Existing password account can be linked only under the approved rules.
-- [ ] Existing Google subject logs into the same customer without creating a duplicate.
-- [ ] Missing server configuration fails startup/config validation in the intended environments.
+- [x] Valid token for an allowed server audience succeeds.
+- [x] A provider-rejected token for another audience is rejected.
+- [x] Expired/invalid-issuer provider failures, missing subject, and unverified email are rejected.
+- [x] Existing password account can be linked only under the approved rules.
+- [x] Existing Google subject logs into the same customer without creating a duplicate.
+- [x] Missing server configuration fails startup/config validation in the intended environments.
 
 Acceptance criteria:
 
@@ -192,23 +190,30 @@ Acceptance criteria:
 - Google login and account linking are deterministic, tested, and do not leak provider errors.
 - Existing correctly linked Google customers retain access after migration.
 
+##### Execution record - 2026-08-09
+
+- `GoogleAuth:AllowedClientIds[]` is parsed and validated only from server configuration. `GoogleJsonWebSignature` receives that allowlist directly; no public request value participates in audience validation.
+- The new `IGoogleJwtValidator` seam keeps the provider implementation behind infrastructure while testing allowed audiences, provider rejection (including issuer/expiry/signature failures), missing claims, and unverified email without recording tokens.
+- Linking is allowed only for a verified identity matching an existing password account with no Google subject. A conflicting email/subject pair gets the same generic `Google authentication failed.` response as an invalid token.
+- Storefront Google configuration remains a public `VITE_GOOGLE_CLIENT_ID`, only to obtain a browser credential. The backend request contract is now `{ "idToken": "..." }`.
+
 #### PRH-004 - Replace simulated 2FA with complete TOTP authentication
 
-- [ ] Write an ADR for TOTP library choice, encryption approach, recovery-code policy, allowed clock drift, and challenge-token lifetime.
-- [ ] Extend the customer model with a pending setup state; generating a secret must not enable 2FA immediately.
-- [ ] Generate TOTP secrets with a cryptographically secure RNG and Base32 encoding.
-- [ ] Encrypt TOTP secrets at rest with a key that is external to the database and repository.
-- [ ] Add setup-start API returning an `otpauth://` URI and the minimum data needed for frontend QR rendering.
-- [ ] Add setup-confirm API; enable 2FA only after a valid code proves authenticator enrollment.
-- [ ] Generate one-time recovery codes, return them once, and persist only their hashes.
-- [ ] Change password login to return `RequiresTwoFactor` plus a short-lived, single-purpose challenge instead of an access token when 2FA is enabled.
-- [ ] Apply the same second-factor policy after Google primary authentication when the matched customer has 2FA enabled.
-- [ ] Add TOTP verification and recovery-code verification endpoints that issue the normal customer token only after success.
-- [ ] Prevent reuse of a TOTP time step or otherwise document and test the replay policy.
-- [ ] Require a current TOTP/recovery code or equivalent recent-auth proof before disabling 2FA.
-- [ ] Rate-limit setup confirmation and login challenge verification separately from ordinary API traffic.
-- [ ] Remove the current simulated generator and toggle endpoint after frontend migration.
-- [ ] Ensure logs and API errors never contain secrets, OTP values, recovery codes, or challenge token contents.
+- [x] Write an ADR for TOTP library choice, encryption approach, recovery-code policy, allowed clock drift, and challenge-token lifetime.
+- [x] Extend the customer model with a pending setup state; generating a secret does not enable 2FA immediately.
+- [x] Generate TOTP secrets with a cryptographically secure RNG and Base32 encoding.
+- [x] Encrypt TOTP secrets at rest with a key that is external to the database and repository.
+- [x] Add setup-start API returning an `otpauth://` URI and the minimum data needed for frontend QR rendering.
+- [x] Add setup-confirm API; enable 2FA only after a valid code proves authenticator enrollment.
+- [x] Generate one-time recovery codes, return them once, and persist only their hashes.
+- [x] Change password login to return `RequiresTwoFactor` plus a short-lived, single-purpose challenge instead of an access token when 2FA is enabled.
+- [x] Apply the same second-factor policy after Google primary authentication when the matched customer has 2FA enabled.
+- [x] Add TOTP verification and recovery-code verification endpoints that issue the normal customer token only after success.
+- [x] Prevent reuse of a TOTP time step and document/test the replay policy.
+- [x] Require a current TOTP/recovery code before disabling 2FA.
+- [x] Rate-limit setup and login challenge verification separately from ordinary API traffic.
+- [x] Remove the simulated generator and toggle endpoint after frontend migration.
+- [x] Ensure logs and API errors never contain secrets, OTP values, recovery codes, or challenge token contents.
 
 Proposed persistence additions:
 
@@ -220,13 +225,13 @@ Proposed persistence additions:
 
 Required tests:
 
-- [ ] Setup start does not enable 2FA.
-- [ ] Correct setup code enables 2FA; incorrect/expired code does not.
-- [ ] Password and Google login both stop at the challenge when 2FA is enabled.
-- [ ] Valid TOTP completes login; invalid, expired, replayed, or rate-limited codes fail safely.
-- [ ] Recovery code works once and cannot be replayed.
-- [ ] Disable requires second-factor proof and removes/revokes stored 2FA material.
-- [ ] Encrypted secrets and hashed codes are not returned by queries, DTOs, logs, or API responses.
+- [x] Setup start does not enable 2FA.
+- [x] Correct setup code enables 2FA; incorrect/expired code does not.
+- [x] Password and Google login both stop at the challenge when 2FA is enabled.
+- [x] Valid TOTP completes login; invalid, expired, replayed, or rate-limited codes fail safely.
+- [x] Recovery code works once and cannot be replayed.
+- [x] Disable requires second-factor proof and removes/revokes stored 2FA material.
+- [x] Encrypted secrets and hashed codes are not returned by queries, DTOs, logs, or API responses.
 
 Acceptance criteria:
 
@@ -234,100 +239,136 @@ Acceptance criteria:
 - No access token is issued after primary authentication until the second factor succeeds.
 - Recovery and disable flows are secure and covered by integration tests.
 
+##### Execution record - 2026-08-09
+
+- [ADR 002](docs/adr/002-customer-totp-authentication.md) records `Otp.NET` 1.4.1, 20-byte Base32 secrets, 30-second periods, ±1 time-step drift, replay prevention, ten one-time recovery codes, 5-minute hashed login challenges, and external key-ring requirements.
+- New persistence is additive: encrypted pending/active secrets, expiry, replay metadata, hashed challenge records, and hashed recovery-code records. Recovery-code `used_at` and TOTP time-step metadata are EF concurrency tokens to prevent concurrent replay. The migration explicitly clears the obsolete simulated state so only confirmed authenticators can be enabled; affected users must re-enroll.
+- Production fails before startup if `DataProtection:KeyRingPath` is absent. The key ring must be a persistent, access-controlled mount outside the repository and PostgreSQL, shared by API instances.
+- APIs: `POST /api/customer/me/2fa/setup`, `.../confirm`, `.../disable`, `/api/customer/auth/2fa/verify`, and `.../recovery`. Storefront now performs the login challenge and exposes enrollment/recovery-code UX; no toggle endpoint remains.
+- Test coverage includes fake-clock unit tests and a PostgreSQL-backed API integration flow covering real TOTP setup/verification, recovery consumption/replay, and secure disable.
+
+Verification:
+
+- `dotnet build WorkspaceEcommerce.slnx --disable-build-servers -m:1 --nologo`: passed with 0 warnings and 0 errors.
+- `dotnet test WorkspaceEcommerce.slnx --no-build --no-restore --disable-build-servers -m:1 --nologo`: passed `499/499` (`285` Application, `163` Infrastructure, `51` API integration).
+- `dotnet ef migrations has-pending-model-changes --project src\WorkspaceEcommerce.Infrastructure --startup-project src\WorkspaceEcommerce.Api --no-build`: passed with no pending model changes.
+- `corepack pnpm --dir frontend typecheck` and `corepack pnpm --dir frontend build`: passed. Vite retains the pre-existing advisory for bundles above 500 kB.
+- `./scripts/scan-tracked-runtime-secrets.ps1` and `git diff --check`: passed.
+
 ### P1 - Account lifecycle, moderation, and durable media
 
 #### PRH-005 - Complete the customer account lifecycle
 
-- [ ] Introduce an email-delivery abstraction and a durable notification outbox so signup/reset requests are not coupled to provider availability.
-- [ ] Add email-verification tokens with cryptographically random values, stored as hashes with expiry and consumed timestamp.
-- [ ] Decide and document whether unverified customers may checkout; enforce the decision consistently.
-- [ ] Add request-verification and confirm-verification endpoints without leaking whether an arbitrary email exists.
-- [ ] Add forgot-password and reset-password flows with single-use, hashed, expiring tokens.
-- [ ] Revoke outstanding reset tokens after successful password change/reset.
-- [ ] Add refresh-token families with rotation, hashed token storage, expiry, revocation reason, and reuse detection.
-- [ ] Change customer login/2FA completion responses to issue access and refresh credentials using an explicitly documented browser-storage strategy.
-- [ ] Add refresh and logout endpoints; logout revokes the active refresh-token family.
-- [ ] Revoke all refresh-token families after password reset and offer/implement revoke-all-sessions after password change.
-- [ ] Keep access tokens short-lived and retain current role/customer claims for compatibility.
-- [ ] Define cleanup jobs and retention periods for expired tokens, challenges, recovery data, and login history.
-- [ ] Update frontend flows for verify email, forgot/reset password, session refresh, logout, and expired-session recovery.
+- [x] Introduce an email-delivery abstraction and a durable notification outbox so signup/reset requests are not coupled to provider availability.
+- [x] Add email-verification tokens with cryptographically random values, stored as hashes with expiry and consumed timestamp.
+- [x] Decide and document whether unverified customers may checkout; enforce the decision consistently.
+- [x] Add request-verification and confirm-verification endpoints without leaking whether an arbitrary email exists.
+- [x] Add forgot-password and reset-password flows with single-use, hashed, expiring tokens.
+- [x] Revoke outstanding reset tokens after successful password change/reset.
+- [x] Add refresh-token families with rotation, hashed token storage, expiry, revocation reason, and reuse detection.
+- [x] Change customer login/2FA completion responses to issue access and refresh credentials using an explicitly documented browser-storage strategy.
+- [x] Add refresh and logout endpoints; logout revokes the active refresh-token family.
+- [x] Revoke all refresh-token families after password reset and offer/implement revoke-all-sessions after password change.
+- [x] Keep access tokens short-lived and retain current role/customer claims for compatibility.
+- [x] Define cleanup jobs and retention periods for expired tokens, challenges, recovery data, and login history.
+- [x] Update frontend flows for verify email, forgot/reset password, session refresh, logout, and expired-session recovery.
 
 Required tests:
 
-- [ ] Verification/reset requests do not reveal account existence.
-- [ ] Verification and reset tokens expire, are single-use, and are stored only as hashes.
-- [ ] Refresh rotates tokens and concurrent/replayed old tokens revoke the affected family.
-- [ ] Logout prevents subsequent refresh.
-- [ ] Password reset revokes existing sessions.
-- [ ] Email-provider outage leaves a retryable outbox item and does not corrupt account state.
+- [x] Verification/reset requests do not reveal account existence.
+- [x] Verification and reset tokens expire, are single-use, and are stored only as hashes.
+- [x] Refresh rotates tokens and concurrent/replayed old tokens revoke the affected family.
+- [x] Logout prevents subsequent refresh.
+- [x] Password reset revokes existing sessions.
+- [x] Email-provider outage leaves a retryable outbox item and does not corrupt account state.
 
 Acceptance criteria:
 
-- Customers can verify, recover, refresh, and explicitly end sessions.
-- Token theft/replay has a defined, tested containment behavior.
-- Authentication no longer depends on a successful synchronous email-provider call.
+- [x] Customers can verify, recover, refresh, and explicitly end sessions.
+- [x] Token theft/replay has a defined, tested containment behavior.
+- [x] Authentication no longer depends on a successful synchronous email-provider call.
+
+##### Execution record - 2026-08-09
+
+- Added migration `20260809140013_AddCustomerAccountLifecycle` with additive `customer.account_tokens`, `customer.refresh_token_families`, `customer.refresh_tokens`, and `customer.email_outbox` tables. One-time credentials and refresh credentials are stored only as SHA-256 digests; email bodies are Data Protection protected before persistence.
+- Added neutral verification/reset request endpoints; successful registration queues verification work without waiting for SMTP. SMTP is required outside Development, while the development metadata-only provider avoids logging raw account links.
+- Added rotating refresh families, replay containment, logout/logout-all, session invalidation on password change/reset, and a transaction plus PostgreSQL `FOR UPDATE` around refresh consumption. Login, Google login, and completed TOTP/recovery challenges all now issue the same cookie-backed session shape.
+- Added [ADR 003](docs/adr/003-customer-account-lifecycle.md), including the intentional policy that unverified and guest-equivalent customers may checkout, browser storage, deployment, and retention policy. Cleanup workers retain expired credentials/challenges/delivered email for 7 days and login history for 90 days.
+- Storefront now has verify-email and reset-password routes, cookie-backed startup/near-expiry refresh, expired-session cleanup, and a "Sign out everywhere" control. The short-lived access token is tab-scoped in `sessionStorage`; the refresh credential is never exposed in JSON.
+
+Verification:
+
+- `dotnet build WorkspaceEcommerce.slnx --no-restore --nologo`: passed, 0 errors and 0 warnings.
+- `dotnet test WorkspaceEcommerce.slnx --no-build --no-restore --nologo`: passed 508/508 (291 Application, 163 Infrastructure, 54 API integration).
+- `dotnet ef migrations has-pending-model-changes ... --no-build`: passed with no pending model changes.
+- `cd frontend; corepack pnpm typecheck`: passed for all participating packages/apps.
+- `cd frontend; corepack pnpm build`: passed. Existing Vite bundle-size advisories remain (Admin 554.01 kB; Storefront 799.41 kB).
 
 #### PRH-006 - Add an explicit blog comment moderation workflow
 
-- [ ] Replace the comment approval boolean with an explicit `Pending`, `Approved`, `Rejected` status, or document why a boolean plus audit fields is sufficient.
-- [ ] Create all public comments as pending.
-- [ ] Return a neutral submission acknowledgement; do not return content as publicly visible before approval.
-- [ ] Ensure storefront blog reads include approved comments only.
-- [ ] Add admin filters and endpoints to list pending comments and approve/reject them.
-- [ ] Record moderation timestamp and moderator identity.
-- [ ] Decide whether rejection is soft-state or permanent deletion; keep auditability for abuse handling.
-- [ ] Add comment-specific rate limiting and maximum body/name/email lengths.
-- [ ] Render comment content as plain text by default; if rich text is required, use a documented allowlist sanitizer.
-- [ ] Add an abuse/spam-provider abstraction only if required; do not make approval dependent on an unavailable external service.
-- [ ] Update admin/storefront UI states and counts.
+- [x] Replace the comment approval boolean with explicit `Pending`, `Approved`, and `Rejected` status.
+- [x] Create all public comments as pending.
+- [x] Return a neutral submission acknowledgement; do not return content as publicly visible before approval.
+- [x] Ensure storefront blog reads include approved comments only.
+- [x] Add admin filters and endpoints to list pending comments and approve/reject them.
+- [x] Record moderation timestamp and moderator identity.
+- [x] Keep rejection as an auditable soft state; the legacy delete route now rejects rather than removes data.
+- [x] Add comment-specific rate limiting and retain maximum body/name/email validation.
+- [x] Render comment content as plain text by default; storefront and admin React views do not inject comment HTML.
+- [x] Keep moderation independent of any unavailable spam provider; pending review is the safe default.
+- [x] Update admin/storefront UI states and counts.
 
 Required tests:
 
-- [ ] New comment is pending and absent from storefront reads.
-- [ ] Admin approval makes it visible exactly once.
-- [ ] Rejected/deleted comment remains hidden.
-- [ ] Unauthorized users cannot moderate.
-- [ ] Oversized, malformed, rate-limited, and script-bearing content is handled safely.
+- [x] New comment is pending and absent from storefront reads.
+- [x] Admin approval makes it visible exactly once.
+- [x] Rejected/deleted comment remains hidden.
+- [x] Unauthorized users cannot moderate.
+- [x] Oversized, malformed, rate-limited, and script-bearing content is handled safely.
 
 Acceptance criteria:
 
 - No public submission bypasses moderation.
 - Moderator actions are attributable and storefront rendering is XSS-safe.
 
+Completion evidence (2026-08-09): application and API integration tests cover Pending/Approved/Rejected visibility, public neutral acknowledgement, admin authorization, moderation attribution, script-bearing plain-text rendering, and oversized comment rejection. The dedicated `blog-comment` fixed-window policy is 3 requests/window in production (500 in Development).
+
 #### PRH-007 - Replace local-only media upload with validated durable storage
 
-- [ ] Keep `IMediaStorageService` as the application boundary and introduce explicit save/delete/read-metadata capabilities as needed.
-- [ ] Implement an S3-compatible object-storage provider suitable for development and production; use a local emulator/container for repeatable tests.
-- [ ] Keep the local provider only as an explicit development option, never an accidental production fallback.
-- [ ] Validate content by decoding the image and checking magic bytes, not only MIME type and filename extension.
-- [ ] Enforce decoded pixel count, dimensions, frame count, file size, and supported format limits to prevent decompression bombs.
-- [ ] Normalize orientation and strip unsafe/unneeded metadata.
-- [ ] Re-encode supported formats to canonical output rather than serving arbitrary submitted bytes.
-- [ ] Decide GIF policy explicitly: reject animation or process it with bounded frame limits.
-- [ ] Generate responsive variants/thumbnails needed by products, banners, and blogs.
-- [ ] Generate non-guessable object keys and fixed server-controlled content types/content-disposition.
-- [ ] Add optional malware scanning/quarantine hook; objects must not become public before required validation succeeds.
-- [ ] Return CDN/public URLs from trusted server configuration, not directly from the incoming Host header.
-- [ ] Track object key, owner/reference, checksum, size, dimensions, content type, and creation time where lifecycle management requires it.
-- [ ] Add deletion/replace semantics so product/banner/blog updates do not leak orphaned objects.
-- [ ] Add a cleanup job/report for unreferenced uploads with a conservative retention window.
-- [ ] Migrate existing local files or document a one-time migration procedure before switching production provider.
-- [ ] Update Docker/environment examples without real storage credentials.
+- [x] Keep `IMediaStorageService` as the application boundary and add save/delete/read-metadata capabilities.
+- [x] Implement S3-compatible object storage and a profile-gated MinIO emulator/bootstrap container for development.
+- [x] Keep the local provider as an explicit Development-only option; startup rejects it elsewhere.
+- [x] Validate content by decoding images and checking magic bytes, MIME type, and filename extension together.
+- [x] Enforce decoded pixel count, dimensions, frame count, file size, and supported-format limits.
+- [x] Normalize orientation and strip metadata.
+- [x] Re-encode supported formats to canonical WebP rather than serving submitted bytes.
+- [x] Explicitly reject GIF and all multi-frame sources.
+- [x] Generate 320px, 800px, and 1600px responsive variants when source dimensions need them.
+- [x] Generate random object keys and fixed server-controlled WebP content types/content disposition.
+- [x] Add the `IMediaMalwareScanner` hook; validation/scanning complete before objects are stored or exposed as available.
+- [x] Return CDN/public URLs from trusted `MediaStorage:PublicBaseUrl`, never the incoming Host header.
+- [x] Track object key, owner, checksum, size, dimensions, content type, variants, state, and creation time.
+- [x] Add conservative delete/replace semantics: immediate deletion respects shared references and the worker removes old unreferenced assets.
+- [x] Add hourly unreferenced-upload cleanup with a configurable 24-hour minimum retention window.
+- [x] Document the one-time migration path for legacy local files before production cutover.
+- [x] Update Docker/environment examples without real storage credentials.
 
 Required tests:
 
-- [ ] Valid JPG/PNG/WEBP uploads are decoded, normalized, stored, and readable.
-- [ ] Spoofed MIME/extension, malformed image, oversized dimensions, excessive frames, and non-image bodies are rejected.
-- [ ] Object-store failure leaves no database record that claims a usable asset.
-- [ ] Database failure after upload is compensated or leaves an observable cleanup candidate.
-- [ ] Delete/replace does not remove a still-referenced shared object.
-- [ ] Production startup cannot silently select local disk storage.
+- [x] Valid JPG/PNG/WEBP uploads are decoded, normalized, stored, and readable as canonical WebP.
+- [x] Spoofed MIME/extension, malformed image, oversized dimensions, excessive frames, and non-image bodies are rejected.
+- [x] Object-store failure leaves only a `Failed`, non-usable asset record.
+- [x] Database availability-persistence failure leaves an observable `Pending` cleanup candidate.
+- [x] Delete/replace does not remove a still-referenced shared object.
+- [x] Production startup cannot silently select local disk storage.
 
 Acceptance criteria:
 
 - Upload behavior is safe against content spoofing and resource-exhaustion inputs.
 - Assets survive API restarts and work across multiple API instances.
 - Object lifecycle, orphan cleanup, and public URL generation are deterministic.
+
+Completion evidence (2026-08-09): `content.media_assets`/`media_asset_variants`, the S3/local providers, image processor, and cleanup worker were added in `20260809144638_AddBlogCommentModerationAndDurableMedia`. API/infrastructure tests cover canonical upload, spoof rejection, storage failure, database-state failure, shared-reference deletion, and production-local configuration rejection. See `docs/adr/004-durable-media-storage.md` for operating and legacy-file migration instructions.
 
 ### P2 - Query scalability and final production gate
 
@@ -454,7 +495,7 @@ Migration rules:
 11. `PRH-008`: query work split by module, with evidence per PR.
 12. `PRH-009`: final audit, smoke verification, runbooks, and completion report.
 
-Do not start `PRH-004` until encryption key management is decided. Do not enable refresh cookies in production until CORS, CSRF, SameSite, proxy, and HTTPS behavior is tested in the real topology. Do not switch media providers until existing asset migration and rollback are rehearsed.
+`PRH-004` key management is decided in ADR 002; production deployment still requires an externally managed persistent key ring. Do not enable refresh cookies in production until CORS, CSRF, SameSite, proxy, and HTTPS behavior is tested in the real topology. Do not switch media providers until existing asset migration and rollback are rehearsed.
 
 ## Verification Matrix
 
@@ -496,11 +537,11 @@ Additional required verification:
 
 - [x] PRH-001 - Baseline and security inventory (completed 2026-08-09; 476/476 backend tests, frontend typecheck/build, EF model check, and value-safe history inventory recorded above)
 - [ ] PRH-002 - Repository remediation completed 2026-08-09; external credential rotation and deployment verification pending
-- [ ] PRH-003 - Server-controlled Google OAuth validation
-- [ ] PRH-004 - Real TOTP two-factor authentication
+- [x] PRH-003 - Server-controlled Google OAuth validation (completed 2026-08-09)
+- [x] PRH-004 - Real TOTP two-factor authentication (completed 2026-08-09; existing simulated enrollments are revoked by migration and require re-enrollment)
 - [ ] PRH-005 - Complete customer account lifecycle
-- [ ] PRH-006 - Blog comment moderation
-- [ ] PRH-007 - Durable and validated media storage
+- [x] PRH-006 - Blog comment moderation (completed 2026-08-09)
+- [x] PRH-007 - Durable and validated media storage (completed 2026-08-09)
 - [ ] PRH-008 - Database-side query optimization
 - [ ] PRH-009 - Final production verification and release gate
 

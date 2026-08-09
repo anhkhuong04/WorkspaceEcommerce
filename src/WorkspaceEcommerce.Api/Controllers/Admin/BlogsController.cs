@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using WorkspaceEcommerce.Api.Common;
 using WorkspaceEcommerce.Api.Extensions;
 using WorkspaceEcommerce.Application.Modules.Blogs;
+using WorkspaceEcommerce.Domain.Modules.Blogs;
 
 namespace WorkspaceEcommerce.Api.Controllers.Admin;
 
@@ -97,10 +99,44 @@ public sealed class BlogsController(IAdminBlogService blogService) : ControllerB
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyCollection<BlogCommentDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetBlogPostComments(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetBlogPostComments(
+        Guid id,
+        [FromQuery] BlogCommentModerationStatus? status,
+        CancellationToken cancellationToken)
     {
-        var result = await blogService.GetBlogPostCommentsAsync(id, cancellationToken);
+        var result = await blogService.GetBlogPostCommentsAsync(id, status, cancellationToken);
 
+        return this.ToApiResponse(result);
+    }
+
+    [HttpGet("api/admin/blog-comments")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyCollection<BlogCommentDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetComments(
+        [FromQuery] BlogCommentModerationStatus? status,
+        CancellationToken cancellationToken)
+    {
+        var result = await blogService.GetBlogCommentsAsync(status, cancellationToken);
+        return this.ToApiResponse(result);
+    }
+
+    [HttpPost("api/admin/blog-comments/{id:guid}/approve")]
+    [ProducesResponseType(typeof(ApiResponse<BlogCommentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ApproveComment(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await blogService.ApproveCommentAsync(id, GetModeratorIdentity(), cancellationToken);
+        return this.ToApiResponse(result);
+    }
+
+    [HttpPost("api/admin/blog-comments/{id:guid}/reject")]
+    [ProducesResponseType(typeof(ApiResponse<BlogCommentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RejectComment(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await blogService.RejectCommentAsync(id, GetModeratorIdentity(), cancellationToken);
         return this.ToApiResponse(result);
     }
 
@@ -111,8 +147,15 @@ public sealed class BlogsController(IAdminBlogService blogService) : ControllerB
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteComment(Guid id, CancellationToken cancellationToken)
     {
-        var result = await blogService.DeleteCommentAsync(id, cancellationToken);
+        var result = await blogService.RejectCommentAsync(id, GetModeratorIdentity(), cancellationToken);
 
         return this.ToApiResponse(result);
+    }
+
+    private string GetModeratorIdentity()
+    {
+        return User.FindFirstValue(ClaimTypes.Email)
+            ?? User.Identity?.Name
+            ?? "admin";
     }
 }

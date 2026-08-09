@@ -34,7 +34,3 @@ public sealed record CustomerLoginHistoryDto(
 public sealed record ChangePasswordRequest(
     string CurrentPassword,
     string NewPassword);
-
-public sealed record Toggle2FARequest(
-    bool Enable,
-    string? Code);
