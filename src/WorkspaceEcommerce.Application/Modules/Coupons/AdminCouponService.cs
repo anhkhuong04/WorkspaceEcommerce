@@ -1,6 +1,7 @@
 using FluentValidation;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 
@@ -26,24 +27,54 @@ internal sealed class AdminCouponService(
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var normalizedSearch = NormalizeOptional(request.Search);
-        var productTargetsByCouponId = GetProductTargetsByCouponId();
-        var redemptionCountsByCouponId = GetRedemptionCountsByCouponId();
-        var coupons = dbContext.Coupons
-            .ToArray()
-            .Where(coupon => request.IsActive is null || coupon.IsActive == request.IsActive.Value)
-            .Where(coupon => request.EffectiveAt is null || IsEffectiveAt(coupon, request.EffectiveAt.Value))
-            .Where(coupon => normalizedSearch is null || MatchesSearch(coupon, normalizedSearch))
+        var normalizedSearch = NormalizeOptional(request.Search)?.ToUpperInvariant();
+        var query = dbContext.Coupons.AsNoTrackingIfEf();
+        if (request.IsActive.HasValue)
+        {
+            var isActive = request.IsActive.Value;
+            query = query.Where(coupon => coupon.IsActive == isActive);
+        }
+
+        if (request.EffectiveAt.HasValue)
+        {
+            var effectiveAt = request.EffectiveAt.Value;
+            query = query.Where(coupon =>
+                (coupon.StartsAt == null || coupon.StartsAt <= effectiveAt) &&
+                (coupon.EndsAt == null || coupon.EndsAt >= effectiveAt));
+        }
+        if (normalizedSearch is not null)
+        {
+            query = query.Where(coupon =>
+                coupon.Code.ToUpper().Contains(normalizedSearch) ||
+                coupon.Name.ToUpper().Contains(normalizedSearch));
+        }
+
+        var totalCount = await query.CountAsyncSafe(cancellationToken);
+        var coupons = await query
             .OrderByDescending(coupon => coupon.CreatedAt)
             .ThenBy(coupon => coupon.Code)
-            .ToArray();
+            .Skip(request.Skip)
+            .Take(request.NormalizedPageSize)
+            .ToArrayAsyncSafe(cancellationToken);
 
         var pageNumber = request.NormalizedPageNumber;
         var pageSize = request.NormalizedPageSize;
+        var couponIds = coupons.Select(coupon => coupon.Id).ToArray();
+        var productTargetsByCouponId = (await dbContext.CouponProductTargets
+            .AsNoTrackingIfEf()
+            .Where(target => couponIds.Contains(target.CouponId))
+            .OrderBy(target => target.ProductId)
+            .ToArrayAsyncSafe(cancellationToken))
+            .ToLookup(target => target.CouponId, target => target.ProductId);
+        var redemptionCountsByCouponId = (await dbContext.CouponRedemptions
+            .AsNoTrackingIfEf()
+            .Where(redemption => couponIds.Contains(redemption.CouponId))
+            .GroupBy(redemption => redemption.CouponId)
+            .Select(group => new { CouponId = group.Key, Count = group.Count() })
+            .ToArrayAsyncSafe(cancellationToken))
+            .ToDictionary(group => group.CouponId, group => group.Count);
         var page = new PagedResult<AdminCouponDto>(
             coupons
-                .Skip(request.Skip)
-                .Take(pageSize)
                 .Select(coupon => ToDto(
                     coupon,
                     productTargetsByCouponId[coupon.Id],
@@ -51,27 +82,30 @@ internal sealed class AdminCouponService(
                 .ToArray(),
             pageNumber,
             pageSize,
-            coupons.Length);
+            totalCount);
 
         return Result<PagedResult<AdminCouponDto>>.Success(page);
     }
 
-    public Task<Result<AdminCouponDto>> GetCouponByIdAsync(
+    public async Task<Result<AdminCouponDto>> GetCouponByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var coupon = dbContext.Coupons.FirstOrDefault(existing => existing.Id == id);
+        var coupon = await dbContext.Coupons
+            .AsNoTrackingIfEf()
+            .Where(existing => existing.Id == id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (coupon is null)
         {
-            return Task.FromResult(Result<AdminCouponDto>.NotFound("Coupon was not found."));
+            return Result<AdminCouponDto>.NotFound("Coupon was not found.");
         }
 
-        return Task.FromResult(Result<AdminCouponDto>.Success(ToDto(
+        return Result<AdminCouponDto>.Success(ToDto(
             coupon,
-            GetProductTargets(coupon.Id),
-            GetRedemptionCount(coupon.Id))));
+            await GetProductTargetsAsync(coupon.Id, cancellationToken),
+            await GetRedemptionCountAsync(coupon.Id, cancellationToken)));
     }
 
     public async Task<Result<AdminCouponDto>> CreateCouponAsync(
@@ -85,12 +119,12 @@ internal sealed class AdminCouponService(
         }
 
         var normalizedCode = NormalizeCode(request.Code);
-        if (CodeExists(normalizedCode))
+        if (await CodeExistsAsync(normalizedCode, cancellationToken: cancellationToken))
         {
             return Result<AdminCouponDto>.Conflict("Coupon code already exists.");
         }
 
-        var targetValidation = ValidateProductTargets(request.ProductTargetIds);
+        var targetValidation = await ValidateProductTargetsAsync(request.ProductTargetIds, cancellationToken);
         if (targetValidation.Length > 0)
         {
             return Result<AdminCouponDto>.Validation(targetValidation);
@@ -140,19 +174,21 @@ internal sealed class AdminCouponService(
             return Result<AdminCouponDto>.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
-        var coupon = dbContext.Coupons.FirstOrDefault(existing => existing.Id == id);
+        var coupon = await dbContext.Coupons
+            .Where(existing => existing.Id == id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (coupon is null)
         {
             return Result<AdminCouponDto>.NotFound("Coupon was not found.");
         }
 
         var normalizedCode = NormalizeCode(request.Code);
-        if (CodeExists(normalizedCode, id))
+        if (await CodeExistsAsync(normalizedCode, id, cancellationToken))
         {
             return Result<AdminCouponDto>.Conflict("Coupon code already exists.");
         }
 
-        var targetValidation = ValidateProductTargets(request.ProductTargetIds);
+        var targetValidation = await ValidateProductTargetsAsync(request.ProductTargetIds, cancellationToken);
         if (targetValidation.Length > 0)
         {
             return Result<AdminCouponDto>.Validation(targetValidation);
@@ -181,14 +217,14 @@ internal sealed class AdminCouponService(
                 coupon.Deactivate();
             }
 
-            ReplaceProductTargets(coupon.Id, request.ProductTargetIds);
+            await ReplaceProductTargetsAsync(coupon.Id, request.ProductTargetIds, cancellationToken);
             dbContext.Update(coupon);
             await dbContext.SaveChangesAsync(cancellationToken);
 
             return Result<AdminCouponDto>.Success(ToDto(
                 coupon,
                 NormalizeProductTargetIds(request.ProductTargetIds),
-                GetRedemptionCount(coupon.Id)));
+                await GetRedemptionCountAsync(coupon.Id, cancellationToken)));
         }
         catch (DomainException exception)
         {
@@ -207,7 +243,9 @@ internal sealed class AdminCouponService(
             return Result<AdminCouponDto>.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
-        var coupon = dbContext.Coupons.FirstOrDefault(existing => existing.Id == id);
+        var coupon = await dbContext.Coupons
+            .Where(existing => existing.Id == id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (coupon is null)
         {
             return Result<AdminCouponDto>.NotFound("Coupon was not found.");
@@ -227,23 +265,27 @@ internal sealed class AdminCouponService(
 
         return Result<AdminCouponDto>.Success(ToDto(
             coupon,
-            GetProductTargets(coupon.Id),
-            GetRedemptionCount(coupon.Id)));
+            await GetProductTargetsAsync(coupon.Id, cancellationToken),
+            await GetRedemptionCountAsync(coupon.Id, cancellationToken)));
     }
 
     public async Task<Result<AdminCouponDto>> DeleteCouponAsync(
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var coupon = dbContext.Coupons.FirstOrDefault(existing => existing.Id == id);
+        var coupon = await dbContext.Coupons
+            .Where(existing => existing.Id == id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (coupon is null)
         {
             return Result<AdminCouponDto>.NotFound("Coupon was not found.");
         }
 
-        var productTargets = GetProductTargets(id);
-        var redemptionCount = GetRedemptionCount(id);
-        var hasUsageHistory = redemptionCount > 0 || dbContext.Orders.Any(order => order.CouponId == id);
+        var productTargets = await GetProductTargetsAsync(id, cancellationToken);
+        var redemptionCount = await GetRedemptionCountAsync(id, cancellationToken);
+        var hasUsageHistory = redemptionCount > 0 || await dbContext.Orders
+            .Where(order => order.CouponId == id)
+            .AnyAsyncSafe(cancellationToken);
         if (hasUsageHistory)
         {
             coupon.Deactivate();
@@ -254,7 +296,9 @@ internal sealed class AdminCouponService(
         }
 
         var dto = ToDto(coupon, productTargets, redemptionCount);
-        foreach (var target in dbContext.CouponProductTargets.Where(target => target.CouponId == id).ToArray())
+        foreach (var target in await dbContext.CouponProductTargets
+                     .Where(target => target.CouponId == id)
+                     .ToArrayAsyncSafe(cancellationToken))
         {
             dbContext.Remove(target);
         }
@@ -265,9 +309,14 @@ internal sealed class AdminCouponService(
         return Result<AdminCouponDto>.Success(dto);
     }
 
-    private void ReplaceProductTargets(Guid couponId, IReadOnlyCollection<Guid> productTargetIds)
+    private async Task ReplaceProductTargetsAsync(
+        Guid couponId,
+        IReadOnlyCollection<Guid> productTargetIds,
+        CancellationToken cancellationToken)
     {
-        foreach (var existingTarget in dbContext.CouponProductTargets.Where(target => target.CouponId == couponId).ToArray())
+        foreach (var existingTarget in await dbContext.CouponProductTargets
+                     .Where(target => target.CouponId == couponId)
+                     .ToArrayAsyncSafe(cancellationToken))
         {
             dbContext.Remove(existingTarget);
         }
@@ -278,49 +327,46 @@ internal sealed class AdminCouponService(
         }
     }
 
-    private string[] ValidateProductTargets(IReadOnlyCollection<Guid> productTargetIds)
+    private async Task<string[]> ValidateProductTargetsAsync(
+        IReadOnlyCollection<Guid> productTargetIds,
+        CancellationToken cancellationToken)
     {
         var normalizedProductTargetIds = NormalizeProductTargetIds(productTargetIds);
-        var missingIds = normalizedProductTargetIds
-            .Where(productId => !dbContext.Products.Any(product => product.Id == productId))
-            .ToArray();
+        var foundIds = await dbContext.Products
+            .AsNoTrackingIfEf()
+            .Where(product => normalizedProductTargetIds.Contains(product.Id))
+            .Select(product => product.Id)
+            .ToArrayAsyncSafe(cancellationToken);
 
-        return missingIds.Length == 0 ? [] : ["Coupon target product does not exist."];
+        return foundIds.Length == normalizedProductTargetIds.Length ? [] : ["Coupon target product does not exist."];
     }
 
-    private ILookup<Guid, Guid> GetProductTargetsByCouponId()
+    private Task<Guid[]> GetProductTargetsAsync(Guid couponId, CancellationToken cancellationToken)
     {
         return dbContext.CouponProductTargets
-            .OrderBy(target => target.ProductId)
-            .ToLookup(target => target.CouponId, target => target.ProductId);
-    }
-
-    private Dictionary<Guid, int> GetRedemptionCountsByCouponId()
-    {
-        return dbContext.CouponRedemptions
-            .GroupBy(redemption => redemption.CouponId)
-            .ToDictionary(group => group.Key, group => group.Count());
-    }
-
-    private Guid[] GetProductTargets(Guid couponId)
-    {
-        return dbContext.CouponProductTargets
+            .AsNoTrackingIfEf()
             .Where(target => target.CouponId == couponId)
             .Select(target => target.ProductId)
             .OrderBy(productId => productId)
-            .ToArray();
+            .ToArrayAsyncSafe(cancellationToken);
     }
 
-    private int GetRedemptionCount(Guid couponId)
+    private Task<int> GetRedemptionCountAsync(Guid couponId, CancellationToken cancellationToken)
     {
-        return dbContext.CouponRedemptions.Count(redemption => redemption.CouponId == couponId);
+        return dbContext.CouponRedemptions
+            .Where(redemption => redemption.CouponId == couponId)
+            .CountAsyncSafe(cancellationToken);
     }
 
-    private bool CodeExists(string code, Guid? excludedCouponId = null)
+    private Task<bool> CodeExistsAsync(
+        string code,
+        Guid? excludedCouponId = null,
+        CancellationToken cancellationToken = default)
     {
-        return dbContext.Coupons.Any(coupon =>
-            coupon.Code == code &&
-            (excludedCouponId == null || coupon.Id != excludedCouponId.Value));
+        return dbContext.Coupons
+            .Where(coupon => coupon.Code == code &&
+                (excludedCouponId == null || coupon.Id != excludedCouponId.Value))
+            .AnyAsyncSafe(cancellationToken);
     }
 
     private static AdminCouponDto ToDto(

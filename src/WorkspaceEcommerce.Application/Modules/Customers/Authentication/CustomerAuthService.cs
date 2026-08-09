@@ -2,6 +2,7 @@ using FluentValidation;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Application.Modules.Customers.Addresses;
 using WorkspaceEcommerce.Application.Modules.Customers.TwoFactor;
 using WorkspaceEcommerce.Domain.Modules.Customers;
@@ -33,7 +34,9 @@ internal sealed class CustomerAuthService(
         cancellationToken.ThrowIfCancellationRequested();
 
         var email = NormalizeEmail(request.Email);
-        if (dbContext.Customers.Any(customer => customer.Email == email))
+        if (await dbContext.Customers
+            .Where(customer => customer.Email == email)
+            .AnyAsyncSafe(cancellationToken))
         {
             return Result<CustomerAuthResponse>.Conflict("Customer email is already registered.");
         }
@@ -46,7 +49,7 @@ internal sealed class CustomerAuthService(
             passwordHasher.Hash(request.Password));
 
         dbContext.Add(customer);
-        accountLifecycleService.QueueEmailVerification(customer);
+        await accountLifecycleService.QueueEmailVerificationAsync(customer, cancellationToken);
 
         return Result<CustomerAuthResponse>.Success(await sessionService.IssueAsync(customer, cancellationToken));
     }
@@ -65,7 +68,9 @@ internal sealed class CustomerAuthService(
         cancellationToken.ThrowIfCancellationRequested();
 
         var email = NormalizeEmail(request.Email);
-        var customer = dbContext.Customers.FirstOrDefault(existing => existing.Email == email);
+        var customer = await dbContext.Customers
+            .Where(existing => existing.Email == email)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         var success = customer is not null
             && customer.PasswordHash is not null
             && passwordHasher.Verify(request.Password, customer.PasswordHash);
@@ -108,7 +113,9 @@ internal sealed class CustomerAuthService(
             return Result.Unauthorized("Customer authentication is required.");
         }
 
-        var customer = dbContext.Customers.FirstOrDefault(candidate => candidate.Id == customerId.Value);
+        var customer = await dbContext.Customers
+            .Where(candidate => candidate.Id == customerId.Value)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (customer is null)
         {
             return Result.NotFound("Customer was not found.");
@@ -126,7 +133,7 @@ internal sealed class CustomerAuthService(
 
         customer.UpdatePasswordHash(passwordHasher.Hash(request.NewPassword));
         var now = DateTimeOffset.UtcNow;
-        accountLifecycleService.RevokeOutstandingPasswordResetTokens(customer.Id, now);
+        await accountLifecycleService.RevokeOutstandingPasswordResetTokensAsync(customer.Id, now, cancellationToken);
         await sessionService.RevokeAllAsync(customer.Id, "password_changed", cancellationToken);
 
         return Result.Success();
@@ -146,8 +153,11 @@ internal sealed class CustomerAuthService(
 
         var googleId = identity.Subject.Trim();
         var email = NormalizeEmail(identity.Email);
-        var customerByGoogleId = dbContext.Customers.FirstOrDefault(customer => customer.GoogleId == googleId);
-        var customerByEmail = dbContext.Customers.FirstOrDefault(customer => customer.Email == email);
+        var matchingCustomers = await dbContext.Customers
+            .Where(customer => customer.GoogleId == googleId || customer.Email == email)
+            .ToArrayAsyncSafe(cancellationToken);
+        var customerByGoogleId = matchingCustomers.FirstOrDefault(customer => customer.GoogleId == googleId);
+        var customerByEmail = matchingCustomers.FirstOrDefault(customer => customer.Email == email);
 
         if (customerByGoogleId is not null &&
             customerByEmail is not null &&

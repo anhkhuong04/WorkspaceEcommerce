@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WorkspaceEcommerce.Domain.Common;
@@ -12,9 +13,11 @@ using WorkspaceEcommerce.Infrastructure.Persistence;
 namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260809151744_OptimizeReadPathIndexes")]
+    partial class OptimizeReadPathIndexes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -682,7 +685,6 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_coupons_starts_at");
 
                     b.HasIndex("IsActive", "CreatedAt", "Code")
-                        .IsDescending(false, true, false)
                         .HasDatabaseName("ix_coupons_active_created_code");
 
                     b.ToTable("coupons", "promotions");

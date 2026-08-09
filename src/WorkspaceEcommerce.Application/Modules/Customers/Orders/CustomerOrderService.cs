@@ -3,6 +3,7 @@ using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Notifications;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Application.Modules.Ordering;
 using WorkspaceEcommerce.Application.Modules.Shipments;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
@@ -36,32 +37,38 @@ internal sealed class CustomerOrderService(
         cancellationToken.ThrowIfCancellationRequested();
 
         var status = request.Status;
-        var orders = dbContext.Orders
+        var query = dbContext.Orders
+            .AsNoTrackingIfEf()
             .Where(order => order.CustomerId == customerId.Value)
-            .Where(order => !status.HasValue || order.Status == status.Value)
+            .Where(order => !status.HasValue || order.Status == status.Value);
+        var totalCount = await query.CountAsyncSafe(cancellationToken);
+        var items = await query
             .OrderByDescending(order => order.CreatedAt)
             .ThenByDescending(order => order.OrderCode)
-            .ToArray();
-        var orderIds = orders.Select(order => order.Id).ToArray();
-        var itemCountsByOrderId = dbContext.OrderItems
-            .Where(item => orderIds.Contains(item.OrderId))
-            .GroupBy(item => item.OrderId)
-            .ToDictionary(group => group.Key, group => group.Count());
-        var items = orders
             .Skip(request.Skip)
             .Take(request.NormalizedPageSize)
-            .Select(order => ToListItemDto(order, itemCountsByOrderId.GetValueOrDefault(order.Id)))
-            .ToArray();
+            .Select(order => new CustomerOrderListItemDto(
+                order.Id,
+                order.OrderCode,
+                order.TotalAmount,
+                order.Status,
+                order.PaymentMethod,
+                order.PaymentStatus,
+                order.PaidAt,
+                order.CreatedAt,
+                order.UpdatedAt,
+                dbContext.OrderItems.Count(item => item.OrderId == order.Id)))
+            .ToArrayAsyncSafe(cancellationToken);
         var page = new PagedResult<CustomerOrderListItemDto>(
             items,
             request.NormalizedPageNumber,
             request.NormalizedPageSize,
-            orders.Length);
+            totalCount);
 
         return Result<PagedResult<CustomerOrderListItemDto>>.Success(page);
     }
 
-    public Task<Result<CustomerOrderDto>> GetOrderByIdAsync(
+    public async Task<Result<CustomerOrderDto>> GetOrderByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default)
     {
@@ -70,18 +77,19 @@ internal sealed class CustomerOrderService(
         var customerId = currentCustomer.CustomerId;
         if (!customerId.HasValue)
         {
-            return Task.FromResult(Result<CustomerOrderDto>.Unauthorized("Customer authentication is required."));
+            return Result<CustomerOrderDto>.Unauthorized("Customer authentication is required.");
         }
 
-        var order = dbContext.Orders.FirstOrDefault(existing =>
-            existing.Id == id &&
-            existing.CustomerId == customerId.Value);
+        var order = await dbContext.Orders
+            .AsNoTrackingIfEf()
+            .Where(existing => existing.Id == id && existing.CustomerId == customerId.Value)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (order is null)
         {
-            return Task.FromResult(Result<CustomerOrderDto>.NotFound("Order was not found."));
+            return Result<CustomerOrderDto>.NotFound("Order was not found.");
         }
 
-        return Task.FromResult(Result<CustomerOrderDto>.Success(ToDetailDto(order, customerId.Value)));
+        return Result<CustomerOrderDto>.Success(await ToDetailDtoAsync(order, customerId.Value, cancellationToken));
     }
 
     public async Task<Result<CustomerOrderDto>> CancelOrderAsync(
@@ -97,9 +105,9 @@ internal sealed class CustomerOrderService(
             return Result<CustomerOrderDto>.Unauthorized("Customer authentication is required.");
         }
 
-        var order = dbContext.Orders.FirstOrDefault(existing =>
-            existing.Id == id &&
-            existing.CustomerId == customerId.Value);
+        var order = await dbContext.Orders
+            .Where(existing => existing.Id == id && existing.CustomerId == customerId.Value)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (order is null)
         {
             return Result<CustomerOrderDto>.NotFound("Order was not found.");
@@ -117,15 +125,21 @@ internal sealed class CustomerOrderService(
         order.ChangeStatus(Guid.NewGuid(), OrderStatus.Cancelled, cancelNote, "Customer");
 
         // Restore variant stocks
-        var orderItems = dbContext.OrderItems
+        var orderItems = await dbContext.OrderItems
             .Where(item => item.OrderId == order.Id)
-            .ToArray();
+            .ToArrayAsyncSafe(cancellationToken);
+        var variantIds = orderItems.Select(item => item.ProductVariantId).Distinct().ToArray();
+        var variantsById = (await dbContext.ProductVariants
+            .Where(variant => variantIds.Contains(variant.Id))
+            .ToArrayAsyncSafe(cancellationToken))
+            .ToDictionary(variant => variant.Id);
 
         foreach (var orderItem in orderItems)
         {
-            var variant = dbContext.ProductVariants
-                .FirstOrDefault(v => v.Id == orderItem.ProductVariantId);
-            variant?.RestoreStock(orderItem.Quantity);
+            if (variantsById.TryGetValue(orderItem.ProductVariantId, out var variant))
+            {
+                variant.RestoreStock(orderItem.Quantity);
+            }
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -142,7 +156,7 @@ internal sealed class CustomerOrderService(
             new { orderId = order.Id, orderCode = order.OrderCode, newStatus = (int)order.Status },
             cancellationToken);
 
-        return Result<CustomerOrderDto>.Success(ToDetailDto(order, customerId.Value));
+        return Result<CustomerOrderDto>.Success(await ToDetailDtoAsync(order, customerId.Value, cancellationToken));
     }
 
     public async Task<Result<CustomerOrderDto>> RequestReturnAsync(
@@ -158,9 +172,9 @@ internal sealed class CustomerOrderService(
             return Result<CustomerOrderDto>.Unauthorized("Customer authentication is required.");
         }
 
-        var order = dbContext.Orders.FirstOrDefault(existing =>
-            existing.Id == id &&
-            existing.CustomerId == customerId.Value);
+        var order = await dbContext.Orders
+            .Where(existing => existing.Id == id && existing.CustomerId == customerId.Value)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (order is null)
         {
             return Result<CustomerOrderDto>.NotFound("Order was not found.");
@@ -185,23 +199,28 @@ internal sealed class CustomerOrderService(
             new { orderId = order.Id, orderCode = order.OrderCode, newStatus = (int)order.Status },
             cancellationToken);
 
-        return Result<CustomerOrderDto>.Success(ToDetailDto(order, customerId.Value));
+        return Result<CustomerOrderDto>.Success(await ToDetailDtoAsync(order, customerId.Value, cancellationToken));
     }
 
-    private CustomerOrderDto ToDetailDto(Order order, Guid customerId)
+    private async Task<CustomerOrderDto> ToDetailDtoAsync(
+        Order order,
+        Guid customerId,
+        CancellationToken cancellationToken)
     {
-        var items = dbContext.OrderItems
+        var items = await dbContext.OrderItems
+            .AsNoTrackingIfEf()
             .Where(item => item.OrderId == order.Id)
             .OrderBy(item => item.SkuSnapshot)
             .ThenBy(item => item.Id)
-            .Select(ToItemDto)
-            .ToArray();
-        var statusHistory = dbContext.OrderStatusHistories
+            .Select(item => ToItemDto(item))
+            .ToArrayAsyncSafe(cancellationToken);
+        var statusHistory = await dbContext.OrderStatusHistories
+            .AsNoTrackingIfEf()
             .Where(history => history.OrderId == order.Id)
             .OrderBy(history => history.ChangedAt)
             .ThenBy(history => history.Id)
-            .Select(ToStatusHistoryDto)
-            .ToArray();
+            .Select(history => ToStatusHistoryDto(history))
+            .ToArrayAsyncSafe(cancellationToken);
 
         return new CustomerOrderDto(
             order.Id,
@@ -229,21 +248,6 @@ internal sealed class CustomerOrderService(
             order.ShipmentId,
             items,
             statusHistory);
-    }
-
-    private static CustomerOrderListItemDto ToListItemDto(Order order, int itemCount)
-    {
-        return new CustomerOrderListItemDto(
-            order.Id,
-            order.OrderCode,
-            order.TotalAmount,
-            order.Status,
-            order.PaymentMethod,
-            order.PaymentStatus,
-            order.PaidAt,
-            order.CreatedAt,
-            order.UpdatedAt,
-            itemCount);
     }
 
     private static OrderItemDto ToItemDto(OrderItem item)

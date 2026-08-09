@@ -43,6 +43,12 @@ internal sealed class ReviewConfiguration : IEntityTypeConfiguration<Review>
         builder.HasIndex(review => review.ProductId)
             .HasDatabaseName("ix_reviews_product_id");
 
+        builder.HasIndex(review => new { review.ProductId, review.CreatedAt, review.Id })
+            .HasDatabaseName("ix_reviews_product_created_id");
+
+        builder.HasIndex(review => new { review.CreatedAt, review.Id })
+            .HasDatabaseName("ix_reviews_created_id");
+
         builder.HasIndex(review => review.CustomerId)
             .HasDatabaseName("ix_reviews_customer_id");
 

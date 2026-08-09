@@ -345,13 +345,14 @@ public sealed class CustomerAuthServiceTests
 
     private sealed class StubAccountLifecycleService : ICustomerAccountLifecycleService
     {
-        public void QueueEmailVerification(Customer customer)
-        {
-        }
+        public Task QueueEmailVerificationAsync(Customer customer, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
 
-        public void RevokeOutstandingPasswordResetTokens(Guid customerId, DateTimeOffset now)
-        {
-        }
+        public Task RevokeOutstandingPasswordResetTokensAsync(
+            Guid customerId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
 
         public Task<Result> RequestEmailVerificationAsync(RequestEmailVerificationRequest request, CancellationToken cancellationToken = default) =>
             Task.FromResult(Result.Success());

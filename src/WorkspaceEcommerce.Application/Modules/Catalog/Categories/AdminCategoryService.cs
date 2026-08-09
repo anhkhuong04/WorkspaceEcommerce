@@ -16,6 +16,7 @@ internal sealed class AdminCategoryService(
         CancellationToken cancellationToken = default)
     {
         var categories = await dbContext.Categories
+            .AsNoTrackingIfEf()
             .OrderBy(category => category.SortOrder)
             .ThenBy(category => category.Slug)
             .ToArrayAsyncSafe(cancellationToken);
@@ -36,12 +37,12 @@ internal sealed class AdminCategoryService(
         }
 
         var normalizedSlug = NormalizeSlug(request.Slug);
-        if (SlugExists(normalizedSlug))
+        if (await SlugExistsAsync(normalizedSlug, cancellationToken: cancellationToken))
         {
             return Result<AdminCategoryDto>.Conflict("Category slug already exists.");
         }
 
-        if (request.ParentId is not null && !CategoryExists(request.ParentId.Value))
+        if (request.ParentId is not null && !await CategoryExistsAsync(request.ParentId.Value, cancellationToken))
         {
             return Result<AdminCategoryDto>.Validation(["Parent category does not exist."]);
         }
@@ -71,14 +72,16 @@ internal sealed class AdminCategoryService(
             return Result<AdminCategoryDto>.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
-        var category = dbContext.Categories.FirstOrDefault(existing => existing.Id == id);
+        var category = await dbContext.Categories
+            .Where(existing => existing.Id == id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (category is null)
         {
             return Result<AdminCategoryDto>.NotFound("Category was not found.");
         }
 
         var normalizedSlug = NormalizeSlug(request.Slug);
-        if (SlugExists(normalizedSlug, id))
+        if (await SlugExistsAsync(normalizedSlug, id, cancellationToken))
         {
             return Result<AdminCategoryDto>.Conflict("Category slug already exists.");
         }
@@ -90,12 +93,12 @@ internal sealed class AdminCategoryService(
 
         if (request.ParentId is not null)
         {
-            if (!CategoryExists(request.ParentId.Value))
+            if (!await CategoryExistsAsync(request.ParentId.Value, cancellationToken))
             {
                 return Result<AdminCategoryDto>.Validation(["Parent category does not exist."]);
             }
 
-            if (WouldCreateCycle(id, request.ParentId.Value))
+            if (await WouldCreateCycleAsync(id, request.ParentId.Value, cancellationToken))
             {
                 return Result<AdminCategoryDto>.Validation(["Category parent would create a cycle."]);
             }
@@ -123,18 +126,24 @@ internal sealed class AdminCategoryService(
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var category = dbContext.Categories.FirstOrDefault(existing => existing.Id == id);
+        var category = await dbContext.Categories
+            .Where(existing => existing.Id == id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (category is null)
         {
             return Result<AdminCategoryDto>.NotFound("Category was not found.");
         }
 
-        if (dbContext.Categories.Any(existing => existing.ParentId == id))
+        if (await dbContext.Categories
+                .Where(existing => existing.ParentId == id)
+                .AnyAsyncSafe(cancellationToken))
         {
             return Result<AdminCategoryDto>.Conflict("Category has child categories and cannot be deleted.");
         }
 
-        if (dbContext.Products.Any(product => product.CategoryId == id))
+        if (await dbContext.Products
+                .Where(product => product.CategoryId == id)
+                .AnyAsyncSafe(cancellationToken))
         {
             return Result<AdminCategoryDto>.Conflict("Category has products and cannot be deleted. Move or delete them first.");
         }
@@ -178,21 +187,32 @@ internal sealed class AdminCategoryService(
             children);
     }
 
-    private bool SlugExists(string slug, Guid? excludedCategoryId = null)
+    private Task<bool> SlugExistsAsync(
+        string slug,
+        Guid? excludedCategoryId = null,
+        CancellationToken cancellationToken = default)
     {
-        return dbContext.Categories.Any(category =>
-            category.Slug == slug &&
-            (excludedCategoryId == null || category.Id != excludedCategoryId.Value));
+        return dbContext.Categories
+            .Where(category => category.Slug == slug &&
+                (excludedCategoryId == null || category.Id != excludedCategoryId.Value))
+            .AnyAsyncSafe(cancellationToken);
     }
 
-    private bool CategoryExists(Guid id)
+    private Task<bool> CategoryExistsAsync(Guid id, CancellationToken cancellationToken)
     {
-        return dbContext.Categories.Any(category => category.Id == id);
+        return dbContext.Categories
+            .Where(category => category.Id == id)
+            .AnyAsyncSafe(cancellationToken);
     }
 
-    private bool WouldCreateCycle(Guid categoryId, Guid parentId)
+    private async Task<bool> WouldCreateCycleAsync(
+        Guid categoryId,
+        Guid parentId,
+        CancellationToken cancellationToken)
     {
-        var categoriesById = dbContext.Categories.ToDictionary(category => category.Id);
+        var categoriesById = await dbContext.Categories
+            .AsNoTrackingIfEf()
+            .ToDictionaryAsyncSafe(category => category.Id, cancellationToken);
         var currentParentId = parentId;
 
         while (categoriesById.TryGetValue(currentParentId, out var parent))

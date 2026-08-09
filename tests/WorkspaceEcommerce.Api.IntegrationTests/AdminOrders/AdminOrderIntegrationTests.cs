@@ -88,4 +88,25 @@ public sealed class AdminOrderIntegrationTests(ApiIntegrationTestFixture fixture
             "Order status cannot change from Pending to Completed.",
             json["errors"]!.AsArray().Select(error => error!.GetValue<string>()));
     }
+
+    [Fact]
+    public async Task ListOrders_UsesBoundedCountAndPageQueries()
+    {
+        await fixture.ResetDatabaseAsync();
+        var catalog = TestData.CreateVisibleCatalog();
+        var order = TestData.CreatePendingOrder(catalog.Variant.Id);
+        await fixture.SeedAsync(dbContext =>
+        {
+            dbContext.AddRange(catalog.Category, catalog.Product, catalog.Variant, order);
+            return Task.CompletedTask;
+        });
+        using var client = fixture.CreateClient();
+        client.UseBearerToken(await client.LoginAsAdminAsync());
+        fixture.ResetSqlCommandCount();
+
+        using var response = await client.GetAsync("/api/admin/orders?pageNumber=1&pageSize=1");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.InRange(fixture.GetSqlSelectCount(), 2, 2);
+    }
 }

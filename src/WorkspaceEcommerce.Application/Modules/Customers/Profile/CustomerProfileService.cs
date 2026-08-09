@@ -2,6 +2,7 @@ using FluentValidation;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Application.Modules.Customers.Addresses;
 using WorkspaceEcommerce.Domain.Modules.Customers;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
@@ -13,20 +14,20 @@ internal sealed class CustomerProfileService(
     ICurrentCustomerContext currentCustomer,
     IValidator<UpdateCustomerProfileRequest> updateValidator) : ICustomerProfileService
 {
-    public Task<Result<CustomerProfileDto>> GetMeAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<CustomerProfileDto>> GetMeAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         var customerId = currentCustomer.CustomerId;
         if (!customerId.HasValue)
         {
-            return Task.FromResult(Result<CustomerProfileDto>.Unauthorized("Customer authentication is required."));
+            return Result<CustomerProfileDto>.Unauthorized("Customer authentication is required.");
         }
 
-        var customer = FindCustomerById(customerId.Value);
+        var customer = await FindCustomerByIdAsync(customerId.Value, cancellationToken);
         return customer is null
-            ? Task.FromResult(Result<CustomerProfileDto>.NotFound("Customer was not found."))
-            : Task.FromResult(Result<CustomerProfileDto>.Success(ToDto(customer)));
+            ? Result<CustomerProfileDto>.NotFound("Customer was not found.")
+            : Result<CustomerProfileDto>.Success(ToDto(customer));
     }
 
     public async Task<Result<CustomerProfileDto>> UpdateMeAsync(
@@ -46,7 +47,7 @@ internal sealed class CustomerProfileService(
             return Result<CustomerProfileDto>.Unauthorized("Customer authentication is required.");
         }
 
-        var customer = FindCustomerById(customerId.Value);
+        var customer = await FindCustomerByIdAsync(customerId.Value, cancellationToken);
         if (customer is null)
         {
             return Result<CustomerProfileDto>.NotFound("Customer was not found.");
@@ -59,40 +60,44 @@ internal sealed class CustomerProfileService(
         return Result<CustomerProfileDto>.Success(ToDto(customer));
     }
 
-    public Task<Result<CustomerAccountStatsDto>> GetStatsAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<CustomerAccountStatsDto>> GetStatsAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         var customerId = currentCustomer.CustomerId;
         if (!customerId.HasValue)
         {
-            return Task.FromResult(Result<CustomerAccountStatsDto>.Unauthorized("Customer authentication is required."));
+            return Result<CustomerAccountStatsDto>.Unauthorized("Customer authentication is required.");
         }
 
-        var customer = FindCustomerById(customerId.Value);
+        var customer = await FindCustomerByIdAsync(customerId.Value, cancellationToken);
         if (customer is null)
         {
-            return Task.FromResult(Result<CustomerAccountStatsDto>.NotFound("Customer was not found."));
+            return Result<CustomerAccountStatsDto>.NotFound("Customer was not found.");
         }
 
-        var totalOrders = dbContext.Orders.Count(o => o.CustomerId == customerId.Value);
-        var pendingOrders = dbContext.Orders.Count(o =>
-            o.CustomerId == customerId.Value &&
-            (o.Status == OrderStatus.Pending || o.Status == OrderStatus.Confirmed));
-        var shippingOrders = dbContext.Orders.Count(o =>
-            o.CustomerId == customerId.Value &&
-            (o.Status == OrderStatus.Processing || o.Status == OrderStatus.Shipping));
+        var orderStats = await dbContext.Orders
+            .AsNoTrackingIfEf()
+            .Where(order => order.CustomerId == customerId.Value)
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                Total = group.Count(),
+                Pending = group.Count(order => order.Status == OrderStatus.Pending || order.Status == OrderStatus.Confirmed),
+                Shipping = group.Count(order => order.Status == OrderStatus.Processing || order.Status == OrderStatus.Shipping)
+            })
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
         var stats = new CustomerAccountStatsDto(
-            totalOrders,
-            pendingOrders,
-            shippingOrders,
+            orderStats?.Total ?? 0,
+            orderStats?.Pending ?? 0,
+            orderStats?.Shipping ?? 0,
             customer.RewardPoints);
 
-        return Task.FromResult(Result<CustomerAccountStatsDto>.Success(stats));
+        return Result<CustomerAccountStatsDto>.Success(stats);
     }
 
-    public Task<Result<IReadOnlyList<CustomerLoginHistoryDto>>> GetLoginHistoryAsync(
+    public async Task<Result<IReadOnlyList<CustomerLoginHistoryDto>>> GetLoginHistoryAsync(
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -100,22 +105,26 @@ internal sealed class CustomerProfileService(
         var customerId = currentCustomer.CustomerId;
         if (!customerId.HasValue)
         {
-            return Task.FromResult(Result<IReadOnlyList<CustomerLoginHistoryDto>>.Unauthorized("Customer authentication is required."));
+            return Result<IReadOnlyList<CustomerLoginHistoryDto>>.Unauthorized("Customer authentication is required.");
         }
 
-        var history = dbContext.CustomerLoginHistories
+        var history = await dbContext.CustomerLoginHistories
+            .AsNoTrackingIfEf()
             .Where(h => h.CustomerId == customerId.Value)
             .OrderByDescending(h => h.LoginTime)
+            .ThenByDescending(h => h.Id)
             .Take(20)
             .Select(h => new CustomerLoginHistoryDto(h.Id, h.LoginTime, h.IpAddress, h.UserAgent, h.Success))
-            .ToArray();
+            .ToArrayAsyncSafe(cancellationToken);
 
-        return Task.FromResult(Result<IReadOnlyList<CustomerLoginHistoryDto>>.Success(history));
+        return Result<IReadOnlyList<CustomerLoginHistoryDto>>.Success(history);
     }
 
-    private Customer? FindCustomerById(Guid customerId)
+    private Task<Customer?> FindCustomerByIdAsync(Guid customerId, CancellationToken cancellationToken)
     {
-        return dbContext.Customers.FirstOrDefault(customer => customer.Id == customerId);
+        return dbContext.Customers
+            .Where(customer => customer.Id == customerId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
     }
 
     private static CustomerProfileDto ToDto(Customer customer)

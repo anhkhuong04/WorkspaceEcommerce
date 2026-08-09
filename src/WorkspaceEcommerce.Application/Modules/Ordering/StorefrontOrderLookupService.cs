@@ -1,6 +1,7 @@
 using FluentValidation;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Application.Modules.Ordering;
@@ -23,20 +24,22 @@ internal sealed class StorefrontOrderLookupService(
 
         var orderCode = NormalizeOrderCode(request.OrderCode);
         var phone = NormalizePhone(request.Phone);
-        var order = dbContext.Orders.FirstOrDefault(existing =>
-            existing.OrderCode == orderCode &&
-            existing.CustomerPhone == phone);
+        var order = await dbContext.Orders
+            .AsNoTrackingIfEf()
+            .Where(existing => existing.OrderCode == orderCode && existing.CustomerPhone == phone)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
         if (order is null)
         {
             return Result<OrderLookupResponse>.NotFound("Order was not found.");
         }
 
-        var items = dbContext.OrderItems
+        var items = await dbContext.OrderItems
+            .AsNoTrackingIfEf()
             .Where(item => item.OrderId == order.Id)
             .OrderBy(item => item.SkuSnapshot)
             .ThenBy(item => item.Id)
-            .ToArray();
+            .ToArrayAsyncSafe(cancellationToken);
 
         return Result<OrderLookupResponse>.Success(new OrderLookupResponse(ToDto(order, items)));
     }

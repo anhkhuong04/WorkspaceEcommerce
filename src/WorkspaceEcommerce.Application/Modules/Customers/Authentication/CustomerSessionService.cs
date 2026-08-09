@@ -3,6 +3,7 @@ using System.Text;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Domain.Modules.Customers;
 
 namespace WorkspaceEcommerce.Application.Modules.Customers.Authentication;
@@ -60,11 +61,14 @@ internal sealed class CustomerSessionService(
                 return;
             }
 
-            var family = dbContext.CustomerRefreshTokenFamilies
-                .FirstOrDefault(candidate => candidate.Id == token.FamilyId);
+            var family = await dbContext.CustomerRefreshTokenFamilies
+                .Where(candidate => candidate.Id == token.FamilyId)
+                .FirstOrDefaultAsyncSafe(transactionToken);
             var customer = family is null
                 ? null
-                : dbContext.Customers.FirstOrDefault(candidate => candidate.Id == family.CustomerId);
+                : await dbContext.Customers
+                    .Where(candidate => candidate.Id == family.CustomerId)
+                    .FirstOrDefaultAsyncSafe(transactionToken);
             if (family is null || customer is null || !family.IsActiveAt(now))
             {
                 failure = Result<CustomerAuthResponse>.Unauthorized("Invalid or expired refresh token.");
@@ -104,15 +108,17 @@ internal sealed class CustomerSessionService(
             return;
         }
 
-        var token = dbContext.CustomerRefreshTokens
-            .FirstOrDefault(candidate => candidate.TokenHash == HashToken(refreshToken));
+        var token = await dbContext.CustomerRefreshTokens
+            .Where(candidate => candidate.TokenHash == HashToken(refreshToken))
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (token is null)
         {
             return;
         }
 
-        var family = dbContext.CustomerRefreshTokenFamilies
-            .FirstOrDefault(candidate => candidate.Id == token.FamilyId);
+        var family = await dbContext.CustomerRefreshTokenFamilies
+            .Where(candidate => candidate.Id == token.FamilyId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (family is null || family.RevokedAt.HasValue)
         {
             return;
@@ -128,9 +134,9 @@ internal sealed class CustomerSessionService(
         CancellationToken cancellationToken = default)
     {
         var now = timeProvider.GetUtcNow();
-        var families = dbContext.CustomerRefreshTokenFamilies
+        var families = await dbContext.CustomerRefreshTokenFamilies
             .Where(family => family.CustomerId == customerId && family.RevokedAt == null)
-            .ToArray();
+            .ToArrayAsyncSafe(cancellationToken);
         foreach (var family in families)
         {
             family.Revoke(now, reason);

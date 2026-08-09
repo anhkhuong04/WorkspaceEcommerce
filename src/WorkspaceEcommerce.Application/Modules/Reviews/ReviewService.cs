@@ -2,6 +2,7 @@ using FluentValidation;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Reviews;
@@ -13,6 +14,8 @@ internal sealed class ReviewService(
     ICurrentCustomerContext currentCustomer,
     IValidator<CreateReviewRequest> validator) : IReviewService
 {
+    private const int MaxProductReviews = 100;
+
     public async Task<Result<ReviewDto>> CreateReviewAsync(
         CreateReviewRequest request,
         CancellationToken cancellationToken = default)
@@ -33,8 +36,9 @@ internal sealed class ReviewService(
         cancellationToken.ThrowIfCancellationRequested();
 
         // Ensure product exists
-        var product = db.Products
-            .FirstOrDefault(p => p.Slug == request.Slug && p.IsActive);
+        var product = await db.Products
+            .Where(p => p.Slug == request.Slug && p.IsActive)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
         if (product is null)
         {
@@ -42,14 +46,14 @@ internal sealed class ReviewService(
         }
 
         // Verify customer has purchased this product via a completed/shipping order
-        var hasPurchased = db.OrderItems
+        var hasPurchased = await db.OrderItems
             .Join(db.Orders, item => item.OrderId, order => order.Id, (item, order) => new { item, order })
             .Join(db.ProductVariants, x => x.item.ProductVariantId, v => v.Id, (x, v) => new { x.item, x.order, variant = v })
-            .Any(
-                x => x.order.CustomerId == customerId
-                     && x.variant.ProductId == product.Id
-                     && (x.order.Status == OrderStatus.Completed
-                         || x.order.Status == OrderStatus.Shipping));
+            .Where(x => x.order.CustomerId == customerId
+                        && x.variant.ProductId == product.Id
+                        && (x.order.Status == OrderStatus.Completed
+                            || x.order.Status == OrderStatus.Shipping))
+            .AnyAsyncSafe(cancellationToken);
 
         if (!hasPurchased)
         {
@@ -57,8 +61,9 @@ internal sealed class ReviewService(
         }
 
         // Check if already reviewed
-        var alreadyReviewed = db.Reviews
-            .Any(r => r.ProductId == product.Id && r.CustomerId == customerId);
+        var alreadyReviewed = await db.Reviews
+            .Where(r => r.ProductId == product.Id && r.CustomerId == customerId)
+            .AnyAsyncSafe(cancellationToken);
 
         if (alreadyReviewed)
         {
@@ -79,61 +84,67 @@ internal sealed class ReviewService(
         db.Add(review);
 
         // Recalculate product rating stats including the new rating
-        var existingRatings = db.Reviews
+        var ratingSummary = await db.Reviews
             .Where(r => r.ProductId == product.Id)
-            .Select(r => r.Rating)
-            .ToList();
-
-        existingRatings.Add(request.Rating);
-        var newAverage = existingRatings.Average();
-        var newCount = existingRatings.Count;
+            .GroupBy(_ => 1)
+            .Select(group => new { Total = group.Sum(review => review.Rating), Count = group.Count() })
+            .FirstOrDefaultAsyncSafe(cancellationToken);
+        var newCount = (ratingSummary?.Count ?? 0) + 1;
+        var newAverage = ((ratingSummary?.Total ?? 0) + request.Rating) / (double)newCount;
         product.UpdateRatingStats(newAverage, newCount);
         db.Update(product);
 
         await db.SaveChangesAsync(cancellationToken);
 
         // Get customer name for response
-        var customer = db.Customers.FirstOrDefault(c => c.Id == customerId);
+        var customer = await db.Customers
+            .AsNoTrackingIfEf()
+            .Where(c => c.Id == customerId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
         return Result<ReviewDto>.Success(ToDto(review, customer?.FullName ?? "Customer"));
     }
 
-    public Task<Result<ProductReviewSummaryDto>> GetProductReviewsAsync(
+    public async Task<Result<ProductReviewSummaryDto>> GetProductReviewsAsync(
         string slug,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var product = db.Products
-            .FirstOrDefault(p => p.Slug == slug && p.IsActive);
+        var product = await db.Products
+            .AsNoTrackingIfEf()
+            .Where(p => p.Slug == slug && p.IsActive)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
         if (product is null)
         {
-            return Task.FromResult(Result<ProductReviewSummaryDto>.NotFound("Product was not found."));
+            return Result<ProductReviewSummaryDto>.NotFound("Product was not found.");
         }
 
-        var customersById = db.Customers.ToDictionary(c => c.Id, c => c.FullName);
-
-        var reviews = db.Reviews
-            .Where(r => r.ProductId == product.Id)
-            .OrderByDescending(r => r.CreatedAt)
-            .ToArray()
-            .Select(r => new ReviewDto(
-                r.Id,
-                r.ProductId,
-                r.CustomerId,
-                customersById.GetValueOrDefault(r.CustomerId, "Customer"),
-                r.Rating,
-                r.Comment,
-                r.CreatedAt))
-            .ToArray();
+        var reviews = await (
+                from review in db.Reviews.AsNoTrackingIfEf()
+                join customer in db.Customers.AsNoTrackingIfEf()
+                    on review.CustomerId equals customer.Id into customers
+                from customer in customers.DefaultIfEmpty()
+                where review.ProductId == product.Id
+                orderby review.CreatedAt descending, review.Id descending
+                select new ReviewDto(
+                    review.Id,
+                    review.ProductId,
+                    review.CustomerId,
+                    customer == null ? "Customer" : customer.FullName,
+                    review.Rating,
+                    review.Comment,
+                    review.CreatedAt))
+            .Take(MaxProductReviews)
+            .ToArrayAsyncSafe(cancellationToken);
 
         var summary = new ProductReviewSummaryDto(
             product.AverageRating,
             product.ReviewCount,
             reviews);
 
-        return Task.FromResult(Result<ProductReviewSummaryDto>.Success(summary));
+        return Result<ProductReviewSummaryDto>.Success(summary);
     }
 
     private static ReviewDto ToDto(Review review, string customerName)

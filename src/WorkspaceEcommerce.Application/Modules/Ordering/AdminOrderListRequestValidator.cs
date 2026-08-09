@@ -6,6 +6,9 @@ public sealed class AdminOrderListRequestValidator : AbstractValidator<AdminOrde
 {
     public AdminOrderListRequestValidator()
     {
+        RuleFor(request => request.Search)
+            .MaximumLength(250);
+
         RuleFor(request => request.Status)
             .IsInEnum()
             .When(request => request.Status.HasValue);

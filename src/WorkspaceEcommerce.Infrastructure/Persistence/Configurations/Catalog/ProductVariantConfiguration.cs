@@ -82,6 +82,9 @@ internal sealed class ProductVariantConfiguration : IEntityTypeConfiguration<Pro
         builder.HasIndex(variant => variant.ProductId)
             .HasDatabaseName("ix_product_variants_product_id");
 
+        builder.HasIndex(variant => new { variant.ProductId, variant.IsActive, variant.Price })
+            .HasDatabaseName("ix_product_variants_product_active_price");
+
         builder.HasIndex(variant => variant.IsActive)
             .HasDatabaseName("ix_product_variants_is_active");
     }

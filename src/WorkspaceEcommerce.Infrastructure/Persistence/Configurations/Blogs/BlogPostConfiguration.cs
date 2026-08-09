@@ -60,5 +60,8 @@ internal sealed class BlogPostConfiguration : IEntityTypeConfiguration<BlogPost>
 
         builder.HasIndex(post => post.IsPublished)
             .HasDatabaseName("ix_blog_posts_is_published");
+
+        builder.HasIndex(post => new { post.IsPublished, post.PublishedAt, post.Id })
+            .HasDatabaseName("ix_blog_posts_published_at_id");
     }
 }

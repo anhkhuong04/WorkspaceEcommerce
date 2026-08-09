@@ -12,6 +12,7 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
         CancellationToken cancellationToken = default)
     {
         var categories = await catalogStore.Categories
+            .AsNoTrackingIfEf()
             .Where(category => category.IsActive)
             .OrderBy(category => category.SortOrder)
             .ThenBy(category => category.Slug)
@@ -25,12 +26,18 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
         ProductListRequest request,
         CancellationToken cancellationToken = default)
     {
+        var validationErrors = ValidateListRequest(request);
+        if (validationErrors.Length > 0)
+        {
+            return Result<PagedResult<StorefrontProductListItemDto>>.Validation(validationErrors);
+        }
+
         var currentLanguage = languageProvider.CurrentLanguage;
         var normalizedCategorySlug = NormalizeOptional(request.CategorySlug);
         var normalizedSearch = NormalizeOptional(request.Search);
         var query =
-            from product in catalogStore.Products
-            join category in catalogStore.Categories on product.CategoryId equals category.Id
+            from product in catalogStore.Products.AsNoTrackingIfEf()
+            join category in catalogStore.Categories.AsNoTrackingIfEf() on product.CategoryId equals category.Id
             where product.IsActive && category.IsActive
             select new ProductCatalogRow { Product = product, Category = category };
 
@@ -73,11 +80,13 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
             .ToArrayAsyncSafe(cancellationToken);
         var productIds = rows.Select(row => row.Product.Id).ToArray();
         var activeVariantsByProductId = (await catalogStore.ProductVariants
+            .AsNoTrackingIfEf()
             .Where(variant => productIds.Contains(variant.ProductId) && variant.IsActive)
             .OrderBy(variant => variant.Sku)
             .ToArrayAsyncSafe(cancellationToken))
             .ToLookup(variant => variant.ProductId);
         var imagesByProductId = (await catalogStore.ProductImages
+            .AsNoTrackingIfEf()
             .Where(image => productIds.Contains(image.ProductId))
             .OrderBy(image => image.SortOrder)
             .ThenBy(image => image.ImageUrl)
@@ -106,6 +115,7 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
     {
         var normalizedSlug = NormalizeRequired(slug);
         var product = await catalogStore.Products
+            .AsNoTrackingIfEf()
             .Where(existing => existing.IsActive && existing.Slug == normalizedSlug)
             .FirstOrDefaultAsyncSafe(cancellationToken);
 
@@ -115,6 +125,7 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
         }
 
         var category = await catalogStore.Categories
+            .AsNoTrackingIfEf()
             .Where(existing => existing.Id == product.CategoryId && existing.IsActive)
             .FirstOrDefaultAsyncSafe(cancellationToken);
 
@@ -124,15 +135,18 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
         }
 
         var variants = await catalogStore.ProductVariants
+            .AsNoTrackingIfEf()
             .Where(variant => variant.ProductId == product.Id && variant.IsActive)
             .OrderBy(variant => variant.Sku)
             .ToArrayAsyncSafe(cancellationToken);
         var images = await catalogStore.ProductImages
+            .AsNoTrackingIfEf()
             .Where(image => image.ProductId == product.Id)
             .OrderBy(image => image.SortOrder)
             .ThenBy(image => image.ImageUrl)
             .ToArrayAsyncSafe(cancellationToken);
         var specifications = await catalogStore.ProductSpecifications
+            .AsNoTrackingIfEf()
             .Where(specification => specification.ProductId == product.Id)
             .OrderBy(specification => specification.SortOrder)
             .ThenBy(specification => specification.Name)
@@ -303,6 +317,38 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
     private static string NormalizeRequired(string value)
     {
         return value.Trim().ToLowerInvariant();
+    }
+
+    private static string[] ValidateListRequest(ProductListRequest request)
+    {
+        var errors = new List<string>();
+        if (request.CategorySlug?.Length > 100)
+        {
+            errors.Add("Category slug must not exceed 100 characters.");
+        }
+
+        if (request.Search?.Length > 100)
+        {
+            errors.Add("Search must not exceed 100 characters.");
+        }
+
+        if (request.MinPrice is < 0 || request.MaxPrice is < 0)
+        {
+            errors.Add("Price filters cannot be negative.");
+        }
+
+        if (request.MinPrice is not null && request.MaxPrice is not null && request.MinPrice > request.MaxPrice)
+        {
+            errors.Add("Minimum price cannot exceed maximum price.");
+        }
+
+        var sortBy = NormalizeOptional(request.SortBy);
+        if (sortBy is not null && sortBy is not ("name-asc" or "price-asc" or "price-desc" or "updated-desc"))
+        {
+            errors.Add("Sort must be one of name-asc, price-asc, price-desc, or updated-desc.");
+        }
+
+        return [.. errors];
     }
 
     private sealed class ProductCatalogRow

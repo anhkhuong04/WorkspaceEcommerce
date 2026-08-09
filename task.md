@@ -374,18 +374,18 @@ Completion evidence (2026-08-09): `content.media_assets`/`media_asset_variants`,
 
 #### PRH-008 - Move filtering, projection, and pagination into PostgreSQL
 
-- [ ] Inventory every `IQueryable` terminal operation in Application and Infrastructure, especially `ToArray`, `ToList`, `FirstOrDefault`, `Count`, and `Any` in request paths.
-- [ ] Prioritize customer orders, reviews, blogs, coupons, catalog search, dashboard, and lookup endpoints by expected table growth.
-- [ ] Replace synchronous EF database calls with cancellation-aware async counterparts.
-- [ ] Apply filters before `CountAsync`, `Skip`, and `Take`; never paginate after full materialization.
-- [ ] Project directly to DTO/read models and use `AsNoTracking` for read-only queries.
-- [ ] Replace per-row/N+1 queries with joins, grouped projections, or bounded batch reads.
-- [ ] Keep deterministic secondary ordering for stable pagination.
-- [ ] Clamp all page sizes and validate search/filter inputs.
-- [ ] Review translated SQL for case-insensitive search, JSON/localized fields, aggregates, and large `Contains` sets.
-- [ ] Add only evidence-backed indexes; verify plans with representative PostgreSQL data before and after each index.
-- [ ] Add query-count or SQL-capture tests for endpoints prone to N+1 behavior.
-- [ ] Add a repeatable representative-data performance script and record latency, rows read, and generated SQL/plan evidence.
+- [x] Inventory every `IQueryable` terminal operation in Application and Infrastructure, especially `ToArray`, `ToList`, `FirstOrDefault`, `Count`, and `Any` in request paths.
+- [x] Prioritize customer orders, reviews, blogs, coupons, catalog search, dashboard, and lookup endpoints by expected table growth.
+- [x] Replace synchronous EF database calls with cancellation-aware async counterparts.
+- [x] Apply filters before `CountAsync`, `Skip`, and `Take`; never paginate after full materialization.
+- [x] Project directly to DTO/read models and use `AsNoTracking` for read-only queries.
+- [x] Replace per-row/N+1 queries with joins, grouped projections, or bounded batch reads.
+- [x] Keep deterministic secondary ordering for stable pagination.
+- [x] Clamp all page sizes and validate search/filter inputs.
+- [x] Review translated SQL for case-insensitive search, JSON/localized fields, aggregates, and large `Contains` sets.
+- [x] Add only evidence-backed indexes; verify plans with representative PostgreSQL data before and after each index.
+- [x] Add query-count or SQL-capture tests for endpoints prone to N+1 behavior.
+- [x] Add a repeatable representative-data performance script and record latency, rows read, and generated SQL/plan evidence.
 
 Initial high-priority targets:
 
@@ -399,6 +399,10 @@ Acceptance criteria:
 - Every paged endpoint performs server-side filtered count and bounded page retrieval.
 - No high-traffic read endpoint performs unbounded table materialization or request-thread-blocking EF I/O.
 - Representative-data tests show bounded query counts and no material regression.
+
+Completion evidence (2026-08-09): The repeatable terminal inventory found 131 syntactic terminal operations after the migration; request-path EF calls are cancellation-aware and the only remaining correlated `Count` expressions are SQL projections for order item count. Customer/admin orders, admin reviews/coupons, loyalty transactions, catalog pages, dashboard reads, blogs, authentication/profile/lookups, payment, shipment tracking, and shipment webhooks now use database-side filters/projections or bounded batch reads. Legacy non-paged blog/review/comment collections have an explicit 100-item database-side cap.
+
+`20260809151744_OptimizeReadPathIndexes` adds only indexes verified against PostgreSQL 17. On isolated representative data (50,000 orders, 10,000 reviews, 10,000 coupons), executor time changed from customer orders 12.729 to 0.129 ms, admin orders 6.908 to 0.124 ms, reviews 0.329 to 0.122 ms, and coupons 1.495 to 0.074 ms; buffer/plan evidence is recorded in `docs/performance/prh-008-query-plan-runbook.md`. SQL-capture tests constrain customer/admin order pages to two selects and coupon pages to four bounded batch selects. `dotnet build WorkspaceEcommerce.slnx --no-restore`, `dotnet test WorkspaceEcommerce.slnx --no-build --no-restore` (533 passed), and EF pending-model check pass.
 
 #### PRH-009 - Cross-cutting production verification and release gate
 
@@ -542,7 +546,7 @@ Additional required verification:
 - [ ] PRH-005 - Complete customer account lifecycle
 - [x] PRH-006 - Blog comment moderation (completed 2026-08-09)
 - [x] PRH-007 - Durable and validated media storage (completed 2026-08-09)
-- [ ] PRH-008 - Database-side query optimization
+- [x] PRH-008 - Database-side query optimization (completed 2026-08-09; PostgreSQL query-plan and query-count evidence recorded)
 - [ ] PRH-009 - Final production verification and release gate
 
 ## Completion Report

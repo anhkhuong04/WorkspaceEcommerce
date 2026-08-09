@@ -163,6 +163,40 @@ public sealed class CustomerAccountIntegrationTests(ApiIntegrationTestFixture fi
     }
 
     [Fact]
+    public async Task CustomerOrderList_UsesServerSideCountAndBoundedPageQuery()
+    {
+        await fixture.ResetDatabaseAsync();
+        var catalog = TestData.CreateVisibleCatalog();
+        using var client = fixture.CreateClient();
+        var token = await client.RegisterCustomerAsync();
+        client.UseBearerToken(token);
+        var customerId = await fixture.ExecuteDbAsync(dbContext =>
+            dbContext.Customers
+                .Where(customer => customer.Email == "customer@example.com")
+                .Select(customer => customer.Id)
+                .SingleAsync());
+        var order = CreateOrder(
+            Guid.NewGuid(),
+            "ORD-PAGE-001",
+            customerId,
+            catalog.Variant.Id,
+            "Nguyen Van A",
+            "0900000000",
+            "customer@example.com");
+        await fixture.SeedAsync(dbContext =>
+        {
+            dbContext.AddRange(catalog.Category, catalog.Product, catalog.Variant, order);
+            return Task.CompletedTask;
+        });
+        fixture.ResetSqlCommandCount();
+
+        using var response = await client.GetAsync("/api/customer/orders?pageNumber=1&pageSize=1");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(2, fixture.GetSqlSelectCount());
+    }
+
+    [Fact]
     public async Task CustomerEndpoint_WithAdminToken_ReturnsForbidden()
     {
         await fixture.ResetDatabaseAsync();

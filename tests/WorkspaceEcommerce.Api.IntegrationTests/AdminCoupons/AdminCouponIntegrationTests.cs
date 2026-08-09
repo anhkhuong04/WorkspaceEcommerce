@@ -102,6 +102,22 @@ public sealed class AdminCouponIntegrationTests(ApiIntegrationTestFixture fixtur
     }
 
     [Fact]
+    public async Task ListCoupons_UsesBoundedBatchQueriesForPageRelations()
+    {
+        await fixture.ResetDatabaseAsync();
+        using var client = fixture.CreateClient();
+        client.UseBearerToken(await client.LoginAsAdminAsync());
+        await CreateCouponAsync(client, "QUERYCOUNT10");
+        fixture.ResetSqlCommandCount();
+
+        using var response = await client.GetAsync("/api/admin/coupons?pageNumber=1&pageSize=1");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        // Count + page + all page targets + all page redemption counts. This must not grow per coupon.
+        Assert.Equal(4, fixture.GetSqlSelectCount());
+    }
+
+    [Fact]
     public async Task CreateCoupon_DuplicateCode_ReturnsConflictEnvelope()
     {
         await fixture.ResetDatabaseAsync();

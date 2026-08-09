@@ -52,6 +52,8 @@ public sealed class UpdateCouponRequestValidator : AbstractValidator<UpdateCoupo
             .NotEmpty();
 
         RuleFor(request => request.ProductTargetIds)
+            .Must(ids => ids.Length <= 100)
+            .WithMessage("At most 100 product targets are allowed.")
             .Must(ids => ids.Distinct().Count() == ids.Length)
             .WithMessage("Product target ids must be unique.");
     }

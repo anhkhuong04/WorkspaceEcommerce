@@ -4,6 +4,7 @@ using FluentValidation;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Application.Modules.Customers.Authentication;
 using WorkspaceEcommerce.Domain.Modules.Customers;
 
@@ -26,7 +27,7 @@ internal sealed class CustomerTwoFactorService(
     public async Task<Result<TwoFactorSetupStartResponse>> StartSetupAsync(
         CancellationToken cancellationToken = default)
     {
-        var customerResult = FindCurrentCustomer();
+        var customerResult = await FindCurrentCustomerAsync(cancellationToken);
         if (!customerResult.IsSuccess)
         {
             return ToTyped<TwoFactorSetupStartResponse>(customerResult);
@@ -62,7 +63,7 @@ internal sealed class CustomerTwoFactorService(
                 validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
-        var customerResult = FindCurrentCustomer();
+        var customerResult = await FindCurrentCustomerAsync(cancellationToken);
         if (!customerResult.IsSuccess)
         {
             return ToTyped<TwoFactorSetupConfirmationResponse>(customerResult);
@@ -91,9 +92,9 @@ internal sealed class CustomerTwoFactorService(
         }
 
         customer.ConfirmTwoFactorSetup();
-        foreach (var existingCode in dbContext.CustomerTwoFactorRecoveryCodes
+        foreach (var existingCode in await dbContext.CustomerTwoFactorRecoveryCodes
                      .Where(code => code.CustomerId == customer.Id)
-                     .ToArray())
+                     .ToArrayAsyncSafe(cancellationToken))
         {
             dbContext.Remove(existingCode);
         }
@@ -124,7 +125,7 @@ internal sealed class CustomerTwoFactorService(
             return Result.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
-        var customerResult = FindCurrentCustomer();
+        var customerResult = await FindCurrentCustomerAsync(cancellationToken);
         if (!customerResult.IsSuccess)
         {
             return ToUntyped(customerResult);
@@ -145,7 +146,7 @@ internal sealed class CustomerTwoFactorService(
         }
         else if (!string.IsNullOrWhiteSpace(request.RecoveryCode))
         {
-            var recoveryCode = FindUnusedRecoveryCode(customer.Id, request.RecoveryCode);
+            var recoveryCode = await FindUnusedRecoveryCodeAsync(customer.Id, request.RecoveryCode, cancellationToken);
             if (recoveryCode is not null)
             {
                 recoveryCode.MarkUsed(now);
@@ -159,9 +160,9 @@ internal sealed class CustomerTwoFactorService(
         }
 
         customer.DisableTwoFactor();
-        foreach (var recoveryCode in dbContext.CustomerTwoFactorRecoveryCodes
+        foreach (var recoveryCode in await dbContext.CustomerTwoFactorRecoveryCodes
                      .Where(code => code.CustomerId == customer.Id)
-                     .ToArray())
+                     .ToArrayAsyncSafe(cancellationToken))
         {
             dbContext.Remove(recoveryCode);
         }
@@ -188,9 +189,9 @@ internal sealed class CustomerTwoFactorService(
         }
 
         var now = timeProvider.GetUtcNow();
-        foreach (var previousChallenge in dbContext.CustomerTwoFactorChallenges
+        foreach (var previousChallenge in await dbContext.CustomerTwoFactorChallenges
                      .Where(challenge => challenge.CustomerId == customer.Id && challenge.ConsumedAt == null)
-                     .ToArray())
+                     .ToArrayAsyncSafe(cancellationToken))
         {
             dbContext.Remove(previousChallenge);
         }
@@ -224,13 +225,15 @@ internal sealed class CustomerTwoFactorService(
         }
 
         var now = timeProvider.GetUtcNow();
-        var challenge = FindActiveChallenge(request.ChallengeToken, now);
+        var challenge = await FindActiveChallengeAsync(request.ChallengeToken, now, cancellationToken);
         if (challenge is null)
         {
             return Result<CustomerAuthResponse>.Unauthorized("Invalid or expired two-factor challenge.");
         }
 
-        var customer = dbContext.Customers.FirstOrDefault(candidate => candidate.Id == challenge.CustomerId);
+        var customer = await dbContext.Customers
+            .Where(candidate => candidate.Id == challenge.CustomerId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (customer is null || !customer.TwoFactorEnabled || string.IsNullOrWhiteSpace(customer.TwoFactorSecret) ||
             !TryVerifyTotp(customer.TwoFactorSecret, request.Code, now, out var timeStep) ||
             !customer.TryUseTwoFactorTimeStep(timeStep))
@@ -263,16 +266,18 @@ internal sealed class CustomerTwoFactorService(
         }
 
         var now = timeProvider.GetUtcNow();
-        var challenge = FindActiveChallenge(request.ChallengeToken, now);
+        var challenge = await FindActiveChallengeAsync(request.ChallengeToken, now, cancellationToken);
         if (challenge is null)
         {
             return Result<CustomerAuthResponse>.Unauthorized("Invalid or expired two-factor challenge.");
         }
 
-        var customer = dbContext.Customers.FirstOrDefault(candidate => candidate.Id == challenge.CustomerId);
+        var customer = await dbContext.Customers
+            .Where(candidate => candidate.Id == challenge.CustomerId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         var recoveryCode = customer is null || !customer.TwoFactorEnabled
             ? null
-            : FindUnusedRecoveryCode(customer.Id, request.RecoveryCode);
+            : await FindUnusedRecoveryCodeAsync(customer.Id, request.RecoveryCode, cancellationToken);
         if (recoveryCode is null || customer is null)
         {
             return Result<CustomerAuthResponse>.Unauthorized("Invalid recovery code.");
@@ -292,7 +297,7 @@ internal sealed class CustomerTwoFactorService(
         return Result<CustomerAuthResponse>.Success(await sessionService.IssueAsync(customer, cancellationToken));
     }
 
-    private Result<Customer> FindCurrentCustomer()
+    private async Task<Result<Customer>> FindCurrentCustomerAsync(CancellationToken cancellationToken)
     {
         var customerId = currentCustomer.CustomerId;
         if (!customerId.HasValue)
@@ -300,7 +305,9 @@ internal sealed class CustomerTwoFactorService(
             return Result<Customer>.Unauthorized("Customer authentication is required.");
         }
 
-        var customer = dbContext.Customers.FirstOrDefault(candidate => candidate.Id == customerId.Value);
+        var customer = await dbContext.Customers
+            .Where(candidate => candidate.Id == customerId.Value)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         return customer is null
             ? Result<Customer>.NotFound("Customer was not found.")
             : Result<Customer>.Success(customer);
@@ -330,22 +337,29 @@ internal sealed class CustomerTwoFactorService(
         };
     }
 
-    private CustomerTwoFactorChallenge? FindActiveChallenge(string token, DateTimeOffset now)
+    private async Task<CustomerTwoFactorChallenge?> FindActiveChallengeAsync(
+        string token,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
     {
         var tokenHash = HashChallengeToken(token);
-        var challenge = dbContext.CustomerTwoFactorChallenges
-            .FirstOrDefault(candidate => candidate.TokenHash == tokenHash);
+        var challenge = await dbContext.CustomerTwoFactorChallenges
+            .Where(candidate => candidate.TokenHash == tokenHash)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
         return challenge is not null && challenge.IsActiveAt(now)
             ? challenge
             : null;
     }
 
-    private CustomerTwoFactorRecoveryCode? FindUnusedRecoveryCode(Guid customerId, string suppliedCode)
+    private async Task<CustomerTwoFactorRecoveryCode?> FindUnusedRecoveryCodeAsync(
+        Guid customerId,
+        string suppliedCode,
+        CancellationToken cancellationToken)
     {
-        foreach (var recoveryCode in dbContext.CustomerTwoFactorRecoveryCodes
+        foreach (var recoveryCode in await dbContext.CustomerTwoFactorRecoveryCodes
                      .Where(code => code.CustomerId == customerId && code.UsedAt == null)
-                     .ToArray())
+                     .ToArrayAsyncSafe(cancellationToken))
         {
             if (passwordHasher.Verify(suppliedCode.Trim(), recoveryCode.CodeHash))
             {

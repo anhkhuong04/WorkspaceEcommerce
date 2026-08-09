@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Application.Modules.Loyalty;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Shipments;
@@ -32,7 +33,9 @@ internal sealed class ShipmentWebhookService(
             return Result<ShipmentWebhookResult>.Validation(["Shipment webhook contains an unsupported provider status."]);
         }
 
-        var existingEvent = dbContext.ShipmentEventInbox.FirstOrDefault(entry => entry.Id == payload.EventId);
+        var existingEvent = await dbContext.ShipmentEventInbox
+            .Where(entry => entry.Id == payload.EventId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (existingEvent is not null)
         {
             if (!string.IsNullOrWhiteSpace(existingEvent.ProcessingError))
@@ -47,7 +50,9 @@ internal sealed class ShipmentWebhookService(
 
         var orderCode = payload.ExternalOrderId.Trim().ToUpperInvariant();
         var trackingCode = payload.TrackingCode.Trim();
-        var order = dbContext.Orders.FirstOrDefault(candidate => candidate.OrderCode == orderCode);
+        var order = await dbContext.Orders
+            .Where(candidate => candidate.OrderCode == orderCode)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (order is null)
         {
             return Result<ShipmentWebhookResult>.NotFound("Order was not found for shipment webhook.");
@@ -59,7 +64,9 @@ internal sealed class ShipmentWebhookService(
             return Result<ShipmentWebhookResult>.Conflict("Shipment webhook tracking code does not match the order.");
         }
 
-        var shipment = dbContext.OrderShipments.FirstOrDefault(candidate => candidate.OrderId == order.Id);
+        var shipment = await dbContext.OrderShipments
+            .Where(candidate => candidate.OrderId == order.Id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (shipment is not null &&
             !string.Equals(shipment.TrackingCode, trackingCode, StringComparison.OrdinalIgnoreCase))
         {
@@ -115,11 +122,12 @@ internal sealed class ShipmentWebhookService(
                         payload.ChangedAtUtc);
                 }
 
-                var timelineExists = dbContext.ShipmentTimelineEntries.Any(entry =>
-                    entry.ProviderEventId == payload.EventId ||
-                    (entry.OrderShipmentId == shipment.Id &&
-                     entry.ProviderStatus == payload.Status &&
-                     entry.ChangedAtUtc == payload.ChangedAtUtc));
+                var timelineExists = await dbContext.ShipmentTimelineEntries
+                    .Where(entry => entry.ProviderEventId == payload.EventId ||
+                        (entry.OrderShipmentId == shipment.Id &&
+                         entry.ProviderStatus == payload.Status &&
+                         entry.ChangedAtUtc == payload.ChangedAtUtc))
+                    .AnyAsyncSafe(transactionToken);
                 if (!timelineExists)
                 {
                     dbContext.Add(new ShipmentTimelineEntry(

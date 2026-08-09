@@ -3,6 +3,7 @@ using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Abstractions.Shipment;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Application.Modules.Loyalty;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Shipments;
@@ -17,7 +18,7 @@ internal sealed class OrderShipmentService(
     TimeProvider timeProvider,
     ILogger<OrderShipmentService> logger) : IOrderShipmentService
 {
-    public Task<Result<ShipmentTrackingDto>> GetGuestTrackingAsync(
+    public async Task<Result<ShipmentTrackingDto>> GetGuestTrackingAsync(
         string orderCode,
         string phone,
         CancellationToken cancellationToken = default)
@@ -25,60 +26,71 @@ internal sealed class OrderShipmentService(
         cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(orderCode) || string.IsNullOrWhiteSpace(phone))
         {
-            return Task.FromResult(Result<ShipmentTrackingDto>.Validation(["Order code and phone are required."]));
+            return Result<ShipmentTrackingDto>.Validation(["Order code and phone are required."]);
         }
 
         var normalizedCode = orderCode.Trim().ToUpperInvariant();
         var normalizedPhone = phone.Trim();
-        var order = dbContext.Orders.FirstOrDefault(candidate =>
-            candidate.OrderCode == normalizedCode && candidate.CustomerPhone == normalizedPhone);
+        var order = await dbContext.Orders
+            .AsNoTrackingIfEf()
+            .Where(candidate => candidate.OrderCode == normalizedCode && candidate.CustomerPhone == normalizedPhone)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
-        return Task.FromResult(order is null
+        return order is null
             ? Result<ShipmentTrackingDto>.NotFound("Order was not found.")
-            : Result<ShipmentTrackingDto>.Success(ToDto(order)));
+            : Result<ShipmentTrackingDto>.Success(await ToDtoAsync(order, cancellationToken));
     }
 
-    public Task<Result<ShipmentTrackingDto>> GetCustomerTrackingAsync(
+    public async Task<Result<ShipmentTrackingDto>> GetCustomerTrackingAsync(
         Guid orderId,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!currentCustomer.CustomerId.HasValue)
         {
-            return Task.FromResult(Result<ShipmentTrackingDto>.Unauthorized("Customer authentication is required."));
+            return Result<ShipmentTrackingDto>.Unauthorized("Customer authentication is required.");
         }
 
         var customerId = currentCustomer.CustomerId.Value;
-        var order = dbContext.Orders.FirstOrDefault(candidate =>
-            candidate.Id == orderId && candidate.CustomerId == customerId);
+        var order = await dbContext.Orders
+            .AsNoTrackingIfEf()
+            .Where(candidate => candidate.Id == orderId && candidate.CustomerId == customerId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
-        return Task.FromResult(order is null
+        return order is null
             ? Result<ShipmentTrackingDto>.NotFound("Order was not found.")
-            : Result<ShipmentTrackingDto>.Success(ToDto(order)));
+            : Result<ShipmentTrackingDto>.Success(await ToDtoAsync(order, cancellationToken));
     }
 
-    public Task<Result<ShipmentTrackingDto>> GetAdminTrackingAsync(
+    public async Task<Result<ShipmentTrackingDto>> GetAdminTrackingAsync(
         Guid orderId,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var order = dbContext.Orders.FirstOrDefault(candidate => candidate.Id == orderId);
-        return Task.FromResult(order is null
+        var order = await dbContext.Orders
+            .AsNoTrackingIfEf()
+            .Where(candidate => candidate.Id == orderId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
+        return order is null
             ? Result<ShipmentTrackingDto>.NotFound("Order was not found.")
-            : Result<ShipmentTrackingDto>.Success(ToDto(order)));
+            : Result<ShipmentTrackingDto>.Success(await ToDtoAsync(order, cancellationToken));
     }
 
     public async Task<Result<ShipmentTrackingDto>> RefreshAsync(
         Guid orderId,
         CancellationToken cancellationToken = default)
     {
-        var order = dbContext.Orders.FirstOrDefault(candidate => candidate.Id == orderId);
+        var order = await dbContext.Orders
+            .Where(candidate => candidate.Id == orderId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (order is null)
         {
             return Result<ShipmentTrackingDto>.NotFound("Order was not found.");
         }
 
-        var shipment = dbContext.OrderShipments.FirstOrDefault(candidate => candidate.OrderId == orderId);
+        var shipment = await dbContext.OrderShipments
+            .Where(candidate => candidate.OrderId == orderId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (shipment is null || string.IsNullOrWhiteSpace(shipment.TrackingCode))
         {
             return Result<ShipmentTrackingDto>.Conflict("Order does not have a shipment to refresh.");
@@ -89,7 +101,7 @@ internal sealed class OrderShipmentService(
             var tracking = await provider.GetTrackingAsync(shipment.TrackingCode, cancellationToken);
             var applyResult = await ApplyTrackingAsync(order, shipment, tracking, ShipmentTimelineSource.LiveRefresh, cancellationToken);
             return applyResult.IsSuccess
-                ? Result<ShipmentTrackingDto>.Success(ToDto(order))
+                ? Result<ShipmentTrackingDto>.Success(await ToDtoAsync(order, cancellationToken))
                 : ToTrackingFailure(applyResult, "Tracking response was invalid.");
         }
         catch (HttpRequestException exception)
@@ -108,20 +120,22 @@ internal sealed class OrderShipmentService(
         Guid orderId,
         CancellationToken cancellationToken = default)
     {
-        var order = dbContext.Orders.FirstOrDefault(candidate => candidate.Id == orderId);
+        var order = await dbContext.Orders
+            .Where(candidate => candidate.Id == orderId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (order is null)
         {
             return Result<ShipmentTrackingDto>.NotFound("Order was not found.");
         }
 
-        if (!CanCreate(order))
+        if (!await CanCreateAsync(order, cancellationToken))
         {
             return Result<ShipmentTrackingDto>.Conflict("Shipment cannot be created for this order.");
         }
 
         var result = await TryCreateAsync(order, queueOnFailure: true, cancellationToken);
         return result.IsSuccess
-            ? Result<ShipmentTrackingDto>.Success(ToDto(order))
+            ? Result<ShipmentTrackingDto>.Success(await ToDtoAsync(order, cancellationToken))
             : ToTrackingFailure(result, "Shipment could not be created.");
     }
 
@@ -130,13 +144,17 @@ internal sealed class OrderShipmentService(
         string reason,
         CancellationToken cancellationToken = default)
     {
-        var order = dbContext.Orders.FirstOrDefault(candidate => candidate.Id == orderId);
+        var order = await dbContext.Orders
+            .Where(candidate => candidate.Id == orderId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (order is null)
         {
             return Result<ShipmentTrackingDto>.NotFound("Order was not found.");
         }
 
-        var shipment = dbContext.OrderShipments.FirstOrDefault(candidate => candidate.OrderId == orderId);
+        var shipment = await dbContext.OrderShipments
+            .Where(candidate => candidate.OrderId == orderId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (shipment is null)
         {
             return Result<ShipmentTrackingDto>.Conflict("Order does not have a shipment to cancel.");
@@ -155,7 +173,7 @@ internal sealed class OrderShipmentService(
                 cancellationToken);
             var applyResult = await ApplyTrackingAsync(order, shipment, tracking, ShipmentTimelineSource.Cancellation, cancellationToken);
             return applyResult.IsSuccess
-                ? Result<ShipmentTrackingDto>.Success(ToDto(order))
+                ? Result<ShipmentTrackingDto>.Success(await ToDtoAsync(order, cancellationToken))
                 : ToTrackingFailure(applyResult, "Cancellation response was invalid.");
         }
         catch (HttpRequestException exception) when (ShipmentProviderFailure.IsTransient(exception))
@@ -167,7 +185,7 @@ internal sealed class OrderShipmentService(
                 order.OrderCode,
                 shipment.TrackingCode);
             await EnqueueCommandAsync(order.Id, ShipmentCommandType.Cancel, NormalizeCancelReason(reason), cancellationToken);
-            return Result<ShipmentTrackingDto>.Success(ToDto(order));
+            return Result<ShipmentTrackingDto>.Success(await ToDtoAsync(order, cancellationToken));
         }
         catch (HttpRequestException exception)
         {
@@ -194,25 +212,29 @@ internal sealed class OrderShipmentService(
         CancellationToken cancellationToken = default)
     {
         var now = timeProvider.GetUtcNow();
-        var commandIds = dbContext.ShipmentCommandOutbox
+        var commandIds = await dbContext.ShipmentCommandOutbox
             .Where(command => command.CompletedAtUtc == null && command.NextAttemptAtUtc <= now)
             .OrderBy(command => command.NextAttemptAtUtc)
             .ThenBy(command => command.CreatedAtUtc)
             .Take(Math.Max(1, batchSize))
             .Select(command => command.Id)
-            .ToArray();
+            .ToArrayAsyncSafe(cancellationToken);
         var processed = 0;
 
         foreach (var commandId in commandIds)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var command = dbContext.ShipmentCommandOutbox.FirstOrDefault(candidate => candidate.Id == commandId);
+            var command = await dbContext.ShipmentCommandOutbox
+                .Where(candidate => candidate.Id == commandId)
+                .FirstOrDefaultAsyncSafe(cancellationToken);
             if (command is null || command.CompletedAtUtc.HasValue)
             {
                 continue;
             }
 
-            var order = dbContext.Orders.FirstOrDefault(candidate => candidate.Id == command.OrderId);
+            var order = await dbContext.Orders
+                .Where(candidate => candidate.Id == command.OrderId)
+                .FirstOrDefaultAsyncSafe(cancellationToken);
             if (order is null)
             {
                 command.MarkCompleted(timeProvider.GetUtcNow());
@@ -224,7 +246,9 @@ internal sealed class OrderShipmentService(
             Result operationResult;
             if (command.CommandType == ShipmentCommandType.Create)
             {
-                operationResult = dbContext.OrderShipments.Any(shipment => shipment.OrderId == order.Id)
+                operationResult = await dbContext.OrderShipments
+                    .Where(shipment => shipment.OrderId == order.Id)
+                    .AnyAsyncSafe(cancellationToken)
                     ? Result.Success()
                     : await TryCreateAsync(order, queueOnFailure: false, cancellationToken);
             }
@@ -266,7 +290,7 @@ internal sealed class OrderShipmentService(
         bool queueOnFailure,
         CancellationToken cancellationToken)
     {
-        var requestResult = BuildCreateRequest(order);
+        var requestResult = await BuildCreateRequestAsync(order, cancellationToken);
         if (requestResult.IsFailure)
         {
             return Result.Validation(requestResult.Errors);
@@ -285,7 +309,7 @@ internal sealed class OrderShipmentService(
             }, cancellationToken);
             order.SetShippingFee(quote.TotalFeeAmount);
 
-            requestResult = BuildCreateRequest(order);
+            requestResult = await BuildCreateRequestAsync(order, cancellationToken);
             if (requestResult.IsFailure)
             {
                 return Result.Validation(requestResult.Errors);
@@ -359,7 +383,9 @@ internal sealed class OrderShipmentService(
         string? reason,
         CancellationToken cancellationToken)
     {
-        var shipment = dbContext.OrderShipments.FirstOrDefault(candidate => candidate.OrderId == order.Id);
+        var shipment = await dbContext.OrderShipments
+            .Where(candidate => candidate.OrderId == order.Id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (shipment is null)
         {
             return Result.Success();
@@ -427,10 +453,11 @@ internal sealed class OrderShipmentService(
 
         foreach (var item in tracking.Timeline.OrderBy(entry => entry.ChangedAtUtc))
         {
-            var exists = dbContext.ShipmentTimelineEntries.Any(entry =>
-                entry.OrderShipmentId == shipment.Id &&
-                entry.ProviderStatus == item.Status &&
-                entry.ChangedAtUtc == item.ChangedAtUtc);
+            var exists = await dbContext.ShipmentTimelineEntries
+                .Where(entry => entry.OrderShipmentId == shipment.Id &&
+                    entry.ProviderStatus == item.Status &&
+                    entry.ChangedAtUtc == item.ChangedAtUtc)
+                .AnyAsyncSafe(cancellationToken);
             if (!exists)
             {
                 dbContext.Add(new ShipmentTimelineEntry(
@@ -462,23 +489,27 @@ internal sealed class OrderShipmentService(
         return Result.Success();
     }
 
-    private Result<CreateShipmentRequest> BuildCreateRequest(Order order)
+    private async Task<Result<CreateShipmentRequest>> BuildCreateRequestAsync(
+        Order order,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(order.ShippingWard) || string.IsNullOrWhiteSpace(order.ShippingProvince))
         {
             return Result<CreateShipmentRequest>.Validation(["Structured shipping address is required to create a shipment."]);
         }
 
-        var items = dbContext.OrderItems.Where(item => item.OrderId == order.Id).ToArray();
+        var items = await dbContext.OrderItems
+            .Where(item => item.OrderId == order.Id)
+            .ToArrayAsyncSafe(cancellationToken);
         if (items.Length == 0)
         {
             return Result<CreateShipmentRequest>.Validation(["Order must contain at least one item."]);
         }
 
         var variantIds = items.Select(item => item.ProductVariantId).ToArray();
-        var variants = dbContext.ProductVariants
+        var variants = await dbContext.ProductVariants
             .Where(variant => variantIds.Contains(variant.Id))
-            .ToDictionary(variant => variant.Id);
+            .ToDictionaryAsyncSafe(variant => variant.Id, cancellationToken);
         decimal totalWeight = 0m;
         decimal maxLength = 0m;
         decimal maxWidth = 0m;
@@ -526,10 +557,11 @@ internal sealed class OrderShipmentService(
         string? reason,
         CancellationToken cancellationToken)
     {
-        var exists = dbContext.ShipmentCommandOutbox.Any(command =>
-            command.OrderId == orderId &&
-            command.CommandType == commandType &&
-            command.CompletedAtUtc == null);
+        var exists = await dbContext.ShipmentCommandOutbox
+            .Where(command => command.OrderId == orderId &&
+                command.CommandType == commandType &&
+                command.CompletedAtUtc == null)
+            .AnyAsyncSafe(cancellationToken);
         if (exists)
         {
             return;
@@ -544,12 +576,16 @@ internal sealed class OrderShipmentService(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private ShipmentTrackingDto ToDto(Order order)
+    private async Task<ShipmentTrackingDto> ToDtoAsync(Order order, CancellationToken cancellationToken)
     {
-        var shipment = dbContext.OrderShipments.FirstOrDefault(candidate => candidate.OrderId == order.Id);
+        var shipment = await dbContext.OrderShipments
+            .AsNoTrackingIfEf()
+            .Where(candidate => candidate.OrderId == order.Id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         var timeline = shipment is null
             ? []
-            : dbContext.ShipmentTimelineEntries
+            : await dbContext.ShipmentTimelineEntries
+                .AsNoTrackingIfEf()
                 .Where(entry => entry.OrderShipmentId == shipment.Id)
                 .OrderBy(entry => entry.ChangedAtUtc)
                 .ThenBy(entry => entry.Id)
@@ -559,11 +595,13 @@ internal sealed class OrderShipmentService(
                     entry.Note,
                     entry.ChangedAtUtc,
                     entry.Source.ToString()))
-                .ToArray();
-        var activeCommand = dbContext.ShipmentCommandOutbox
+                .ToArrayAsyncSafe(cancellationToken);
+        var activeCommand = await dbContext.ShipmentCommandOutbox
+            .AsNoTrackingIfEf()
             .Where(command => command.OrderId == order.Id && command.CompletedAtUtc == null)
             .OrderByDescending(command => command.CreatedAtUtc)
-            .FirstOrDefault();
+            .ThenByDescending(command => command.Id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
         return new ShipmentTrackingDto(
             order.Id,
@@ -577,18 +615,20 @@ internal sealed class OrderShipmentService(
             shipment?.Currency,
             shipment?.LastSyncedAtUtc,
             shipment?.LastEventAtUtc,
-            CanCreate(order),
+            await CanCreateAsync(order, cancellationToken),
             shipment is not null,
             shipment is not null && CanCancel(order, shipment),
             activeCommand?.LastError,
             timeline);
     }
 
-    private bool CanCreate(Order order)
+    private async Task<bool> CanCreateAsync(Order order, CancellationToken cancellationToken)
     {
         return string.IsNullOrWhiteSpace(order.TrackingCode) &&
             !order.ShipmentId.HasValue &&
-            !dbContext.OrderShipments.Any(shipment => shipment.OrderId == order.Id) &&
+            !await dbContext.OrderShipments
+                .Where(shipment => shipment.OrderId == order.Id)
+                .AnyAsyncSafe(cancellationToken) &&
             order.Status is not (OrderStatus.Cancelled or OrderStatus.Completed or OrderStatus.Returned) &&
             (order.PaymentMethod != PaymentMethod.VNPay || order.PaymentStatus == PaymentStatus.Paid);
     }

@@ -4,6 +4,7 @@ using WorkspaceEcommerce.Application.Abstractions.Payments;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Abstractions.Shipment;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Payments;
@@ -63,7 +64,7 @@ internal sealed class PaymentService(
         };
     }
 
-    public Task<Result<PaymentResultDto>> GetPaymentResultAsync(
+    public async Task<Result<PaymentResultDto>> GetPaymentResultAsync(
         string orderCode,
         string? phone = null,
         CancellationToken cancellationToken = default)
@@ -73,7 +74,7 @@ internal sealed class PaymentService(
         var normalizedOrderCode = NormalizeOrderCode(orderCode);
         if (normalizedOrderCode is null)
         {
-            return Task.FromResult(Result<PaymentResultDto>.Validation(["Order code is required."]));
+            return Result<PaymentResultDto>.Validation(["Order code is required."]);
         }
 
         var normalizedPhone = NormalizeOptional(phone);
@@ -83,23 +84,26 @@ internal sealed class PaymentService(
             orders = orders.Where(existing => existing.CustomerPhone == normalizedPhone);
         }
 
-        var order = orders.FirstOrDefault();
+        var order = await orders
+            .AsNoTrackingIfEf()
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (order is null)
         {
-            return Task.FromResult(Result<PaymentResultDto>.NotFound("Order was not found."));
+            return Result<PaymentResultDto>.NotFound("Order was not found.");
         }
 
-        var transaction = dbContext.PaymentTransactions
+        var transaction = await dbContext.PaymentTransactions
+            .AsNoTrackingIfEf()
             .Where(existing => existing.OrderId == order.Id)
             .OrderByDescending(existing => existing.CreatedAt)
             .ThenByDescending(existing => existing.Id)
-            .FirstOrDefault();
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
-        return Task.FromResult(Result<PaymentResultDto>.Success(ToPaymentResultDto(
+        return Result<PaymentResultDto>.Success(ToPaymentResultDto(
             order,
             transaction,
             transaction?.GatewayResponseCode,
-            transaction?.GatewayResponseMessage)));
+            transaction?.GatewayResponseMessage));
     }
 
     private async Task<Result<PaymentResultDto>> ProcessVerifiedVNPayCallbackAsync(
@@ -114,15 +118,17 @@ internal sealed class PaymentService(
             return Result<PaymentResultDto>.Validation(["VNPay transaction reference is required."]);
         }
 
-        var transaction = dbContext.PaymentTransactions.FirstOrDefault(existing =>
-            existing.Provider == PaymentProvider.VNPay &&
-            existing.TxnRef == txnRef);
+        var transaction = await dbContext.PaymentTransactions
+            .Where(existing => existing.Provider == PaymentProvider.VNPay && existing.TxnRef == txnRef)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (transaction is null)
         {
             return Result<PaymentResultDto>.NotFound("Payment transaction was not found.");
         }
 
-        var order = dbContext.Orders.FirstOrDefault(existing => existing.Id == transaction.OrderId);
+        var order = await dbContext.Orders
+            .Where(existing => existing.Id == transaction.OrderId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (order is null)
         {
             return Result<PaymentResultDto>.NotFound("Order was not found.");
@@ -137,7 +143,9 @@ internal sealed class PaymentService(
         {
             if (transaction.Status == PaymentTransactionStatus.Success &&
                 !order.ShipmentId.HasValue &&
-                !dbContext.OrderShipments.Any(shipment => shipment.OrderId == order.Id))
+                !await dbContext.OrderShipments
+                    .Where(shipment => shipment.OrderId == order.Id)
+                    .AnyAsyncSafe(cancellationToken))
             {
                 await TryCreateShipmentAfterPaymentAsync(order, cancellationToken);
             }
@@ -227,10 +235,10 @@ internal sealed class PaymentService(
             return;
         }
 
-        var orderItems = dbContext.OrderItems
+        var orderItems = await dbContext.OrderItems
             .Where(item => item.OrderId == order.Id)
             .OrderBy(item => item.Id)
-            .ToArray();
+            .ToArrayAsyncSafe(cancellationToken);
         if (orderItems.Length == 0)
         {
             logger.LogWarning(
@@ -257,7 +265,7 @@ internal sealed class PaymentService(
                     Ward = order.ShippingWard ?? string.Empty,
                     Province = order.ShippingProvince ?? string.Empty
                 },
-                Parcel = AggregateParcel(orderItems),
+                Parcel = await AggregateParcelAsync(orderItems, cancellationToken),
                 GoodsValueAmount = order.Subtotal,
                 CodAmount = 0m,
                 Note = order.Note
@@ -303,10 +311,11 @@ internal sealed class PaymentService(
                 exception,
                 "Shipment creation failed after VNPay success for order {OrderCode}. Payment remains paid.",
                 order.OrderCode);
-            var pendingCommandExists = dbContext.ShipmentCommandOutbox.Any(command =>
-                command.OrderId == order.Id &&
-                command.CommandType == ShipmentCommandType.Create &&
-                command.CompletedAtUtc == null);
+            var pendingCommandExists = await dbContext.ShipmentCommandOutbox
+                .Where(command => command.OrderId == order.Id &&
+                    command.CommandType == ShipmentCommandType.Create &&
+                    command.CompletedAtUtc == null)
+                .AnyAsyncSafe(cancellationToken);
             if (!pendingCommandExists)
             {
                 dbContext.Add(new ShipmentCommandOutbox(
@@ -328,7 +337,9 @@ internal sealed class PaymentService(
         }
     }
 
-    private ShippingParcel AggregateParcel(IReadOnlyCollection<OrderItem> orderItems)
+    private async Task<ShippingParcel> AggregateParcelAsync(
+        IReadOnlyCollection<OrderItem> orderItems,
+        CancellationToken cancellationToken)
     {
         const decimal defaultWeightKg = 0.5m;
         const decimal defaultLengthCm = 15m;
@@ -340,10 +351,16 @@ internal sealed class PaymentService(
         var maxWidth = 0m;
         var totalHeight = 0m;
 
+        var variantIds = orderItems.Select(orderItem => orderItem.ProductVariantId).Distinct().ToArray();
+        var variantsById = (await dbContext.ProductVariants
+            .AsNoTrackingIfEf()
+            .Where(existing => variantIds.Contains(existing.Id))
+            .ToArrayAsyncSafe(cancellationToken))
+            .ToDictionary(variant => variant.Id);
+
         foreach (var orderItem in orderItems)
         {
-            var variant = dbContext.ProductVariants.FirstOrDefault(existing =>
-                existing.Id == orderItem.ProductVariantId);
+            variantsById.TryGetValue(orderItem.ProductVariantId, out var variant);
             var weight = variant?.WeightKg ?? defaultWeightKg;
             var length = variant?.LengthCm ?? defaultLengthCm;
             var width = variant?.WidthCm ?? defaultWidthCm;

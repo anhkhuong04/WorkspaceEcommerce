@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using FluentValidation;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Application.Common.Localization;
 using WorkspaceEcommerce.Application.Modules.Catalog.Storefront;
 using WorkspaceEcommerce.Domain.Modules.Blogs;
@@ -17,17 +18,21 @@ internal sealed class StorefrontBlogService(
     ICurrentLanguageProvider languageProvider,
     IValidator<CreateCommentRequest> commentValidator) : IStorefrontBlogService
 {
-    public Task<Result<IReadOnlyCollection<StorefrontBlogPostDto>>> GetPublishedBlogPostsAsync(
+    private const int MaxBlogPosts = 100;
+    private const int MaxBlogComments = 100;
+    private const int MaxRelatedProducts = 100;
+
+    public async Task<Result<IReadOnlyCollection<StorefrontBlogPostDto>>> GetPublishedBlogPostsAsync(
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var posts = dbContext.BlogPosts
+        var dtos = await dbContext.BlogPosts
+            .AsNoTrackingIfEf()
             .Where(p => p.IsPublished)
             .OrderByDescending(p => p.PublishedAt)
-            .ToList();
-
-        var dtos = posts
+            .ThenByDescending(p => p.Id)
+            .Take(MaxBlogPosts)
             .Select(p => new StorefrontBlogPostDto(
                 p.Id,
                 p.Title,
@@ -38,33 +43,38 @@ internal sealed class StorefrontBlogService(
                 p.PublishedAt,
                 Array.Empty<StorefrontProductListItemDto>(),
                 Array.Empty<BlogCommentDto>()))
-            .ToArray();
+            .ToArrayAsyncSafe(cancellationToken);
 
-        return Task.FromResult(Result<IReadOnlyCollection<StorefrontBlogPostDto>>.Success(dtos));
+        return Result<IReadOnlyCollection<StorefrontBlogPostDto>>.Success(dtos);
     }
 
-    public Task<Result<StorefrontBlogPostDto>> GetBlogPostBySlugAsync(
+    public async Task<Result<StorefrontBlogPostDto>> GetBlogPostBySlugAsync(
         string slug,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         var normalizedSlug = slug.Trim().ToLowerInvariant();
-        var post = dbContext.BlogPosts
-            .FirstOrDefault(p => p.IsPublished && p.Slug == normalizedSlug);
+        var post = await dbContext.BlogPosts
+            .AsNoTrackingIfEf()
+            .Where(p => p.IsPublished && p.Slug == normalizedSlug)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
         if (post is null)
         {
-            return Task.FromResult(Result<StorefrontBlogPostDto>.NotFound("Blog post was not found."));
+            return Result<StorefrontBlogPostDto>.NotFound("Blog post was not found.");
         }
 
-        var relatedProducts = GetRelatedProducts(post.Id);
+        var relatedProducts = await GetRelatedProductsAsync(post.Id, cancellationToken);
 
-        var comments = dbContext.BlogComments
+        var comments = await dbContext.BlogComments
+            .AsNoTrackingIfEf()
             .Where(c => c.BlogPostId == post.Id && c.ModerationStatus == BlogCommentModerationStatus.Approved)
             .OrderByDescending(c => c.CreatedAt)
+            .ThenByDescending(c => c.Id)
+            .Take(MaxBlogComments)
             .Select(c => ToCommentDto(c))
-            .ToList();
+            .ToArrayAsyncSafe(cancellationToken);
 
         var dto = new StorefrontBlogPostDto(
             post.Id,
@@ -77,7 +87,7 @@ internal sealed class StorefrontBlogService(
             relatedProducts,
             comments);
 
-        return Task.FromResult(Result<StorefrontBlogPostDto>.Success(dto));
+        return Result<StorefrontBlogPostDto>.Success(dto);
     }
 
     public async Task<Result<CommentSubmissionAcknowledgement>> SubmitCommentAsync(
@@ -92,8 +102,9 @@ internal sealed class StorefrontBlogService(
         }
 
         var normalizedSlug = slug.Trim().ToLowerInvariant();
-        var post = dbContext.BlogPosts
-            .FirstOrDefault(p => p.IsPublished && p.Slug == normalizedSlug);
+        var post = await dbContext.BlogPosts
+            .Where(p => p.IsPublished && p.Slug == normalizedSlug)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
         if (post is null)
         {
@@ -114,32 +125,48 @@ internal sealed class StorefrontBlogService(
             new CommentSubmissionAcknowledgement("Thank you. Your comment is awaiting moderation."));
     }
 
-    private IReadOnlyCollection<StorefrontProductListItemDto> GetRelatedProducts(Guid postId)
+    private async Task<IReadOnlyCollection<StorefrontProductListItemDto>> GetRelatedProductsAsync(
+        Guid postId,
+        CancellationToken cancellationToken)
     {
-        var productIds = dbContext.BlogPostRelatedProducts
+        var productIds = await dbContext.BlogPostRelatedProducts
+            .AsNoTrackingIfEf()
             .Where(rp => rp.BlogPostId == postId)
+            .OrderBy(rp => rp.ProductId)
             .Select(rp => rp.ProductId)
-            .ToList();
+            .Take(MaxRelatedProducts)
+            .ToArrayAsyncSafe(cancellationToken);
 
-        if (productIds.Count == 0)
+        if (productIds.Length == 0)
         {
             return Array.Empty<StorefrontProductListItemDto>();
         }
 
-        var products = dbContext.Products
+        var products = await dbContext.Products
+            .AsNoTrackingIfEf()
             .Where(p => productIds.Contains(p.Id) && p.IsActive)
-            .ToList();
+            .OrderBy(p => p.Slug)
+            .ToArrayAsyncSafe(cancellationToken);
 
-        var categories = dbContext.Categories
+        var categories = (await dbContext.Categories
+            .AsNoTrackingIfEf()
             .Where(c => c.IsActive)
+            .ToArrayAsyncSafe(cancellationToken))
             .ToDictionary(c => c.Id);
 
-        var variants = dbContext.ProductVariants
+        var variants = (await dbContext.ProductVariants
+            .AsNoTrackingIfEf()
             .Where(v => productIds.Contains(v.ProductId) && v.IsActive)
+            .OrderBy(v => v.Sku)
+            .ToArrayAsyncSafe(cancellationToken))
             .ToLookup(v => v.ProductId);
 
-        var images = dbContext.ProductImages
+        var images = (await dbContext.ProductImages
+            .AsNoTrackingIfEf()
             .Where(i => productIds.Contains(i.ProductId))
+            .OrderBy(i => i.SortOrder)
+            .ThenBy(i => i.ImageUrl)
+            .ToArrayAsyncSafe(cancellationToken))
             .ToLookup(i => i.ProductId);
 
         var list = new List<StorefrontProductListItemDto>();

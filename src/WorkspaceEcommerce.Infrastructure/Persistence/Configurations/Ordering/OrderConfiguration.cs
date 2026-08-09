@@ -148,11 +148,20 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasIndex(order => order.CustomerId)
             .HasDatabaseName("ix_orders_customer_id");
 
+        builder.HasIndex(order => new { order.CustomerId, order.CreatedAt, order.OrderCode })
+            .HasDatabaseName("ix_orders_customer_created_order_code");
+
+        builder.HasIndex(order => new { order.CustomerId, order.Status, order.CreatedAt, order.OrderCode })
+            .HasDatabaseName("ix_orders_customer_status_created_order_code");
+
         builder.HasIndex(order => order.CouponId)
             .HasDatabaseName("ix_orders_coupon_id");
 
         builder.HasIndex(order => order.Status)
             .HasDatabaseName("ix_orders_status");
+
+        builder.HasIndex(order => new { order.Status, order.CreatedAt, order.OrderCode })
+            .HasDatabaseName("ix_orders_status_created_order_code");
 
         builder.HasIndex(order => order.PaymentStatus)
             .HasDatabaseName("ix_orders_payment_status");

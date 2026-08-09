@@ -1,6 +1,7 @@
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Domain.Modules.Customers;
 
 namespace WorkspaceEcommerce.Application.Modules.Customers.Addresses;
@@ -9,7 +10,7 @@ internal sealed class CustomerAddressService(
     IAppDbContext dbContext,
     ICurrentCustomerContext currentCustomer) : ICustomerAddressService
 {
-    public Task<Result<IReadOnlyList<CustomerAddressDto>>> GetAddressesAsync(
+    public async Task<Result<IReadOnlyList<CustomerAddressDto>>> GetAddressesAsync(
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -17,16 +18,19 @@ internal sealed class CustomerAddressService(
         var customerId = currentCustomer.CustomerId;
         if (!customerId.HasValue)
         {
-            return Task.FromResult(Result<IReadOnlyList<CustomerAddressDto>>.Unauthorized("Customer authentication is required."));
+            return Result<IReadOnlyList<CustomerAddressDto>>.Unauthorized("Customer authentication is required.");
         }
 
-        var addresses = dbContext.CustomerAddresses
+        var addresses = await dbContext.CustomerAddresses
+            .AsNoTrackingIfEf()
             .Where(a => a.CustomerId == customerId.Value)
             .OrderByDescending(a => a.IsDefault)
-            .Select(ToDto)
-            .ToArray();
+            .ThenBy(a => a.Label)
+            .ThenBy(a => a.Id)
+            .Select(address => ToDto(address))
+            .ToArrayAsyncSafe(cancellationToken);
 
-        return Task.FromResult(Result<IReadOnlyList<CustomerAddressDto>>.Success(addresses));
+        return Result<IReadOnlyList<CustomerAddressDto>>.Success(addresses);
     }
 
     public async Task<Result<CustomerAddressDto>> CreateAddressAsync(
@@ -41,8 +45,9 @@ internal sealed class CustomerAddressService(
             return Result<CustomerAddressDto>.Unauthorized("Customer authentication is required.");
         }
 
-        var existingCount = dbContext.CustomerAddresses
-            .Count(a => a.CustomerId == customerId.Value);
+        var existingCount = await dbContext.CustomerAddresses
+            .Where(a => a.CustomerId == customerId.Value)
+            .CountAsyncSafe(cancellationToken);
 
         // First address is automatically default
         var isDefault = existingCount == 0;
@@ -88,8 +93,9 @@ internal sealed class CustomerAddressService(
             return Result<CustomerAddressDto>.Unauthorized("Customer authentication is required.");
         }
 
-        var address = dbContext.CustomerAddresses.FirstOrDefault(a =>
-            a.Id == id && a.CustomerId == customerId.Value);
+        var address = await dbContext.CustomerAddresses
+            .Where(a => a.Id == id && a.CustomerId == customerId.Value)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (address is null)
         {
             return Result<CustomerAddressDto>.NotFound("Address was not found.");
@@ -120,8 +126,9 @@ internal sealed class CustomerAddressService(
             return Result.Unauthorized("Customer authentication is required.");
         }
 
-        var address = dbContext.CustomerAddresses.FirstOrDefault(a =>
-            a.Id == id && a.CustomerId == customerId.Value);
+        var address = await dbContext.CustomerAddresses
+            .Where(a => a.Id == id && a.CustomerId == customerId.Value)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (address is null)
         {
             return Result.NotFound("Address was not found.");
@@ -133,8 +140,11 @@ internal sealed class CustomerAddressService(
         // If deleted address was default, promote the next one
         if (address.IsDefault)
         {
-            var next = dbContext.CustomerAddresses
-                .FirstOrDefault(a => a.CustomerId == customerId.Value);
+            var next = await dbContext.CustomerAddresses
+                .Where(a => a.CustomerId == customerId.Value)
+                .OrderBy(a => a.Label)
+                .ThenBy(a => a.Id)
+                .FirstOrDefaultAsyncSafe(cancellationToken);
             if (next is not null)
             {
                 next.SetDefault(true);
@@ -157,8 +167,9 @@ internal sealed class CustomerAddressService(
             return Result<CustomerAddressDto>.Unauthorized("Customer authentication is required.");
         }
 
-        var address = dbContext.CustomerAddresses.FirstOrDefault(a =>
-            a.Id == id && a.CustomerId == customerId.Value);
+        var address = await dbContext.CustomerAddresses
+            .Where(a => a.Id == id && a.CustomerId == customerId.Value)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (address is null)
         {
             return Result<CustomerAddressDto>.NotFound("Address was not found.");
@@ -173,9 +184,9 @@ internal sealed class CustomerAddressService(
 
     private async Task ClearDefaultsAsync(Guid customerId, CancellationToken cancellationToken)
     {
-        var currentDefaults = dbContext.CustomerAddresses
+        var currentDefaults = await dbContext.CustomerAddresses
             .Where(a => a.CustomerId == customerId && a.IsDefault)
-            .ToArray();
+            .ToArrayAsyncSafe(cancellationToken);
 
         foreach (var addr in currentDefaults)
         {

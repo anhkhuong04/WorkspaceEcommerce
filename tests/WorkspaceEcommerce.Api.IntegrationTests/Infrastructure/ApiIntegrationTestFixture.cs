@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
@@ -54,6 +55,16 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         }
 
         return _factory.CreateClient(options);
+    }
+
+    public void ResetSqlCommandCount()
+    {
+        GetSqlCommandCounter().Reset();
+    }
+
+    public int GetSqlSelectCount()
+    {
+        return GetSqlCommandCounter().SelectCount;
     }
 
     public async Task ResetDatabaseAsync()
@@ -130,6 +141,16 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         return _factory.Services.CreateAsyncScope();
     }
 
+    private SqlCommandCounter GetSqlCommandCounter()
+    {
+        if (_factory is null)
+        {
+            throw new InvalidOperationException("The API test factory has not been initialized.");
+        }
+
+        return _factory.Services.GetRequiredService<SqlCommandCounter>();
+    }
+
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
@@ -188,6 +209,8 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
                 services.AddScoped<IShipmentService, FakeIntegrationShipmentService>();
                 services.RemoveAll<IVNPayPaymentService>();
                 services.AddSingleton<IVNPayPaymentService, FakeIntegrationVNPayPaymentService>();
+                services.AddSingleton<SqlCommandCounter>();
+                services.AddSingleton<IInterceptor>(provider => provider.GetRequiredService<SqlCommandCounter>());
             });
         }
     }

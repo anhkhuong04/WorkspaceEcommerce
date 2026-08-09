@@ -15,6 +15,7 @@ internal sealed class AdminBannerService(
         CancellationToken cancellationToken = default)
     {
         var banners = await dbContext.Banners
+            .AsNoTrackingIfEf()
             .OrderBy(banner => banner.SortOrder)
             .ThenBy(banner => banner.Title)
             .Select(banner => new AdminBannerDto(
@@ -66,7 +67,9 @@ internal sealed class AdminBannerService(
             return Result<AdminBannerDto>.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
-        var banner = dbContext.Banners.FirstOrDefault(existing => existing.Id == id);
+        var banner = await dbContext.Banners
+            .Where(existing => existing.Id == id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (banner is null)
         {
             return Result<AdminBannerDto>.NotFound("Banner was not found.");
@@ -92,7 +95,9 @@ internal sealed class AdminBannerService(
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var banner = dbContext.Banners.FirstOrDefault(existing => existing.Id == id);
+        var banner = await dbContext.Banners
+            .Where(existing => existing.Id == id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (banner is null)
         {
             return Result<AdminBannerDto>.NotFound("Banner was not found.");

@@ -5,9 +5,12 @@ namespace WorkspaceEcommerce.Application.Modules.Customers.Authentication;
 
 public interface ICustomerAccountLifecycleService
 {
-    void QueueEmailVerification(Customer customer);
+    Task QueueEmailVerificationAsync(Customer customer, CancellationToken cancellationToken = default);
 
-    void RevokeOutstandingPasswordResetTokens(Guid customerId, DateTimeOffset now);
+    Task RevokeOutstandingPasswordResetTokensAsync(
+        Guid customerId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
 
     Task<Result> RequestEmailVerificationAsync(
         RequestEmailVerificationRequest request,

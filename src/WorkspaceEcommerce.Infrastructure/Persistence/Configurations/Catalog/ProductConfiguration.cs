@@ -70,6 +70,9 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasIndex(product => product.IsActive)
             .HasDatabaseName("ix_products_is_active");
 
+        builder.HasIndex(product => new { product.CategoryId, product.IsActive, product.Slug })
+            .HasDatabaseName("ix_products_category_active_slug");
+
         builder.HasIndex(product => product.IsFeatured)
             .HasDatabaseName("ix_products_is_featured");
 

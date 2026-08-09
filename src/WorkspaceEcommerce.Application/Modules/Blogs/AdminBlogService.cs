@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using FluentValidation;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Domain.Modules.Blogs;
 
 namespace WorkspaceEcommerce.Application.Modules.Blogs;
@@ -15,48 +16,61 @@ internal sealed class AdminBlogService(
     IValidator<CreateBlogPostRequest> createValidator,
     IValidator<UpdateBlogPostRequest> updateValidator) : IAdminBlogService
 {
-    public Task<Result<IReadOnlyCollection<AdminBlogPostDto>>> GetBlogPostsAsync(
+    private const int MaxBlogPosts = 100;
+    private const int MaxComments = 100;
+
+    public async Task<Result<IReadOnlyCollection<AdminBlogPostDto>>> GetBlogPostsAsync(
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var posts = dbContext.BlogPosts
+        var posts = await dbContext.BlogPosts
+            .AsNoTrackingIfEf()
             .OrderByDescending(p => p.CreatedAt)
-            .ToList();
+            .ThenByDescending(p => p.Id)
+            .Take(MaxBlogPosts)
+            .ToArrayAsyncSafe(cancellationToken);
 
-        var postIds = posts.Select(p => p.Id).ToList();
+        var postIds = posts.Select(p => p.Id).ToArray();
 
-        var relatedProductsMap = dbContext.BlogPostRelatedProducts
+        var relatedProductsMap = (await dbContext.BlogPostRelatedProducts
+            .AsNoTrackingIfEf()
             .Where(rp => postIds.Contains(rp.BlogPostId))
+            .OrderBy(rp => rp.ProductId)
+            .ToArrayAsyncSafe(cancellationToken))
             .ToLookup(rp => rp.BlogPostId, rp => rp.ProductId);
 
         var dtos = posts
             .Select(p => ToDto(p, relatedProductsMap[p.Id].ToArray()))
             .ToArray();
 
-        return Task.FromResult(Result<IReadOnlyCollection<AdminBlogPostDto>>.Success(dtos));
+        return Result<IReadOnlyCollection<AdminBlogPostDto>>.Success(dtos);
     }
 
-    public Task<Result<AdminBlogPostDto>> GetBlogPostByIdAsync(
+    public async Task<Result<AdminBlogPostDto>> GetBlogPostByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var post = dbContext.BlogPosts
-            .FirstOrDefault(p => p.Id == id);
+        var post = await dbContext.BlogPosts
+            .AsNoTrackingIfEf()
+            .Where(p => p.Id == id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
         if (post is null)
         {
-            return Task.FromResult(Result<AdminBlogPostDto>.NotFound("Blog post was not found."));
+            return Result<AdminBlogPostDto>.NotFound("Blog post was not found.");
         }
 
-        var relatedProductIds = dbContext.BlogPostRelatedProducts
+        var relatedProductIds = await dbContext.BlogPostRelatedProducts
+            .AsNoTrackingIfEf()
             .Where(rp => rp.BlogPostId == id)
             .Select(rp => rp.ProductId)
-            .ToArray();
+            .OrderBy(productId => productId)
+            .ToArrayAsyncSafe(cancellationToken);
 
-        return Task.FromResult(Result<AdminBlogPostDto>.Success(ToDto(post, relatedProductIds)));
+        return Result<AdminBlogPostDto>.Success(ToDto(post, relatedProductIds));
     }
 
     public async Task<Result<AdminBlogPostDto>> CreateBlogPostAsync(
@@ -69,8 +83,9 @@ internal sealed class AdminBlogService(
             return Result<AdminBlogPostDto>.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
-        var slugExists = dbContext.BlogPosts
-            .Any(p => p.Slug == request.Slug.Trim().ToLower());
+        var slugExists = await dbContext.BlogPosts
+            .Where(p => p.Slug == request.Slug.Trim().ToLower())
+            .AnyAsyncSafe(cancellationToken);
 
         if (slugExists)
         {
@@ -91,10 +106,10 @@ internal sealed class AdminBlogService(
         var validProductIds = new List<Guid>();
         if (request.RelatedProductIds is { Count: > 0 })
         {
-            validProductIds = dbContext.Products
+            validProductIds = await dbContext.Products
                 .Where(p => request.RelatedProductIds.Contains(p.Id))
                 .Select(p => p.Id)
-                .ToList();
+                .ToListAsyncSafe(cancellationToken);
 
             foreach (var productId in validProductIds)
             {
@@ -118,16 +133,18 @@ internal sealed class AdminBlogService(
             return Result<AdminBlogPostDto>.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
-        var blogPost = dbContext.BlogPosts
-            .FirstOrDefault(p => p.Id == id);
+        var blogPost = await dbContext.BlogPosts
+            .Where(p => p.Id == id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
         if (blogPost is null)
         {
             return Result<AdminBlogPostDto>.NotFound("Blog post was not found.");
         }
 
-        var slugExists = dbContext.BlogPosts
-            .Any(p => p.Id != id && p.Slug == request.Slug.Trim().ToLower());
+        var slugExists = await dbContext.BlogPosts
+            .Where(p => p.Id != id && p.Slug == request.Slug.Trim().ToLower())
+            .AnyAsyncSafe(cancellationToken);
 
         if (slugExists)
         {
@@ -153,9 +170,9 @@ internal sealed class AdminBlogService(
         dbContext.Update(blogPost);
 
         // Update related products
-        var currentRelated = dbContext.BlogPostRelatedProducts
+        var currentRelated = await dbContext.BlogPostRelatedProducts
             .Where(rp => rp.BlogPostId == id)
-            .ToList();
+            .ToListAsyncSafe(cancellationToken);
 
         foreach (var rp in currentRelated)
         {
@@ -165,10 +182,10 @@ internal sealed class AdminBlogService(
         var validProductIds = new List<Guid>();
         if (request.RelatedProductIds is { Count: > 0 })
         {
-            validProductIds = dbContext.Products
+            validProductIds = await dbContext.Products
                 .Where(p => request.RelatedProductIds.Contains(p.Id))
                 .Select(p => p.Id)
-                .ToList();
+                .ToListAsyncSafe(cancellationToken);
 
             foreach (var productId in validProductIds)
             {
@@ -185,18 +202,19 @@ internal sealed class AdminBlogService(
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var blogPost = dbContext.BlogPosts
-            .FirstOrDefault(p => p.Id == id);
+        var blogPost = await dbContext.BlogPosts
+            .Where(p => p.Id == id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
         if (blogPost is null)
         {
             return Result<AdminBlogPostDto>.NotFound("Blog post was not found.");
         }
 
-        var relatedProductIds = dbContext.BlogPostRelatedProducts
+        var relatedProductIds = await dbContext.BlogPostRelatedProducts
             .Where(rp => rp.BlogPostId == id)
             .Select(rp => rp.ProductId)
-            .ToArray();
+            .ToArrayAsyncSafe(cancellationToken);
 
         var dto = ToDto(blogPost, relatedProductIds);
 
@@ -210,8 +228,9 @@ internal sealed class AdminBlogService(
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var blogPost = dbContext.BlogPosts
-            .FirstOrDefault(p => p.Id == id);
+        var blogPost = await dbContext.BlogPosts
+            .Where(p => p.Id == id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
         if (blogPost is null)
         {
@@ -230,42 +249,48 @@ internal sealed class AdminBlogService(
         dbContext.Update(blogPost);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        var relatedProductIds = dbContext.BlogPostRelatedProducts
+        var relatedProductIds = await dbContext.BlogPostRelatedProducts
             .Where(rp => rp.BlogPostId == id)
             .Select(rp => rp.ProductId)
-            .ToArray();
+            .ToArrayAsyncSafe(cancellationToken);
 
         return Result<AdminBlogPostDto>.Success(ToDto(blogPost, relatedProductIds));
     }
 
-    public Task<Result<IReadOnlyCollection<BlogCommentDto>>> GetBlogPostCommentsAsync(
+    public async Task<Result<IReadOnlyCollection<BlogCommentDto>>> GetBlogPostCommentsAsync(
         Guid postId,
         BlogCommentModerationStatus? status = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var comments = dbContext.BlogComments
+        var comments = await dbContext.BlogComments
+            .AsNoTrackingIfEf()
             .Where(c => c.BlogPostId == postId && (!status.HasValue || c.ModerationStatus == status.Value))
             .OrderByDescending(c => c.CreatedAt)
+            .ThenByDescending(c => c.Id)
+            .Take(MaxComments)
             .Select(c => ToCommentDto(c))
-            .ToArray();
+            .ToArrayAsyncSafe(cancellationToken);
 
-        return Task.FromResult(Result<IReadOnlyCollection<BlogCommentDto>>.Success(comments));
+        return Result<IReadOnlyCollection<BlogCommentDto>>.Success(comments);
     }
 
-    public Task<Result<IReadOnlyCollection<BlogCommentDto>>> GetBlogCommentsAsync(
+    public async Task<Result<IReadOnlyCollection<BlogCommentDto>>> GetBlogCommentsAsync(
         BlogCommentModerationStatus? status = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var comments = dbContext.BlogComments
+        var comments = await dbContext.BlogComments
+            .AsNoTrackingIfEf()
             .Where(comment => !status.HasValue || comment.ModerationStatus == status.Value)
             .OrderByDescending(comment => comment.CreatedAt)
-            .Select(ToCommentDto)
-            .ToArray();
-        return Task.FromResult(Result<IReadOnlyCollection<BlogCommentDto>>.Success(comments));
+            .ThenByDescending(comment => comment.Id)
+            .Take(MaxComments)
+            .Select(comment => ToCommentDto(comment))
+            .ToArrayAsyncSafe(cancellationToken);
+        return Result<IReadOnlyCollection<BlogCommentDto>>.Success(comments);
     }
 
     public Task<Result<BlogCommentDto>> ApproveCommentAsync(
@@ -284,8 +309,9 @@ internal sealed class AdminBlogService(
         Guid commentId,
         CancellationToken cancellationToken = default)
     {
-        var comment = dbContext.BlogComments
-            .FirstOrDefault(c => c.Id == commentId);
+        var comment = await dbContext.BlogComments
+            .Where(c => c.Id == commentId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
 
         if (comment is null)
         {
@@ -310,7 +336,9 @@ internal sealed class AdminBlogService(
             return Result<BlogCommentDto>.Unauthorized("Moderator identity is required.");
         }
 
-        var comment = dbContext.BlogComments.FirstOrDefault(candidate => candidate.Id == commentId);
+        var comment = await dbContext.BlogComments
+            .Where(candidate => candidate.Id == commentId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (comment is null)
         {
             return Result<BlogCommentDto>.NotFound("Comment was not found.");

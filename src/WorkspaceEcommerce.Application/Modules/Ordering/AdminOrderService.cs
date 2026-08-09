@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Localization;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Application.Modules.Loyalty;
 using WorkspaceEcommerce.Application.Modules.Shipments;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
@@ -36,6 +37,7 @@ internal sealed class AdminOrderService(
         var normalizedSearch = NormalizeOptional(request.Search)?.ToLowerInvariant();
         var status = request.Status;
         var query = dbContext.Orders
+            .AsNoTrackingIfEf()
             .Where(order => !status.HasValue || order.Status == status.Value);
         if (normalizedSearch is not null)
         {
@@ -46,29 +48,33 @@ internal sealed class AdminOrderService(
                 (order.TrackingCode != null && order.TrackingCode.ToLower().Contains(normalizedSearch)));
         }
 
-        var totalCount = query.Count();
+        var totalCount = await query.CountAsyncSafe(cancellationToken);
         var pageNumber = request.NormalizedPageNumber;
         var pageSize = request.NormalizedPageSize;
-        var orders = query
+        var items = await query
             .OrderByDescending(order => order.CreatedAt)
             .ThenByDescending(order => order.OrderCode)
             .Skip(request.Skip)
             .Take(pageSize)
-            .ToArray();
-        var orderIds = orders.Select(order => order.Id).ToArray();
-        var itemCountsByOrderId = dbContext.OrderItems
-            .Where(item => orderIds.Contains(item.OrderId))
-            .GroupBy(item => item.OrderId)
-            .ToDictionary(group => group.Key, group => group.Count());
-        var shipmentStatusesByOrderId = dbContext.OrderShipments
-            .Where(shipment => orderIds.Contains(shipment.OrderId))
-            .ToDictionary(shipment => shipment.OrderId, shipment => shipment.ProviderStatus);
-        var items = orders
-            .Select(order => ToListItemDto(
-                order,
-                itemCountsByOrderId.GetValueOrDefault(order.Id),
-                shipmentStatusesByOrderId.GetValueOrDefault(order.Id)))
-            .ToArray();
+            .Select(order => new AdminOrderListItemDto(
+                order.Id,
+                order.OrderCode,
+                order.CustomerName,
+                order.CustomerPhone,
+                order.TotalAmount,
+                order.Status,
+                order.PaymentMethod,
+                order.PaymentStatus,
+                order.PaidAt,
+                order.CreatedAt,
+                order.UpdatedAt,
+                dbContext.OrderItems.Count(item => item.OrderId == order.Id),
+                order.TrackingCode,
+                dbContext.OrderShipments
+                    .Where(shipment => shipment.OrderId == order.Id)
+                    .Select(shipment => shipment.ProviderStatus)
+                    .FirstOrDefault()))
+            .ToArrayAsyncSafe(cancellationToken);
         var page = new PagedResult<AdminOrderListItemDto>(
             items,
             pageNumber,
@@ -78,19 +84,22 @@ internal sealed class AdminOrderService(
         return Result<PagedResult<AdminOrderListItemDto>>.Success(page);
     }
 
-    public Task<Result<AdminOrderDto>> GetOrderByIdAsync(
+    public async Task<Result<AdminOrderDto>> GetOrderByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var order = dbContext.Orders.FirstOrDefault(existing => existing.Id == id);
+        var order = await dbContext.Orders
+            .AsNoTrackingIfEf()
+            .Where(existing => existing.Id == id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (order is null)
         {
-            return Task.FromResult(Result<AdminOrderDto>.NotFound("Order was not found."));
+            return Result<AdminOrderDto>.NotFound("Order was not found.");
         }
 
-        return Task.FromResult(Result<AdminOrderDto>.Success(ToDetailDto(order)));
+        return Result<AdminOrderDto>.Success(await ToDetailDtoAsync(order, cancellationToken));
     }
 
     public async Task<Result<AdminOrderDto>> UpdateStatusAsync(
@@ -105,7 +114,9 @@ internal sealed class AdminOrderService(
             return Result<AdminOrderDto>.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
-        var order = dbContext.Orders.FirstOrDefault(existing => existing.Id == id);
+        var order = await dbContext.Orders
+            .Where(existing => existing.Id == id)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (order is null)
         {
             return Result<AdminOrderDto>.NotFound("Order was not found.");
@@ -137,7 +148,7 @@ internal sealed class AdminOrderService(
                     cancellationToken);
             }
 
-            return Result<AdminOrderDto>.Success(ToDetailDto(order));
+            return Result<AdminOrderDto>.Success(await ToDetailDtoAsync(order, cancellationToken));
         }
         catch (DomainException exception)
         {
@@ -509,13 +520,13 @@ internal sealed class AdminOrderService(
         for (var attempt = 0; attempt < 5; attempt++)
         {
             var orderCode = $"ORD-{DateTimeOffset.UtcNow:yyyyMMdd}-{Guid.NewGuid():N}"[..21].ToUpperInvariant();
-            if (!dbContext.Orders.Any(order => order.OrderCode == orderCode))
+            if (!await dbContext.Orders
+                    .Where(order => order.OrderCode == orderCode)
+                    .AnyAsyncSafe(cancellationToken))
             {
                 return orderCode;
             }
         }
-
-        await Task.CompletedTask;
         throw new DomainException("Could not generate a unique order code.");
     }
 
@@ -582,18 +593,22 @@ internal sealed class AdminOrderService(
         };
     }
 
-    private AdminOrderDto ToDetailDto(Order order)
+    private async Task<AdminOrderDto> ToDetailDtoAsync(Order order, CancellationToken cancellationToken)
     {
-        var items = dbContext.OrderItems
+        var items = await dbContext.OrderItems
+            .AsNoTrackingIfEf()
             .Where(item => item.OrderId == order.Id)
             .OrderBy(item => item.SkuSnapshot)
             .ThenBy(item => item.Id)
-            .ToArray();
-        var statusHistory = dbContext.OrderStatusHistories
+            .Select(item => ToItemDto(item))
+            .ToArrayAsyncSafe(cancellationToken);
+        var statusHistory = await dbContext.OrderStatusHistories
+            .AsNoTrackingIfEf()
             .Where(history => history.OrderId == order.Id)
             .OrderBy(history => history.ChangedAt)
             .ThenBy(history => history.Id)
-            .ToArray();
+            .Select(history => ToStatusHistoryDto(history))
+            .ToArrayAsyncSafe(cancellationToken);
 
         return new AdminOrderDto(
             order.Id,
@@ -619,8 +634,8 @@ internal sealed class AdminOrderService(
             order.UpdatedAt,
             order.TrackingCode,
             order.ShipmentId,
-            items.Select(ToItemDto).ToArray(),
-            statusHistory.Select(ToStatusHistoryDto).ToArray());
+            items,
+            statusHistory);
     }
 
     private static AdminOrderListItemDto ToListItemDto(Order order, int itemCount, string? shipmentStatus = null)

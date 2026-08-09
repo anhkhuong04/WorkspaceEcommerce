@@ -2,6 +2,7 @@ using FluentValidation;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Loyalty;
@@ -16,22 +17,25 @@ internal sealed class LoyaltyService(
     IValidator<LoyaltyTransactionListRequest> transactionListValidator,
     IValidator<RedeemLoyaltyPointsRequest> redeemValidator) : ILoyaltyService
 {
-    public Task<Result<LoyaltyAccountDto>> GetMyLoyaltyAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<LoyaltyAccountDto>> GetMyLoyaltyAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         if (currentCustomer.CustomerId is not { } customerId)
         {
-            return Task.FromResult(Result<LoyaltyAccountDto>.Unauthorized("Customer authentication is required."));
+            return Result<LoyaltyAccountDto>.Unauthorized("Customer authentication is required.");
         }
 
-        var account = dbContext.CustomerLoyaltyAccounts.FirstOrDefault(existing => existing.CustomerId == customerId);
-        var tiers = GetTierDefinitions();
+        var account = await dbContext.CustomerLoyaltyAccounts
+            .AsNoTrackingIfEf()
+            .Where(existing => existing.CustomerId == customerId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
+        var tiers = await GetTierDefinitionsAsync(cancellationToken);
         var dto = account is null
             ? ToEmptyAccountDto(customerId, tiers)
             : ToAccountDto(account, tiers);
 
-        return Task.FromResult(Result<LoyaltyAccountDto>.Success(dto));
+        return Result<LoyaltyAccountDto>.Success(dto);
     }
 
     public async Task<Result<PagedResult<LoyaltyTransactionDto>>> GetMyTransactionsAsync(
@@ -50,7 +54,11 @@ internal sealed class LoyaltyService(
             return Result<PagedResult<LoyaltyTransactionDto>>.Unauthorized("Customer authentication is required.");
         }
 
-        var account = dbContext.CustomerLoyaltyAccounts.FirstOrDefault(existing => existing.CustomerId == customerId);
+        var account = await dbContext.CustomerLoyaltyAccounts
+            .AsNoTrackingIfEf()
+            .Where(existing => existing.CustomerId == customerId)
+            .Select(existing => new { existing.Id })
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (account is null)
         {
             return Result<PagedResult<LoyaltyTransactionDto>>.Success(
@@ -58,33 +66,44 @@ internal sealed class LoyaltyService(
         }
 
         var transactions = dbContext.LoyaltyTransactions
+            .AsNoTrackingIfEf()
             .Where(transaction => transaction.CustomerLoyaltyAccountId == account.Id)
             .OrderByDescending(transaction => transaction.CreatedAt)
-            .ThenByDescending(transaction => transaction.Id)
-            .ToArray();
+            .ThenByDescending(transaction => transaction.Id);
+
+        var totalCount = await transactions.CountAsyncSafe(cancellationToken);
+        var items = await transactions
+            .Skip(request.Skip)
+            .Take(request.NormalizedPageSize)
+            .Select(transaction => new LoyaltyTransactionDto(
+                transaction.Id,
+                transaction.Type,
+                transaction.Points,
+                transaction.BalanceAfter,
+                transaction.OrderId,
+                transaction.VoucherId,
+                transaction.Description,
+                transaction.CreatedAt))
+            .ToArrayAsyncSafe(cancellationToken);
 
         var page = new PagedResult<LoyaltyTransactionDto>(
-            transactions
-                .Skip(request.Skip)
-                .Take(request.NormalizedPageSize)
-                .Select(ToTransactionDto)
-                .ToArray(),
+            items,
             request.NormalizedPageNumber,
             request.NormalizedPageSize,
-            transactions.Length);
+            totalCount);
 
         return Result<PagedResult<LoyaltyTransactionDto>>.Success(page);
     }
 
-    public Task<Result<IReadOnlyCollection<LoyaltyTierDto>>> GetTiersAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<IReadOnlyCollection<LoyaltyTierDto>>> GetTiersAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        IReadOnlyCollection<LoyaltyTierDto> tiers = GetTierDefinitions()
+        IReadOnlyCollection<LoyaltyTierDto> tiers = (await GetTierDefinitionsAsync(cancellationToken))
             .Select(ToTierDto)
             .ToArray();
 
-        return Task.FromResult(Result<IReadOnlyCollection<LoyaltyTierDto>>.Success(tiers));
+        return Result<IReadOnlyCollection<LoyaltyTierDto>>.Success(tiers);
     }
 
     public async Task<Result<RedeemLoyaltyPointsResponse>> RedeemPointsAsync(
@@ -115,7 +134,9 @@ internal sealed class LoyaltyService(
         {
             await dbContext.ExecuteInTransactionAsync(async transactionCancellationToken =>
             {
-                var account = dbContext.CustomerLoyaltyAccounts.FirstOrDefault(existing => existing.CustomerId == customerId);
+                var account = await dbContext.CustomerLoyaltyAccounts
+                    .Where(existing => existing.CustomerId == customerId)
+                    .FirstOrDefaultAsyncSafe(transactionCancellationToken);
                 if (account is null)
                 {
                     result = Result<RedeemLoyaltyPointsResponse>.Validation(["Loyalty account does not have enough points."]);
@@ -179,7 +200,9 @@ internal sealed class LoyaltyService(
             return Result.Validation(["Order id is required."]);
         }
 
-        var order = dbContext.Orders.FirstOrDefault(existing => existing.Id == orderId);
+        var order = await dbContext.Orders
+            .Where(existing => existing.Id == orderId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (order is null)
         {
             return Result.NotFound("Order was not found.");
@@ -195,9 +218,9 @@ internal sealed class LoyaltyService(
             return Result.Success();
         }
 
-        if (dbContext.LoyaltyTransactions.Any(transaction =>
-                transaction.Type == LoyaltyTransactionType.Earn &&
-                transaction.OrderId == order.Id))
+        if (await dbContext.LoyaltyTransactions
+                .Where(transaction => transaction.Type == LoyaltyTransactionType.Earn && transaction.OrderId == order.Id)
+                .AnyAsyncSafe(cancellationToken))
         {
             return Result.Success();
         }
@@ -210,7 +233,9 @@ internal sealed class LoyaltyService(
 
         try
         {
-            var account = dbContext.CustomerLoyaltyAccounts.FirstOrDefault(existing => existing.CustomerId == customerId);
+            var account = await dbContext.CustomerLoyaltyAccounts
+                .Where(existing => existing.CustomerId == customerId)
+                .FirstOrDefaultAsyncSafe(cancellationToken);
             var isNewAccount = account is null;
             account ??= new CustomerLoyaltyAccount(Guid.NewGuid(), customerId);
 
@@ -219,7 +244,7 @@ internal sealed class LoyaltyService(
                 order.Id,
                 $"Earned {points} loyalty points from order {order.OrderCode}.");
 
-            account.TryEvaluateTierUpgrade(GetTierDefinitions());
+            account.TryEvaluateTierUpgrade(await GetTierDefinitionsAsync(cancellationToken));
 
             if (isNewAccount)
             {
@@ -262,12 +287,13 @@ internal sealed class LoyaltyService(
         return errors.Length == 0 ? null : errors;
     }
 
-    private LoyaltyTier[] GetTierDefinitions()
+    private Task<LoyaltyTier[]> GetTierDefinitionsAsync(CancellationToken cancellationToken)
     {
         return dbContext.LoyaltyTiers
+            .AsNoTrackingIfEf()
             .OrderBy(tier => tier.MinTotalPointsEarned)
             .ThenBy(tier => tier.Type)
-            .ToArray();
+            .ToArrayAsyncSafe(cancellationToken);
     }
 
     private static LoyaltyAccountDto ToEmptyAccountDto(Guid customerId, IReadOnlyCollection<LoyaltyTier> tiers)

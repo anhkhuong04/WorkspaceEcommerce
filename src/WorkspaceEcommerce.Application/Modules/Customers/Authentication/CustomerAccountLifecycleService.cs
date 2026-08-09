@@ -5,6 +5,7 @@ using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Notifications;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Domain.Modules.Customers;
 
 namespace WorkspaceEcommerce.Application.Modules.Customers.Authentication;
@@ -21,7 +22,7 @@ internal sealed class CustomerAccountLifecycleService(
     IValidator<ForgotPasswordRequest> forgotPasswordValidator,
     IValidator<ResetPasswordRequest> resetPasswordValidator) : ICustomerAccountLifecycleService
 {
-    public void QueueEmailVerification(Customer customer)
+    public async Task QueueEmailVerificationAsync(Customer customer, CancellationToken cancellationToken = default)
     {
         if (customer.IsEmailVerified)
         {
@@ -29,7 +30,7 @@ internal sealed class CustomerAccountLifecycleService(
         }
 
         var now = timeProvider.GetUtcNow();
-        InvalidateActiveTokens(customer.Id, CustomerAccountTokenPurpose.EmailVerification, now);
+        await InvalidateActiveTokensAsync(customer.Id, CustomerAccountTokenPurpose.EmailVerification, now, cancellationToken);
         var token = CreateToken(customer.Id, CustomerAccountTokenPurpose.EmailVerification, now);
         emailOutbox.Enqueue(new CustomerEmailMessage(
             customer.Email,
@@ -37,9 +38,12 @@ internal sealed class CustomerAccountLifecycleService(
             $"Verify your email address by opening: {BuildStorefrontLink("verify-email", token)}"));
     }
 
-    public void RevokeOutstandingPasswordResetTokens(Guid customerId, DateTimeOffset now)
+    public Task RevokeOutstandingPasswordResetTokensAsync(
+        Guid customerId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
     {
-        InvalidateActiveTokens(customerId, CustomerAccountTokenPurpose.PasswordReset, now);
+        return InvalidateActiveTokensAsync(customerId, CustomerAccountTokenPurpose.PasswordReset, now, cancellationToken);
     }
 
     public async Task<Result> RequestEmailVerificationAsync(
@@ -52,10 +56,10 @@ internal sealed class CustomerAccountLifecycleService(
             return Result.Validation(validation.Errors.Select(error => error.ErrorMessage));
         }
 
-        var customer = FindCustomerByEmail(request.Email);
+        var customer = await FindCustomerByEmailAsync(request.Email, cancellationToken);
         if (customer is not null && !customer.IsEmailVerified)
         {
-            QueueEmailVerification(customer);
+            await QueueEmailVerificationAsync(customer, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
@@ -73,13 +77,15 @@ internal sealed class CustomerAccountLifecycleService(
         }
 
         var now = timeProvider.GetUtcNow();
-        var token = FindActiveToken(request.Token, CustomerAccountTokenPurpose.EmailVerification, now);
+        var token = await FindActiveTokenAsync(request.Token, CustomerAccountTokenPurpose.EmailVerification, now, cancellationToken);
         if (token is null)
         {
             return Result.Unauthorized("Invalid or expired email verification link.");
         }
 
-        var customer = dbContext.Customers.FirstOrDefault(candidate => candidate.Id == token.CustomerId);
+        var customer = await dbContext.Customers
+            .Where(candidate => candidate.Id == token.CustomerId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (customer is null)
         {
             return Result.Unauthorized("Invalid or expired email verification link.");
@@ -101,11 +107,11 @@ internal sealed class CustomerAccountLifecycleService(
             return Result.Validation(validation.Errors.Select(error => error.ErrorMessage));
         }
 
-        var customer = FindCustomerByEmail(request.Email);
+        var customer = await FindCustomerByEmailAsync(request.Email, cancellationToken);
         if (customer?.PasswordHash is not null)
         {
             var now = timeProvider.GetUtcNow();
-            InvalidateActiveTokens(customer.Id, CustomerAccountTokenPurpose.PasswordReset, now);
+            await InvalidateActiveTokensAsync(customer.Id, CustomerAccountTokenPurpose.PasswordReset, now, cancellationToken);
             var token = CreateToken(customer.Id, CustomerAccountTokenPurpose.PasswordReset, now);
             emailOutbox.Enqueue(new CustomerEmailMessage(
                 customer.Email,
@@ -128,29 +134,33 @@ internal sealed class CustomerAccountLifecycleService(
         }
 
         var now = timeProvider.GetUtcNow();
-        var token = FindActiveToken(request.Token, CustomerAccountTokenPurpose.PasswordReset, now);
+        var token = await FindActiveTokenAsync(request.Token, CustomerAccountTokenPurpose.PasswordReset, now, cancellationToken);
         if (token is null)
         {
             return Result.Unauthorized("Invalid or expired password reset link.");
         }
 
-        var customer = dbContext.Customers.FirstOrDefault(candidate => candidate.Id == token.CustomerId);
+        var customer = await dbContext.Customers
+            .Where(candidate => candidate.Id == token.CustomerId)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         if (customer is null)
         {
             return Result.Unauthorized("Invalid or expired password reset link.");
         }
 
         token.Consume(now);
-        RevokeOutstandingPasswordResetTokens(customer.Id, now);
+        await RevokeOutstandingPasswordResetTokensAsync(customer.Id, now, cancellationToken);
         customer.UpdatePasswordHash(passwordHasher.Hash(request.NewPassword));
         await sessionService.RevokeAllAsync(customer.Id, "password_reset", cancellationToken);
         return Result.Success();
     }
 
-    private Customer? FindCustomerByEmail(string email)
+    private Task<Customer?> FindCustomerByEmailAsync(string email, CancellationToken cancellationToken)
     {
         var normalizedEmail = email.Trim().ToLowerInvariant();
-        return dbContext.Customers.FirstOrDefault(candidate => candidate.Email == normalizedEmail);
+        return dbContext.Customers
+            .Where(candidate => candidate.Email == normalizedEmail)
+            .FirstOrDefaultAsyncSafe(cancellationToken);
     }
 
     private string CreateToken(Guid customerId, CustomerAccountTokenPurpose purpose, DateTimeOffset now)
@@ -169,21 +179,27 @@ internal sealed class CustomerAccountLifecycleService(
         return token;
     }
 
-    private CustomerAccountToken? FindActiveToken(
+    private async Task<CustomerAccountToken?> FindActiveTokenAsync(
         string suppliedToken,
         CustomerAccountTokenPurpose purpose,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
     {
-        var token = dbContext.CustomerAccountTokens.FirstOrDefault(candidate =>
-            candidate.Purpose == purpose && candidate.TokenHash == HashToken(suppliedToken));
+        var token = await dbContext.CustomerAccountTokens
+            .Where(candidate => candidate.Purpose == purpose && candidate.TokenHash == HashToken(suppliedToken))
+            .FirstOrDefaultAsyncSafe(cancellationToken);
         return token is not null && token.IsActiveAt(now) ? token : null;
     }
 
-    private void InvalidateActiveTokens(Guid customerId, CustomerAccountTokenPurpose purpose, DateTimeOffset now)
+    private async Task InvalidateActiveTokensAsync(
+        Guid customerId,
+        CustomerAccountTokenPurpose purpose,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
     {
-        foreach (var token in dbContext.CustomerAccountTokens
+        foreach (var token in await dbContext.CustomerAccountTokens
                      .Where(candidate => candidate.CustomerId == customerId && candidate.Purpose == purpose && candidate.ConsumedAt == null)
-                     .ToArray())
+                     .ToArrayAsyncSafe(cancellationToken))
         {
             token.Consume(now);
         }

@@ -21,6 +21,7 @@ internal sealed class AdminProductService(
         var pageNumber = request.NormalizedPageNumber;
         var pageSize = request.NormalizedPageSize;
         var productsQuery = catalogStore.Products
+            .AsNoTrackingIfEf()
             .OrderBy(product => product.Slug);
 
         var totalCount = await productsQuery.CountAsyncSafe(cancellationToken);
@@ -32,20 +33,24 @@ internal sealed class AdminProductService(
         var productIds = products.Select(product => product.Id).ToArray();
         var categoryIds = products.Select(product => product.CategoryId).Distinct().ToArray();
         var categoriesById = await catalogStore.Categories
+            .AsNoTrackingIfEf()
             .Where(category => categoryIds.Contains(category.Id))
             .ToDictionaryAsyncSafe(category => category.Id, cancellationToken);
         var variantsByProductId = (await catalogStore.ProductVariants
+            .AsNoTrackingIfEf()
             .Where(variant => productIds.Contains(variant.ProductId))
             .OrderBy(variant => variant.Sku)
             .ToArrayAsyncSafe(cancellationToken))
             .ToLookup(variant => variant.ProductId);
         var imagesByProductId = (await catalogStore.ProductImages
+            .AsNoTrackingIfEf()
             .Where(image => productIds.Contains(image.ProductId))
             .OrderBy(image => image.SortOrder)
             .ThenBy(image => image.ImageUrl)
             .ToArrayAsyncSafe(cancellationToken))
             .ToLookup(image => image.ProductId);
         var specificationsByProductId = (await catalogStore.ProductSpecifications
+            .AsNoTrackingIfEf()
             .Where(specification => productIds.Contains(specification.ProductId))
             .OrderBy(specification => specification.SortOrder)
             .ThenBy(specification => specification.Name)

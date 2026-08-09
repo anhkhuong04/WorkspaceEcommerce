@@ -73,13 +73,13 @@ internal static class OrderImportFileParser
     {
         using var reader = new StreamReader(content, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
         var rows = new List<string[]>();
-        while (!reader.EndOfStream)
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var line = await reader.ReadLineAsync(cancellationToken);
             if (line is null)
             {
-                continue;
+                break;
             }
 
             rows.Add(ParseCsvLine(line).ToArray());

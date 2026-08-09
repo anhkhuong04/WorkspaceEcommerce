@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -49,7 +50,14 @@ public static class DependencyInjection
             return dataSourceBuilder.Build();
         });
         services.AddDbContext<AppDbContext>((provider, options) =>
-            options.UseNpgsql(provider.GetRequiredService<NpgsqlDataSource>()));
+        {
+            options.UseNpgsql(provider.GetRequiredService<NpgsqlDataSource>());
+            var interceptors = provider.GetServices<IInterceptor>().ToArray();
+            if (interceptors.Length > 0)
+            {
+                options.AddInterceptors(interceptors);
+            }
+        });
         services.AddScoped<IAppDbContext>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddScoped<ICatalogReadStore>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddScoped<IOrderReadStore>(provider => provider.GetRequiredService<AppDbContext>());

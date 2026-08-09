@@ -5,6 +5,23 @@ namespace WorkspaceEcommerce.Application.Common.Persistence;
 
 internal static class QueryableAsyncExtensions
 {
+    public static IQueryable<T> AsNoTrackingIfEf<T>(this IQueryable<T> query)
+        where T : class
+    {
+        return IsEfAsyncQuery(query) ? query.AsNoTracking() : query;
+    }
+
+    public static Task<List<T>> ToListAsyncSafe<T>(
+        this IQueryable<T> query,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return IsEfAsyncQuery(query)
+            ? query.ToListAsync(cancellationToken)
+            : Task.FromResult(query.ToList());
+    }
+
     public static Task<T[]> ToArrayAsyncSafe<T>(
         this IQueryable<T> query,
         CancellationToken cancellationToken = default)

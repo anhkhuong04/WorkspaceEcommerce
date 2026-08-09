@@ -92,6 +92,10 @@ internal sealed class CouponConfiguration : IEntityTypeConfiguration<Coupon>
         builder.HasIndex(coupon => coupon.IsActive)
             .HasDatabaseName("ix_coupons_is_active");
 
+        builder.HasIndex(coupon => new { coupon.IsActive, coupon.CreatedAt, coupon.Code })
+            .IsDescending(false, true, false)
+            .HasDatabaseName("ix_coupons_active_created_code");
+
         builder.HasIndex(coupon => coupon.StartsAt)
             .HasDatabaseName("ix_coupons_starts_at");
 
