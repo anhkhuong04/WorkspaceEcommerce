@@ -14,7 +14,7 @@ platform secret/configuration authority.
 | Data Protection | `DataProtection:KeyRingPath` | Local ignored path | Ephemeral test path | Encrypted, persistent shared mount/managed key store | Platform | Access/key-ring recovery rehearsal quarterly |
 | Google OAuth | `GoogleAuth:*`, frontend `VITE_GOOGLE_CLIENT_ID` | Local public client ID optional | Disabled/synthetic | Server audience list from configuration authority; public client ID in frontend build | Application security | Review on client/domain change; disable/revoke on compromise |
 | Email | `EmailDelivery:*` | Logging provider only | Logging provider only | SMTP sandbox/production secrets from secret manager | Platform + product ops | Provider credential after exposure / quarterly |
-| Durable media | `MediaStorage:*` | Local or isolated MinIO | Local only | S3-compatible bucket, encryption, restricted workload credential | Platform + storage owner | Credential / bucket policy on change; quarterly restore review |
+| Durable media | `MediaStorage:*`, `MediaStorage:NoOpMalwareScannerRisk*` | Local or isolated MinIO | Local only | S3-compatible bucket, encryption, restricted workload credential; temporary NoOp scanner exception needs named security owner, risk reference, and <=90-day expiry | Platform + storage owner + application security | Credential / bucket policy on change; security-risk renewal before expiry; quarterly restore review |
 | Payment | `Payment:VNPay:*` | Sandbox only | Synthetic callback values | Provider portal + secret manager | Payments owner | Hash secret/merchant setup on exposure or provider request |
 | MiniLogistics | `MiniLogistics:*` | Local/sandbox only | Fake provider | Provider portal + secret manager | Logistics owner | API/webhook secret on exposure or provider request |
 | Browser origin and host | `AllowedHosts`, `Cors:AllowedOrigins`, `Storefront:BaseUrl`, `MediaStorage:PublicBaseUrl` | Localhost only | Test-only host | Exact public HTTPS names only | Platform + frontend owner | Review with every domain/ingress change |
@@ -25,8 +25,9 @@ platform secret/configuration authority.
 ## Startup safety contract
 
 Outside Development, existing provider validators reject local media storage, logging
-email delivery, missing production CORS origins, placeholder credentials, and missing
-Data Protection/Application Insights configuration. In Production,
+email delivery, an unaccepted/expired NoOp media-scanner exception, missing production
+CORS origins, placeholder credentials, and missing Data Protection/Application Insights
+configuration. In Production,
 `ProductionRuntimeConfigurationValidator` additionally rejects wildcard/localhost
 `AllowedHosts`, a relative/non-external Data Protection key-ring path, an empty or
 placeholder telemetry connection string, and a non-HTTPS storefront URL.

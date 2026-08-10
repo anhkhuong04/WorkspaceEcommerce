@@ -75,7 +75,8 @@ public static class DependencyInjection
         services.AddSingleton(emailDeliveryOptions);
         services.AddSingleton(mediaStorageOptions);
         services.AddSingleton<MediaImageProcessor>();
-        services.AddSingleton<IMediaMalwareScanner, NoOpMediaMalwareScanner>();
+        services.AddSingleton<IMediaMalwareScanner>(_ =>
+            new NoOpMediaMalwareScanner(mediaStorageOptions, environment.EnvironmentName));
         services.AddSingleton<IMediaObjectStore>(_ =>
         {
             if (string.Equals(mediaStorageOptions.Provider, "S3", StringComparison.OrdinalIgnoreCase))

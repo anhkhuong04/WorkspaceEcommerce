@@ -138,7 +138,7 @@ public sealed class AdminMediaIntegrationTests(ApiIntegrationTestFixture fixture
             var service = new FailingAvailabilityMediaStorageService(
                 dbContext,
                 new InMemoryObjectStore(),
-                new NoOpMediaMalwareScanner(),
+                new NoOpMediaMalwareScanner(options, "Development"),
                 new MediaImageProcessor(options),
                 options);
             await using var stream = new MemoryStream(ValidPng);
@@ -178,7 +178,7 @@ public sealed class AdminMediaIntegrationTests(ApiIntegrationTestFixture fixture
         return new DurableMediaStorageService(
             dbContext,
             store,
-            new NoOpMediaMalwareScanner(),
+            new NoOpMediaMalwareScanner(options, "Development"),
             new MediaImageProcessor(options),
             options);
     }

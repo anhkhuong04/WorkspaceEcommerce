@@ -7,6 +7,8 @@ namespace WorkspaceEcommerce.Api.Hubs;
 [Authorize(Roles = AuthRoles.Customer)]
 public sealed class NotificationHub : Hub
 {
+    public const string Route = "/hubs/notifications";
+
     public override async Task OnConnectedAsync()
     {
         var userId = Context.UserIdentifier;

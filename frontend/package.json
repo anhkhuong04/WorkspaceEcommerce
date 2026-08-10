@@ -9,9 +9,14 @@
     "dev:admin": "corepack pnpm --filter @workspace-ecommerce/admin dev",
     "build": "corepack pnpm --recursive --if-present build",
     "typecheck": "corepack pnpm --recursive --if-present typecheck",
-    "lint": "corepack pnpm --recursive --if-present lint"
+    "lint": "corepack pnpm --recursive --if-present lint",
+    "test": "corepack pnpm --filter @workspace-ecommerce/storefront test",
+    "test:storefront": "corepack pnpm --filter @workspace-ecommerce/storefront test",
+    "test:e2e:safety": "node --test --experimental-strip-types e2e/safety.test.ts",
+    "test:e2e:storefront": "playwright test --config playwright.config.ts"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@eslint/js": "10.0.1",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",

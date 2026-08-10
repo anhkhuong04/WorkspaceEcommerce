@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using WorkspaceEcommerce.Api.Common;
+using WorkspaceEcommerce.Api.Hubs;
 using WorkspaceEcommerce.Infrastructure.Configuration;
 
 namespace WorkspaceEcommerce.Api.Extensions;
@@ -32,6 +33,21 @@ internal static class AuthExtensions
 
                 options.Events = new JwtBearerEvents
                 {
+                    OnMessageReceived = context =>
+                    {
+                        // Browser WebSocket APIs cannot send an Authorization header. SignalR
+                        // therefore puts its short-lived bearer token in this query parameter
+                        // during a hub transport upgrade. Never accept it on ordinary API routes.
+                        var accessToken = context.Request.Query["access_token"].ToString();
+                        if (!context.Request.Headers.ContainsKey("Authorization") &&
+                            !string.IsNullOrWhiteSpace(accessToken) &&
+                            context.HttpContext.Request.Path.StartsWithSegments(NotificationHub.Route))
+                        {
+                            context.Token = accessToken;
+                        }
+
+                        return Task.CompletedTask;
+                    },
                     OnChallenge = async context =>
                     {
                         context.HandleResponse();

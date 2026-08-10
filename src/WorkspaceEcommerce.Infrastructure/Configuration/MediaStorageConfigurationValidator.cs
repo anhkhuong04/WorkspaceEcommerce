@@ -32,6 +32,18 @@ public static class MediaStorageConfigurationValidator
             throw new InvalidOperationException("MediaStorage limits must be positive and the upload limit must not exceed 25 MB.");
         }
 
+        if (!MediaMalwareScanningPolicy.IsSupportedProvider(options.MalwareScannerProvider))
+        {
+            throw new InvalidOperationException(
+                "MediaStorage:MalwareScannerProvider must be 'NoOp' until a concrete scanner implementation is registered.");
+        }
+
+        if (!string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase) &&
+            !MediaMalwareScanningPolicy.HasActiveNoOpRiskAcceptance(options, DateTimeOffset.UtcNow))
+        {
+            throw new InvalidOperationException(MediaMalwareScanningPolicy.GetNoOpRiskRequirementMessage());
+        }
+
         if (string.Equals(provider, "Local", StringComparison.OrdinalIgnoreCase))
         {
             if (!string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase))

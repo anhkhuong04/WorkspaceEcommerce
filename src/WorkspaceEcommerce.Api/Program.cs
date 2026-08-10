@@ -138,7 +138,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
     Predicate = healthCheck => healthCheck.Tags.Contains("ready")
 });
 app.MapControllers();
-app.MapHub<NotificationHub>("/hubs/notifications");
+app.MapHub<NotificationHub>(NotificationHub.Route);
 
 app.Run();
 

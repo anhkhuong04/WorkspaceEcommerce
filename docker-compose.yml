@@ -53,6 +53,10 @@ services:
       MediaStorage__AccessKey: ${MediaStorage__AccessKey:-}
       MediaStorage__SecretKey: ${MediaStorage__SecretKey:-}
       MediaStorage__ForcePathStyle: ${MediaStorage__ForcePathStyle:-true}
+      MediaStorage__MalwareScannerProvider: ${MediaStorage__MalwareScannerProvider:-NoOp}
+      MediaStorage__NoOpMalwareScannerRiskOwner: ${MediaStorage__NoOpMalwareScannerRiskOwner:-}
+      MediaStorage__NoOpMalwareScannerRiskExpiresAtUtc: ${MediaStorage__NoOpMalwareScannerRiskExpiresAtUtc:-}
+      MediaStorage__NoOpMalwareScannerRiskReference: ${MediaStorage__NoOpMalwareScannerRiskReference:-}
       MiniLogistics__BaseUrl: ${MiniLogistics__BaseUrl:-http://host.docker.internal:5221/api/v1/partner}
       MiniLogistics__ApiKey: ${MiniLogistics__ApiKey:?Set MiniLogistics__ApiKey in .env}
       MiniLogistics__WebhookSecret: ${MiniLogistics__WebhookSecret:?Set MiniLogistics__WebhookSecret in .env}

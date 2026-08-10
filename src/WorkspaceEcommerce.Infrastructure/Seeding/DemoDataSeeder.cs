@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using WorkspaceEcommerce.Application.Abstractions.Seeding;
 using WorkspaceEcommerce.Domain.Modules.Cart;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
@@ -17,7 +18,7 @@ using WorkspaceEcommerce.Infrastructure.Persistence;
 
 namespace WorkspaceEcommerce.Infrastructure.Seeding;
 
-internal sealed class DemoDataSeeder(AppDbContext dbContext) : IDemoDataSeeder
+internal sealed class DemoDataSeeder(AppDbContext dbContext, IConfiguration configuration) : IDemoDataSeeder
 {
     public const string CheckoutReadySessionId = "demo-checkout-session";
 
@@ -476,9 +477,13 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext) : IDemoDataSeeder
         return count;
     }
 
-    private static async Task<IReadOnlyCollection<HyperWorkProduct>> FetchHyperWorkProductsAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyCollection<HyperWorkProduct>> FetchHyperWorkProductsAsync(CancellationToken cancellationToken)
     {
-        if (Environment.GetEnvironmentVariable("Jwt__Issuer") == "WorkspaceEcommerce.IntegrationTests")
+        // A reproducible seed must not depend on a third-party catalog being reachable or unchanged.
+        // Integration tests retain their historical deterministic behavior; isolated browser E2E
+        // runs opt out explicitly through DemoSeed__IncludeExternalCatalog=false.
+        if (!configuration.GetValue("DemoSeed:IncludeExternalCatalog", true) ||
+            Environment.GetEnvironmentVariable("Jwt__Issuer") == "WorkspaceEcommerce.IntegrationTests")
         {
             return Array.Empty<HyperWorkProduct>();
         }

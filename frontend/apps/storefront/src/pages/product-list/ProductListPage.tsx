@@ -158,7 +158,7 @@ export function ProductListPage() {
 
   function clearFilters() {
     clearPendingTextFilterUpdate();
-    setDraftSearch("");
+    setDraftSearchState({ search, value: "" });
     setSearchParams(
       createFilterSearchParams({
         categorySlug: "",

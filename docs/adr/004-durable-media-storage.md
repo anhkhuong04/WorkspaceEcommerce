@@ -6,7 +6,7 @@ Administrative uploads cross a single `IMediaStorageService` boundary. The servi
 
 `Local` storage is deliberately accepted only for `Development`; every other environment must configure the S3-compatible provider with secret-backed credentials. Public URLs always derive from `MediaStorage:PublicBaseUrl`, never from an incoming HTTP `Host` header.
 
-GIF, multi-frame, malformed, spoofed-type, oversized and oversized-decoded images are rejected. This release intentionally uses a no-op `IMediaMalwareScanner` implementation as a non-blocking seam; deployments which require scanning must replace it before media is marked available.
+GIF, multi-frame, malformed, spoofed-type, oversized and oversized-decoded images are rejected. The current release has no malware-detection engine: its only registered scanner is the explicitly named `NoOp` implementation. Outside `Development`, startup rejects that implementation unless the deployment configuration supplies a non-placeholder accountable owner, an active expiry no more than 90 days away, and an external accepted-risk reference through `MediaStorage:NoOpMalwareScannerRiskOwner`, `MediaStorage:NoOpMalwareScannerRiskExpiresAtUtc`, and `MediaStorage:NoOpMalwareScannerRiskReference`. The no-op scanner checks this policy again for every upload and fails closed after expiry, even before a process restart. This is a temporary, reviewable exception rather than evidence of malware scanning; a real scanner integration must replace the no-op provider before the accepted risk expires. See the [media-malware scanning runbook](../runbooks/media-malware-scanning.md).
 
 ## Lifecycle and failure handling
 

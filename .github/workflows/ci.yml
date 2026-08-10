@@ -121,6 +121,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Frontend unit tests
+        run: pnpm test
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -153,6 +156,49 @@ jobs:
         with:
           name: frontend-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/frontend
+          if-no-files-found: warn
+          retention-days: 90
+
+  browser-e2e:
+    name: Isolated storefront browser smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install locked frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium system dependencies
+        working-directory: frontend
+        run: corepack pnpm exec playwright install --with-deps chromium
+
+      - name: Run isolated storefront browser smoke
+        shell: pwsh
+        run: ./scripts/run-prh-015-storefront-e2e.ps1
+
+      - name: Upload browser smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-e2e-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/frontend/e2e
           if-no-files-found: warn
           retention-days: 90
 
