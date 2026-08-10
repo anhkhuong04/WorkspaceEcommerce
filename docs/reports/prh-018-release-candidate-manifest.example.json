@@ -1,0 +1,29 @@
+{
+  "candidateCommit": "<full-git-commit-sha>",
+  "imageReference": "registry.example.invalid/workspace-ecommerce-api@sha256:<64-hex-digest>",
+  "gates": [
+    { "id": "backend-ci", "status": "Pending", "evidence": "<CI run/artifact link>" },
+    { "id": "frontend-ci", "status": "Pending", "evidence": "<CI run/artifact link>" },
+    { "id": "container-ci", "status": "Pending", "evidence": "<CI run/artifact link>" },
+    { "id": "migrations", "status": "Pending", "evidence": "<migration-job/log link>" },
+    { "id": "dependency-and-secret-security", "status": "Pending", "evidence": "<audit/SBOM/scan link>" },
+    { "id": "browser-e2e", "status": "Pending", "evidence": "<isolated E2E report link>" },
+    { "id": "api-contract-and-authorization", "status": "Pending", "evidence": "<contract/matrix report link>" },
+    { "id": "two-replica-topology", "status": "Pending", "evidence": "<two-replica smoke report link>" },
+    { "id": "load-and-resilience", "status": "Pending", "evidence": "<PRH-016 evidence link>" },
+    { "id": "backup-and-recovery", "status": "Pending", "evidence": "<PRH-017 evidence link>" },
+    { "id": "telemetry-and-alerts", "status": "Pending", "evidence": "<dashboard/alert/redaction query link>" },
+    { "id": "configuration-and-rotation", "status": "Pending", "evidence": "<configuration/rotation evidence link>" }
+  ],
+  "findings": [
+    {
+      "id": "<tracking-id>",
+      "severity": "High",
+      "status": "Resolved",
+      "owner": "<owner>",
+      "remediationDate": "<YYYY-MM-DD>",
+      "justification": "<required only for AcceptedRisk>",
+      "evidence": "<finding verification link>"
+    }
+  ]
+}

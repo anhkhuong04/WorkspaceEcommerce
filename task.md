@@ -474,7 +474,7 @@ Acceptance criteria:
 
 - Added `global.json`, `.node-version`, NuGet `packages.lock.json` files, and the pinned local `dotnet-ef` tool manifest. A local `dotnet restore --locked-mode`, Release build, and EF pending-model check passed.
 - Added CI workflows for backend/frontend/container evidence and a separate digest-only release-candidate evidence workflow. Hosted execution, GitHub required-check protection, registry immutability, image push/attestation, and deployment-environment approval must be performed by the repository/platform owner before the acceptance criteria can be marked complete.
-- Added `scripts/verify-prh-010-container.ps1`, which migrates an isolated PostgreSQL container then probes `/health/live` and `/health/ready` without publishing a port or using an external secret. Its local execution is blocked only by the unavailable Docker daemon on this workstation, not treated as passing evidence.
+- Added `scripts/verify-prh-010-container.ps1`, which migrates an isolated PostgreSQL container then probes `/health/live` and `/health/ready` without publishing a port or using an external secret. Its local execution passed on 2026-08-10 under PRH-013, including the non-root runtime identity; hosted CI evidence is still required for the release candidate.
 
 #### PRH-011 - Close credential rotation and production configuration authority
 
@@ -520,7 +520,7 @@ Acceptance criteria:
 - Added durable email and shipment state/lease metadata, database-clock `FOR UPDATE SKIP LOCKED` claim paths, stale-lease guarded finalization, retry ceilings, dead-letter state, and a deterministic migration backfill for existing sent/completed rows.
 - Checkout and VNPay callbacks now enqueue shipment work transactionally; only the durable worker calls shipment create/cancel. Shipment provider keys remain stable across retries.
 - Added advisory-lock leader policy for cleanup, bounded queue/processing metrics, admin inspect/replay endpoints, and the operator runbook. Release build, targeted domain/application/infrastructure tests, and EF pending-model validation passed locally.
-- The required Testcontainers two-replica, killed-worker, SMTP/provider, SignalR scale-out, distributed rate-limit, ingress/WAF, and rolling-restart tests are not marked passed: this workstation has no Docker daemon and the corresponding staging/platform topology is not yet attached.
+- A Docker-backed `CustomerEmailOutboxLeasingIntegrationTests` run passed on 2026-08-10, proving an active PostgreSQL lease is excluded and reclaimed only after expiry. The required two-replica, killed-worker, SMTP/provider, SignalR scale-out, distributed rate-limit, ingress/WAF, and rolling-restart tests remain unpassed because the corresponding staging/platform topology is not yet attached.
 
 #### PRH-013 - Harden the production runtime, container, and network topology
 
@@ -577,12 +577,16 @@ Acceptance criteria:
 #### PRH-015 - Add automated browser, contract, and security regression gates
 
 - [ ] Add a frontend unit/component test runner and cover session bootstrap/refresh, 2FA challenge/setup, verification/reset, checkout/coupon errors, comment moderation state, and media upload validation UX.
+- [x] Add a locked Vitest/jsdom runner and regression tests for completed, malformed, expired, and profile-updated customer sessions. The remaining UI journeys in the preceding item are still open.
 - [ ] Add Playwright or an equivalent browser E2E suite against an isolated PostgreSQL/object-store environment.
+- [x] Add an isolated Chromium storefront smoke using a temporary PostgreSQL container, API container, loopback Vite server, deterministic demo seed, and local test-only media filesystem. It refuses non-loopback targets and generates all runtime credentials in memory; S3-compatible object-store coverage remains open.
 - [ ] Cover guest and customer checkout, concurrent last-stock checkout, VNPay success/failure/duplicate callback, loyalty earning/redeeming, refresh reuse/logout, Google/2FA boundaries, admin moderation, media variants, SignalR notification, and shipment webhook/outbox flows.
-- [ ] Make E2E data deterministic and isolated per run; never target production or reuse production credentials.
+- [x] Make E2E data deterministic and isolated per run; never target production or reuse production credentials.
 - [ ] Add OpenAPI/API-contract compatibility checks so frontend clients and partner callbacks fail CI on unreviewed breaking changes.
-- [ ] Add an authorization matrix test for anonymous/customer/admin access, ownership boundaries, ID enumeration, and admin-only operations.
+- [x] Add CI API-contract presence checks for public catalog, customer/admin order, authentication, and VNPay callback operations. A reviewed schema/compatibility baseline is still required before the broader preceding item can close.
+- [x] Add an authorization matrix test for anonymous/customer/admin access, ownership boundaries, ID enumeration, and admin-only operations.
 - [ ] Decide the production malware-scanning policy. If scanning is required, configure a real scanner/quarantine provider and reject `NoOpMediaMalwareScanner` outside Development; otherwise record the accepted risk and compensating controls.
+- [x] Implement a fail-closed NoOp exception policy: every non-Development environment requires a valid, short-lived risk owner/reference/expiry, and the scanner returns unavailable after expiry. A real production scanner or a signed operational exception remains required.
 - [ ] Run a staging DAST baseline and focused tests for CORS, CSRF/cookie behavior, rate limits, header spoofing, upload fuzzing, webhook replay/signature, open redirects, and error-detail leakage.
 - [ ] Add accessibility smoke for critical storefront/admin paths and a supported browser viewport matrix.
 - [ ] Triage every finding by severity, owner, and remediation date; block release on unaccepted critical/high findings.
@@ -593,11 +597,20 @@ Acceptance criteria:
 - API contract and authorization regressions fail CI before merge.
 - No critical/high application-security finding remains without explicit accepted risk, owner, and date.
 
+##### Implementation evidence - 2026-08-10
+
+- Added locked Vitest/jsdom session regression tests and a CI frontend-unit-test step. `corepack pnpm test` passes locally (4 tests).
+- Added an isolated Playwright Chromium smoke and CI job. The local runner built/used the candidate API and migration images, ran deterministic demo seeding against a temporary PostgreSQL container, and passed catalog → product variant → cart on 2026-08-10. It cleans its containers/network and writes a non-secret result artifact.
+- Added API OpenAPI operation checks, anonymous/customer/admin authorization-matrix coverage, and a SignalR token-transport boundary test. The tests confirm a browser query bearer is accepted only for the notification hub, not ordinary API routes.
+- Added a documented, tested fail-closed temporary NoOp media-scanner exception policy. It is not production scanner evidence: a real scanner/quarantine integration or a signed, time-bounded operational exception is still required before release.
+- Critical-flow breadth, S3-compatible media E2E, staging DAST, accessibility/browser-matrix coverage, finding triage, and executed hosted CI evidence remain deliberately unchecked.
+
 #### PRH-016 - Prove performance and resilience with representative load and soak tests
 
 - [ ] Define approved SLOs and traffic model before testing. Provisional gate: read endpoints p95 <= 500 ms, application-controlled checkout p95 <= 2 s excluding provider latency, HTTP 5xx < 1%, and zero commerce-integrity violations.
 - [ ] Generate representative PostgreSQL data/cardinality and S3 media objects; preserve the data-generation version and query plans with results.
 - [ ] Add a repeatable k6/Azure Load Testing script for catalog/search, login/refresh, cart, checkout/coupon, order reads, admin lists, media, SignalR, and shipment callbacks.
+- [x] Add a local-safe k6 wrapper and eight versioned suites for public reads, authenticated reads/refresh rotation, privileged lists, public media, SignalR transport, signed test webhook, bounded cart/checkout traffic, and resilience probes. The wrapper requires an immutable digest for non-local runs, blocks unsafe targets/raw secret-bearing samples, and records non-secret metadata; it is static-validated only until an approved load-generator/staging run is attached.
 - [ ] Run a ramp test and at least 30 minutes at the approved peak (initial planning target: 100 concurrent virtual users), then an 8-hour lower-volume soak.
 - [ ] Capture p50/p95/p99 latency, throughput, errors, timeouts, rows read, query count, DB pool usage, CPU, memory/GC, queue lag, external calls, and object-store latency.
 - [ ] Prove stock, coupon usage, payment state, loyalty points, webhook inbox, outbox state, and shipment commands remain internally consistent after load.
@@ -612,6 +625,11 @@ Acceptance criteria:
 - Failure injection and rolling restart recover within documented bounds without lost durable work or duplicate commerce side effects.
 - Results are reproducible from scripts and linked to the exact candidate commit/image digest.
 
+##### Implementation evidence - 2026-08-10
+
+- Added `scripts/performance/run-prh-016-k6.ps1`, nine JavaScript modules, a load/resilience runbook, and a candidate-specific evidence template. All JavaScript modules passed `node --check` and the PowerShell runner passed AST parsing.
+- `k6` is not installed on this workstation and no approved isolated staging target, representative data set, candidate digest, fault-injection authority, or telemetry dashboard has been supplied. Therefore no load, peak, soak, integrity reconciliation, rolling-restart, or recovery result is claimed; those release gates remain unchecked.
+
 #### PRH-017 - Rehearse backup, restore, rollback, and incident recovery
 
 - [ ] Obtain business-approved RPO/RTO; provisional planning target is RPO <= 15 minutes and RTO <= 60 minutes until replaced by an approved value.
@@ -620,7 +638,8 @@ Acceptance criteria:
 - [ ] Restore PostgreSQL plus sampled original/variant media objects into an isolated environment; verify checksums, references, permissions, and application reads.
 - [ ] Rehearse recovery from accidental media deletion, corrupted metadata, failed migration, expired Data Protection key access, and revoked external credentials.
 - [ ] Verify clean-database migrations and upgrade from the shipment schema again using the exact release image/migration job.
-- [ ] For every post-shipment migration, document forward-fix, data compatibility, application rollback boundary, and whether `Down` is prohibited in production.
+- [x] Document forward-fix, data compatibility, rollback boundary, and the production `Down` prohibition for every post-shipment migration currently in the repository.
+- [x] Run the repository regression checks for clean-create/upgrade from `20260802034719_AddShipmentIntegration` and a synthetic PostgreSQL + durable-media metadata restore. The exact immutable release image/migration-job rehearsal remains open.
 - [ ] Rehearse deployment rollback and forward-fix without restoring an exposed credential or discarding moderation/token/media audit state.
 - [ ] Record start/end timestamps, achieved RPO/RTO, operator, backup/object versions, candidate digest, discrepancies, and follow-up owners.
 
@@ -630,11 +649,18 @@ Acceptance criteria:
 - Migration/deployment recovery procedures are executable by an operator who did not write the feature.
 - Backup, restore, credential, and incident runbooks have test evidence rather than document-only approval.
 
+##### Implementation evidence - 2026-08-10
+
+- Added an operator-oriented disaster-recovery/forward-fix runbook and a candidate-specific rehearsal evidence template. They explicitly require isolated target controls, PostgreSQL/PITR and object-version evidence, shared Data Protection key recovery, application media reads, RPO/RTO measurement, and a non-author recovery operator.
+- Updated the production migration table with the outbox-lease migration forward fix and production `Down` boundary. It now covers every post-shipment migration in the current repository.
+- `verify-prh-009-migrations.ps1` and `verify-prh-009-backup-restore.ps1` passed locally on 2026-08-10. They are code regression checks only; no managed PostgreSQL PITR, S3 object-byte restoration, approved RPO/RTO, platform alert, credential rotation, or full recovery rehearsal has occurred, so those gates remain unchecked.
+
 ### P2 - Staging release candidate and final go/no-go
 
 #### PRH-018 - Freeze and approve the pre-deployment release candidate
 
 - [ ] Freeze feature work; allow only reviewed release-blocker fixes and regenerate all evidence after each candidate change.
+- [x] Add a repository release-candidate manifest validator that binds a full checked-out commit SHA to an immutable image digest, requires every evidence gate to pass, rejects placeholder evidence/dirty worktrees, and enforces critical/high finding policy. It is a no-go validator, not staging evidence or deployment authorization.
 - [ ] Deploy the immutable candidate digest to a production-like staging topology with at least two API replicas, external PostgreSQL, shared SignalR/rate-limit mechanism, shared Data Protection keys, S3-compatible storage, SMTP sandbox, and provider sandboxes.
 - [ ] Apply migrations through the one-shot migration job before API rollout; confirm exactly one migration executor.
 - [ ] Run full backend, frontend, E2E, security, migration, two-replica, load/soak, failure-injection, backup/restore, and rollback gates.
@@ -651,6 +677,11 @@ Final go/no-go criteria:
 - Two-replica peak/soak/rolling-restart and disaster-recovery flows pass within approved SLO/RPO/RTO.
 - PRH-002 and all four remaining PRH-009 production evidence items are complete.
 - Only after every criterion above is evidenced may deployment planning/execution begin.
+
+##### Implementation evidence - 2026-08-10
+
+- Added `verify-prh-018-release-candidate.ps1`, release-gate guidance, and an intentionally pending manifest schema. The validator requires a clean candidate checkout, a full commit SHA, an `image@sha256` digest, twelve named evidence gates, non-placeholder evidence, and formal critical/high-finding handling.
+- The validator parsed successfully, rejected the intentionally pending example, and passed only a temporary local fixture run using `-AllowDirtyWorktree`. That fixture was deleted immediately and is not release evidence. Feature freeze, registry/staging deployment, hosted CI, two-replica topology, load/recovery, telemetry/alert, sign-off, and all actual candidate evidence remain unchecked.
 
 ## Proposed API Changes
 
