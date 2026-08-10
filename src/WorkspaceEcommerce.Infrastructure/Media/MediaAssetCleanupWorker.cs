@@ -39,42 +39,55 @@ internal sealed class MediaAssetCleanupWorker(
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var cutoff = DateTimeOffset.UtcNow.AddHours(-options.CleanupRetentionHours);
-        var candidates = await dbContext.MediaAssets
-            .Include(asset => asset.Variants)
-            .Where(asset => asset.State != MediaAssetState.Deleted && asset.CreatedAt < cutoff)
-            .OrderBy(asset => asset.CreatedAt)
-            .Take(100)
-            .ToArrayAsync(cancellationToken);
-
-        foreach (var asset in candidates)
+        var cleanupLock = await PostgreSqlAdvisoryLock.TryAcquireAsync(
+            dbContext,
+            "workspace-ecommerce:media-asset-cleanup",
+            cancellationToken);
+        if (cleanupLock is null)
         {
-            var referenced = await dbContext.ProductImages.AnyAsync(image => image.ImageUrl == asset.PublicUrl, cancellationToken) ||
-                await dbContext.Banners.AnyAsync(banner => banner.ImageUrl == asset.PublicUrl, cancellationToken) ||
-                await dbContext.BlogPosts.AnyAsync(post => post.ImageUrl == asset.PublicUrl, cancellationToken);
-            if (referenced)
-            {
-                continue;
-            }
-
-            try
-            {
-                await objectStore.DeleteAsync(asset.ObjectKey, cancellationToken);
-                foreach (var variant in asset.Variants)
-                {
-                    await objectStore.DeleteAsync(variant.ObjectKey, cancellationToken);
-                }
-                asset.MarkDeleted();
-            }
-            catch (Exception exception)
-            {
-                logger.LogWarning(exception, "Could not delete unreferenced media asset {MediaAssetId}", asset.Id);
-            }
+            logger.LogDebug("Skipped media cleanup because another replica owns its advisory lock.");
+            return;
         }
 
-        if (dbContext.ChangeTracker.HasChanges())
+        await using (cleanupLock)
         {
-            await dbContext.SaveChangesAsync(cancellationToken);
+            var cutoff = DateTimeOffset.UtcNow.AddHours(-options.CleanupRetentionHours);
+            var candidates = await dbContext.MediaAssets
+                .Include(asset => asset.Variants)
+                .Where(asset => asset.State != MediaAssetState.Deleted && asset.CreatedAt < cutoff)
+                .OrderBy(asset => asset.CreatedAt)
+                .Take(100)
+                .ToArrayAsync(cancellationToken);
+
+            foreach (var asset in candidates)
+            {
+                var referenced = await dbContext.ProductImages.AnyAsync(image => image.ImageUrl == asset.PublicUrl, cancellationToken) ||
+                    await dbContext.Banners.AnyAsync(banner => banner.ImageUrl == asset.PublicUrl, cancellationToken) ||
+                    await dbContext.BlogPosts.AnyAsync(post => post.ImageUrl == asset.PublicUrl, cancellationToken);
+                if (referenced)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    await objectStore.DeleteAsync(asset.ObjectKey, cancellationToken);
+                    foreach (var variant in asset.Variants)
+                    {
+                        await objectStore.DeleteAsync(variant.ObjectKey, cancellationToken);
+                    }
+                    asset.MarkDeleted();
+                }
+                catch (Exception exception)
+                {
+                    logger.LogWarning(exception, "Could not delete unreferenced media asset {MediaAssetId}", asset.Id);
+                }
+            }
+
+            if (dbContext.ChangeTracker.HasChanges())
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
         }
     }
 }

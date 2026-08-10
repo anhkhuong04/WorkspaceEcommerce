@@ -2,6 +2,7 @@ using WorkspaceEcommerce.Domain.Modules.Cart;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Domain.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Application.Abstractions.Persistence;
 
@@ -24,6 +25,18 @@ public interface ICheckoutStore
         CancellationToken cancellationToken = default);
 
     Task<bool> OrderCodeExistsAsync(string orderCode, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Atomically records a shipment side effect for the durable outbox. Checkout
+    /// must not call the carrier directly because requests can be retried or run
+    /// concurrently on multiple API replicas.
+    /// </summary>
+    Task<bool> TryEnqueueShipmentCommandAsync(
+        Guid orderId,
+        ShipmentCommandType commandType,
+        string? reason,
+        DateTimeOffset createdAtUtc,
+        CancellationToken cancellationToken = default);
 
     Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default);
 

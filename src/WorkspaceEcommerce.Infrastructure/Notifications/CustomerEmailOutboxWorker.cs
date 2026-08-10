@@ -2,7 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using WorkspaceEcommerce.Application.Abstractions.Notifications;
+using WorkspaceEcommerce.Application.Abstractions.Persistence;
+using WorkspaceEcommerce.Application.Modules.Operations;
+using WorkspaceEcommerce.Domain.Modules.Customers;
 using WorkspaceEcommerce.Infrastructure.Configuration;
 using WorkspaceEcommerce.Infrastructure.Persistence;
 
@@ -13,6 +17,8 @@ internal sealed class CustomerEmailOutboxWorker(
     EmailDeliveryOptions options,
     ILogger<CustomerEmailOutboxWorker> logger) : BackgroundService
 {
+    private readonly string workerIdentity = $"{Environment.MachineName}:{Environment.ProcessId}:{Guid.NewGuid():N}";
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var interval = TimeSpan.FromSeconds(options.WorkerIntervalSeconds);
@@ -41,19 +47,21 @@ internal sealed class CustomerEmailOutboxWorker(
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var payloadReader = scope.ServiceProvider.GetRequiredService<CustomerEmailOutboxPayloadReader>();
         var deliveryService = scope.ServiceProvider.GetRequiredService<ICustomerEmailDeliveryService>();
-        var now = DateTimeOffset.UtcNow;
-        var dueMessages = await dbContext.CustomerEmailOutboxMessages
-            .Where(message => message.SentAt == null && message.NextAttemptAt <= now)
-            .OrderBy(message => message.NextAttemptAt)
-            .Take(20)
-            .ToArrayAsync(cancellationToken);
+        var leaseToken = Guid.NewGuid();
+        var dueMessages = await dbContext.ClaimDueMessagesAsync(
+            workerIdentity,
+            TimeSpan.FromSeconds(options.LeaseDurationSeconds),
+            leaseToken,
+            options.WorkerBatchSize,
+            cancellationToken);
+        OutboxProcessingMetrics.RecordClaim("customer-email", dueMessages.Length);
 
         foreach (var message in dueMessages)
         {
+            var startedAt = Stopwatch.GetTimestamp();
             try
             {
                 await deliveryService.SendAsync(payloadReader.Read(message), cancellationToken);
-                message.MarkSent(DateTimeOffset.UtcNow);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -61,17 +69,75 @@ internal sealed class CustomerEmailOutboxWorker(
             }
             catch (Exception exception)
             {
-                var delay = TimeSpan.FromSeconds(Math.Min(3600, 30 * Math.Pow(2, Math.Min(message.AttemptCount, 6))));
-                // Exception messages can include provider request details. Persist a
-                // stable category instead of letting a delivery library leak bodies.
-                message.ScheduleRetry($"Delivery failed ({exception.GetType().Name}).", DateTimeOffset.UtcNow.Add(delay));
-                logger.LogWarning("Customer email delivery failed for outbox message {MessageId}; retry scheduled.", message.Id);
+                await RecordDeliveryFailureAsync(dbContext, message, leaseToken, exception, cancellationToken);
+                OutboxProcessingMetrics.RecordProcessingDuration(
+                    "customer-email",
+                    Stopwatch.GetElapsedTime(startedAt));
+                continue;
+            }
+
+            try
+            {
+                message.MarkSent(leaseToken, DateTimeOffset.UtcNow);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                OutboxProcessingMetrics.RecordCompleted("customer-email");
+            }
+            catch (PersistenceConcurrencyException)
+            {
+                DetachStaleMessage(dbContext, message);
+                logger.LogWarning(
+                    "Customer email outbox lease was lost before message {MessageId} could be marked delivered.",
+                    message.Id);
+            }
+            finally
+            {
+                OutboxProcessingMetrics.RecordProcessingDuration(
+                    "customer-email",
+                    Stopwatch.GetElapsedTime(startedAt));
             }
         }
+    }
 
-        if (dueMessages.Length > 0)
+    private async Task RecordDeliveryFailureAsync(
+        AppDbContext dbContext,
+        CustomerEmailOutboxMessage message,
+        Guid leaseToken,
+        Exception exception,
+        CancellationToken cancellationToken)
+    {
+        // Exception messages can include provider request details. Persist a
+        // stable category instead of letting a delivery library leak bodies.
+        var error = $"Delivery failed ({exception.GetType().Name}).";
+        try
         {
+            if (message.AttemptCount + 1 >= options.MaxDeliveryAttempts)
+            {
+                message.DeadLetter(leaseToken, error, DateTimeOffset.UtcNow);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                OutboxProcessingMetrics.RecordDeadLetter("customer-email");
+                logger.LogError(
+                    "Customer email outbox message {MessageId} reached its delivery-attempt limit and was dead-lettered.",
+                    message.Id);
+                return;
+            }
+
+            var delay = TimeSpan.FromSeconds(Math.Min(3600, 30 * Math.Pow(2, Math.Min(message.AttemptCount, 6))));
+            message.ScheduleRetry(leaseToken, error, DateTimeOffset.UtcNow.Add(delay));
             await dbContext.SaveChangesAsync(cancellationToken);
+            OutboxProcessingMetrics.RecordRetry("customer-email");
+            logger.LogWarning("Customer email delivery failed for outbox message {MessageId}; retry scheduled.", message.Id);
         }
+        catch (PersistenceConcurrencyException)
+        {
+            DetachStaleMessage(dbContext, message);
+            logger.LogWarning(
+                "Customer email outbox lease was lost before a delivery failure for message {MessageId} could be recorded.",
+                message.Id);
+        }
+    }
+
+    private static void DetachStaleMessage(AppDbContext dbContext, CustomerEmailOutboxMessage message)
+    {
+        dbContext.Entry(message).State = EntityState.Detached;
     }
 }

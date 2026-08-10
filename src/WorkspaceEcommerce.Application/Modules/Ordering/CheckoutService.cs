@@ -165,7 +165,7 @@ internal sealed class CheckoutService(
         }
         else
         {
-            await shippingCoordinator.TryCreateShipmentAsync(
+            await shippingCoordinator.RefreshShippingQuoteAfterCheckoutAsync(
                 placement.Order,
                 request,
                 placement.Snapshots,

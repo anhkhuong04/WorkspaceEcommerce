@@ -498,14 +498,14 @@ Acceptance criteria:
 
 - [ ] Choose and document the production SignalR scale-out mechanism: Azure SignalR Service or Redis backplane. Configure it only through validated server settings.
 - [ ] Add a two-replica SignalR integration/smoke test proving clients connected through different replicas receive the same authorized notification.
-- [ ] Replace read-then-process outbox polling with an atomic database claim protocol, normally `FOR UPDATE SKIP LOCKED` plus persisted `lease_owner`, `lease_expires_at`, status, and attempt metadata.
-- [ ] Commit a claim before external I/O, recover expired leases after worker/process failure, and prevent a stale worker from completing work after its lease is lost.
-- [ ] Apply the claim protocol to customer-email and shipment-command outboxes. Define at-least-once semantics and the residual SMTP duplicate window; use stable provider idempotency/message identifiers where supported.
-- [ ] Verify shipment create/cancel keeps stable idempotency keys and cannot produce concurrent provider commands for one order/type.
-- [ ] Coordinate account cleanup and media cleanup across replicas using bounded database claims or an advisory-lock/leader policy; deletion must remain safe if retried.
-- [ ] Add queue age, due count, leased count, retry count, dead-letter count, oldest item age, and processing duration metrics.
-- [ ] Define retry ceilings and a terminal/dead-letter state; do not retry permanent validation/authentication/provider conflicts forever.
-- [ ] Provide an audited admin/runbook path to inspect and replay terminal work without editing database rows manually.
+- [x] Replace read-then-process outbox polling with an atomic database claim protocol, normally `FOR UPDATE SKIP LOCKED` plus persisted `lease_owner`, `lease_expires_at`, status, and attempt metadata. (Implemented in migration `20260810011708_AddOutboxLeaseMetadata`.)
+- [x] Commit a claim before external I/O, recover expired leases after worker/process failure, and prevent a stale worker from completing work after its lease is lost. (Lease-token guarded completion/retry/dead-letter updates are persisted before/after external I/O as appropriate.)
+- [x] Apply the claim protocol to customer-email and shipment-command outboxes. Define at-least-once semantics and the residual SMTP duplicate window; use stable provider idempotency/message identifiers where supported. (Documented in `docs/runbooks/background-outbox-operations.md`; provider retention must still be verified in staging.)
+- [x] Verify shipment create/cancel keeps stable idempotency keys and cannot produce concurrent provider commands for one order/type. (Create uses order code, cancel uses `<order-code>:cancel`, and active commands have a PostgreSQL partial unique index.)
+- [x] Coordinate account cleanup and media cleanup across replicas using bounded database claims or an advisory-lock/leader policy; deletion must remain safe if retried. (Both cleanup workers take a PostgreSQL session advisory lock before bounded work.)
+- [x] Add queue age, due count, leased count, retry count, dead-letter count, oldest item age, and processing duration metrics. (Repository metrics and a bounded snapshot worker are implemented; dashboard/alert rules remain PRH-014 staging evidence.)
+- [x] Define retry ceilings and a terminal/dead-letter state; do not retry permanent validation/authentication/provider conflicts forever. (Email and shipment workers use bounded attempts; permanent shipment failures dead-letter immediately.)
+- [x] Provide an audited admin/runbook path to inspect and replay terminal work without editing database rows manually. (Admin outbox endpoints create a new command and retain the original terminal row; the runbook records safe audit fields.)
 - [ ] Configure cluster-wide rate limiting at the ingress/WAF or a distributed store; keep application limits as defense in depth and verify trusted-client-IP partitioning.
 - [ ] Run two-replica tests for refresh-token rotation/reuse, email outbox, shipment create/cancel, webhook idempotency, media access/cleanup, SignalR, and rolling worker restart.
 
@@ -514,6 +514,13 @@ Acceptance criteria:
 - Two replicas never process the same leased row simultaneously; a killed worker's work becomes eligible after the lease expires.
 - No test produces duplicate shipment side effects, duplicate loyalty earning, duplicate webhook timeline entries, or unbounded email/shipment retries.
 - SignalR and rate-limit behavior no longer depends on which replica receives the request.
+
+##### Implementation evidence - 2026-08-10
+
+- Added durable email and shipment state/lease metadata, database-clock `FOR UPDATE SKIP LOCKED` claim paths, stale-lease guarded finalization, retry ceilings, dead-letter state, and a deterministic migration backfill for existing sent/completed rows.
+- Checkout and VNPay callbacks now enqueue shipment work transactionally; only the durable worker calls shipment create/cancel. Shipment provider keys remain stable across retries.
+- Added advisory-lock leader policy for cleanup, bounded queue/processing metrics, admin inspect/replay endpoints, and the operator runbook. Release build, targeted domain/application/infrastructure tests, and EF pending-model validation passed locally.
+- The required Testcontainers two-replica, killed-worker, SMTP/provider, SignalR scale-out, distributed rate-limit, ingress/WAF, and rolling-restart tests are not marked passed: this workstation has no Docker daemon and the corresponding staging/platform topology is not yet attached.
 
 #### PRH-013 - Harden the production runtime, container, and network topology
 

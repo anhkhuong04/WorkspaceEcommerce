@@ -201,6 +201,26 @@ internal sealed class FakeCheckoutStore : ICheckoutStore
         return Task.FromResult(1);
     }
 
+    public Task<bool> TryEnqueueShipmentCommandAsync(
+        Guid orderId,
+        ShipmentCommandType commandType,
+        string? reason,
+        DateTimeOffset createdAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_shipmentCommandOutbox.Any(command => command.OrderId == orderId &&
+            command.CommandType == commandType &&
+            command.Status is ShipmentCommandStatus.Pending or ShipmentCommandStatus.Leased))
+        {
+            return Task.FromResult(false);
+        }
+
+        _shipmentCommandOutbox.Add(new ShipmentCommandOutbox(
+            Guid.NewGuid(), orderId, commandType, reason, createdAtUtc));
+        return Task.FromResult(true);
+    }
+
     private List<TEntity> GetSet<TEntity>()
         where TEntity : class
     {

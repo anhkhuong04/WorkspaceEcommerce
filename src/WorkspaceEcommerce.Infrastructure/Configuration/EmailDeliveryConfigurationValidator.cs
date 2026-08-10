@@ -30,6 +30,21 @@ public static class EmailDeliveryConfigurationValidator
             throw new InvalidOperationException("Configuration 'EmailDelivery:WorkerIntervalSeconds' must be between 5 and 3600.");
         }
 
+        if (configured.WorkerBatchSize is < 1 or > 100)
+        {
+            throw new InvalidOperationException("Configuration 'EmailDelivery:WorkerBatchSize' must be between 1 and 100.");
+        }
+
+        if (configured.LeaseDurationSeconds is < 15 or > 3600)
+        {
+            throw new InvalidOperationException("Configuration 'EmailDelivery:LeaseDurationSeconds' must be between 15 and 3600.");
+        }
+
+        if (configured.MaxDeliveryAttempts is < 1 or > 20)
+        {
+            throw new InvalidOperationException("Configuration 'EmailDelivery:MaxDeliveryAttempts' must be between 1 and 20.");
+        }
+
         if (isSmtp)
         {
             if (string.IsNullOrWhiteSpace(configured.Host) || configured.Port is < 1 or > 65535 ||
@@ -57,7 +72,10 @@ public static class EmailDeliveryConfigurationValidator
             EnableSsl = configured.EnableSsl,
             UserName = configured.UserName,
             Password = configured.Password,
-            WorkerIntervalSeconds = configured.WorkerIntervalSeconds
+            WorkerIntervalSeconds = configured.WorkerIntervalSeconds,
+            WorkerBatchSize = configured.WorkerBatchSize,
+            LeaseDurationSeconds = configured.LeaseDurationSeconds,
+            MaxDeliveryAttempts = configured.MaxDeliveryAttempts
         };
     }
 }

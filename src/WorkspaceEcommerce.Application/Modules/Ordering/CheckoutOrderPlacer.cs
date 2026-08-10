@@ -7,6 +7,7 @@ using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Payments;
+using WorkspaceEcommerce.Domain.Modules.Shipments;
 using CartAggregate = WorkspaceEcommerce.Domain.Modules.Cart.Cart;
 
 namespace WorkspaceEcommerce.Application.Modules.Ordering;
@@ -94,6 +95,19 @@ internal sealed class CheckoutOrderPlacer(
                 checkoutStore.Add(order);
                 checkoutStore.Remove(cart);
                 await checkoutStore.SaveChangesAsync(transactionCancellationToken);
+
+                if (request.PaymentMethod == PaymentMethod.Cod)
+                {
+                    // Persist the provider side effect in the same transaction
+                    // as the accepted COD order. A process crash after checkout
+                    // can no longer leave an order with no durable shipment work.
+                    await checkoutStore.TryEnqueueShipmentCommandAsync(
+                        order.Id,
+                        ShipmentCommandType.Create,
+                        reason: null,
+                        DateTimeOffset.UtcNow,
+                        transactionCancellationToken);
+                }
             }, cancellationToken);
         }
         catch (DomainException exception)

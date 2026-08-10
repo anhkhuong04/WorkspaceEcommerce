@@ -1,10 +1,12 @@
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Abstractions.Shipment;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Application.Modules.Loyalty;
+using WorkspaceEcommerce.Application.Modules.Operations;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Shipments;
 
@@ -18,6 +20,10 @@ internal sealed class OrderShipmentService(
     TimeProvider timeProvider,
     ILogger<OrderShipmentService> logger) : IOrderShipmentService
 {
+    private const int ShipmentCommandLeaseSeconds = 120;
+    private const int MaxShipmentCommandAttempts = 8;
+    private readonly string workerIdentity = $"{Environment.MachineName}:{Environment.ProcessId}:{Guid.NewGuid():N}";
+
     public async Task<Result<ShipmentTrackingDto>> GetGuestTrackingAsync(
         string orderCode,
         string phone,
@@ -133,10 +139,8 @@ internal sealed class OrderShipmentService(
             return Result<ShipmentTrackingDto>.Conflict("Shipment cannot be created for this order.");
         }
 
-        var result = await TryCreateAsync(order, queueOnFailure: true, cancellationToken);
-        return result.IsSuccess
-            ? Result<ShipmentTrackingDto>.Success(await ToDtoAsync(order, cancellationToken))
-            : ToTrackingFailure(result, "Shipment could not be created.");
+        await EnqueueCommandAsync(order.Id, ShipmentCommandType.Create, reason: null, cancellationToken);
+        return Result<ShipmentTrackingDto>.Success(await ToDtoAsync(order, cancellationToken));
     }
 
     public async Task<Result<ShipmentTrackingDto>> CancelAsync(
@@ -165,38 +169,8 @@ internal sealed class OrderShipmentService(
             return Result<ShipmentTrackingDto>.Conflict("Shipment cannot be cancelled at its current order or provider status.");
         }
 
-        try
-        {
-            var tracking = await provider.CancelShipmentAsync(
-                shipment.TrackingCode,
-                NormalizeCancelReason(reason),
-                cancellationToken);
-            var applyResult = await ApplyTrackingAsync(order, shipment, tracking, ShipmentTimelineSource.Cancellation, cancellationToken);
-            return applyResult.IsSuccess
-                ? Result<ShipmentTrackingDto>.Success(await ToDtoAsync(order, cancellationToken))
-                : ToTrackingFailure(applyResult, "Cancellation response was invalid.");
-        }
-        catch (HttpRequestException exception) when (ShipmentProviderFailure.IsTransient(exception))
-        {
-            ShipmentIntegrationMetrics.RecordCancelFailure();
-            logger.LogWarning(
-                exception,
-                "Shipment cancellation failed for order {OrderCode}, tracking {TrackingCode}; command will be retried",
-                order.OrderCode,
-                shipment.TrackingCode);
-            await EnqueueCommandAsync(order.Id, ShipmentCommandType.Cancel, NormalizeCancelReason(reason), cancellationToken);
-            return Result<ShipmentTrackingDto>.Success(await ToDtoAsync(order, cancellationToken));
-        }
-        catch (HttpRequestException exception)
-        {
-            ShipmentIntegrationMetrics.RecordCancelFailure();
-            logger.LogWarning(
-                exception,
-                "Shipment cancellation was rejected for order {OrderCode}, tracking {TrackingCode}",
-                order.OrderCode,
-                shipment.TrackingCode);
-            return Result<ShipmentTrackingDto>.Conflict("Shipment cancellation was rejected by the provider.");
-        }
+        await EnqueueCommandAsync(order.Id, ShipmentCommandType.Cancel, NormalizeCancelReason(reason), cancellationToken);
+        return Result<ShipmentTrackingDto>.Success(await ToDtoAsync(order, cancellationToken));
     }
 
     public Task QueueCancelAsync(
@@ -211,35 +185,44 @@ internal sealed class OrderShipmentService(
         int batchSize,
         CancellationToken cancellationToken = default)
     {
-        var now = timeProvider.GetUtcNow();
-        var commandIds = await dbContext.ShipmentCommandOutbox
-            .Where(command => command.CompletedAtUtc == null && command.NextAttemptAtUtc <= now)
-            .OrderBy(command => command.NextAttemptAtUtc)
-            .ThenBy(command => command.CreatedAtUtc)
-            .Take(Math.Max(1, batchSize))
-            .Select(command => command.Id)
-            .ToArrayAsyncSafe(cancellationToken);
+        var commands = await dbContext.ClaimDueShipmentCommandsAsync(
+            workerIdentity,
+            TimeSpan.FromSeconds(ShipmentCommandLeaseSeconds),
+            Math.Clamp(batchSize, 1, 100),
+            cancellationToken);
+        OutboxProcessingMetrics.RecordClaim("shipment-command", commands.Length);
         var processed = 0;
 
-        foreach (var commandId in commandIds)
+        foreach (var command in commands)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var command = await dbContext.ShipmentCommandOutbox
-                .Where(candidate => candidate.Id == commandId)
-                .FirstOrDefaultAsyncSafe(cancellationToken);
-            if (command is null || command.CompletedAtUtc.HasValue)
+            if (!command.LeaseToken.HasValue)
             {
                 continue;
             }
+
+            var leaseToken = command.LeaseToken.Value;
+            var resultPersisted = false;
+            var startedAt = Stopwatch.GetTimestamp();
 
             var order = await dbContext.Orders
                 .Where(candidate => candidate.Id == command.OrderId)
                 .FirstOrDefaultAsyncSafe(cancellationToken);
             if (order is null)
             {
-                command.MarkCompleted(timeProvider.GetUtcNow());
-                await dbContext.SaveChangesAsync(cancellationToken);
-                processed++;
+                resultPersisted = await dbContext.CompleteShipmentCommandLeaseAsync(
+                        command.Id,
+                        leaseToken,
+                        timeProvider.GetUtcNow(),
+                        cancellationToken);
+                if (resultPersisted)
+                {
+                    processed++;
+                    OutboxProcessingMetrics.RecordCompleted("shipment-command");
+                }
+                OutboxProcessingMetrics.RecordProcessingDuration(
+                    "shipment-command",
+                    Stopwatch.GetElapsedTime(startedAt));
                 continue;
             }
 
@@ -259,27 +242,84 @@ internal sealed class OrderShipmentService(
 
             if (operationResult.IsSuccess)
             {
-                command.MarkCompleted(timeProvider.GetUtcNow());
+                resultPersisted = await dbContext.CompleteShipmentCommandLeaseAsync(
+                        command.Id,
+                        leaseToken,
+                        timeProvider.GetUtcNow(),
+                        cancellationToken);
+                if (resultPersisted)
+                {
+                    processed++;
+                    OutboxProcessingMetrics.RecordCompleted("shipment-command");
+                }
             }
             else if (operationResult.Status is ResultStatus.Validation or ResultStatus.NotFound or ResultStatus.Conflict)
             {
                 logger.LogWarning(
-                    "Completing non-retryable shipment command {CommandId} for order {OrderCode}: {Error}",
+                    "Dead-lettering non-retryable shipment command {CommandId} for order {OrderCode}: {Error}",
                     command.Id,
                     order.OrderCode,
                     operationResult.FirstError);
-                command.MarkCompleted(timeProvider.GetUtcNow());
+                resultPersisted = await dbContext.DeadLetterShipmentCommandLeaseAsync(
+                        command.Id,
+                        leaseToken,
+                        operationResult.FirstError ?? "Shipment command was rejected.",
+                        operationResult.Status.ToString(),
+                        timeProvider.GetUtcNow(),
+                        cancellationToken);
+                if (resultPersisted)
+                {
+                    processed++;
+                    OutboxProcessingMetrics.RecordDeadLetter("shipment-command");
+                }
             }
             else
             {
-                var delayMinutes = Math.Min(60, Math.Pow(2, Math.Min(command.AttemptCount, 6)));
-                command.ScheduleRetry(
-                    operationResult.FirstError ?? "Shipment command failed.",
-                    timeProvider.GetUtcNow().AddMinutes(delayMinutes));
+                var error = operationResult.FirstError ?? "Shipment command failed.";
+                if (command.AttemptCount >= MaxShipmentCommandAttempts)
+                {
+                    resultPersisted = await dbContext.DeadLetterShipmentCommandLeaseAsync(
+                            command.Id,
+                            leaseToken,
+                            error,
+                            "TransientRetryLimitExceeded",
+                            timeProvider.GetUtcNow(),
+                            cancellationToken);
+                    if (resultPersisted)
+                    {
+                        processed++;
+                        OutboxProcessingMetrics.RecordDeadLetter("shipment-command");
+                    }
+                }
+                else
+                {
+                    var delayMinutes = Math.Min(60, Math.Pow(2, Math.Min(command.AttemptCount, 6)));
+                    var jitter = 0.9 + Random.Shared.NextDouble() * 0.2;
+                    resultPersisted = await dbContext.RetryShipmentCommandLeaseAsync(
+                            command.Id,
+                            leaseToken,
+                            error,
+                            "TransientProviderFailure",
+                            timeProvider.GetUtcNow().AddMinutes(delayMinutes * jitter),
+                            cancellationToken);
+                    if (resultPersisted)
+                    {
+                        processed++;
+                        OutboxProcessingMetrics.RecordRetry("shipment-command");
+                    }
+                }
             }
 
-            await dbContext.SaveChangesAsync(cancellationToken);
-            processed++;
+            if (!resultPersisted)
+            {
+                logger.LogWarning(
+                    "Shipment command {CommandId} lease was lost before its result could be persisted.",
+                    command.Id);
+            }
+
+            OutboxProcessingMetrics.RecordProcessingDuration(
+                "shipment-command",
+                Stopwatch.GetElapsedTime(startedAt));
         }
 
         return processed;
@@ -396,6 +436,7 @@ internal sealed class OrderShipmentService(
             var tracking = await provider.CancelShipmentAsync(
                 shipment.TrackingCode,
                 NormalizeCancelReason(reason),
+                BuildCancelIdempotencyKey(order.OrderCode),
                 cancellationToken);
             return await ApplyTrackingAsync(order, shipment, tracking, ShipmentTimelineSource.Cancellation, cancellationToken);
         }
@@ -557,23 +598,12 @@ internal sealed class OrderShipmentService(
         string? reason,
         CancellationToken cancellationToken)
     {
-        var exists = await dbContext.ShipmentCommandOutbox
-            .Where(command => command.OrderId == orderId &&
-                command.CommandType == commandType &&
-                command.CompletedAtUtc == null)
-            .AnyAsyncSafe(cancellationToken);
-        if (exists)
-        {
-            return;
-        }
-
-        dbContext.Add(new ShipmentCommandOutbox(
-            Guid.NewGuid(),
+        await dbContext.TryEnqueueShipmentCommandAsync(
             orderId,
             commandType,
             reason,
-            timeProvider.GetUtcNow()));
-        await dbContext.SaveChangesAsync(cancellationToken);
+            timeProvider.GetUtcNow(),
+            cancellationToken);
     }
 
     private async Task<ShipmentTrackingDto> ToDtoAsync(Order order, CancellationToken cancellationToken)
@@ -598,7 +628,9 @@ internal sealed class OrderShipmentService(
                 .ToArrayAsyncSafe(cancellationToken);
         var activeCommand = await dbContext.ShipmentCommandOutbox
             .AsNoTrackingIfEf()
-            .Where(command => command.OrderId == order.Id && command.CompletedAtUtc == null)
+            .Where(command => command.OrderId == order.Id &&
+                (command.Status == ShipmentCommandStatus.Pending ||
+                 command.Status == ShipmentCommandStatus.Leased))
             .OrderByDescending(command => command.CreatedAtUtc)
             .ThenByDescending(command => command.Id)
             .FirstOrDefaultAsyncSafe(cancellationToken);
@@ -643,6 +675,8 @@ internal sealed class OrderShipmentService(
     {
         return string.IsNullOrWhiteSpace(reason) ? "Order cancelled." : reason.Trim();
     }
+
+    private static string BuildCancelIdempotencyKey(string orderCode) => $"{orderCode}:cancel";
 
     private static Result<ShipmentTrackingDto> ToTrackingFailure(Result result, string fallbackError)
     {

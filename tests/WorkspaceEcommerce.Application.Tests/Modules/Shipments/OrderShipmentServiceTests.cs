@@ -17,7 +17,7 @@ public sealed class OrderShipmentServiceTests
     private static readonly DateTimeOffset Now = new(2026, 8, 2, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task RetryCreateAsync_ValidOrder_CreatesShipmentWithStableIdempotencyKey()
+    public async Task RetryCreateAsync_ValidOrder_QueuesThenCreatesShipmentWithStableIdempotencyKey()
     {
         var dbContext = new FakeAppDbContext();
         var (order, variant) = CreateOrderWithVariant();
@@ -29,6 +29,13 @@ public sealed class OrderShipmentServiceTests
         var result = await service.RetryCreateAsync(order.Id);
 
         Assert.True(result.IsSuccess);
+        Assert.Equal(0, provider.CreateCallCount);
+        var command = Assert.Single(dbContext.ShipmentCommandOutbox);
+        Assert.Equal(ShipmentCommandStatus.Pending, command.Status);
+
+        var processed = await service.ProcessDueCommandsAsync(batchSize: 10);
+
+        Assert.Equal(1, processed);
         Assert.Equal(order.OrderCode, provider.LastIdempotencyKey);
         Assert.Equal(1, provider.CreateCallCount);
         Assert.Equal(provider.CreateResponse.TrackingCode, order.TrackingCode);
@@ -65,7 +72,7 @@ public sealed class OrderShipmentServiceTests
     }
 
     [Fact]
-    public async Task RetryCreateAsync_TransientProviderFailure_QueuesSingleCreateCommand()
+    public async Task RetryCreateAsync_TransientProviderFailure_RetriesTheLeasedCommandWithoutDuplication()
     {
         var dbContext = new FakeAppDbContext();
         var (order, variant) = CreateOrderWithVariant();
@@ -73,20 +80,25 @@ public sealed class OrderShipmentServiceTests
         dbContext.Seed(variant);
         var provider = new StubShipmentService
         {
-            QuoteException = new HttpRequestException("network unavailable")
+            CreateException = new HttpRequestException("network unavailable")
         };
         var service = CreateService(dbContext, provider);
 
         var first = await service.RetryCreateAsync(order.Id);
         var second = await service.RetryCreateAsync(order.Id);
+        var processed = await service.ProcessDueCommandsAsync(batchSize: 10);
 
-        Assert.Equal(ResultStatus.Failure, first.Status);
-        Assert.Equal(ResultStatus.Failure, second.Status);
-        Assert.Single(dbContext.ShipmentCommandOutbox);
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(1, processed);
+        var command = Assert.Single(dbContext.ShipmentCommandOutbox);
+        Assert.Equal(ShipmentCommandStatus.Pending, command.Status);
+        Assert.Equal(1, command.AttemptCount);
+        Assert.Equal(1, provider.CreateCallCount);
     }
 
     [Fact]
-    public async Task CancelAsync_CancellableShipment_UpdatesProviderAndOrderStatus()
+    public async Task CancelAsync_CancellableShipment_QueuesThenUpdatesProviderAndOrderStatus()
     {
         var dbContext = new FakeAppDbContext();
         var (order, _) = CreateOrderWithVariant();
@@ -119,14 +131,22 @@ public sealed class OrderShipmentServiceTests
         var result = await service.CancelAsync(order.Id, "Customer request");
 
         Assert.True(result.IsSuccess);
+        Assert.Equal(0, provider.CancelCallCount);
+        var command = Assert.Single(dbContext.ShipmentCommandOutbox);
+        Assert.Equal(ShipmentCommandType.Cancel, command.CommandType);
+
+        var processed = await service.ProcessDueCommandsAsync(batchSize: 10);
+
+        Assert.Equal(1, processed);
         Assert.Equal(OrderStatus.Cancelled, order.Status);
         Assert.Equal("Cancelled", shipment.ProviderStatus);
         Assert.Equal(1, provider.CancelCallCount);
+        Assert.Equal($"{order.OrderCode}:cancel", provider.LastCancelIdempotencyKey);
         Assert.Single(dbContext.ShipmentTimelineEntries);
     }
 
     [Fact]
-    public async Task CancelAsync_ProviderConflict_ReturnsConflictWithoutOutboxRetry()
+    public async Task CancelAsync_ProviderConflict_DeadLettersTheQueuedCommand()
     {
         var dbContext = new FakeAppDbContext();
         var (order, _) = CreateOrderWithVariant();
@@ -140,9 +160,14 @@ public sealed class OrderShipmentServiceTests
         var service = CreateService(dbContext, provider);
 
         var result = await service.CancelAsync(order.Id, "Customer request");
+        var processed = await service.ProcessDueCommandsAsync(batchSize: 10);
 
-        Assert.Equal(ResultStatus.Conflict, result.Status);
-        Assert.Empty(dbContext.ShipmentCommandOutbox);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, processed);
+        Assert.Equal(1, provider.CancelCallCount);
+        var command = Assert.Single(dbContext.ShipmentCommandOutbox);
+        Assert.Equal(ShipmentCommandStatus.DeadLetter, command.Status);
+        Assert.Equal("Conflict", command.LastErrorCategory);
     }
 
     [Fact]
@@ -256,6 +281,8 @@ public sealed class OrderShipmentServiceTests
 
         public HttpRequestException? QuoteException { get; init; }
 
+        public HttpRequestException? CreateException { get; init; }
+
         public HttpRequestException? CancelException { get; init; }
 
         public TrackingResponse? CancelResponse { get; init; }
@@ -265,6 +292,8 @@ public sealed class OrderShipmentServiceTests
         public int CancelCallCount { get; private set; }
 
         public string? LastIdempotencyKey { get; private set; }
+
+        public string? LastCancelIdempotencyKey { get; private set; }
 
         public Task<ShippingQuoteResponse> GetShippingQuoteAsync(ShippingQuoteRequest request, CancellationToken cancellationToken = default)
         {
@@ -280,6 +309,11 @@ public sealed class OrderShipmentServiceTests
         {
             CreateCallCount++;
             LastIdempotencyKey = idempotencyKey;
+            if (CreateException is not null)
+            {
+                throw CreateException;
+            }
+
             return Task.FromResult(new CreateShipmentResponse
             {
                 ShipmentId = CreateResponse.ShipmentId,
@@ -303,6 +337,16 @@ public sealed class OrderShipmentServiceTests
             }
 
             return Task.FromResult(CancelResponse ?? throw new InvalidOperationException("Cancel response is not configured."));
+        }
+
+        public Task<TrackingResponse> CancelShipmentAsync(
+            string trackingCode,
+            string reason,
+            string idempotencyKey,
+            CancellationToken cancellationToken = default)
+        {
+            LastCancelIdempotencyKey = idempotencyKey;
+            return CancelShipmentAsync(trackingCode, reason, cancellationToken);
         }
     }
 

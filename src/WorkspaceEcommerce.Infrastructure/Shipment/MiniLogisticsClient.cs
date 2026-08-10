@@ -143,15 +143,37 @@ internal sealed class MiniLogisticsClient(
         string reason,
         CancellationToken cancellationToken = default)
     {
+        return await CancelShipmentAsync(
+            trackingCode,
+            reason,
+            $"cancel:{trackingCode}",
+            cancellationToken);
+    }
+
+    public async Task<TrackingResponse> CancelShipmentAsync(
+        string trackingCode,
+        string reason,
+        string idempotencyKey,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            throw new ArgumentException("A cancellation idempotency key is required.", nameof(idempotencyKey));
+        }
+
         logger.LogInformation("Cancelling shipment {TrackingCode}", trackingCode);
 
-        using var response = await SendWithRetryAsync(
-            () => new HttpRequestMessage(
+        using var response = await SendWithRetryAsync(() =>
+        {
+            var request = new HttpRequestMessage(
                 HttpMethod.Post,
                 $"shipments/{Uri.EscapeDataString(trackingCode)}/cancel")
-            {
-                Content = JsonContent.Create(new { Reason = reason }, options: JsonOptions)
-            },
+                {
+                    Content = JsonContent.Create(new { Reason = reason }, options: JsonOptions)
+                };
+            request.Headers.Add("Idempotency-Key", idempotencyKey);
+            return request;
+        },
             "cancel shipment",
             cancellationToken);
 

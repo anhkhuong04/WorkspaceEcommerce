@@ -4,7 +4,6 @@ using WorkspaceEcommerce.Application.Abstractions.Shipment;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Shipments;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
-using WorkspaceEcommerce.Domain.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Application.Modules.Ordering;
 
@@ -75,7 +74,7 @@ internal sealed class CheckoutShippingCoordinator(
         }
     }
 
-    public async Task TryCreateShipmentAsync(
+    public async Task RefreshShippingQuoteAfterCheckoutAsync(
         Order order,
         CheckoutRequest request,
         IReadOnlyCollection<CheckoutItemSnapshot> snapshots,
@@ -90,77 +89,18 @@ internal sealed class CheckoutShippingCoordinator(
                 snapshots,
                 codAmount,
                 cancellationToken);
-
-            var shipmentResponse = await shipmentService.CreateShipmentAsync(new CreateShipmentRequest
-            {
-                ExternalOrderId = order.OrderCode,
-                Receiver = new ShipmentContact
-                {
-                    Name = order.CustomerName,
-                    Phone = order.CustomerPhone
-                },
-                DeliveryAddress = BuildDeliveryAddress(order, request),
-                Parcel = CheckoutCartBuilder.AggregateParcel(snapshots),
-                GoodsValueAmount = order.Subtotal,
-                CodAmount = codAmount,
-                Note = order.Note
-            }, order.OrderCode, cancellationToken);
-
-            if (shipmentResponse.ShipmentId == Guid.Empty ||
-                string.IsNullOrWhiteSpace(shipmentResponse.TrackingCode) ||
-                !string.Equals(shipmentResponse.ExternalOrderId, order.OrderCode, StringComparison.OrdinalIgnoreCase) ||
-                !ShipmentProviderContract.IsKnownStatus(shipmentResponse.Status))
-            {
-                throw new InvalidOperationException("MiniLogistics returned an invalid shipment mapping.");
-            }
-
-            order.UpdateShipmentInfo(shipmentResponse.TrackingCode, shipmentResponse.ShipmentId);
-
-            var now = DateTimeOffset.UtcNow;
-            var shipment = new OrderShipment(
-                Guid.NewGuid(),
-                order.Id,
-                "MiniLogistics",
-                shipmentResponse.ShipmentId,
-                shipmentResponse.TrackingCode,
-                shipmentResponse.Status,
-                shipmentResponse.ShippingFeeAmount,
-                shipmentResponse.Currency,
-                now);
-
             checkoutStore.Update(order);
-            checkoutStore.Add(shipment);
-            checkoutStore.Add(new ShipmentTimelineEntry(
-                Guid.NewGuid(),
-                shipment.Id,
-                shipmentResponse.Status,
-                "Shipment created.",
-                now,
-                ShipmentTimelineSource.ShipmentCreated,
-                providerEventId: null,
-                now));
-            await checkoutStore.SaveChangesAsync(cancellationToken);
         }
-        catch (HttpRequestException ex) when (ShipmentProviderFailure.IsTransient(ex))
+        catch (HttpRequestException ex)
         {
             ShipmentIntegrationMetrics.RecordCreateFailure();
-            logger.LogWarning(ex, "MiniLogistics shipment creation failed for order {OrderCode}. Order was placed without shipment.", order.OrderCode);
-            checkoutStore.Add(new ShipmentCommandOutbox(
-                Guid.NewGuid(),
-                order.Id,
-                ShipmentCommandType.Create,
-                reason: null,
-                DateTimeOffset.UtcNow));
-            await checkoutStore.SaveChangesAsync(cancellationToken);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            ShipmentIntegrationMetrics.RecordCreateFailure();
-            logger.LogError(
+            logger.LogWarning(
                 ex,
-                "MiniLogistics shipment creation failed permanently for order {OrderCode}; use admin retry after correcting the request or provider contract",
+                "MiniLogistics quote refresh failed for order {OrderCode}; durable shipment creation remains queued.",
                 order.OrderCode);
         }
+
+        await checkoutStore.SaveChangesAsync(cancellationToken);
     }
 
     private async Task ApplyShippingQuoteAsync(

@@ -1,23 +1,18 @@
 using System.Text.Json;
-using Microsoft.Extensions.Logging;
 using WorkspaceEcommerce.Application.Abstractions.Payments;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
-using WorkspaceEcommerce.Application.Abstractions.Shipment;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Payments;
 using WorkspaceEcommerce.Domain.Modules.Shipments;
-using WorkspaceEcommerce.Application.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Application.Modules.Payments;
 
 internal sealed class PaymentService(
     IAppDbContext dbContext,
-    IVNPayPaymentService vnPayPaymentService,
-    IShipmentService shipmentService,
-    ILogger<PaymentService> logger) : IPaymentService
+    IVNPayPaymentService vnPayPaymentService) : IPaymentService
 {
     public async Task<Result<PaymentResultDto>> HandleVNPayReturnAsync(
         VNPayCallbackRequest request,
@@ -118,57 +113,61 @@ internal sealed class PaymentService(
             return Result<PaymentResultDto>.Validation(["VNPay transaction reference is required."]);
         }
 
-        var transaction = await dbContext.PaymentTransactions
-            .Where(existing => existing.Provider == PaymentProvider.VNPay && existing.TxnRef == txnRef)
-            .FirstOrDefaultAsyncSafe(cancellationToken);
-        if (transaction is null)
-        {
-            return Result<PaymentResultDto>.NotFound("Payment transaction was not found.");
-        }
-
-        var order = await dbContext.Orders
-            .Where(existing => existing.Id == transaction.OrderId)
-            .FirstOrDefaultAsyncSafe(cancellationToken);
-        if (order is null)
-        {
-            return Result<PaymentResultDto>.NotFound("Order was not found.");
-        }
-
-        if (verification.Amount is not null && verification.Amount.Value != transaction.Amount)
-        {
-            return Result<PaymentResultDto>.Conflict("VNPay amount does not match payment transaction amount.");
-        }
-
-        if (transaction.IsTerminal)
-        {
-            if (transaction.Status == PaymentTransactionStatus.Success &&
-                !order.ShipmentId.HasValue &&
-                !await dbContext.OrderShipments
-                    .Where(shipment => shipment.OrderId == order.Id)
-                    .AnyAsyncSafe(cancellationToken))
-            {
-                await TryCreateShipmentAfterPaymentAsync(order, cancellationToken);
-            }
-
-            return Result<PaymentResultDto>.Success(ToPaymentResultDto(
-                order,
-                transaction,
-                transaction.GatewayResponseCode ?? verification.ResponseCode,
-                transaction.GatewayResponseMessage ?? "Payment transaction already processed."));
-        }
-
-        var processedAt = DateTimeOffset.UtcNow;
-        var outcome = vnPayPaymentService.GetPaymentOutcome(
-            verification.ResponseCode,
-            verification.TransactionStatus);
-        var gatewayMessage = BuildGatewayMessage(verification.ResponseCode, outcome);
-        var rawResponse = SerializeParameters(verification.Parameters);
-        var shouldCreateShipment = false;
-
+        Result<PaymentResultDto>? callbackResult = null;
         try
         {
             await dbContext.ExecuteInTransactionAsync(async transactionCancellationToken =>
             {
+                // Both callbacks can arrive at the same time (browser return and
+                // VNPay IPN, or provider retries). The locked reads make one of
+                // them observe the other's terminal write instead of applying the
+                // payment state twice.
+                var transaction = await dbContext.FindVNPayPaymentTransactionForUpdateAsync(
+                    txnRef,
+                    transactionCancellationToken);
+                if (transaction is null)
+                {
+                    callbackResult = Result<PaymentResultDto>.NotFound("Payment transaction was not found.");
+                    return;
+                }
+
+                var order = await dbContext.FindOrderForUpdateAsync(
+                    transaction.OrderId,
+                    transactionCancellationToken);
+                if (order is null)
+                {
+                    callbackResult = Result<PaymentResultDto>.NotFound("Order was not found.");
+                    return;
+                }
+
+                if (verification.Amount is not null && verification.Amount.Value != transaction.Amount)
+                {
+                    callbackResult = Result<PaymentResultDto>.Conflict("VNPay amount does not match payment transaction amount.");
+                    return;
+                }
+
+                if (transaction.IsTerminal)
+                {
+                    if (transaction.Status == PaymentTransactionStatus.Success && !order.ShipmentId.HasValue)
+                    {
+                        await EnqueueShipmentCreateAsync(order.Id, transactionCancellationToken);
+                    }
+
+                    callbackResult = Result<PaymentResultDto>.Success(ToPaymentResultDto(
+                        order,
+                        transaction,
+                        transaction.GatewayResponseCode ?? verification.ResponseCode,
+                        transaction.GatewayResponseMessage ?? "Payment transaction already processed."));
+                    return;
+                }
+
+                var processedAt = DateTimeOffset.UtcNow;
+                var outcome = vnPayPaymentService.GetPaymentOutcome(
+                    verification.ResponseCode,
+                    verification.TransactionStatus);
+                var gatewayMessage = BuildGatewayMessage(verification.ResponseCode, outcome);
+                var rawResponse = SerializeParameters(verification.Parameters);
+
                 switch (outcome)
                 {
                     case VNPayPaymentOutcome.Success:
@@ -180,7 +179,6 @@ internal sealed class PaymentService(
                             rawResponse,
                             processedAt);
                         order.MarkPaymentPaid(processedAt);
-                        shouldCreateShipment = true;
                         break;
                     case VNPayPaymentOutcome.Cancelled:
                         transaction.MarkCancelled(
@@ -207,6 +205,20 @@ internal sealed class PaymentService(
                 dbContext.Update(transaction);
                 dbContext.Update(order);
                 await dbContext.SaveChangesAsync(transactionCancellationToken);
+
+                if (outcome == VNPayPaymentOutcome.Success)
+                {
+                    // The shipment worker is the only code path that calls the
+                    // provider. Keeping this insert in the same database
+                    // transaction closes the paid-without-shipment crash window.
+                    await EnqueueShipmentCreateAsync(order.Id, transactionCancellationToken);
+                }
+
+                callbackResult = Result<PaymentResultDto>.Success(ToPaymentResultDto(
+                    order,
+                    transaction,
+                    verification.ResponseCode,
+                    gatewayMessage));
             }, cancellationToken);
         }
         catch (DomainException exception)
@@ -214,171 +226,19 @@ internal sealed class PaymentService(
             return Result<PaymentResultDto>.Conflict(exception.Message);
         }
 
-        if (shouldCreateShipment)
-        {
-            await TryCreateShipmentAfterPaymentAsync(order, cancellationToken);
-        }
-
-        return Result<PaymentResultDto>.Success(ToPaymentResultDto(
-            order,
-            transaction,
-            verification.ResponseCode,
-            gatewayMessage));
+        return callbackResult ?? Result<PaymentResultDto>.Failure("Payment callback processing did not produce a result.");
     }
 
-    private async Task TryCreateShipmentAfterPaymentAsync(
-        Order order,
+    private Task EnqueueShipmentCreateAsync(
+        Guid orderId,
         CancellationToken cancellationToken)
     {
-        if (order.ShipmentId is not null)
-        {
-            return;
-        }
-
-        var orderItems = await dbContext.OrderItems
-            .Where(item => item.OrderId == order.Id)
-            .OrderBy(item => item.Id)
-            .ToArrayAsyncSafe(cancellationToken);
-        if (orderItems.Length == 0)
-        {
-            logger.LogWarning(
-                "Skipping shipment creation for paid order {OrderCode} because it has no order items.",
-                order.OrderCode);
-            return;
-        }
-
-        try
-        {
-            var shipmentResponse = await shipmentService.CreateShipmentAsync(new CreateShipmentRequest
-            {
-                ExternalOrderId = order.OrderCode,
-                Receiver = new ShipmentContact
-                {
-                    Name = order.CustomerName,
-                    Phone = order.CustomerPhone
-                },
-                DeliveryAddress = new ShippingAddress
-                {
-                    Street = string.IsNullOrWhiteSpace(order.ShippingStreet)
-                        ? order.ShippingAddress
-                        : order.ShippingStreet,
-                    Ward = order.ShippingWard ?? string.Empty,
-                    Province = order.ShippingProvince ?? string.Empty
-                },
-                Parcel = await AggregateParcelAsync(orderItems, cancellationToken),
-                GoodsValueAmount = order.Subtotal,
-                CodAmount = 0m,
-                Note = order.Note
-            }, order.OrderCode, cancellationToken);
-
-            if (shipmentResponse.ShipmentId == Guid.Empty ||
-                string.IsNullOrWhiteSpace(shipmentResponse.TrackingCode) ||
-                !string.Equals(shipmentResponse.ExternalOrderId, order.OrderCode, StringComparison.OrdinalIgnoreCase) ||
-                !ShipmentProviderContract.IsKnownStatus(shipmentResponse.Status))
-            {
-                throw new InvalidOperationException("MiniLogistics returned an invalid shipment mapping.");
-            }
-
-            order.UpdateShipmentInfo(shipmentResponse.TrackingCode, shipmentResponse.ShipmentId);
-            var now = DateTimeOffset.UtcNow;
-            var shipment = new OrderShipment(
-                Guid.NewGuid(),
-                order.Id,
-                "MiniLogistics",
-                shipmentResponse.ShipmentId,
-                shipmentResponse.TrackingCode,
-                shipmentResponse.Status,
-                shipmentResponse.ShippingFeeAmount,
-                shipmentResponse.Currency,
-                now);
-            dbContext.Update(order);
-            dbContext.Add(shipment);
-            dbContext.Add(new ShipmentTimelineEntry(
-                Guid.NewGuid(),
-                shipment.Id,
-                shipmentResponse.Status,
-                "Shipment created after payment confirmation.",
-                now,
-                ShipmentTimelineSource.ShipmentCreated,
-                providerEventId: null,
-                now));
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-        catch (HttpRequestException exception) when (ShipmentProviderFailure.IsTransient(exception))
-        {
-            ShipmentIntegrationMetrics.RecordCreateFailure();
-            logger.LogWarning(
-                exception,
-                "Shipment creation failed after VNPay success for order {OrderCode}. Payment remains paid.",
-                order.OrderCode);
-            var pendingCommandExists = await dbContext.ShipmentCommandOutbox
-                .Where(command => command.OrderId == order.Id &&
-                    command.CommandType == ShipmentCommandType.Create &&
-                    command.CompletedAtUtc == null)
-                .AnyAsyncSafe(cancellationToken);
-            if (!pendingCommandExists)
-            {
-                dbContext.Add(new ShipmentCommandOutbox(
-                    Guid.NewGuid(),
-                    order.Id,
-                    ShipmentCommandType.Create,
-                    reason: null,
-                    DateTimeOffset.UtcNow));
-                await dbContext.SaveChangesAsync(cancellationToken);
-            }
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            ShipmentIntegrationMetrics.RecordCreateFailure();
-            logger.LogError(
-                exception,
-                "Shipment creation failed permanently after VNPay success for order {OrderCode}; use admin retry after correcting the request or provider contract",
-                order.OrderCode);
-        }
-    }
-
-    private async Task<ShippingParcel> AggregateParcelAsync(
-        IReadOnlyCollection<OrderItem> orderItems,
-        CancellationToken cancellationToken)
-    {
-        const decimal defaultWeightKg = 0.5m;
-        const decimal defaultLengthCm = 15m;
-        const decimal defaultWidthCm = 10m;
-        const decimal defaultHeightCm = 8m;
-
-        var totalWeight = 0m;
-        var maxLength = 0m;
-        var maxWidth = 0m;
-        var totalHeight = 0m;
-
-        var variantIds = orderItems.Select(orderItem => orderItem.ProductVariantId).Distinct().ToArray();
-        var variantsById = (await dbContext.ProductVariants
-            .AsNoTrackingIfEf()
-            .Where(existing => variantIds.Contains(existing.Id))
-            .ToArrayAsyncSafe(cancellationToken))
-            .ToDictionary(variant => variant.Id);
-
-        foreach (var orderItem in orderItems)
-        {
-            variantsById.TryGetValue(orderItem.ProductVariantId, out var variant);
-            var weight = variant?.WeightKg ?? defaultWeightKg;
-            var length = variant?.LengthCm ?? defaultLengthCm;
-            var width = variant?.WidthCm ?? defaultWidthCm;
-            var height = variant?.HeightCm ?? defaultHeightCm;
-
-            totalWeight += weight * orderItem.Quantity;
-            if (length > maxLength) maxLength = length;
-            if (width > maxWidth) maxWidth = width;
-            totalHeight += height * orderItem.Quantity;
-        }
-
-        return new ShippingParcel
-        {
-            WeightKg = totalWeight,
-            LengthCm = maxLength,
-            WidthCm = maxWidth,
-            HeightCm = totalHeight
-        };
+        return dbContext.TryEnqueueShipmentCommandAsync(
+            orderId,
+            ShipmentCommandType.Create,
+            reason: null,
+            DateTimeOffset.UtcNow,
+            cancellationToken);
     }
 
     private static PaymentResultDto ToPaymentResultDto(

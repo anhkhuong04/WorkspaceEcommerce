@@ -21,13 +21,33 @@ internal sealed class ShipmentCommandOutboxConfiguration : IEntityTypeConfigurat
         builder.Property(command => command.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
         builder.Property(command => command.CompletedAtUtc).HasColumnName("completed_at_utc");
         builder.Property(command => command.LastError).HasColumnName("last_error").HasMaxLength(2000);
+        builder.Property(command => command.Status)
+            .HasColumnName("status")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+        builder.Property(command => command.LeaseOwner).HasColumnName("lease_owner").HasMaxLength(200);
+        builder.Property(command => command.LeaseToken)
+            .HasColumnName("lease_token")
+            .IsConcurrencyToken();
+        builder.Property(command => command.LeaseExpiresAtUtc).HasColumnName("lease_expires_at_utc");
+        builder.Property(command => command.LastAttemptAtUtc).HasColumnName("last_attempt_at_utc");
+        builder.Property(command => command.DeadLetteredAtUtc).HasColumnName("dead_lettered_at_utc");
+        builder.Property(command => command.LastErrorCategory).HasColumnName("last_error_category").HasMaxLength(100);
 
         builder.HasIndex(command => new { command.OrderId, command.CommandType })
             .IsUnique()
-            .HasFilter("completed_at_utc IS NULL")
+            .HasFilter("status IN ('Pending', 'Leased')")
             .HasDatabaseName("ux_shipment_command_outbox_active_order_type");
-        builder.HasIndex(command => new { command.CompletedAtUtc, command.NextAttemptAtUtc })
-            .HasDatabaseName("ix_shipment_command_outbox_due");
+        builder.HasIndex(command => new
+            {
+                command.Status,
+                command.NextAttemptAtUtc,
+                command.LeaseExpiresAtUtc,
+                command.CreatedAtUtc,
+                command.Id
+            })
+            .HasDatabaseName("ix_shipment_command_outbox_claim");
 
         builder.HasOne<Order>()
             .WithMany()

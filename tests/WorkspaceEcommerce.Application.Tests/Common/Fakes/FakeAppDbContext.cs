@@ -122,6 +122,103 @@ internal sealed class FakeAppDbContext : IAppDbContext
         return Task.FromResult(_customerRefreshTokens.FirstOrDefault(token => token.TokenHash == tokenHash));
     }
 
+    public Task<PaymentTransaction?> FindVNPayPaymentTransactionForUpdateAsync(
+        string txnRef,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_paymentTransactions.FirstOrDefault(transaction =>
+            transaction.Provider == PaymentProvider.VNPay &&
+            string.Equals(transaction.TxnRef, txnRef, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    public Task<Order?> FindOrderForUpdateAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_orders.FirstOrDefault(order => order.Id == orderId));
+    }
+
+    public Task<ShipmentCommandOutbox[]> ClaimDueShipmentCommandsAsync(
+        string leaseOwner,
+        TimeSpan leaseDuration,
+        int batchSize,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var now = DateTimeOffset.UtcNow;
+        var commands = _shipmentCommandOutbox
+            .Where(command => command.IsDueAt(now))
+            .OrderBy(command => command.NextAttemptAtUtc)
+            .ThenBy(command => command.CreatedAtUtc)
+            .ThenBy(command => command.Id)
+            .Take(batchSize)
+            .ToArray();
+
+        foreach (var command in commands)
+        {
+            command.Claim(leaseOwner, Guid.NewGuid(), now, now.Add(leaseDuration));
+        }
+
+        return Task.FromResult(commands);
+    }
+
+    public Task<bool> CompleteShipmentCommandLeaseAsync(
+        Guid commandId,
+        Guid leaseToken,
+        DateTimeOffset completedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var command = _shipmentCommandOutbox.SingleOrDefault(candidate => candidate.Id == commandId);
+        if (command?.LeaseToken != leaseToken)
+        {
+            return Task.FromResult(false);
+        }
+
+        command.MarkCompleted(leaseToken, completedAtUtc);
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> RetryShipmentCommandLeaseAsync(
+        Guid commandId,
+        Guid leaseToken,
+        string error,
+        string errorCategory,
+        DateTimeOffset nextAttemptAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var command = _shipmentCommandOutbox.SingleOrDefault(candidate => candidate.Id == commandId);
+        if (command?.LeaseToken != leaseToken)
+        {
+            return Task.FromResult(false);
+        }
+
+        command.ScheduleRetry(leaseToken, error, errorCategory, nextAttemptAtUtc);
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> DeadLetterShipmentCommandLeaseAsync(
+        Guid commandId,
+        Guid leaseToken,
+        string error,
+        string errorCategory,
+        DateTimeOffset deadLetteredAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var command = _shipmentCommandOutbox.SingleOrDefault(candidate => candidate.Id == commandId);
+        if (command?.LeaseToken != leaseToken)
+        {
+            return Task.FromResult(false);
+        }
+
+        command.DeadLetter(leaseToken, error, errorCategory, deadLetteredAtUtc);
+        return Task.FromResult(true);
+    }
+
     public int SaveChangesCallCount { get; private set; }
 
     public int TransactionCallCount { get; private set; }
@@ -323,6 +420,26 @@ internal sealed class FakeAppDbContext : IAppDbContext
         TransactionCallCount++;
 
         await operation(cancellationToken);
+    }
+
+    public Task<bool> TryEnqueueShipmentCommandAsync(
+        Guid orderId,
+        ShipmentCommandType commandType,
+        string? reason,
+        DateTimeOffset createdAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_shipmentCommandOutbox.Any(command => command.OrderId == orderId &&
+            command.CommandType == commandType &&
+            command.Status is ShipmentCommandStatus.Pending or ShipmentCommandStatus.Leased))
+        {
+            return Task.FromResult(false);
+        }
+
+        _shipmentCommandOutbox.Add(new ShipmentCommandOutbox(
+            Guid.NewGuid(), orderId, commandType, reason, createdAtUtc));
+        return Task.FromResult(true);
     }
 
     private List<TEntity> GetSet<TEntity>()

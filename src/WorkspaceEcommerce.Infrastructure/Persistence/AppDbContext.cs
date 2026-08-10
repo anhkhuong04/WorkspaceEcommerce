@@ -165,6 +165,156 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             .FromSqlInterpolated($"SELECT * FROM customer.refresh_tokens WHERE token_hash = {tokenHash} FOR UPDATE")
             .FirstOrDefaultAsync(cancellationToken);
 
+    Task<PaymentTransaction?> IAppDbContext.FindVNPayPaymentTransactionForUpdateAsync(
+        string txnRef,
+        CancellationToken cancellationToken) =>
+        PaymentTransactions
+            .FromSqlInterpolated($"""
+                SELECT *
+                FROM payments.payment_transactions
+                WHERE provider = 'VNPay' AND txn_ref = {txnRef}
+                FOR UPDATE
+                """)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    Task<Order?> IAppDbContext.FindOrderForUpdateAsync(
+        Guid orderId,
+        CancellationToken cancellationToken) =>
+        Orders
+            .FromSqlInterpolated($"SELECT * FROM ordering.orders WHERE id = {orderId} FOR UPDATE")
+            .FirstOrDefaultAsync(cancellationToken);
+
+    async Task<ShipmentCommandOutbox[]> IAppDbContext.ClaimDueShipmentCommandsAsync(
+        string leaseOwner,
+        TimeSpan leaseDuration,
+        int batchSize,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(leaseOwner))
+        {
+            throw new ArgumentException("A shipment command lease owner is required.", nameof(leaseOwner));
+        }
+
+        if (leaseDuration <= TimeSpan.Zero || leaseDuration > TimeSpan.FromHours(1))
+        {
+            throw new ArgumentOutOfRangeException(nameof(leaseDuration), "Shipment command lease duration must be between zero and one hour.");
+        }
+
+        if (batchSize is < 1 or > 100)
+        {
+            throw new ArgumentOutOfRangeException(nameof(batchSize), "Shipment command batch size must be between 1 and 100.");
+        }
+
+        await using var transaction = await Database.BeginTransactionAsync(cancellationToken);
+        var databaseNow = await Database
+            .SqlQuery<DateTimeOffset>($"SELECT clock_timestamp() AS \"Value\"")
+            .SingleAsync(cancellationToken);
+        var leaseExpiresAt = databaseNow.Add(leaseDuration);
+        var commands = await ShipmentCommandOutbox
+            .FromSqlInterpolated($"""
+                SELECT *
+                FROM shipping.shipment_command_outbox
+                WHERE status IN ('Pending', 'Leased')
+                  AND completed_at_utc IS NULL
+                  AND dead_lettered_at_utc IS NULL
+                  AND next_attempt_at_utc <= clock_timestamp()
+                  AND (lease_expires_at_utc IS NULL OR lease_expires_at_utc <= clock_timestamp())
+                ORDER BY next_attempt_at_utc, created_at_utc, id
+                LIMIT {batchSize}
+                FOR UPDATE SKIP LOCKED
+                """)
+            .ToArrayAsync(cancellationToken);
+
+        foreach (var command in commands)
+        {
+            command.Claim(leaseOwner, Guid.NewGuid(), databaseNow, leaseExpiresAt);
+        }
+
+        if (commands.Length > 0)
+        {
+            await SaveChangesAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return commands;
+    }
+
+    async Task<bool> IAppDbContext.CompleteShipmentCommandLeaseAsync(
+        Guid commandId,
+        Guid leaseToken,
+        DateTimeOffset completedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var affected = await ShipmentCommandOutbox
+            .Where(command => command.Id == commandId &&
+                command.Status == ShipmentCommandStatus.Leased &&
+                command.LeaseToken == leaseToken)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(command => command.CompletedAtUtc, completedAtUtc)
+                    .SetProperty(command => command.Status, ShipmentCommandStatus.Completed)
+                    .SetProperty(command => command.LastError, (string?)null)
+                    .SetProperty(command => command.LastErrorCategory, (string?)null)
+                    .SetProperty(command => command.LeaseOwner, (string?)null)
+                    .SetProperty(command => command.LeaseToken, (Guid?)null)
+                    .SetProperty(command => command.LeaseExpiresAtUtc, (DateTimeOffset?)null),
+                cancellationToken);
+
+        return affected == 1;
+    }
+
+    async Task<bool> IAppDbContext.RetryShipmentCommandLeaseAsync(
+        Guid commandId,
+        Guid leaseToken,
+        string error,
+        string errorCategory,
+        DateTimeOffset nextAttemptAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var affected = await ShipmentCommandOutbox
+            .Where(command => command.Id == commandId &&
+                command.Status == ShipmentCommandStatus.Leased &&
+                command.LeaseToken == leaseToken)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(command => command.Status, ShipmentCommandStatus.Pending)
+                    .SetProperty(command => command.LastError, error)
+                    .SetProperty(command => command.LastErrorCategory, errorCategory)
+                    .SetProperty(command => command.NextAttemptAtUtc, nextAttemptAtUtc)
+                    .SetProperty(command => command.LeaseOwner, (string?)null)
+                    .SetProperty(command => command.LeaseToken, (Guid?)null)
+                    .SetProperty(command => command.LeaseExpiresAtUtc, (DateTimeOffset?)null),
+                cancellationToken);
+
+        return affected == 1;
+    }
+
+    async Task<bool> IAppDbContext.DeadLetterShipmentCommandLeaseAsync(
+        Guid commandId,
+        Guid leaseToken,
+        string error,
+        string errorCategory,
+        DateTimeOffset deadLetteredAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var affected = await ShipmentCommandOutbox
+            .Where(command => command.Id == commandId &&
+                command.Status == ShipmentCommandStatus.Leased &&
+                command.LeaseToken == leaseToken)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(command => command.Status, ShipmentCommandStatus.DeadLetter)
+                    .SetProperty(command => command.LastError, error)
+                    .SetProperty(command => command.LastErrorCategory, errorCategory)
+                    .SetProperty(command => command.DeadLetteredAtUtc, deadLetteredAtUtc)
+                    .SetProperty(command => command.LeaseOwner, (string?)null)
+                    .SetProperty(command => command.LeaseToken, (Guid?)null)
+                    .SetProperty(command => command.LeaseExpiresAtUtc, (DateTimeOffset?)null),
+                cancellationToken);
+
+        return affected == 1;
+    }
+
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -175,6 +325,34 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             throw new PersistenceConcurrencyException("A concurrency conflict occurred while saving changes.", exception);
         }
+    }
+
+    public async Task<bool> TryEnqueueShipmentCommandAsync(
+        Guid orderId,
+        ShipmentCommandType commandType,
+        string? reason,
+        DateTimeOffset createdAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        if (orderId == Guid.Empty)
+        {
+            throw new ArgumentException("A shipment command order id is required.", nameof(orderId));
+        }
+
+        if (createdAtUtc == default)
+        {
+            throw new ArgumentException("A shipment command creation timestamp is required.", nameof(createdAtUtc));
+        }
+
+        var affected = await Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO shipping.shipment_command_outbox
+                (id, order_id, command_type, reason, attempt_count, next_attempt_at_utc, created_at_utc, status)
+            VALUES
+                ({Guid.NewGuid()}, {orderId}, {commandType.ToString()}, {reason}, 0, {createdAtUtc}, {createdAtUtc}, 'Pending')
+            ON CONFLICT (order_id, command_type) WHERE status IN ('Pending', 'Leased') DO NOTHING;
+            """, cancellationToken);
+
+        return affected == 1;
     }
 
     async Task<Cart?> ICartStore.FindCartBySessionIdAsync(
@@ -287,6 +465,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     {
         return await Orders.AnyAsync(order => order.OrderCode == orderCode, cancellationToken);
     }
+
+    Task<bool> ICheckoutStore.TryEnqueueShipmentCommandAsync(
+        Guid orderId,
+        ShipmentCommandType commandType,
+        string? reason,
+        DateTimeOffset createdAtUtc,
+        CancellationToken cancellationToken) =>
+        TryEnqueueShipmentCommandAsync(
+            orderId,
+            commandType,
+            reason,
+            createdAtUtc,
+            cancellationToken);
 
     async Task ICheckoutStore.ExecuteInTransactionAsync(
         Func<CancellationToken, Task> operation,

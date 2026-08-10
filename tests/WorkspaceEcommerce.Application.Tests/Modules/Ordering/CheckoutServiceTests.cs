@@ -11,6 +11,7 @@ using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Coupons;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Payments;
+using WorkspaceEcommerce.Domain.Modules.Shipments;
 using CartAggregate = WorkspaceEcommerce.Domain.Modules.Cart.Cart;
 
 namespace WorkspaceEcommerce.Application.Tests.Modules.Ordering;
@@ -53,6 +54,10 @@ public sealed class CheckoutServiceTests
         Assert.Equal(3, variant.StockQuantity);
         Assert.Empty(store.Carts);
         Assert.Single(store.Orders);
+        var shipmentCommand = Assert.Single(store.ShipmentCommandOutbox);
+        Assert.Equal(order.Id, shipmentCommand.OrderId);
+        Assert.Equal(ShipmentCommandType.Create, shipmentCommand.CommandType);
+        Assert.Equal(ShipmentCommandStatus.Pending, shipmentCommand.Status);
         Assert.Equal(1, store.TransactionCallCount);
         Assert.Equal(2, store.SaveChangesCallCount);
     }

@@ -1,22 +1,20 @@
-using Microsoft.Extensions.Logging.Abstractions;
 using WorkspaceEcommerce.Application.Abstractions.Payments;
-using WorkspaceEcommerce.Application.Abstractions.Shipment;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Payments;
 using WorkspaceEcommerce.Application.Tests.Common.Fakes;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Payments;
+using WorkspaceEcommerce.Domain.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Application.Tests.Modules.Payments;
 
 public sealed class PaymentServiceTests
 {
     [Fact]
-    public async Task HandleVNPayReturnAsync_Success_MarksPaidAndCreatesShipment()
+    public async Task HandleVNPayReturnAsync_Success_MarksPaidAndQueuesDurableShipmentCommand()
     {
         var setup = CreatePendingPayment();
-        var shipmentService = new FakeShipmentService();
-        var service = CreateService(setup.DbContext, shipmentService: shipmentService);
+        var service = CreateService(setup.DbContext);
 
         var result = await service.HandleVNPayReturnAsync(CreateCallback(setup.Transaction.TxnRef, "00", "00", setup.Transaction.Amount));
 
@@ -26,18 +24,19 @@ public sealed class PaymentServiceTests
         Assert.NotNull(setup.Order.PaidAt);
         Assert.Equal(PaymentTransactionStatus.Success, setup.Transaction.Status);
         Assert.Equal("00", setup.Transaction.GatewayResponseCode);
-        Assert.NotNull(setup.Order.ShipmentId);
-        Assert.NotNull(setup.Order.TrackingCode);
-        Assert.True(result.Value.ShipmentCreated);
-        Assert.Equal(1, shipmentService.CreateShipmentCallCount);
+        Assert.Null(setup.Order.ShipmentId);
+        Assert.Null(setup.Order.TrackingCode);
+        Assert.False(result.Value.ShipmentCreated);
+        var command = Assert.Single(setup.DbContext.ShipmentCommandOutbox);
+        Assert.Equal(ShipmentCommandType.Create, command.CommandType);
+        Assert.Equal(ShipmentCommandStatus.Pending, command.Status);
     }
 
     [Fact]
-    public async Task HandleVNPayReturnAsync_DuplicateSuccess_IsIdempotentAndDoesNotCreateShipmentAgain()
+    public async Task HandleVNPayReturnAsync_DuplicateSuccess_IsIdempotentAndDoesNotQueueAnotherShipmentCommand()
     {
         var setup = CreatePendingPayment();
-        var shipmentService = new FakeShipmentService();
-        var service = CreateService(setup.DbContext, shipmentService: shipmentService);
+        var service = CreateService(setup.DbContext);
         var request = CreateCallback(setup.Transaction.TxnRef, "00", "00", setup.Transaction.Amount);
 
         var firstResult = await service.HandleVNPayReturnAsync(request);
@@ -47,15 +46,15 @@ public sealed class PaymentServiceTests
         Assert.True(secondResult.IsSuccess);
         Assert.Equal(PaymentStatus.Paid, setup.Order.PaymentStatus);
         Assert.Equal(PaymentTransactionStatus.Success, setup.Transaction.Status);
-        Assert.Equal(1, shipmentService.CreateShipmentCallCount);
+        var command = Assert.Single(setup.DbContext.ShipmentCommandOutbox);
+        Assert.Equal(ShipmentCommandType.Create, command.CommandType);
     }
 
     [Fact]
     public async Task HandleVNPayReturnAsync_Failed_MarksPaymentFailed()
     {
         var setup = CreatePendingPayment();
-        var shipmentService = new FakeShipmentService();
-        var service = CreateService(setup.DbContext, shipmentService: shipmentService);
+        var service = CreateService(setup.DbContext);
 
         var result = await service.HandleVNPayReturnAsync(CreateCallback(setup.Transaction.TxnRef, "99", "02", setup.Transaction.Amount));
 
@@ -67,18 +66,16 @@ public sealed class PaymentServiceTests
         Assert.Equal("99", setup.Transaction.GatewayResponseCode);
         Assert.Null(setup.Order.ShipmentId);
         Assert.False(result.Value.ShipmentCreated);
-        Assert.Equal(0, shipmentService.CreateShipmentCallCount);
+        Assert.Empty(setup.DbContext.ShipmentCommandOutbox);
     }
 
     [Fact]
     public async Task HandleVNPayReturnAsync_TamperedHash_ReturnsValidationAndDoesNotMutatePayment()
     {
         var setup = CreatePendingPayment();
-        var shipmentService = new FakeShipmentService();
         var service = CreateService(
             setup.DbContext,
-            new FakeVNPayPaymentService { IsValid = false },
-            shipmentService);
+            new FakeVNPayPaymentService { IsValid = false });
 
         var result = await service.HandleVNPayReturnAsync(CreateCallback(setup.Transaction.TxnRef, "00", "00", setup.Transaction.Amount));
 
@@ -87,15 +84,14 @@ public sealed class PaymentServiceTests
         Assert.Equal(PaymentStatus.Pending, setup.Order.PaymentStatus);
         Assert.Equal(PaymentTransactionStatus.Pending, setup.Transaction.Status);
         Assert.Null(setup.Order.ShipmentId);
-        Assert.Equal(0, shipmentService.CreateShipmentCallCount);
+        Assert.Empty(setup.DbContext.ShipmentCommandOutbox);
     }
 
     [Fact]
     public async Task HandleVNPayReturnAsync_UnknownTxnRef_ReturnsNotFound()
     {
         var setup = CreatePendingPayment();
-        var shipmentService = new FakeShipmentService();
-        var service = CreateService(setup.DbContext, shipmentService: shipmentService);
+        var service = CreateService(setup.DbContext);
 
         var result = await service.HandleVNPayReturnAsync(CreateCallback("MISSING-TXN", "00", "00", setup.Transaction.Amount));
 
@@ -103,35 +99,31 @@ public sealed class PaymentServiceTests
         Assert.Contains("Payment transaction was not found.", result.Errors);
         Assert.Equal(PaymentStatus.Pending, setup.Order.PaymentStatus);
         Assert.Equal(PaymentTransactionStatus.Pending, setup.Transaction.Status);
-        Assert.Equal(0, shipmentService.CreateShipmentCallCount);
+        Assert.Empty(setup.DbContext.ShipmentCommandOutbox);
     }
 
     [Fact]
-    public async Task HandleVNPayReturnAsync_WhenShipmentFails_KeepsPaymentPaid()
+    public async Task HandleVNPayReturnAsync_ExistingTerminalSuccess_RecreatesOnlyMissingActiveCommand()
     {
         var setup = CreatePendingPayment();
-        var shipmentService = new FakeShipmentService { ThrowOnCreate = true };
-        var service = CreateService(setup.DbContext, shipmentService: shipmentService);
+        var service = CreateService(setup.DbContext);
 
+        await service.HandleVNPayReturnAsync(CreateCallback(setup.Transaction.TxnRef, "00", "00", setup.Transaction.Amount));
         var result = await service.HandleVNPayReturnAsync(CreateCallback(setup.Transaction.TxnRef, "00", "00", setup.Transaction.Amount));
 
         Assert.True(result.IsSuccess);
         Assert.Equal(PaymentStatus.Paid, setup.Order.PaymentStatus);
         Assert.Equal(PaymentTransactionStatus.Success, setup.Transaction.Status);
-        Assert.Null(setup.Order.ShipmentId);
-        Assert.Equal(1, shipmentService.CreateShipmentCallCount);
+        Assert.Single(setup.DbContext.ShipmentCommandOutbox);
     }
 
     private static PaymentService CreateService(
         FakeAppDbContext dbContext,
-        IVNPayPaymentService? vnPayPaymentService = null,
-        IShipmentService? shipmentService = null)
+        IVNPayPaymentService? vnPayPaymentService = null)
     {
         return new PaymentService(
             dbContext,
-            vnPayPaymentService ?? new FakeVNPayPaymentService(),
-            shipmentService ?? new FakeShipmentService(),
-            NullLogger<PaymentService>.Instance);
+            vnPayPaymentService ?? new FakeVNPayPaymentService());
     }
 
     private static PaymentSetup CreatePendingPayment()
@@ -248,67 +240,4 @@ public sealed class PaymentServiceTests
         }
     }
 
-    private sealed class FakeShipmentService : IShipmentService
-    {
-        public int CreateShipmentCallCount { get; private set; }
-
-        public bool ThrowOnCreate { get; init; }
-
-        public Task<ShippingQuoteResponse> GetShippingQuoteAsync(
-            ShippingQuoteRequest request,
-            CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(new ShippingQuoteResponse());
-        }
-
-        public Task<CreateShipmentResponse> CreateShipmentAsync(
-            CreateShipmentRequest request,
-            string idempotencyKey,
-            CancellationToken cancellationToken = default)
-        {
-            CreateShipmentCallCount++;
-            if (ThrowOnCreate)
-            {
-                throw new HttpRequestException("MiniLogistics unavailable.");
-            }
-
-            return Task.FromResult(new CreateShipmentResponse
-            {
-                ShipmentId = Guid.NewGuid(),
-                ExternalOrderId = request.ExternalOrderId,
-                TrackingCode = "ML-" + Guid.NewGuid().ToString("N")[..10].ToUpperInvariant(),
-                Status = "PendingPickup",
-                ShippingFeeAmount = 0m,
-                Currency = "VND"
-            });
-        }
-
-        public Task<TrackingResponse> GetTrackingAsync(
-            string trackingCode,
-            CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(new TrackingResponse
-            {
-                TrackingCode = trackingCode,
-                ExternalOrderId = "ORD-20260710-ABCDEF",
-                Status = "PendingPickup",
-                ShippingFeeAmount = 0m,
-                Timeline = []
-            });
-        }
-
-        public Task<TrackingResponse> CancelShipmentAsync(
-            string trackingCode,
-            string reason,
-            CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(new TrackingResponse
-            {
-                TrackingCode = trackingCode,
-                ExternalOrderId = "ORD-20260710-ABCDEF",
-                Status = "Cancelled",
-                Currency = "VND"
-            });
-        }
-    }
 }
