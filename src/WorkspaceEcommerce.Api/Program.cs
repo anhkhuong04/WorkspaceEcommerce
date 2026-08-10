@@ -26,7 +26,15 @@ if (builder.Environment.IsDevelopment())
 
 var jwtOptions = builder.Configuration.GetValidatedJwtOptions();
 var dataProtectionKeyRingPath = builder.Configuration["DataProtection:KeyRingPath"];
+var runtimeLimits = builder.Configuration
+    .GetSection(RuntimeLimitsOptions.SectionName)
+    .Get<RuntimeLimitsOptions>() ?? new RuntimeLimitsOptions();
+runtimeLimits.Validate();
 ProductionRuntimeConfigurationValidator.Validate(builder.Configuration, builder.Environment);
+
+builder.WebHost.ConfigureKestrel(runtimeLimits.ApplyTo);
+builder.Services.Configure<HostOptions>(options =>
+    options.ShutdownTimeout = TimeSpan.FromSeconds(runtimeLimits.ShutdownTimeoutSeconds));
 
 var dataProtectionBuilder = builder.Services
     .AddDataProtection()
@@ -65,6 +73,9 @@ builder.Services.AddApplicationForwardedHeaders(builder.Configuration);
 builder.Services.AddApplicationRateLimiter(builder.Environment);
 builder.Services
     .AddHealthChecks()
+    .AddCheck<ApplicationLivenessHealthCheck>(
+        "application-liveness",
+        tags: ["live"])
     .AddCheck<DatabaseHealthCheck>(
         "postgresql",
         tags: ["ready"]);
@@ -118,7 +129,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
-    Predicate = _ => false
+    Predicate = healthCheck => healthCheck.Tags.Contains("live")
 });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {

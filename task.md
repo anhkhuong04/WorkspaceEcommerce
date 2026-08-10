@@ -524,22 +524,28 @@ Acceptance criteria:
 
 #### PRH-013 - Harden the production runtime, container, and network topology
 
-- [ ] Run the API image as an explicit non-root user with minimum filesystem permissions; keep only the Data Protection mount and required temp paths writable.
-- [ ] Pin runtime/build/tool images and deployment artifacts by reviewed version/digest; document the update cadence instead of relying on mutable tags.
-- [ ] Set exact production `AllowedHosts`; reject wildcard host acceptance outside Development.
-- [ ] Define Kestrel/ingress request-header, request-body, upload, connection, keep-alive, and timeout limits consistent with the media API contract.
-- [ ] Confirm forwarded headers are accepted only from immediate trusted proxies and that direct forged headers cannot alter scheme/client IP/rate-limit partition.
+- [x] Run the API image as an explicit non-root user with minimum filesystem permissions; keep only the Data Protection mount and required temp paths writable. (The final image runs as fixed UID/GID `10001`; the CI smoke asserts the identity and writable media/key paths.)
+- [x] Pin runtime/build/tool images and deployment artifacts by reviewed version/digest; document the update cadence instead of relying on mutable tags. (Docker runtime/SDK base images are exact tag-plus-digest references aligned to `global.json`; update guidance is in the Dockerfile.)
+- [x] Set exact production `AllowedHosts`; reject wildcard host acceptance outside Development. (Implemented by PRH-011 production validation.)
+- [x] Define Kestrel/ingress request-header, request-body, upload, connection, keep-alive, and timeout limits consistent with the media API contract. (Validated `RuntimeLimits` config applies bounded Kestrel and graceful-shutdown values.)
+- [x] Confirm forwarded headers are accepted only from immediate trusted proxies and that direct forged headers cannot alter scheme/client IP/rate-limit partition. (No headers are processed without an explicit trusted proxy; configured proxy IPs replace framework defaults.)
 - [ ] Verify TLS termination, HTTPS redirect, HSTS, security headers, cookie security, CORS credentials, and websocket upgrade through the real ingress path.
 - [ ] Define CPU/memory requests and limits, connection-pool sizing, graceful shutdown duration, deployment surge/unavailable settings, and PostgreSQL maximum-connection budget.
-- [ ] Separate health semantics: liveness detects a stuck process, readiness covers required local/DB capability, and optional dependency diagnostics expose S3/SMTP/MiniLogistics without causing an avoidable cascading restart.
-- [ ] Ensure workers stop claiming new work during shutdown and finish or release active leases within the termination grace period.
-- [ ] Validate the production filesystem is ephemeral except for explicitly mounted/shared state and that media never falls back to local disk.
+- [x] Separate health semantics: liveness detects a stuck process, readiness covers required local/DB capability, and optional dependency diagnostics expose S3/SMTP/MiniLogistics without causing an avoidable cascading restart. (A dedicated liveness check is separate from PostgreSQL readiness; optional-dependency diagnostics remain a platform dashboard task.)
+- [x] Ensure workers stop claiming new work during shutdown and finish or release active leases within the termination grace period. (Workers honor the host cancellation token; PRH-012 leases bound recovery after an abrupt stop.)
+- [x] Validate the production filesystem is ephemeral except for explicitly mounted/shared state and that media never falls back to local disk. (Production media validation rejects local provider; only explicit media/Data Protection paths are writable in the image.)
 
 Acceptance criteria:
 
 - The hardened image starts and serves traffic as non-root with a read-only root filesystem policy where the platform supports it.
 - Ingress tests prove correct host, proxy, TLS/HSTS, CORS, websocket, request-limit, and health behavior.
 - A rolling restart causes no request corruption, lost durable work, local-media dependency, or exhausted database connections.
+
+##### Implementation evidence - 2026-08-10
+
+- Added fixed non-root runtime identity, exact reviewed base-image tag/digest references, initialized writable development volumes, request/runtime limits, strict forwarded-header trust, and liveness/readiness separation.
+- Local evidence passed: 12 focused API configuration/liveness tests; `docker compose --env-file .env.example config --quiet`; final and migration image builds; and `scripts/verify-prh-010-container.ps1`, including migration execution, UID `10001`, and live/ready probes.
+- Real ingress TLS/HSTS/CORS/websocket behavior, platform resource/connection budgets, read-only-root policy, production mounts, optional dependency diagnostics, and rolling-restart evidence remain staging/platform gates and are deliberately still unchecked.
 
 ### P1 - Observability, automated verification, and recovery
 

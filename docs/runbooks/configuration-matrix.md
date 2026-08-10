@@ -19,6 +19,7 @@ platform secret/configuration authority.
 | MiniLogistics | `MiniLogistics:*` | Local/sandbox only | Fake provider | Provider portal + secret manager | Logistics owner | API/webhook secret on exposure or provider request |
 | Browser origin and host | `AllowedHosts`, `Cors:AllowedOrigins`, `Storefront:BaseUrl`, `MediaStorage:PublicBaseUrl` | Localhost only | Test-only host | Exact public HTTPS names only | Platform + frontend owner | Review with every domain/ingress change |
 | Proxy / topology | `ForwardedHeaders:KnownProxies`, replica/backplane/edge limiter settings | Empty/direct | Test-only | Platform-controlled immediate proxy IPs and shared service references | Platform/SRE | Review every ingress, network, or scaling change |
+| Process limits | `RuntimeLimits:*` | Repository defaults | Repository defaults | Bounded values, changed only with load-test evidence | Platform/SRE + application | Review after a capacity or upload-policy change |
 | Telemetry | `APPLICATIONINSIGHTS_CONNECTION_STRING` / `ApplicationInsights:ConnectionString` | Optional | Omitted/synthetic | Secret/config authority; redaction policy in code | Platform + observability owner | Access review quarterly; rotate on exposure |
 
 ## Startup safety contract

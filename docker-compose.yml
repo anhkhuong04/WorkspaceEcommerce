@@ -21,7 +21,9 @@ services:
       Jwt__Audience: ${Jwt__Audience:?Set Jwt__Audience in .env}
       Jwt__SigningKey: ${Jwt__SigningKey:?Set Jwt__SigningKey in .env}
       Jwt__AccessTokenMinutes: ${Jwt__AccessTokenMinutes:-60}
-      DataProtection__KeyRingPath: ${DataProtection__KeyRingPath:-}
+      # This is a development-only named volume. Production must mount its own
+      # encrypted, shared key ring through the deployment platform.
+      DataProtection__KeyRingPath: ${DataProtection__KeyRingPath:-/var/lib/workspace-ecommerce/keys}
       APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING:-}
       Cors__AllowedOrigins__0: ${Cors__AllowedOrigins__0:-}
       Cors__AllowedOrigins__1: ${Cors__AllowedOrigins__1:-}
@@ -40,6 +42,9 @@ services:
       EmailDelivery__UserName: ${EmailDelivery__UserName:-}
       EmailDelivery__Password: ${EmailDelivery__Password:-}
       EmailDelivery__WorkerIntervalSeconds: ${EmailDelivery__WorkerIntervalSeconds:-30}
+      EmailDelivery__WorkerBatchSize: ${EmailDelivery__WorkerBatchSize:-20}
+      EmailDelivery__LeaseDurationSeconds: ${EmailDelivery__LeaseDurationSeconds:-120}
+      EmailDelivery__MaxDeliveryAttempts: ${EmailDelivery__MaxDeliveryAttempts:-8}
       MediaStorage__Provider: ${MediaStorage__Provider:-Local}
       MediaStorage__PublicBaseUrl: ${MediaStorage__PublicBaseUrl:-http://localhost:5080}
       MediaStorage__Bucket: ${MediaStorage__Bucket:-}
@@ -74,9 +79,39 @@ services:
     volumes:
       - ./.certs:/https:ro
       - media_data:/app/wwwroot/media
+      - data_protection_data:/var/lib/workspace-ecommerce/keys
     depends_on:
+      runtime-data-init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Docker creates named volumes as root. Initialize the two writable
+  # development volumes for the API image's fixed unprivileged UID/GID
+  # before the application process starts.
+  runtime-data-init:
+    image: alpine:3.22
+    command:
+      - /bin/sh
+      - -ec
+      - >-
+        mkdir -p /media /keys &&
+        chown -R 10001:10001 /media /keys &&
+        chmod 0750 /media &&
+        chmod 0700 /keys
+    volumes:
+      - media_data:/media
+      - data_protection_data:/keys
 
   postgres:
     image: postgres:17-alpine
@@ -172,4 +207,5 @@ services:
 volumes:
   postgres_data:
   media_data:
+  data_protection_data:
   minio_data:

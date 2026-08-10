@@ -72,6 +72,7 @@ Before exposing traffic, the platform owner must verify these with the actual de
 3. Confirm production startup rejects absent CORS origins, Data Protection key-ring path, Application Insights connection string, SMTP configuration, or S3 media configuration. Confirm the shared key ring is writable by the application identity and unavailable to other tenants.
 4. Confirm HTTP redirects to HTTPS after forwarded headers are processed, HSTS is present only on HTTPS production responses, and `/health/live` is live-process only while `/health/ready` includes PostgreSQL readiness. Put liveness and readiness on the correct load-balancer probes and restrict public access as required by the platform.
 5. Rate limits in this application are per process. For more than one API replica, configure and test an edge/WAF or distributed limiter with equivalent auth, 2FA, comment, transaction, catalog, and default partitions; the per-process limiter alone is not a cluster-wide control.
+6. The candidate image runs as fixed UID `10001`; CI verifies that identity and its media/Data Protection write paths. Keep the workload non-root, retain `no-new-privileges`/dropped capabilities (or platform equivalents), set resource limits, and provide only the required persistent writable mounts. The repository's compose file is a development topology, not a production deployment manifest.
 
 ## Telemetry and log redaction verification
 
