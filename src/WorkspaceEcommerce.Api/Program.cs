@@ -9,6 +9,7 @@ using WorkspaceEcommerce.Api.Health;
 using WorkspaceEcommerce.Api.Localization;
 using WorkspaceEcommerce.Api.Hubs;
 using WorkspaceEcommerce.Api.Middleware;
+using WorkspaceEcommerce.Api.Observability;
 using WorkspaceEcommerce.Application;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Seeding;
@@ -64,6 +65,7 @@ builder.Services
 builder.Services.AddOpenApi();
 builder.Services.AddApplicationAuthentication(jwtOptions);
 builder.Services.AddApplicationInsightsTelemetry();
+builder.Services.AddApplicationInsightsTelemetryProcessor<SensitiveTelemetryRedactionProcessor>();
 builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentCustomerContext, CurrentCustomerContext>();

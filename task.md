@@ -551,10 +551,10 @@ Acceptance criteria:
 
 #### PRH-014 - Complete production observability, redaction, and operational alerts
 
-- [ ] Define service-level indicators for request availability/latency, checkout failures, payment callbacks, refresh-token reuse, queue age/retries, webhook rejection, media failures, and database saturation.
-- [ ] Add a telemetry initializer/processor or equivalent allowlist so headers, cookies, authorization, query strings, email addresses, request bodies, tokens, TOTP/recovery codes, connection strings, webhook signatures/bodies, and provider credentials cannot enter logs/custom dimensions.
-- [ ] Preserve safe correlation fields: trace ID, event ID, order code/ID, message ID, provider status category, route template, and replica identity.
-- [ ] Add structured metrics and traces around checkout transaction/stock lock, coupon reservation, VNPay reconciliation, loyalty earning, outbox claims, shipment provider calls, media storage, and cleanup jobs.
+- [x] Define service-level indicators for request availability/latency, checkout failures, payment callbacks, refresh-token reuse, queue age/retries, webhook rejection, media failures, and database saturation. (Repository signal/owner contract is in `docs/runbooks/observability-and-alerting.md`; staging thresholds remain pending.)
+- [x] Add a telemetry initializer/processor or equivalent allowlist so headers, cookies, authorization, query strings, email addresses, request bodies, tokens, TOTP/recovery codes, connection strings, webhook signatures/bodies, and provider credentials cannot enter logs/custom dimensions. (The Application Insights processor redacts these values before transmission and has focused regression tests.)
+- [x] Preserve safe correlation fields: trace ID, event ID, order code/ID, message ID, provider status category, route template, and replica identity. (The redaction boundary strips sensitive values by name/content while retaining safe dimensions.)
+- [x] Add structured metrics and traces around checkout transaction/stock lock, coupon reservation, VNPay reconciliation, loyalty earning, outbox claims, shipment provider calls, media storage, and cleanup jobs. (Existing commerce/shipment instrumentation plus PRH-012 outbox metrics are documented; dashboard wiring remains external.)
 - [ ] Configure Application Insights sampling and retention so security/audit signals and failed dependencies are not accidentally discarded.
 - [ ] Create dashboards for API golden signals, PostgreSQL pool/latency, external dependencies, authentication abuse, and background queues.
 - [ ] Create actionable alerts with thresholds, evaluation windows, severity, named owner, escalation route, and linked runbook.
@@ -567,6 +567,12 @@ Acceptance criteria:
 - Redaction tests and staging sink queries find no sensitive marker content.
 - Every release-critical failure has a dashboard signal, an actionable alert, an owner, and a tested runbook.
 - Operators can correlate one customer-safe trace across API, database, outbox, and external provider without logging credentials or payload bodies.
+
+##### Implementation evidence - 2026-08-10
+
+- Registered `SensitiveTelemetryRedactionProcessor` with Application Insights. Focused tests verify that request URLs/query values, authorization/cookie/bearer data, custom credential/email/signature fields, dependency text, trace text, and exception text are redacted while safe operational fields remain.
+- Added the repository SLI/metric contract and the staging marker/alert verification procedure in `docs/runbooks/observability-and-alerting.md`.
+- Sampling/retention, dashboards, alerts, hosted sink-marker searches, alert exercises, acknowledgements, and final noise triage remain Platform/Observability staging evidence and are deliberately still unchecked.
 
 #### PRH-015 - Add automated browser, contract, and security regression gates
 
