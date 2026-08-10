@@ -32,16 +32,17 @@ function Invoke-MigrationUpdate([string]$TargetMigration) {
     $env:Jwt__SigningKey = 'prh009-local-signing-key-at-least-32-bytes'
 
     $arguments = @(
-        'ef', 'database', 'update',
+        'database', 'update',
         '--project', 'src\WorkspaceEcommerce.Infrastructure',
         '--startup-project', 'src\WorkspaceEcommerce.Api',
         '--context', 'AppDbContext',
+        '--configuration', 'Release',
         '--no-build')
     if (-not [string]::IsNullOrWhiteSpace($TargetMigration)) {
         $arguments += $TargetMigration
     }
 
-    & dotnet @arguments
+    & dotnet tool run dotnet-ef @arguments
     if ($LASTEXITCODE -ne 0) {
         throw "Migration update to '$TargetMigration' failed."
     }

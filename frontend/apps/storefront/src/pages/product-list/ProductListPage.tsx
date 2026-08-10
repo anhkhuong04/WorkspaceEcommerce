@@ -35,7 +35,8 @@ export function ProductListPage() {
   const search = searchParams.get("search") ?? "";
   const sortBy = normalizeSortBy(searchParams.get("sortBy"));
   const inStock = searchParams.get("inStock") === "true";
-  const [draftSearch, setDraftSearch] = useState(search);
+  const [draftSearchState, setDraftSearchState] = useState(() => ({ search, value: search }));
+  const draftSearch = draftSearchState.search === search ? draftSearchState.value : search;
   const textFilterTimerRef = useRef<number | undefined>(undefined);
   const parsedPageNumber = Number(searchParams.get("pageNumber") ?? "1");
   const pageNumber = Number.isFinite(parsedPageNumber) && parsedPageNumber > 0 ? parsedPageNumber : 1;
@@ -86,10 +87,6 @@ export function ProductListPage() {
   }, [isFilterOpen]);
 
   useEffect(() => {
-    setDraftSearch(search);
-  }, [search]);
-
-  useEffect(() => {
     return () => {
       clearPendingTextFilterUpdate();
     };
@@ -119,7 +116,7 @@ export function ProductListPage() {
   }
 
   function updateSearchDraft(value: string) {
-    setDraftSearch(value);
+    setDraftSearchState({ search, value });
     queueTextFilterUpdate(value);
   }
 

@@ -15,6 +15,14 @@ interface StorefrontSearchOverlayProps {
 }
 
 export function StorefrontSearchOverlay({ isOpen, onClose }: StorefrontSearchOverlayProps) {
+  if (!isOpen) {
+    return null;
+  }
+
+  return <StorefrontSearchOverlayContent onClose={onClose} />;
+}
+
+function StorefrontSearchOverlayContent({ onClose }: Pick<StorefrontSearchOverlayProps, "onClose">) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -22,10 +30,6 @@ export function StorefrontSearchOverlay({ isOpen, onClose }: StorefrontSearchOve
   const normalizedQuery = debouncedQuery.trim();
 
   useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     window.setTimeout(() => inputRef.current?.focus(), 0);
@@ -41,7 +45,7 @@ export function StorefrontSearchOverlay({ isOpen, onClose }: StorefrontSearchOve
       document.body.style.overflow = originalOverflow;
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen, onClose]);
+  }, [onClose]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -51,24 +55,16 @@ export function StorefrontSearchOverlay({ isOpen, onClose }: StorefrontSearchOve
     return () => window.clearTimeout(timer);
   }, [query]);
 
-  useEffect(() => {
-    if (!isOpen) {
-      setQuery("");
-      setDebouncedQuery("");
-      setActiveTab("products");
-    }
-  }, [isOpen]);
-
   const productsQuery = useQuery({
     queryKey: ["storefront", "header-search", "products", normalizedQuery],
     queryFn: () => storefrontApi.getProducts({ search: normalizedQuery, pageNumber: 1, pageSize: 6 }),
-    enabled: isOpen && normalizedQuery.length > 0
+    enabled: normalizedQuery.length > 0
   });
 
   const blogsQuery = useQuery({
     queryKey: ["storefront", "header-search", "blogs"],
     queryFn: storefrontApi.getBlogPosts,
-    enabled: isOpen
+    enabled: true
   });
 
   const products = productsQuery.data?.items ?? [];
@@ -87,10 +83,6 @@ export function StorefrontSearchOverlay({ isOpen, onClose }: StorefrontSearchOve
     setQuery("");
     setDebouncedQuery("");
     inputRef.current?.focus();
-  }
-
-  if (!isOpen) {
-    return null;
   }
 
   return (

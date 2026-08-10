@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { GoogleLogin } from "@react-oauth/google";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -158,19 +158,6 @@ export function LoginPage() {
     }
   });
 
-  useEffect(() => {
-    reset({
-      fullName: isRegister ? "" : undefined,
-      phoneNumber: isRegister ? "" : undefined,
-      email: "",
-      password: "",
-      confirmPassword: isRegister ? "" : undefined
-    });
-    setApiError(null);
-    setShowPassword(false);
-    setShowConfirmPassword(false);
-  }, [isRegister, reset]);
-
   async function onSubmit(values: AuthFormValues) {
     setApiError(null);
 
@@ -206,6 +193,20 @@ export function LoginPage() {
   }
 
   function switchMode(nextMode: AuthMode) {
+    if (nextMode === mode) {
+      return;
+    }
+
+    reset({
+      fullName: nextMode === "register" ? "" : undefined,
+      phoneNumber: nextMode === "register" ? "" : undefined,
+      email: "",
+      password: "",
+      confirmPassword: nextMode === "register" ? "" : undefined
+    });
+    setApiError(null);
+    setShowPassword(false);
+    setShowConfirmPassword(false);
     setMode(nextMode);
   }
 

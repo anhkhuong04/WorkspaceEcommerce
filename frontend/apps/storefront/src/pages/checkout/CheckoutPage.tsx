@@ -46,7 +46,7 @@ export function CheckoutPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { cartQueryKey, cartSessionId, openCartDrawer, resetCartSession } = useStorefrontCart();
-  const { customer, isAuthenticated } = useCustomerAuth();
+  const { customer } = useCustomerAuth();
   const [couponCodeInput, setCouponCodeInput] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<CheckoutCouponValidationResponse | null>(null);
   const [couponNotice, setCouponNotice] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);

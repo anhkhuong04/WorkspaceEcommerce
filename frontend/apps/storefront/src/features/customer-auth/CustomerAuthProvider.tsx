@@ -126,13 +126,19 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timeoutId);
   }, [clearSession, renewSession, session]);
 
+  const accessToken = session?.accessToken;
+
   useEffect(() => {
-    if (!session) {
+    if (!accessToken) {
       return;
     }
 
-    void refreshCustomer().catch(() => undefined);
-  }, [refreshCustomer, session?.accessToken]);
+    const timeoutId = window.setTimeout(() => {
+      void refreshCustomer().catch(() => undefined);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [accessToken, refreshCustomer]);
 
   const value = useMemo<CustomerAuthContextValue>(
     () => ({

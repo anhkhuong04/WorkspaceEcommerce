@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { StorefrontProductDetailDto } from "@workspace-ecommerce/api-types";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -22,7 +21,7 @@ function StarIcon({ filled, onClick, className = "" }: { filled: boolean; onClic
   );
 }
 
-export function ProductReviews({ slug, product }: { slug: string; product: StorefrontProductDetailDto }) {
+export function ProductReviews({ slug }: { slug: string }) {
   const queryClient = useQueryClient();
   const { isAuthenticated } = useCustomerAuth();
 

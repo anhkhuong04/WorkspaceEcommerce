@@ -11,13 +11,16 @@ Never put passwords, JWTs, refresh cookies, TOTP recovery codes, OAuth ID tokens
 Build the exact candidate once, then run the commands below from the repository root:
 
 ```powershell
-dotnet build WorkspaceEcommerce.slnx --disable-build-servers -m:1
+dotnet tool restore
+dotnet restore WorkspaceEcommerce.slnx --locked-mode
+dotnet build WorkspaceEcommerce.slnx --no-restore --disable-build-servers -m:1
 dotnet test WorkspaceEcommerce.slnx --no-build --no-restore --disable-build-servers -m:1
 ./scripts/verify-prh-009-regressions.ps1
 ./scripts/verify-prh-009-migrations.ps1
 ./scripts/verify-prh-009-backup-restore.ps1
 ./scripts/scan-tracked-runtime-secrets.ps1
-dotnet list WorkspaceEcommerce.slnx package --vulnerable --include-transitive
+dotnet list WorkspaceEcommerce.slnx package --vulnerable --include-transitive --format json | Set-Content artifacts/nuget-vulnerabilities.json
+./scripts/assert-no-nuget-vulnerabilities.ps1 -ReportPath artifacts/nuget-vulnerabilities.json
 Push-Location frontend
 corepack pnpm audit --prod --audit-level=high
 New-Item -ItemType Directory -Force ../artifacts | Out-Null
@@ -25,9 +28,25 @@ corepack pnpm licenses list --prod --json | Set-Content ../artifacts/frontend-pr
 corepack pnpm typecheck
 corepack pnpm build
 Pop-Location
+docker build --file src/WorkspaceEcommerce.Api/Dockerfile --target final --tag workspace-ecommerce-api:ci .
+docker build --file src/WorkspaceEcommerce.Api/Dockerfile --target migrate --tag workspace-ecommerce-api-migrate:ci .
+./scripts/verify-prh-010-container.ps1
 ```
 
 The focused regression gate covers two concurrent checkout attempts for the final stock unit, coupon redemption/use limits, VNPay duplicate IPN processing, loyalty earning/redemption, shipment command outbox behavior, and signed/idempotent shipment webhooks. The migration script validates both an empty database and an upgrade from `20260802034719_AddShipmentIntegration`. The backup script restores a real `content.media_assets` metadata sentinel into a separate PostgreSQL instance. Its backup is synthetic-only and removed by default.
+
+`Continuous integration` publishes the corresponding backend, frontend and container
+evidence artifacts for each pull request/main commit. It builds a development-only
+container candidate, runs the migration image against an isolated PostgreSQL container,
+then probes `/health/live` and `/health/ready`. A registry image digest is only release
+evidence after the release workflow pushes that exact CI-tested candidate; local image
+IDs and mutable tags are not deployment identities.
+
+Use the manual `Release candidate evidence` workflow only with a fully-qualified
+`image@sha256:...` reference. It deliberately rejects tags, pulls/scans that exact
+digest, and never calls `docker build`. The platform release workflow must push the
+candidate once, retain its digest/SBOM, and pass the same digest to deployment; it must
+not rebuild the application in a deployment environment.
 
 The license review completed for direct packages introduced by PRH-003 through PRH-007: `AWSSDK.S3`, `Google.Apis.Auth`, and `Magick.NET-Q8-AnyCPU` are Apache-2.0; `Otp.NET` and `Microsoft.ApplicationInsights.AspNetCore` are MIT. `Otp.NET` was checked from its package `LICENSE.txt`. The production frontend license export is retained as a release artifact and must be reviewed for policy exceptions before approval. The account email sender uses .NET's built-in SMTP client; no third-party email package was added.
 

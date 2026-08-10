@@ -2,20 +2,34 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { StorefrontCategoryDto } from "@workspace-ecommerce/api-types";
 import { formatMoney } from "@workspace-ecommerce/shared-utils";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useStorefrontCart } from "../../features/cart/StorefrontCartContext";
 import { ProductReviews } from "./ProductReviews";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
 
+interface ProductSelection {
+  productId: string | null;
+  selectedVariantId: string;
+  selectedImageIndex: number;
+  quantity: number;
+}
+
+function createProductSelection(productId: string | null): ProductSelection {
+  return {
+    productId,
+    selectedVariantId: "",
+    selectedImageIndex: 0,
+    quantity: 1
+  };
+}
+
 export function ProductDetailPage() {
   const { slug = "" } = useParams();
   const queryClient = useQueryClient();
   const { cartQueryKey, cartSessionId, openCartDrawer } = useStorefrontCart();
-  const [selectedVariantId, setSelectedVariantId] = useState("");
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [quantity, setQuantity] = useState(1);
+  const [selection, setSelection] = useState<ProductSelection>(() => createProductSelection(null));
 
   const productQuery = useQuery({
     queryKey: ["storefront", "product", slug],
@@ -28,6 +42,8 @@ export function ProductDetailPage() {
   });
 
   const product = productQuery.data;
+  const currentSelection = selection.productId === product?.id ? selection : createProductSelection(product?.id ?? null);
+  const { selectedVariantId, selectedImageIndex } = currentSelection;
   const categorySlug = useMemo(
     () => (product ? findCategorySlug(categoriesQuery.data ?? [], product.categoryId) : undefined),
     [categoriesQuery.data, product]
@@ -43,6 +59,7 @@ export function ProductDetailPage() {
       product.variants[0]
     );
   }, [product, selectedVariantId]);
+  const quantity = Math.min(Math.max(currentSelection.quantity, 1), Math.max(selectedVariant?.stockQuantity ?? 1, 1));
 
   const addToCartMutation = useMutation({
     mutationFn: () =>
@@ -57,24 +74,29 @@ export function ProductDetailPage() {
     }
   });
 
-  useEffect(() => {
-    setSelectedVariantId("");
-    setSelectedImageIndex(0);
-    setQuantity(1);
-  }, [product?.id]);
-
-  useEffect(() => {
-    if (!selectedVariant) {
+  function updateSelection(update: (current: ProductSelection) => ProductSelection) {
+    if (!product) {
       return;
     }
 
-    const maxQuantity = Math.max(selectedVariant.stockQuantity, 1);
-    setQuantity((current) => Math.min(Math.max(current, 1), maxQuantity));
-  }, [selectedVariant?.id, selectedVariant?.stockQuantity]);
+    setSelection((current) => update(current.productId === product.id ? current : createProductSelection(product.id)));
+  }
+
+  function selectVariant(variantId: string, stockQuantity: number) {
+    updateSelection((current) => ({
+      ...current,
+      selectedVariantId: variantId,
+      quantity: Math.min(Math.max(current.quantity, 1), Math.max(stockQuantity, 1))
+    }));
+  }
+
+  function selectImage(index: number) {
+    updateSelection((current) => ({ ...current, selectedImageIndex: index }));
+  }
 
   function setSafeQuantity(nextQuantity: number) {
     const maxQuantity = Math.max(selectedVariant?.stockQuantity ?? 1, 1);
-    setQuantity(Math.min(Math.max(nextQuantity, 1), maxQuantity));
+    updateSelection((current) => ({ ...current, quantity: Math.min(Math.max(nextQuantity, 1), maxQuantity) }));
   }
 
   function addToCart(event: FormEvent<HTMLFormElement>) {
@@ -158,7 +180,7 @@ export function ProductDetailPage() {
                 <button
                   key={image.id}
                   type="button"
-                  onClick={() => setSelectedImageIndex(index)}
+                  onClick={() => selectImage(index)}
                   className={`aspect-square overflow-hidden rounded-[var(--radius-control)] border bg-[#f6f6f6] transition ${
                     selectedImageIndex === index ? "border-slate-950 ring-2 ring-slate-950/10" : "border-slate-200 hover:border-slate-400"
                   }`}
@@ -232,7 +254,7 @@ export function ProductDetailPage() {
                       role="radio"
                       aria-checked={variantIsSelected}
                       disabled={variantIsOutOfStock}
-                      onClick={() => setSelectedVariantId(variant.id)}
+                      onClick={() => selectVariant(variant.id, variant.stockQuantity)}
                       className={`flex min-w-0 items-start justify-between gap-4 rounded-[var(--radius-control)] border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
                         variantIsSelected ? "border-slate-950 bg-slate-50" : "border-slate-200 hover:border-slate-400"
                       }`}
@@ -351,7 +373,7 @@ export function ProductDetailPage() {
         </div>
       </section>
 
-      <ProductReviews slug={slug} product={product} />
+      <ProductReviews slug={slug} />
     </div>
   );
 }

@@ -308,6 +308,35 @@ dotnet test WorkspaceEcommerce.slnx --logger "console;verbosity=detailed"
 
 ## Production Release Gate
 
+The release candidate is verified with pinned .NET/Node tooling, NuGet lock files,
+frontend lock files, and the CI workflow in `.github/workflows/ci.yml`. From a clean
+checkout, run the equivalent local gates before opening a release PR:
+
+```powershell
+dotnet tool restore
+dotnet restore WorkspaceEcommerce.slnx --locked-mode
+dotnet build WorkspaceEcommerce.slnx --no-restore --configuration Release
+dotnet test WorkspaceEcommerce.slnx --no-build --no-restore --configuration Release
+dotnet tool run dotnet-ef migrations has-pending-model-changes --project src/WorkspaceEcommerce.Infrastructure --startup-project src/WorkspaceEcommerce.Api --context AppDbContext --configuration Release --no-build
+./scripts/verify-prh-009-migrations.ps1
+./scripts/scan-tracked-runtime-secrets.ps1
+Push-Location frontend
+corepack pnpm install --frozen-lockfile
+corepack pnpm lint
+corepack pnpm typecheck
+corepack pnpm build
+corepack pnpm audit --prod --audit-level=high
+Pop-Location
+docker build --file src/WorkspaceEcommerce.Api/Dockerfile --target final --tag workspace-ecommerce-api:ci .
+docker build --file src/WorkspaceEcommerce.Api/Dockerfile --target migrate --tag workspace-ecommerce-api-migrate:ci .
+./scripts/verify-prh-010-container.ps1
+```
+
+The final release still requires the staging/topology, credential-rotation,
+multi-replica, backup/restore, load/soak, and sign-off evidence in the production
+runbook. CI artifacts are evidence for one candidate commit; they are not an
+authorization to deploy by themselves.
+
 Run the repeatable local gates before asking the platform owner to deploy:
 
 ```powershell

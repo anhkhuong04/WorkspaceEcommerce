@@ -31,10 +31,15 @@ coverage/
 *.coveragexml
 coverage*.json
 artifacts/performance/
+artifacts/backend/
+artifacts/frontend/
+artifacts/container/
+artifacts/release-candidate/
 
 # NuGet
 *.nupkg
 /packages/
+.nuget/
 
 # ASP.NET local settings
 appsettings.Local.json

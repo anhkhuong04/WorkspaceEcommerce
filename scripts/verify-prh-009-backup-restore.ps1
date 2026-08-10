@@ -35,10 +35,11 @@ function Invoke-MigrationUpdate {
     $env:AdminAuth__Password = 'prh009-local-admin-password'
     $env:Jwt__SigningKey = 'prh009-local-signing-key-at-least-32-bytes'
 
-    & dotnet ef database update `
+    & dotnet tool run dotnet-ef database update `
         --project 'src\WorkspaceEcommerce.Infrastructure' `
         --startup-project 'src\WorkspaceEcommerce.Api' `
         --context AppDbContext `
+        --configuration Release `
         --no-build
     if ($LASTEXITCODE -ne 0) {
         throw 'Could not migrate the temporary backup source database.'

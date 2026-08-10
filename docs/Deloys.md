@@ -2,6 +2,11 @@
 
 Ngay lap: 2026-07-14
 
+> **Tai lieu ke hoach lich su.** Danh gia "Trang thai repo" ben duoi da duoc lap
+> truoc dot hardening PRH-001 den PRH-009. Cap nhat chuan cho release candidate
+> nam trong `task.md` va `docs/runbooks/production-release.md`; cac de xuat Azure
+> va P0/P1 cu van giu lai de tham khao, khong phai la bang chung gap hien tai.
+
 Pham vi tai lieu:
 
 - E-commerce trong repo hien tai: `.NET WebAPI + PostgreSQL + React Storefront/Admin`.
@@ -125,13 +130,16 @@ Trang thai repo:
 - Customer profile/address/order/account pages da co.
 - Password hashing va JWT da co.
 - Login history cho customer da co.
-- Chua thay OTP/2FA.
+- Customer da co TOTP 2FA, recovery codes, refresh-token rotation, email
+  verification va password-reset flow. Phan nay thay the nhan dinh "chua co OTP/2FA"
+  cua ban ke hoach goc.
 - Admin login la mot credential tu env, role `Admin` chung.
 
 Danh gia:
 
 - Dat cho MVP/portfolio basic.
-- Chua dat "100% production" vi thieu OTP/2FA, refresh token, lockout/brute-force protection, forgot password/email verification, RBAC admin chi tiet.
+- Chua dat "100% production": con can rate-limit phan tan/edge, RBAC admin chi tiet,
+  test hai replica va bang chung production cho key rotation/monitoring.
 - Muc do hien tai: 65-75%.
 
 P0 truoc public demo:
@@ -236,10 +244,13 @@ Trang thai repo:
 - Backend co Dockerfile va docker-compose local cho API + PostgreSQL.
 - HTTPS dev cert cho Docker local.
 - Chua co IaC Bicep/Terraform.
-- Chua co GitHub Actions/Azure Pipelines.
-- Chua co health check endpoint.
-- Chua co Application Insights/Sentry/OpenTelemetry.
-- Chua co backup script ngoai managed DB.
+- Co GitHub Actions release gate cho build/test/audit/migration/container (PRH-010);
+  branch protection va registry immutability van can Platform/GitHub admin cau hinh.
+- Co `/health/live` va `/health/ready`; readiness hien kiem tra PostgreSQL.
+- Co Application Insights registration va production startup validation; dashboard,
+  sampling, alert va redaction-sink evidence van la gate PRH-014.
+- Co script rehearsal local cho PostgreSQL migration va metadata restore; backup/PITR
+  managed va restore object bytes van chua duoc chung minh o production.
 - Chua co WAF/CDN/Front Door config.
 
 Danh gia:
@@ -251,9 +262,10 @@ Danh gia:
 P0 truoc deploy:
 
 - Tao Azure resources bang IaC hoac CLI runbook.
-- Them health endpoint: `/health`.
-- Them production CORS.
-- Them Application Insights.
+- Hoan tat CI, container scan va release-image digest workflow; cau hinh branch
+  protection/registry immutability o GitHub/Azure.
+- Xac minh CORS production qua ingress that; code da bat buoc origin cu the ngoai Development.
+- Xac minh Application Insights redaction, dashboard va alert tren staging.
 - Thiet lap DB backup retention.
 - Khong expose OpenAPI o Production.
 
@@ -276,8 +288,10 @@ Trang thai repo:
 - Co FluentValidation input validation.
 - Co webhook HMAC cho MiniLogistics.
 - Khong luu card, payment redirect qua VNPay.
-- Chua co rate limiting.
-- Chua co security headers/CSP/HSTS explicit trong app.
+- Co ASP.NET Core rate limiting theo client IP sau trusted forwarded headers; can
+  bo sung enforcement phan tan/edge khi chay nhieu replica.
+- Co security headers, HSTS va HTTPS redirect ngoai Development; can kiem chung qua
+  ingress/TLS that truoc release.
 - Chua co WAF.
 - Chua co privacy/data retention/export/delete flow.
 - Chua co penetration test.
@@ -291,8 +305,8 @@ Danh gia:
 
 P0 truoc public demo:
 
-- Them ASP.NET Core rate limiting.
-- Them security headers: HSTS, X-Content-Type-Options, X-Frame-Options/CSP, Referrer-Policy.
+- Cau hinh rate limiting tai ingress/WAF hoac distributed store va kiem chung trusted client IP.
+- Kiem chung HSTS/CSP/security headers tren duong TLS production.
 - Dung HTTPS-only.
 - Dung Key Vault/Container Apps secrets, khong commit secret.
 - Rotate JWT signing key/VNPay secret/MiniLogistics key.
@@ -511,7 +525,8 @@ Payment__VNPay__CurrCode=VND
 Important:
 
 - Khong can mount dev HTTPS cert tren Azure. TLS nen terminate o Azure ingress/App Gateway/Front Door.
-- `Program.cs` hien chi enable CORS trong Development. Neu frontend khac domain voi API, production se bi CORS. Can them production CORS policy doc/implementation truoc deploy.
+- `Program.cs` co CORS policy cho production va bat buoc origin cu the. Can kiem chung
+  origin allow/deny, credentials va websocket qua ingress staging truoc deploy.
 - `MapOpenApi()` hien chi Development, tot cho production.
 
 ### 6.2 Database migration
