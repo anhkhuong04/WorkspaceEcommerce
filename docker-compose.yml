@@ -11,6 +11,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ASPNETCORE_URLS: http://+:8080;https://+:8443
+      AllowedHosts: ${AllowedHosts:-localhost;127.0.0.1}
       ASPNETCORE_Kestrel__Certificates__Default__Path: /https/workspace-ecommerce-devcert.pfx
       ASPNETCORE_Kestrel__Certificates__Default__Password: ${ASPNETCORE_HTTPS_CERT_PASSWORD:?Set ASPNETCORE_HTTPS_CERT_PASSWORD in .env}
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB:?Set POSTGRES_DB in .env};Username=${POSTGRES_USER:?Set POSTGRES_USER in .env};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}

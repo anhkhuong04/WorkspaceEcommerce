@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using WorkspaceEcommerce.Api.Authentication;
 using WorkspaceEcommerce.Api.Common;
+using WorkspaceEcommerce.Api.Configuration;
 using WorkspaceEcommerce.Api.Extensions;
 using WorkspaceEcommerce.Api.Health;
 using WorkspaceEcommerce.Api.Localization;
@@ -25,20 +26,7 @@ if (builder.Environment.IsDevelopment())
 
 var jwtOptions = builder.Configuration.GetValidatedJwtOptions();
 var dataProtectionKeyRingPath = builder.Configuration["DataProtection:KeyRingPath"];
-var applicationInsightsConnectionString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]
-    ?? builder.Configuration["ApplicationInsights:ConnectionString"];
-
-if (builder.Environment.IsProduction() && string.IsNullOrWhiteSpace(dataProtectionKeyRingPath))
-{
-    throw new InvalidOperationException(
-        "Configuration 'DataProtection:KeyRingPath' is required outside Development to protect two-factor secrets with a persistent external key ring.");
-}
-
-if (builder.Environment.IsProduction() && string.IsNullOrWhiteSpace(applicationInsightsConnectionString))
-{
-    throw new InvalidOperationException(
-        "APPLICATIONINSIGHTS_CONNECTION_STRING (or ApplicationInsights:ConnectionString) is required in Production.");
-}
+ProductionRuntimeConfigurationValidator.Validate(builder.Configuration, builder.Environment);
 
 var dataProtectionBuilder = builder.Services
     .AddDataProtection()

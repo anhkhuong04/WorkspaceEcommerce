@@ -482,10 +482,10 @@ Acceptance criteria:
 - [ ] Rotate/revoke every value that was ever committed; verify the old database/provider credential and old JWT key no longer authenticate.
 - [ ] Store secrets in the deployment secret manager and expose them only to the workload identities that require them.
 - [ ] Define a zero-downtime JWT/key rotation procedure or explicitly accept a forced-session-expiry maintenance window.
-- [ ] Generate a value-free configuration matrix for Development, CI, Staging, and Production with owner, required/optional status, source, and rotation period.
-- [ ] Validate exact production `AllowedHosts`, CORS origins, storefront/media public URLs, trusted proxy IPs, cookie domain/SameSite/Secure policy, and Google OAuth audiences.
+- [x] Generate a value-free configuration matrix for Development, CI, Staging, and Production with owner, required/optional status, source, and rotation period. (Implemented in `docs/runbooks/configuration-matrix.md`; named environment owners must still attest each deployment.)
+- [x] Validate exact production `AllowedHosts`, CORS origins, storefront/media public URLs, trusted proxy IPs, cookie domain/SameSite/Secure policy, and Google OAuth audiences. (Repository validators now reject wildcard/local host values outside Development; CORS/media/Google validation already fails closed. Actual ingress/proxy/cookie evidence remains a staging/platform gate.)
 - [ ] Verify the Data Protection key ring is encrypted, persistent, shared by API replicas, backed up, access-controlled, and survives rolling restart.
-- [ ] Add startup validation for any production configuration that is still able to silently use an unsafe/default value.
+- [x] Add startup validation for any production configuration that is still able to silently use an unsafe/default value. (Non-Development startup now rejects unsafe host filtering, non-external Data Protection path, placeholder telemetry configuration, and non-HTTPS storefront URL.)
 - [ ] Exercise credential rotation in staging and record the service/session impact without storing secret values in evidence.
 
 Acceptance criteria:
