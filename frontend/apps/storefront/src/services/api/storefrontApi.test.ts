@@ -1,10 +1,12 @@
 import type { CustomerAuthResponse, CustomerProfileDto } from "@workspace-ecommerce/api-types";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   clearCustomerSession,
   getCustomerSession,
   getCustomerToken,
   saveCustomerSession,
+  setCustomerUnauthorizedHandler,
+  storefrontApi,
   updateCustomerSessionProfile
 } from "./storefrontApi";
 
@@ -27,7 +29,27 @@ function completedAuthentication(overrides: Partial<CustomerAuthResponse> = {}):
 
 afterEach(() => {
   clearCustomerSession();
+  setCustomerUnauthorizedHandler(null);
+  vi.unstubAllGlobals();
 });
+
+function successfulEnvelope<T>(data: T): Response {
+  return new Response(JSON.stringify({ success: true, data, errors: [], traceId: "trace-test" }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" }
+  });
+}
+
+function failedEnvelope(status: number, errors: string[]): Response {
+  return new Response(JSON.stringify({ success: false, data: null, errors, traceId: "trace-test" }), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
+
+function getRequestPath(path: string): string {
+  return new URL(path, "https://storefront.example.test").pathname;
+}
 
 describe("customer session storage", () => {
   it("persists only the completed, short-lived customer session", () => {
@@ -94,5 +116,79 @@ describe("customer session storage", () => {
       phoneNumber: ""
     });
     expect(getCustomerToken()).toBe("short-lived-access-token");
+  });
+
+  it("sends a 2FA challenge through the credentialed API client with only the short-lived bearer", async () => {
+    saveCustomerSession(completedAuthentication());
+    const fetchMock = vi.fn().mockResolvedValue(successfulEnvelope(completedAuthentication({
+      fullName: "Two-factor customer"
+    })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await storefrontApi.verifyTwoFactorLogin({ challengeToken: "challenge-token", code: "123456" });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(getRequestPath(path)).toBe("/api/customer/auth/2fa/verify");
+    expect(init).toMatchObject({ method: "POST", credentials: "include" });
+    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer short-lived-access-token");
+    expect(new Headers(init.headers).get("Content-Type")).toBe("application/json");
+    expect(init.body).toBe(JSON.stringify({ challengeToken: "challenge-token", code: "123456" }));
+  });
+
+  it("routes email verification and password recovery through distinct POST contracts", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(successfulEnvelope(null))
+      .mockResolvedValueOnce(successfulEnvelope(null))
+      .mockResolvedValueOnce(successfulEnvelope(null));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await storefrontApi.requestEmailVerification({ email: "customer@example.com" });
+    await storefrontApi.forgotCustomerPassword({ email: "customer@example.com" });
+    await storefrontApi.resetCustomerPassword({ token: "single-use-token", newPassword: "New-password-123!" });
+
+    expect(fetchMock.mock.calls.map(([path]) => getRequestPath(path as string))).toEqual([
+      "/api/customer/auth/email-verification/request",
+      "/api/customer/auth/password/forgot",
+      "/api/customer/auth/password/reset"
+    ]);
+    expect(fetchMock.mock.calls.map(([, init]) => (init as RequestInit).method)).toEqual(["POST", "POST", "POST"]);
+  });
+
+  it("surfaces a coupon validation conflict without treating it as an authentication failure", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(failedEnvelope(409, ["Coupon is expired."]));
+    vi.stubGlobal("fetch", fetchMock);
+    const unauthorizedHandler = vi.fn();
+    setCustomerUnauthorizedHandler(unauthorizedHandler);
+
+    await expect(storefrontApi.validateCheckoutCoupon({ sessionId: "cart-session", couponCode: "EXPIRED" }))
+      .rejects
+      .toMatchObject({
+        name: "ApiClientError",
+        statusCode: 409,
+        errors: ["Coupon is expired."]
+      });
+
+    expect(unauthorizedHandler).not.toHaveBeenCalled();
+  });
+
+  it("submits blog comments through the moderation acknowledgement endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(successfulEnvelope({ message: "Comment submitted for moderation." }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const acknowledgement = await storefrontApi.submitBlogComment("release-update", {
+      authorName: "Synthetic commenter",
+      authorEmail: "synthetic-commenter@example.test",
+      content: "Please review this update."
+    });
+
+    expect(acknowledgement.message).toContain("moderation");
+    const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(getRequestPath(path)).toBe("/api/blog-posts/release-update/comments");
+    expect(init.body).toBe(JSON.stringify({
+      authorName: "Synthetic commenter",
+      authorEmail: "synthetic-commenter@example.test",
+      content: "Please review this update."
+    }));
   });
 });
