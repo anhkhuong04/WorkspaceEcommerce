@@ -11,7 +11,7 @@ import { StorefrontSearchOverlay } from "./StorefrontSearchOverlay";
 
 const navItems = [
   { to: "/products", label: "Products", hasDropdown: true },
-  { to: "/warranty-policy", label: "Warranty" },
+  { to: "/warranty", label: "Warranty" },
   { to: "/news", label: "News" },
   { label: "Showroom" },
   { to: "/about-us", label: "About us" }

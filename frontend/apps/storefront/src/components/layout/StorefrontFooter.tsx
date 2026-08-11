@@ -82,6 +82,7 @@ const footerColumns = [
       { label: "Shipping Policy", to: "/support/shipping-policy" },
       { label: "Return Policy", to: "/support/returns-policy" },
       { label: "Warranty Policy", to: "/warranty-policy" },
+      { label: "Check Warranty", to: "/warranty" },
     ],
   },
   {

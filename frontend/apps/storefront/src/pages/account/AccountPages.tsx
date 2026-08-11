@@ -4,6 +4,7 @@ import type {
   CustomerOrderDto,
   CustomerOrderListItemDto,
   CustomerOrderStatusHistoryDto,
+  CustomerWarrantyListItemDto,
   LoyaltyAccountDto,
   LoyaltyTierDto,
   LoyaltyTierType,
@@ -517,6 +518,53 @@ export function AccountOrderDetailPage() {
   );
 }
 
+export function AccountWarrantiesPage() {
+  const warrantiesQuery = useQuery({
+    queryKey: ["customer", "warranties"],
+    queryFn: () => storefrontApi.getCustomerWarranties({ pageNumber: 1, pageSize: 20 })
+  });
+
+  return (
+    <AccountShell>
+      <section className="ui-card border border-slate-100 p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="ui-caption uppercase tracking-[0.18em] text-[var(--brand)]">Product protection</p>
+            <h1 className="ui-h2 mt-2 text-slate-950">My warranties</h1>
+            <p className="ui-body mt-2 max-w-2xl text-slate-600">View products assigned to your account and the coverage dates for activated warranties.</p>
+          </div>
+          <Link to="/warranty" className="ui-control rounded-[var(--radius-control)] bg-slate-950 px-4 py-2 text-white transition hover:bg-[var(--brand)]">Check or activate</Link>
+        </div>
+
+        {warrantiesQuery.isLoading ? <StateMessage>Loading warranties...</StateMessage> : null}
+        {warrantiesQuery.error ? <StateMessage tone="error">{getApiErrorMessage(warrantiesQuery.error)}</StateMessage> : null}
+        {warrantiesQuery.data?.items.length === 0 ? <StateMessage>You do not have any assigned warranty products yet.</StateMessage> : null}
+        {warrantiesQuery.data?.items.length ? (
+          <div className="mt-6 grid gap-3">
+            {warrantiesQuery.data.items.map((warranty) => <WarrantyListItem key={warranty.id} warranty={warranty} />)}
+          </div>
+        ) : null}
+      </section>
+    </AccountShell>
+  );
+}
+
+function WarrantyListItem({ warranty }: { warranty: CustomerWarrantyListItemDto }) {
+  const status = warranty.status === 1 ? "Active" : warranty.status === 0 ? "Awaiting activation" : warranty.status === 2 ? "Voided" : "Replaced";
+  return (
+    <article className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 className="font-black text-slate-950">{warranty.productName}</h2>
+        <p className="mt-1 text-sm font-semibold text-slate-500">{warranty.maskedIdentifier}</p>
+      </div>
+      <div className="text-left sm:text-right">
+        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${warranty.status === 1 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{status}</span>
+        <p className="mt-2 text-xs font-semibold text-slate-500">{warranty.latestCoverageEndsAt ? `Coverage ends ${formatDate(warranty.latestCoverageEndsAt)}` : warranty.activatedAt ? `Activated ${formatDate(warranty.activatedAt)}` : "Activation required"}</p>
+      </div>
+    </article>
+  );
+}
+
 function AccountShell({ children }: { children: ReactNode }) {
   const { signOut } = useCustomerAuth();
   const navigate = useNavigate();
@@ -545,6 +593,7 @@ function AccountShell({ children }: { children: ReactNode }) {
               <AccountNavLink to="/account/profile">Profile</AccountNavLink>
               <AccountNavLink to="/account/orders">Orders</AccountNavLink>
               <AccountNavLink to="/account/loyalty">Loyalty</AccountNavLink>
+              <AccountNavLink to="/account/warranties">Warranties</AccountNavLink>
             </nav>
             <button type="button" onClick={handleSignOut} className="ui-control mt-4 flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] border border-slate-200 text-slate-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700">
               Sign out

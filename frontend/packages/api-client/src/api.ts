@@ -81,7 +81,25 @@ import type {
   ReviewDto,
   RedeemLoyaltyPointsRequest,
   RedeemLoyaltyPointsResponse,
-  ShipmentTrackingDto
+  ShipmentTrackingDto,
+  ActivateWarrantyRequest,
+  AdminWarrantyEntitlementDto,
+  AdminWarrantyEntitlementListRequest,
+  AdminWarrantyImportResultDto,
+  AdminWarrantyPlanDto,
+  AdminWarrantyPlanListRequest,
+  AdminWarrantyReasonRequest,
+  AdminWarrantyUnitDto,
+  AdminWarrantyUnitListRequest,
+  AssignWarrantyPlanRequest,
+  AssignWarrantyUnitRequest,
+  CreateWarrantyPlanRequest,
+  CustomerWarrantyDto,
+  CustomerWarrantyListItemDto,
+  CustomerWarrantyListRequest,
+  PublicWarrantyLookupResponse,
+  ReplaceWarrantyRequest,
+  WarrantyLookupRequest
 } from "@workspace-ecommerce/api-types";
 import { ApiClient } from "./httpClient";
 
@@ -122,6 +140,8 @@ export function createStorefrontApi(client: ApiClient) {
     lookupOrder: (request: OrderLookupRequest) => client.get<OrderLookupResponse>(`/api/orders/lookup${buildQuery(request)}`),
     lookupOrderTracking: (request: OrderLookupRequest) =>
       client.get<ShipmentTrackingDto>(`/api/orders/lookup/tracking${buildQuery(request)}`),
+    lookupWarranty: (request: WarrantyLookupRequest) =>
+      client.post<PublicWarrantyLookupResponse, WarrantyLookupRequest>("/api/warranties/lookup", request),
     getPaymentResult: (orderCode: string, phone?: string | null) =>
       client.get<PaymentResultDto>(`/api/payments/result${buildQuery({ orderCode, phone: phone ?? "" })}`),
     registerCustomer: (request: CustomerRegisterRequest) =>
@@ -157,6 +177,11 @@ export function createStorefrontApi(client: ApiClient) {
       client.get<PagedResult<CustomerOrderListItemDto>>(`/api/customer/orders${buildQuery(request)}`),
     getCustomerOrder: (id: string) => client.get<CustomerOrderDto>(`/api/customer/orders/${id}`),
     getCustomerOrderTracking: (id: string) => client.get<ShipmentTrackingDto>(`/api/customer/orders/${id}/tracking`),
+    activateWarranty: (request: ActivateWarrantyRequest) =>
+      client.post<CustomerWarrantyDto, ActivateWarrantyRequest>("/api/customer/warranties/activate", request),
+    getCustomerWarranties: (request: CustomerWarrantyListRequest = {}) =>
+      client.get<PagedResult<CustomerWarrantyListItemDto>>(`/api/customer/warranties${buildQuery(request)}`),
+    getCustomerWarranty: (id: string) => client.get<CustomerWarrantyDto>(`/api/customer/warranties/${id}`),
     getMyLoyalty: () => client.get<LoyaltyAccountDto>("/api/loyalty/me"),
     getLoyaltyTransactions: (request: LoyaltyTransactionListRequest = {}) =>
       client.get<PagedResult<LoyaltyTransactionDto>>(`/api/loyalty/me/transactions${buildQuery(request)}`),
@@ -261,6 +286,35 @@ export function createAdminApi(client: ApiClient) {
     approveBlogComment: (id: string) => client.post<BlogCommentDto, undefined>(`/api/admin/blog-comments/${id}/approve`, undefined),
     rejectBlogComment: (id: string) => client.post<BlogCommentDto, undefined>(`/api/admin/blog-comments/${id}/reject`, undefined),
     getReviews: (page = 1, pageSize = 20) => client.get<PagedResult<AdminReviewListItemDto>>(`/api/admin/reviews${buildQuery({ page, pageSize })}`),
-    deleteReview: (id: string) => client.delete<void>(`/api/admin/reviews/${id}`)
+    deleteReview: (id: string) => client.delete<void>(`/api/admin/reviews/${id}`),
+    getWarrantyPlans: (request: AdminWarrantyPlanListRequest = {}) =>
+      client.get<PagedResult<AdminWarrantyPlanDto>>(`/api/admin/warranty-plans${buildQuery(request)}`),
+    createWarrantyPlan: (request: CreateWarrantyPlanRequest) =>
+      client.post<AdminWarrantyPlanDto, CreateWarrantyPlanRequest>("/api/admin/warranty-plans", request),
+    retireWarrantyPlan: (id: string) => client.post<AdminWarrantyPlanDto, undefined>(`/api/admin/warranty-plans/${id}/retire`, undefined),
+    assignWarrantyPlanToVariant: (variantId: string, request: AssignWarrantyPlanRequest) =>
+      client.put<void, AssignWarrantyPlanRequest>(`/api/admin/product-variants/${variantId}/warranty-plan`, request),
+    previewWarrantyUnitImport: (file: File) => {
+      const formData = new FormData();
+      formData.set("file", file);
+      return client.postForm<AdminWarrantyImportResultDto>("/api/admin/warranty-units/imports/preview", formData);
+    },
+    importWarrantyUnits: (file: File) => {
+      const formData = new FormData();
+      formData.set("file", file);
+      return client.postForm<AdminWarrantyImportResultDto>("/api/admin/warranty-units/imports", formData);
+    },
+    getWarrantyUnits: (request: AdminWarrantyUnitListRequest = {}) =>
+      client.get<PagedResult<AdminWarrantyUnitDto>>(`/api/admin/warranty-units${buildQuery(request)}`),
+    assignWarrantyUnit: (id: string, request: AssignWarrantyUnitRequest) =>
+      client.post<AdminWarrantyEntitlementDto, AssignWarrantyUnitRequest>(`/api/admin/warranty-units/${id}/assign`, request),
+    getAdminWarranties: (request: AdminWarrantyEntitlementListRequest = {}) =>
+      client.get<PagedResult<AdminWarrantyEntitlementDto>>(`/api/admin/warranties${buildQuery(request)}`),
+    getAdminWarranty: (id: string) => client.get<AdminWarrantyEntitlementDto>(`/api/admin/warranties/${id}`),
+    activateAdminWarranty: (id: string) => client.post<AdminWarrantyEntitlementDto, undefined>(`/api/admin/warranties/${id}/activate`, undefined),
+    voidAdminWarranty: (id: string, request: AdminWarrantyReasonRequest) =>
+      client.post<AdminWarrantyEntitlementDto, AdminWarrantyReasonRequest>(`/api/admin/warranties/${id}/void`, request),
+    replaceAdminWarranty: (id: string, request: ReplaceWarrantyRequest) =>
+      client.post<AdminWarrantyEntitlementDto, ReplaceWarrantyRequest>(`/api/admin/warranties/${id}/replace`, request)
   };
 }

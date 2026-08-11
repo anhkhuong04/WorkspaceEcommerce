@@ -6,7 +6,8 @@ import {
   AccountOrderDetailPage,
   AccountOrdersPage,
   AccountOverviewPage,
-  AccountProfilePage
+  AccountProfilePage,
+  AccountWarrantiesPage
 } from "../pages/account/AccountPages";
 import { CartPage } from "../pages/cart/CartPage";
 import { CheckoutPage } from "../pages/checkout/CheckoutPage";
@@ -21,6 +22,7 @@ import { ProductListPage } from "../pages/product-list/ProductListPage";
 import { BlogListPage } from "../pages/news/BlogListPage";
 import { BlogDetailPage } from "../pages/news/BlogDetailPage";
 import { SupportPage } from "../pages/support/SupportPages";
+import { WarrantyPage } from "../pages/warranty/WarrantyPage";
 
 export const router = createBrowserRouter([
   {
@@ -33,6 +35,7 @@ export const router = createBrowserRouter([
       { path: "news", element: <BlogListPage /> },
       { path: "news/:slug", element: <BlogDetailPage /> },
       { path: "warranty-policy", element: <SupportPage slug="warranty-policy" /> },
+      { path: "warranty", element: <WarrantyPage /> },
       { path: "about-us", element: <SupportPage slug="about-us" /> },
       { path: "support/:slug", element: <SupportPage /> },
       { path: "cart", element: <CartPage /> },
@@ -86,6 +89,14 @@ export const router = createBrowserRouter([
         element: (
           <CustomerProtectedRoute>
             <AccountLoyaltyPage />
+          </CustomerProtectedRoute>
+        )
+      },
+      {
+        path: "account/warranties",
+        element: (
+          <CustomerProtectedRoute>
+            <AccountWarrantiesPage />
           </CustomerProtectedRoute>
         )
       },
