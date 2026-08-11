@@ -213,8 +213,8 @@ export function ProductListPage() {
         products={heroProducts}
       />
 
-      <section className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
-        <aside className="hidden self-start lg:block">
+      <section className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="hidden lg:block">
           <div className="sticky top-28 max-h-[calc(100vh-8rem)] overflow-y-auto overscroll-contain pr-2">
             <FilterPanel
               key={`desktop-${filterKey}`}

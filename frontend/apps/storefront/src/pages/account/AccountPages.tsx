@@ -21,7 +21,6 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, NavLink, useNavigate, useParams } from "react-router-dom";
 import { z } from "zod";
-import { PageHeader } from "../../components/ui/PageHeader";
 import { ShipmentTrackingPanel } from "../../components/shipment/ShipmentTrackingPanel";
 import { useCustomerAuth } from "../../features/customer-auth/useCustomerAuth";
 import { getApiErrorMessage } from "../../services/api/errors";
@@ -519,7 +518,7 @@ export function AccountOrderDetailPage() {
 }
 
 function AccountShell({ children }: { children: ReactNode }) {
-  const { customer, signOut } = useCustomerAuth();
+  const { signOut } = useCustomerAuth();
   const navigate = useNavigate();
 
   function handleSignOut() {
@@ -538,26 +537,22 @@ function AccountShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="grid gap-6">
-      <PageHeader
-        eyebrow="Account"
-        title={`Hello${customer?.fullName ? `, ${customer.fullName}` : ""}`}
-        description="Manage your profile, review your orders, and continue shopping with your saved account."
-      />
-
-      <div className="grid gap-6 lg:grid-cols-[250px_minmax(0,1fr)] lg:items-start">
-        <aside className="ui-card border border-slate-100 p-4">
-          <nav className="grid gap-1">
-            <AccountNavLink to="/account" end>Overview</AccountNavLink>
-            <AccountNavLink to="/account/profile">Profile</AccountNavLink>
-            <AccountNavLink to="/account/orders">Orders</AccountNavLink>
-            <AccountNavLink to="/account/loyalty">Loyalty</AccountNavLink>
-          </nav>
-          <button type="button" onClick={handleSignOut} className="ui-control mt-4 flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] border border-slate-200 text-slate-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700">
-            Sign out
-          </button>
-          <button type="button" onClick={() => void handleSignOutEverywhere()} className="ui-control mt-2 flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] border border-red-200 text-red-700 transition hover:bg-red-50">
-            Sign out everywhere
-          </button>
+      <div className="grid gap-6 lg:grid-cols-[250px_minmax(0,1fr)]">
+        <aside className="lg:self-stretch">
+          <div className="ui-card border border-slate-100 p-4 lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:overscroll-contain">
+            <nav className="grid gap-1">
+              <AccountNavLink to="/account" end>Overview</AccountNavLink>
+              <AccountNavLink to="/account/profile">Profile</AccountNavLink>
+              <AccountNavLink to="/account/orders">Orders</AccountNavLink>
+              <AccountNavLink to="/account/loyalty">Loyalty</AccountNavLink>
+            </nav>
+            <button type="button" onClick={handleSignOut} className="ui-control mt-4 flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] border border-slate-200 text-slate-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700">
+              Sign out
+            </button>
+            <button type="button" onClick={() => void handleSignOutEverywhere()} className="ui-control mt-2 flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] border border-red-200 text-red-700 transition hover:bg-red-50">
+              Sign out everywhere
+            </button>
+          </div>
         </aside>
 
         <div className="min-w-0">{children}</div>

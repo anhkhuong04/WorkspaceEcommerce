@@ -13,7 +13,8 @@ const navItems = [
   { to: "/products", label: "Products", hasDropdown: true },
   { label: "Warranty", hasDropdown: true },
   { to: "/news", label: "News" },
-  { label: "Showroom" }
+  { label: "Showroom" },
+  { label: "About us" }
 ];
 
 export function StorefrontLayout() {
@@ -64,9 +65,9 @@ function StorefrontLayoutContent() {
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
         >
-          <div className="mx-auto flex min-h-20 max-w-[1600px] items-center justify-between gap-6 px-5 py-4 sm:px-8 lg:px-10">
-            <div className="flex min-w-0 flex-1 items-center gap-5 lg:gap-12">
-              <NavLink to="/" className="flex shrink-0 items-center" aria-label="WorkspaceEcom home">
+          <div className="mx-auto flex min-h-20 max-w-[1600px] items-center justify-between gap-6 px-5 py-4 sm:px-8 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:px-10">
+            <div className="flex min-w-0 flex-1 items-center gap-5 lg:contents">
+              <NavLink to="/" className="flex shrink-0 items-center lg:col-start-1" aria-label="WorkspaceEcom home">
                 <img
                   src="/demo/logo.svg"
                   alt="WorkspaceEcom"
@@ -74,7 +75,7 @@ function StorefrontLayoutContent() {
                 />
               </NavLink>
 
-              <nav className={`ui-control flex min-w-0 items-center gap-3 overflow-x-auto whitespace-nowrap scrollbar-hidden sm:gap-5 lg:gap-10 transition-colors duration-300 ${textColorClass}`}>
+              <nav className={`ui-control flex min-w-0 items-center gap-3 overflow-x-auto whitespace-nowrap scrollbar-hidden sm:gap-5 lg:col-start-2 lg:justify-self-center lg:gap-8 xl:gap-10 transition-colors duration-300 ${textColorClass}`}>
                 {navItems.map((item) =>
                   item.label === "Products" && item.to ? (
                     <div key={`${item.label}-${item.to}`} className="group inline-flex">
@@ -121,7 +122,7 @@ function StorefrontLayoutContent() {
               </nav>
             </div>
 
-            <div className={`flex shrink-0 items-center gap-3 sm:gap-5 lg:gap-8 transition-colors duration-300 ${iconColorClass}`}>
+            <div className={`flex shrink-0 items-center gap-3 sm:gap-5 lg:col-start-3 lg:justify-self-end lg:gap-8 transition-colors duration-300 ${iconColorClass}`}>
               <button
                 type="button"
                 onClick={() => setIsSearchOpen(true)}
