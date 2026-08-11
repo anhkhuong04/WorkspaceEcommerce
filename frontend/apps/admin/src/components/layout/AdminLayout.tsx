@@ -31,15 +31,12 @@ export function AdminLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--surface-soft)] text-[var(--ink)] lg:grid lg:grid-cols-[264px_1fr]">
-      <aside className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-4 lg:min-h-screen lg:border-b-0 lg:border-r">
+    <div className="min-h-screen bg-[var(--surface-soft)] text-[var(--ink)] lg:grid lg:grid-cols-[264px_minmax(0,1fr)] lg:items-start">
+      <aside className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-4 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:self-start lg:border-b-0 lg:border-r lg:py-5">
         <div className="flex h-12 items-center gap-3 px-2">
           <img src="/demo/logo.svg" alt="WorkspaceEcom" className="h-auto w-[164px]" />
-          <span className="rounded-[var(--radius-control)] bg-[var(--brand-soft)] px-2 py-1 text-xs font-bold uppercase tracking-wide text-[var(--muted-strong)]">
-            Admin
-          </span>
         </div>
-        <nav className="mt-5 flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible" aria-label="Admin navigation">
+        <nav className="mt-5 flex gap-2 overflow-x-auto lg:flex-col lg:overflow-y-auto" aria-label="Admin navigation">
           {menuItems.map((item) => (
             <NavLink
               key={item.to}
@@ -66,19 +63,13 @@ export function AdminLayout() {
             </NavLink>
           ))}
         </nav>
+        <div className="mt-5 flex items-center justify-between gap-3 border-t border-[var(--border)] px-2 pt-4 lg:mt-auto lg:block">
+          <span className="truncate text-xs font-semibold text-[var(--muted)] lg:mb-3 lg:block" title={session?.email}>{session?.email}</span>
+          <Button onClick={handleLogout} className="shrink-0 lg:w-full">Logout</Button>
+        </div>
       </aside>
 
       <div className="min-w-0">
-        <header className="flex flex-col gap-3 border-b border-[var(--border)] bg-[var(--surface)]/90 px-6 py-4 backdrop-blur lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:py-0">
-          <div>
-            <p className="font-black text-[var(--ink)]">Operations console</p>
-            <p className="text-xs font-semibold text-[var(--muted)]">WorkspaceEcom admin portal for MVP operations</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-[var(--muted)]">{session?.email}</span>
-            <Button onClick={handleLogout}>Logout</Button>
-          </div>
-        </header>
         <main className="p-4 lg:p-6">
           <Outlet />
         </main>
