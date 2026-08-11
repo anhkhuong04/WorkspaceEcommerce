@@ -193,36 +193,94 @@ const supportPages: SupportPageContent[] = [
     eyebrow: "Warranty",
     title: "Warranty Policy",
     summary:
-      "Warranty coverage protects eligible products against verified manufacturing defects during the applicable warranty period.",
+      "HyperWork stands behind eligible workspace furniture and accessories with repair or replacement support for verified manufacturing defects. Selected product lines are covered for up to five years.",
     sections: [
       {
         heading: "Warranty scope",
         items: [
-          "Warranty applies to products purchased from WorkspaceEcom or authorized sales channels with valid proof of purchase.",
-          "Coverage is limited to manufacturing defects, material defects, and failures under normal use.",
-          "Warranty periods vary by product category and are shown on product details, invoice, or warranty record."
+          "Warranty is valid only within Vietnam for products purchased directly from HyperWork or an authorized retailer with valid proof of purchase, such as an invoice or warranty record.",
+          "Products purchased from an unauthorized seller, marketplace listing, or third party should be supported by the original seller.",
+          "Warranty is void if original components are replaced, non-genuine HyperWork accessories are used, or the product is transported outside Vietnam through a third-party service."
+        ]
+      },
+      {
+        heading: "Warranty periods by product",
+        items: [
+          "Office chairs: Sleek, Airy, and Airy Pro chairs are covered for 3 years; Cloud Chair is covered for 2 years; open-box and clearance chairs are covered for 1 year.",
+          "Desks: non-motorized desks are covered for 5 years. Motorized desks are covered for 5 years for the frame and 3 years for the motor. Open-box and clearance desks are covered for 1 year.",
+          "Furniture and accessories: keyboards, mice, and peripherals are covered for 1 year; monitor arms for 2 years; filing cabinets for 3 years.",
+          "Open-box and clearance peripherals are covered for 6 months. Other open-box and clearance products are covered for 1 year."
         ]
       },
       {
         heading: "Warranty conditions",
         items: [
-          "Customers should report defects promptly with clear images or videos.",
-          "Products must be used according to the product manual, safety instructions, and intended purpose.",
-          "The product serial number, invoice, warranty stamp, or equivalent proof must be readable and valid."
+          "Report a fault within 7 days of receiving the product through an official HyperWork support channel, with clear photos or videos of the issue.",
+          "Use the product in line with its instructions, safety guidance, and intended office use.",
+          "Coverage applies to manufacturing or material defects, including desk-frame, motor, or controller failures; cracks, breaks, or finishing defects; and structural failures caused by manufacturing defects."
         ]
       },
       {
-        heading: "Exclusions",
+        heading: "What is not covered",
         items: [
-          "Normal wear, cosmetic scratches, fading, fabric pilling, and aging from regular use.",
-          "Damage caused by misuse, liquid exposure, electrical issues, accidents, unauthorized repair, or third-party modification.",
-          "Damage during moving, self-transport, or installation performed outside authorized support instructions."
+          "Expired warranty, normal wear, light scratches, fading, fabric pilling, or natural ageing caused by everyday use, sunlight, heat, or humidity.",
+          "Overloading, misuse, sharp tools, incorrect installation, use outside an office environment, impact, drops, accidents, or exposure to unsuitable outdoor or high-humidity conditions.",
+          "Unauthorised disassembly, repair, modification, or use of non-genuine accessories.",
+          "Damage caused by natural disasters, fire, pests, animals, cleaning chemicals, solvents, or other corrosive substances.",
+          "Natural variation in wood grain or other natural materials; this is not considered a manufacturing defect."
         ]
       },
       {
-        heading: "Resolution",
+        heading: "Warranty process",
+        items: [
+          "Contact HyperWork through its website, form, Zalo, or hotline as soon as you identify a fault.",
+          "Provide proof of purchase and photos or videos that clearly show the issue.",
+          "The HyperWork team reviews the request and responds within 7-10 business days.",
+          "When approved, HyperWork will repair or replace the eligible product or component at no charge under this policy."
+        ]
+      },
+      {
+        heading: "Support contact",
+        items: [
+          "Email: 3h@3hvn.com",
+          "Hotline: 1900 636 660",
+          "Address: No. 48, Street 23, Giao Luu Urban Area, Dong Ngac Ward, Hanoi, Vietnam."
+        ]
+      }
+    ]
+  },
+  {
+    slug: "about-us",
+    eyebrow: "Our story",
+    title: "About WorkspaceEcom",
+    summary:
+      "WorkspaceEcom helps people build more comfortable, focused, and flexible places to work - at home, in a studio, or across an entire team.",
+    sections: [
+      {
+        heading: "Designed around better workdays",
         body:
-          "After inspection, WorkspaceEcom may repair the product, replace the faulty component, provide an equivalent replacement, or recommend paid service when the issue is outside warranty."
+          "We believe a workspace should remove friction from the day. Our catalog brings together practical desks, ergonomic seating, monitor accessories, storage, and everyday tools so customers can create a setup that supports how they actually work."
+      },
+      {
+        heading: "A considered, practical selection",
+        items: [
+          "Clear product information, useful specifications, and straightforward comparisons to make confident choices easier.",
+          "Products chosen for comfort, function, durability, and clean, adaptable design.",
+          "Solutions for individual workspaces as well as growing teams, offices, and project spaces."
+        ]
+      },
+      {
+        heading: "Service that continues after checkout",
+        body:
+          "A good workspace is a long-term investment. We aim to make ordering, delivery, account management, warranty support, and product care easier to understand at every stage."
+      },
+      {
+        heading: "Our promise",
+        items: [
+          "Put useful information before pressure.",
+          "Respect customers' time with clear communication and practical support.",
+          "Keep improving the store experience as the needs of modern work evolve."
+        ]
       }
     ]
   }
@@ -237,9 +295,13 @@ function findSupportPage(slug?: string) {
   return supportPages.find((page) => page.slug === slug);
 }
 
-export function SupportPage() {
-  const { slug } = useParams();
-  const page = findSupportPage(slug);
+function getSupportPagePath(slug: string) {
+  return slug === "warranty-policy" || slug === "about-us" ? `/${slug}` : `/support/${slug}`;
+}
+
+export function SupportPage({ slug: fixedSlug }: { slug?: string }) {
+  const { slug: routeSlug } = useParams();
+  const page = findSupportPage(fixedSlug ?? routeSlug);
 
   if (!page) {
     return <Navigate to="/support/contact" replace />;
@@ -259,7 +321,7 @@ export function SupportPage() {
             {supportNav.map((item) => (
               <Link
                 key={item.slug}
-                to={`/support/${item.slug}`}
+                to={getSupportPagePath(item.slug)}
                 className={`block rounded-xl px-4 py-3 text-sm font-bold transition ${
                   item.slug === page.slug
                     ? "bg-slate-950 text-white"

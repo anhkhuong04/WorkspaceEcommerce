@@ -11,10 +11,10 @@ import { StorefrontSearchOverlay } from "./StorefrontSearchOverlay";
 
 const navItems = [
   { to: "/products", label: "Products", hasDropdown: true },
-  { label: "Warranty", hasDropdown: true },
+  { to: "/warranty-policy", label: "Warranty" },
   { to: "/news", label: "News" },
   { label: "Showroom" },
-  { label: "About us" }
+  { to: "/about-us", label: "About us" }
 ];
 
 export function StorefrontLayout() {

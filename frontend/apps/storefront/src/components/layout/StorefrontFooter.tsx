@@ -81,13 +81,13 @@ const footerColumns = [
       { label: "Privacy Policy", to: "/support/privacy-policy" },
       { label: "Shipping Policy", to: "/support/shipping-policy" },
       { label: "Return Policy", to: "/support/returns-policy" },
-      { label: "Warranty Policy", to: "/support/warranty-policy" },
+      { label: "Warranty Policy", to: "/warranty-policy" },
     ],
   },
   {
     title: "Explore",
     links: [
-      { label: "About Us", to: "#" },
+      { label: "About Us", to: "/about-us" },
       { label: "Recruitment", to: "#" },
       { label: "Showroom", to: "#" },
       { label: "News", to: "/news" },

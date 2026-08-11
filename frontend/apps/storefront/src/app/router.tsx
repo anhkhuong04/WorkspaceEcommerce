@@ -32,6 +32,8 @@ export const router = createBrowserRouter([
       { path: "products/:slug", element: <ProductDetailPage /> },
       { path: "news", element: <BlogListPage /> },
       { path: "news/:slug", element: <BlogDetailPage /> },
+      { path: "warranty-policy", element: <SupportPage slug="warranty-policy" /> },
+      { path: "about-us", element: <SupportPage slug="about-us" /> },
       { path: "support/:slug", element: <SupportPage /> },
       { path: "cart", element: <CartPage /> },
       {
