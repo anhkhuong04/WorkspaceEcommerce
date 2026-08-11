@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CartDto, CartItemDto } from "@workspace-ecommerce/api-types";
 import type { ReactNode, RefObject } from "react";
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useCustomerAuth } from "../customer-auth/useCustomerAuth";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
 import { getCartSessionId, resetCartSessionId } from "../../services/cartSession";
@@ -90,7 +91,14 @@ interface ShoppingCartDrawerProps {
 
 function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLoading, isOpen, onClose }: ShoppingCartDrawerProps) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { isAuthenticated, isReady } = useCustomerAuth();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const [isLoginPromptOpen, setIsLoginPromptOpen] = useState(false);
+  const closeDrawer = useCallback(() => {
+    setIsLoginPromptOpen(false);
+    onClose();
+  }, [onClose]);
   const items = cart?.items ?? [];
   const totalQuantity = cart?.totalQuantity ?? 0;
   const totalAmount = cart?.totalAmount ?? 0;
@@ -136,7 +144,7 @@ function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLo
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        onClose();
+        closeDrawer();
       }
     }
 
@@ -145,7 +153,7 @@ function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLo
       document.body.style.overflow = originalOverflow;
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen, onClose]);
+  }, [closeDrawer, isOpen]);
 
   if (!isOpen) {
     return null;
@@ -154,6 +162,26 @@ function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLo
   const mutationError = updateItemMutation.error ?? removeItemMutation.error ?? clearCartMutation.error;
   const isBusy = updateItemMutation.isPending || removeItemMutation.isPending || clearCartMutation.isPending;
   const hasItems = items.length > 0;
+
+  function handleCheckout() {
+    if (!isReady) {
+      return;
+    }
+
+    if (isAuthenticated) {
+      closeDrawer();
+      void navigate("/checkout");
+      return;
+    }
+
+    setIsLoginPromptOpen(true);
+  }
+
+  function handleLogin() {
+    setIsLoginPromptOpen(false);
+    closeDrawer();
+    void navigate("/login", { state: { from: "/checkout" } });
+  }
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-black/35 p-3 sm:p-6" role="presentation">
@@ -169,11 +197,11 @@ function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLo
             isBusy={isBusy}
             itemCount={totalQuantity}
             onClear={() => clearCartMutation.mutate(items)}
-            onClose={onClose}
+            onClose={closeDrawer}
           />
         ) : (
           <div className="flex justify-end px-5 py-5 sm:px-8 sm:py-6">
-            <CartCloseButton ref={closeButtonRef} onClose={onClose} />
+            <CartCloseButton ref={closeButtonRef} onClose={closeDrawer} />
           </div>
         )}
 
@@ -224,17 +252,22 @@ function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLo
               </div>
             </div>
 
-            <CartDrawerFooter totalAmount={totalAmount} onClose={onClose} />
+            <CartDrawerFooter
+              totalAmount={totalAmount}
+              isCheckoutDisabled={isBusy || !isReady}
+              onCheckout={handleCheckout}
+            />
           </>
         ) : (
           <div className="grid min-h-0 flex-1 place-items-center px-5 pb-16 text-center sm:px-8 sm:pb-20">
             <div className="w-full max-w-sm">
               <CartStatusMessages cartError={cartError} isLoading={isLoading} mutationError={mutationError} />
-              {!isLoading && !cartError ? <EmptyCartState onClose={onClose} /> : null}
+              {!isLoading && !cartError ? <EmptyCartState onClose={closeDrawer} /> : null}
             </div>
           </div>
         )}
       </aside>
+      {isLoginPromptOpen ? <LoginRequiredDialog onCancel={() => setIsLoginPromptOpen(false)} onLogin={handleLogin} /> : null}
     </div>
   );
 }
@@ -344,7 +377,15 @@ function CartItemImage({ item }: { item: CartItemDto }) {
   );
 }
 
-function CartDrawerFooter({ totalAmount, onClose }: { totalAmount: number; onClose: () => void }) {
+function CartDrawerFooter({
+  totalAmount,
+  isCheckoutDisabled,
+  onCheckout
+}: {
+  totalAmount: number;
+  isCheckoutDisabled: boolean;
+  onCheckout: () => void;
+}) {
   return (
     <div className="border-t border-slate-200 px-5 py-5 sm:px-8 sm:py-6">
       <div className="flex items-center justify-between gap-6">
@@ -361,10 +402,11 @@ function CartDrawerFooter({ totalAmount, onClose }: { totalAmount: number; onClo
         </button>
       </div>
 
-      <Link
-        to="/checkout"
-        onClick={onClose}
-        className="mt-5 inline-flex h-14 w-full items-center justify-center gap-3 rounded-full bg-[#171717] px-6 text-base font-bold text-white transition hover:bg-black"
+      <button
+        type="button"
+        onClick={onCheckout}
+        disabled={isCheckoutDisabled}
+        className="mt-5 inline-flex h-14 w-full items-center justify-center gap-3 rounded-full bg-[#171717] px-6 text-base font-bold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
       >
         <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M7 10V8a5 5 0 0 1 10 0v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -372,7 +414,45 @@ function CartDrawerFooter({ totalAmount, onClose }: { totalAmount: number; onClo
           <circle cx="12" cy="15" r="1.5" fill="currentColor" />
         </svg>
         Checkout
-      </Link>
+      </button>
+    </div>
+  );
+}
+
+function LoginRequiredDialog({ onCancel, onLogin }: { onCancel: () => void; onLogin: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/45 p-5" role="presentation">
+      <section
+        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="login-required-title"
+      >
+        <div className="grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-slate-800" aria-hidden="true">
+          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none">
+            <path d="M12 3 4.5 6v5.5c0 4.6 3.1 7.9 7.5 9.5 4.4-1.6 7.5-4.9 7.5-9.5V6L12 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+            <path d="M12 8v4m0 3h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </div>
+        <h2 id="login-required-title" className="mt-5 text-2xl font-bold tracking-tight text-slate-950">Vui lòng đăng nhập</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-500">Bạn vui lòng đăng nhập để mua sản phẩm và hoàn tất thanh toán.</p>
+        <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 px-5 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            onClick={onLogin}
+            className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white transition hover:bg-slate-800"
+          >
+            Đăng nhập
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
