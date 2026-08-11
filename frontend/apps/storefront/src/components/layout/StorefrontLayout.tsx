@@ -75,10 +75,10 @@ function StorefrontLayoutContent() {
                 />
               </NavLink>
 
-              <nav className={`ui-control flex min-w-0 items-center gap-3 overflow-x-auto whitespace-nowrap scrollbar-hidden sm:gap-5 lg:col-start-2 lg:justify-self-center lg:gap-8 xl:gap-10 transition-colors duration-300 ${textColorClass}`}>
+              <nav className={`ui-control flex min-w-0 items-center gap-3 overflow-x-auto whitespace-nowrap scrollbar-hidden sm:gap-5 lg:col-start-2 lg:justify-self-center lg:gap-8 lg:overflow-visible xl:gap-10 transition-colors duration-300 ${textColorClass}`}>
                 {navItems.map((item) =>
                   item.label === "Products" && item.to ? (
-                    <div key={`${item.label}-${item.to}`} className="group inline-flex">
+                    <div key={`${item.label}-${item.to}`} className="group relative inline-flex">
                       <NavLink
                         to={item.to}
                         className={({ isActive }) =>
@@ -217,9 +217,9 @@ function ProductMegaMenu({
   isLoading: boolean;
 }) {
   return (
-    <div className="pointer-events-none fixed left-0 right-0 top-14 z-40 pt-6 opacity-0 transition duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-      <div className="border-y border-slate-100 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
-        <div className="mx-auto grid max-h-[calc(100vh-5rem)] max-w-[1600px] gap-10 overflow-y-auto px-8 py-10 sm:grid-cols-2 lg:grid-cols-4 lg:px-10">
+    <div className="pointer-events-none absolute left-1/2 top-full z-50 w-[min(760px,calc(100vw-2rem))] -translate-x-1/2 pt-3 opacity-0 transition duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+      <div className="max-h-[min(560px,calc(100vh-7rem))] overflow-y-auto rounded-2xl border border-slate-100 bg-white p-5 text-slate-950 shadow-[0_18px_45px_rgba(15,23,42,0.16)]">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {isLoading ? (
             <div className="text-sm font-semibold text-slate-500">Loading categories...</div>
           ) : categories.length === 0 ? (
