@@ -17,6 +17,9 @@ Thumbs.db
 # Logs
 *.log
 
+# Local database recovery artifacts
+backups/
+
 # Frontend
 node_modules/
 **/node_modules/
