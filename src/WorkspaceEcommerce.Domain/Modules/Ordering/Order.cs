@@ -81,6 +81,13 @@ public sealed class Order : Entity
 
     public DateTimeOffset? PaidAt { get; private set; }
 
+    /// <summary>
+    /// Immutable business timestamp set when the order first reaches Completed.
+    /// Warranty eligibility must use this value rather than infer delivery from
+    /// mutable status history at request time.
+    /// </summary>
+    public DateTimeOffset? CompletedAt { get; private set; }
+
     public string CurrencyCode { get; private set; }
 
     public decimal ExchangeRate { get; private set; }
@@ -272,6 +279,10 @@ public sealed class Order : Entity
 
         var fromStatus = Status;
         Status = toStatus;
+        if (toStatus == OrderStatus.Completed && CompletedAt is null)
+        {
+            CompletedAt = DateTimeOffset.UtcNow;
+        }
         Touch();
 
         var history = new OrderStatusHistory(historyId, Id, fromStatus, toStatus, note, changedBy);

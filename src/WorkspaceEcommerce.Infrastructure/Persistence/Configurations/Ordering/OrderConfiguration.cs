@@ -113,6 +113,9 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(order => order.PaidAt)
             .HasColumnName("paid_at");
 
+        builder.Property(order => order.CompletedAt)
+            .HasColumnName("completed_at");
+
         builder.Property(order => order.CurrencyCode)
             .HasColumnName("currency_code")
             .HasMaxLength(10)
@@ -165,6 +168,9 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.HasIndex(order => order.PaymentStatus)
             .HasDatabaseName("ix_orders_payment_status");
+
+        builder.HasIndex(order => order.CompletedAt)
+            .HasDatabaseName("ix_orders_completed_at");
 
         builder.HasIndex(order => order.TrackingCode)
             .IsUnique()

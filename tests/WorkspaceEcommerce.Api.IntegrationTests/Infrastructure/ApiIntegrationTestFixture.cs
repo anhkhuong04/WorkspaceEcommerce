@@ -26,7 +26,13 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         "Storefront__BaseUrl",
         "MiniLogistics__WebhookSecret",
         "MiniLogistics__CommandWorkerIntervalSeconds",
-        "EmailDelivery__WorkerIntervalSeconds"
+        "EmailDelivery__WorkerIntervalSeconds",
+        "Warranty__Enabled",
+        "Warranty__AdminEnabled",
+        "Warranty__ActivationEnabled",
+        "Warranty__PublicLookupEnabled",
+        "Warranty__IdentifierKeyVersion",
+        "Warranty__IdentifierHmacKey"
     ];
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
@@ -76,6 +82,14 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         await dbContext.Database.ExecuteSqlRawAsync(
             """
             TRUNCATE TABLE
+                warranty.warranty_audit_events,
+                warranty.warranty_coverage_snapshots,
+                warranty.warranty_entitlements,
+                warranty.serialized_product_units,
+                warranty.warranty_import_batches,
+                warranty.product_variant_warranty_plans,
+                warranty.warranty_plan_coverages,
+                warranty.warranty_plans,
                 shipping.shipment_timeline_entries,
                 shipping.shipment_event_inbox,
                 shipping.shipment_command_outbox,
@@ -199,6 +213,12 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("MiniLogistics__WebhookSecret", "integration-webhook-secret");
         Environment.SetEnvironmentVariable("MiniLogistics__CommandWorkerIntervalSeconds", "3600");
         Environment.SetEnvironmentVariable("EmailDelivery__WorkerIntervalSeconds", "3600");
+        Environment.SetEnvironmentVariable("Warranty__Enabled", "true");
+        Environment.SetEnvironmentVariable("Warranty__AdminEnabled", "true");
+        Environment.SetEnvironmentVariable("Warranty__ActivationEnabled", "true");
+        Environment.SetEnvironmentVariable("Warranty__PublicLookupEnabled", "true");
+        Environment.SetEnvironmentVariable("Warranty__IdentifierKeyVersion", "1");
+        Environment.SetEnvironmentVariable("Warranty__IdentifierHmacKey", "integration-warranty-hmac-key-at-least-32-characters");
     }
 
     private void RestoreRuntimeConfiguration()

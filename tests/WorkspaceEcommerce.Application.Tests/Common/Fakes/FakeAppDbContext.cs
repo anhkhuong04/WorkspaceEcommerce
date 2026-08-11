@@ -9,6 +9,7 @@ using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Payments;
 using WorkspaceEcommerce.Domain.Modules.Reviews;
 using WorkspaceEcommerce.Domain.Modules.Shipments;
+using WorkspaceEcommerce.Domain.Modules.Warranties;
 
 namespace WorkspaceEcommerce.Application.Tests.Common.Fakes;
 
@@ -47,6 +48,14 @@ internal sealed class FakeAppDbContext : IAppDbContext
     private readonly List<ShipmentTimelineEntry> _shipmentTimelineEntries = [];
     private readonly List<ShipmentEventInbox> _shipmentEventInbox = [];
     private readonly List<ShipmentCommandOutbox> _shipmentCommandOutbox = [];
+    private readonly List<WarrantyPlan> _warrantyPlans = [];
+    private readonly List<WarrantyPlanCoverage> _warrantyPlanCoverages = [];
+    private readonly List<ProductVariantWarrantyPlan> _productVariantWarrantyPlans = [];
+    private readonly List<WarrantyImportBatch> _warrantyImportBatches = [];
+    private readonly List<SerializedProductUnit> _serializedProductUnits = [];
+    private readonly List<WarrantyEntitlement> _warrantyEntitlements = [];
+    private readonly List<WarrantyCoverageSnapshot> _warrantyCoverageSnapshots = [];
+    private readonly List<WarrantyAuditEvent> _warrantyAuditEvents = [];
 
     public IQueryable<Category> Categories => _categories.AsQueryable();
 
@@ -114,6 +123,22 @@ internal sealed class FakeAppDbContext : IAppDbContext
 
     public IQueryable<ShipmentCommandOutbox> ShipmentCommandOutbox => _shipmentCommandOutbox.AsQueryable();
 
+    public IQueryable<WarrantyPlan> WarrantyPlans => _warrantyPlans.AsQueryable();
+
+    public IQueryable<WarrantyPlanCoverage> WarrantyPlanCoverages => _warrantyPlanCoverages.AsQueryable();
+
+    public IQueryable<ProductVariantWarrantyPlan> ProductVariantWarrantyPlans => _productVariantWarrantyPlans.AsQueryable();
+
+    public IQueryable<WarrantyImportBatch> WarrantyImportBatches => _warrantyImportBatches.AsQueryable();
+
+    public IQueryable<SerializedProductUnit> SerializedProductUnits => _serializedProductUnits.AsQueryable();
+
+    public IQueryable<WarrantyEntitlement> WarrantyEntitlements => _warrantyEntitlements.AsQueryable();
+
+    public IQueryable<WarrantyCoverageSnapshot> WarrantyCoverageSnapshots => _warrantyCoverageSnapshots.AsQueryable();
+
+    public IQueryable<WarrantyAuditEvent> WarrantyAuditEvents => _warrantyAuditEvents.AsQueryable();
+
     public Task<CustomerRefreshToken?> FindCustomerRefreshTokenByHashForUpdateAsync(
         string tokenHash,
         CancellationToken cancellationToken = default)
@@ -138,6 +163,27 @@ internal sealed class FakeAppDbContext : IAppDbContext
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(_orders.FirstOrDefault(order => order.Id == orderId));
+    }
+
+    public Task<SerializedProductUnit?> FindSerializedProductUnitForUpdateAsync(
+        WarrantyIdentifierType identifierType,
+        int identifierKeyVersion,
+        string identifierFingerprint,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_serializedProductUnits.FirstOrDefault(unit =>
+            unit.IdentifierType == identifierType &&
+            unit.IdentifierKeyVersion == identifierKeyVersion &&
+            unit.IdentifierFingerprint == identifierFingerprint));
+    }
+
+    public Task<SerializedProductUnit?> FindSerializedProductUnitByIdForUpdateAsync(
+        Guid unitId,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_serializedProductUnits.FirstOrDefault(unit => unit.Id == unitId));
     }
 
     public Task<ShipmentCommandOutbox[]> ClaimDueShipmentCommandsAsync(
@@ -382,6 +428,30 @@ internal sealed class FakeAppDbContext : IAppDbContext
         _shipmentCommandOutbox.AddRange(commands);
     }
 
+    public void Seed(params WarrantyPlan[] plans)
+    {
+        _warrantyPlans.AddRange(plans);
+        _warrantyPlanCoverages.AddRange(plans.SelectMany(plan => plan.Coverages));
+    }
+
+    public void Seed(params WarrantyPlanCoverage[] coverages) => _warrantyPlanCoverages.AddRange(coverages);
+
+    public void Seed(params ProductVariantWarrantyPlan[] mappings) => _productVariantWarrantyPlans.AddRange(mappings);
+
+    public void Seed(params WarrantyImportBatch[] batches) => _warrantyImportBatches.AddRange(batches);
+
+    public void Seed(params SerializedProductUnit[] units) => _serializedProductUnits.AddRange(units);
+
+    public void Seed(params WarrantyEntitlement[] entitlements)
+    {
+        _warrantyEntitlements.AddRange(entitlements);
+        _warrantyCoverageSnapshots.AddRange(entitlements.SelectMany(entitlement => entitlement.CoverageSnapshots));
+    }
+
+    public void Seed(params WarrantyCoverageSnapshot[] snapshots) => _warrantyCoverageSnapshots.AddRange(snapshots);
+
+    public void Seed(params WarrantyAuditEvent[] events) => _warrantyAuditEvents.AddRange(events);
+
     public void Add<TEntity>(TEntity entity)
         where TEntity : class
     {
@@ -608,6 +678,46 @@ internal sealed class FakeAppDbContext : IAppDbContext
         if (typeof(TEntity) == typeof(ShipmentCommandOutbox))
         {
             return (List<TEntity>)(object)_shipmentCommandOutbox;
+        }
+
+        if (typeof(TEntity) == typeof(WarrantyPlan))
+        {
+            return (List<TEntity>)(object)_warrantyPlans;
+        }
+
+        if (typeof(TEntity) == typeof(WarrantyPlanCoverage))
+        {
+            return (List<TEntity>)(object)_warrantyPlanCoverages;
+        }
+
+        if (typeof(TEntity) == typeof(ProductVariantWarrantyPlan))
+        {
+            return (List<TEntity>)(object)_productVariantWarrantyPlans;
+        }
+
+        if (typeof(TEntity) == typeof(WarrantyImportBatch))
+        {
+            return (List<TEntity>)(object)_warrantyImportBatches;
+        }
+
+        if (typeof(TEntity) == typeof(SerializedProductUnit))
+        {
+            return (List<TEntity>)(object)_serializedProductUnits;
+        }
+
+        if (typeof(TEntity) == typeof(WarrantyEntitlement))
+        {
+            return (List<TEntity>)(object)_warrantyEntitlements;
+        }
+
+        if (typeof(TEntity) == typeof(WarrantyCoverageSnapshot))
+        {
+            return (List<TEntity>)(object)_warrantyCoverageSnapshots;
+        }
+
+        if (typeof(TEntity) == typeof(WarrantyAuditEvent))
+        {
+            return (List<TEntity>)(object)_warrantyAuditEvents;
         }
 
         throw new InvalidOperationException($"Unsupported entity type '{typeof(TEntity).Name}'.");

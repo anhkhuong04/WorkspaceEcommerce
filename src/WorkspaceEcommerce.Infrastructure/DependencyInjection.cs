@@ -12,6 +12,7 @@ using WorkspaceEcommerce.Application.Abstractions.Seeding;
 using WorkspaceEcommerce.Application.Abstractions.Shipment;
 using WorkspaceEcommerce.Application.Modules.Admin.Dashboard;
 using WorkspaceEcommerce.Application.Modules.Loyalty;
+using WorkspaceEcommerce.Application.Abstractions.Warranties;
 using WorkspaceEcommerce.Infrastructure.Authentication;
 using WorkspaceEcommerce.Infrastructure.Configuration;
 using WorkspaceEcommerce.Infrastructure.Notifications;
@@ -21,6 +22,7 @@ using WorkspaceEcommerce.Infrastructure.Persistence;
 using WorkspaceEcommerce.Infrastructure.Persistence.Queries;
 using WorkspaceEcommerce.Infrastructure.Seeding;
 using WorkspaceEcommerce.Infrastructure.Shipment;
+using WorkspaceEcommerce.Infrastructure.Warranties;
 
 namespace WorkspaceEcommerce.Infrastructure;
 
@@ -41,6 +43,7 @@ public static class DependencyInjection
         var customerAccountLifecycleOptions = configuration.GetValidatedCustomerAccountLifecycleOptions();
         var emailDeliveryOptions = configuration.GetValidatedEmailDeliveryOptions(environment.EnvironmentName);
         var mediaStorageOptions = configuration.GetValidatedMediaStorageOptions(environment.EnvironmentName);
+        var warrantyOptions = configuration.GetValidatedWarrantyOptions();
 
         services.AddSingleton(_ =>
         {
@@ -74,6 +77,8 @@ public static class DependencyInjection
         services.AddSingleton(customerAccountLifecycleOptions);
         services.AddSingleton(emailDeliveryOptions);
         services.AddSingleton(mediaStorageOptions);
+        services.AddSingleton(warrantyOptions);
+        services.AddSingleton<IWarrantyIdentifierProtector, HmacWarrantyIdentifierProtector>();
         services.AddSingleton<MediaImageProcessor>();
         services.AddSingleton<IMediaMalwareScanner>(_ =>
             new NoOpMediaMalwareScanner(mediaStorageOptions, environment.EnvironmentName));

@@ -20,6 +20,7 @@ using WorkspaceEcommerce.Application.Modules.Operations;
 using WorkspaceEcommerce.Application.Modules.Payments;
 using WorkspaceEcommerce.Application.Modules.Reviews;
 using WorkspaceEcommerce.Application.Modules.Shipments;
+using WorkspaceEcommerce.Application.Modules.Warranties;
 
 namespace WorkspaceEcommerce.Application;
 
@@ -60,6 +61,9 @@ public static class DependencyInjection
         services.AddScoped<IShipmentWebhookService, ShipmentWebhookService>();
         services.AddScoped<IOrderShipmentService, OrderShipmentService>();
         services.AddScoped<IOutboxOperationsService, OutboxOperationsService>();
+        services.AddScoped<IAdminWarrantyService, AdminWarrantyService>();
+        services.AddScoped<ICustomerWarrantyService, CustomerWarrantyService>();
+        services.AddScoped<IPublicWarrantyService, PublicWarrantyService>();
 
         return services;
     }

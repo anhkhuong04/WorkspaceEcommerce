@@ -10,7 +10,7 @@ $username = 'workspace_ecommerce'
 $password = 'workspace_ecommerce_prh009'
 $connectionString = "Host=localhost;Port=$PostgresPort;Database=$database;Username=$username;Password=$password"
 $shipmentMigration = '20260802034719_AddShipmentIntegration'
-$latestMigration = '20260810011708_AddOutboxLeaseMetadata'
+$latestMigration = '20260811110854_AddWarrantyActivation'
 
 function Wait-ForPostgres {
     for ($attempt = 0; $attempt -lt 30; $attempt++) {

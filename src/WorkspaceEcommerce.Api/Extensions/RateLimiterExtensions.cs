@@ -17,6 +17,8 @@ internal static class RateLimiterExtensions
             var twoFactorSetupPermitLimit = isDevelopment ? 500 : 5;
             var transactionPermitLimit = isDevelopment ? 2_000 : 60;
             var catalogPermitLimit = isDevelopment ? 5_000 : 240;
+            var warrantyLookupPermitLimit = isDevelopment ? 500 : 15;
+            var warrantyActivationPermitLimit = isDevelopment ? 500 : 8;
             var defaultPermitLimit = isDevelopment ? 3_000 : 120;
 
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -71,6 +73,31 @@ internal static class RateLimiterExtensions
                         _ => new FixedWindowRateLimiterOptions
                         {
                             PermitLimit = authPermitLimit,
+                            QueueLimit = 0,
+                            Window = TimeSpan.FromMinutes(1)
+                        });
+                }
+
+                if (path.StartsWith("/api/warranties/lookup", StringComparison.OrdinalIgnoreCase))
+                {
+                    return RateLimitPartition.GetFixedWindowLimiter(
+                        $"warranty-lookup:{partitionKey}",
+                        _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = warrantyLookupPermitLimit,
+                            QueueLimit = 0,
+                            Window = TimeSpan.FromMinutes(1)
+                        });
+                }
+
+                if (path.StartsWith("/api/customer/warranties/activate", StringComparison.OrdinalIgnoreCase))
+                {
+                    var customerId = httpContext.User.FindFirst("customer_id")?.Value ?? "anonymous";
+                    return RateLimitPartition.GetFixedWindowLimiter(
+                        $"warranty-activation:{customerId}:{partitionKey}",
+                        _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = warrantyActivationPermitLimit,
                             QueueLimit = 0,
                             Window = TimeSpan.FromMinutes(1)
                         });

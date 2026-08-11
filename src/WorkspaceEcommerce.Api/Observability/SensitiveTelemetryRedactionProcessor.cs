@@ -20,7 +20,7 @@ public sealed class SensitiveTelemetryRedactionProcessor(ITelemetryProcessor nex
         TimeSpan.FromMilliseconds(100));
 
     private static readonly Regex SecretAssignmentPattern = new(
-        @"(?<prefix>\b(?:authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|password|passwd|pwd|secret|credential|connection[_-]?string|private[_-]?key|signing[_-]?key|encryption[_-]?key|otp|totp|two[_-]?factor(?:[_-]?code)?|recovery[_-]?code|verification[_-]?code|webhook[_-]?signature|signature|request[_-]?body|response[_-]?body|payload|session(?:[_-]?id)?|csrf(?:[_-]?token)?|nonce)\b\s*(?:=|:)\s*)(?:""[^""]*""|'[^']*'|[^\s,;&]+)",
+        @"(?<prefix>\b(?:authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|password|passwd|pwd|secret|credential|connection[_-]?string|private[_-]?key|signing[_-]?key|encryption[_-]?key|otp|totp|two[_-]?factor(?:[_-]?code)?|recovery[_-]?code|verification[_-]?code|webhook[_-]?signature|signature|request[_-]?body|response[_-]?body|payload|session(?:[_-]?id)?|csrf(?:[_-]?token)?|nonce|serial|imei|identifier)\b\s*(?:=|:)\s*)(?:""[^""]*""|'[^']*'|[^\s,;&]+)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
         TimeSpan.FromMilliseconds(100));
 
@@ -123,7 +123,10 @@ public sealed class SensitiveTelemetryRedactionProcessor(ITelemetryProcessor nex
                normalized.Contains("responsebody", StringComparison.Ordinal) ||
                normalized.Contains("webhookbody", StringComparison.Ordinal) ||
                normalized == "payload" ||
-               normalized.Contains("webhooksignature", StringComparison.Ordinal);
+               normalized.Contains("webhooksignature", StringComparison.Ordinal) ||
+               normalized.Contains("serial", StringComparison.Ordinal) ||
+               normalized.Contains("imei", StringComparison.Ordinal) ||
+               normalized.Contains("identifier", StringComparison.Ordinal);
     }
 
     private static Uri SanitizeUri(Uri value)

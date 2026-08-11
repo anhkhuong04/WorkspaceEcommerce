@@ -8,6 +8,7 @@ using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Payments;
 using WorkspaceEcommerce.Domain.Modules.Reviews;
 using WorkspaceEcommerce.Domain.Modules.Shipments;
+using WorkspaceEcommerce.Domain.Modules.Warranties;
 
 namespace WorkspaceEcommerce.Application.Abstractions.Persistence;
 
@@ -54,6 +55,20 @@ public interface IAppDbContext : ICatalogReadStore, IOrderReadStore, ILoyaltyRea
         Guid orderId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Holds the serialized-unit row lock during activation so retried or
+    /// concurrent requests for the same identifier become deterministic.
+    /// </summary>
+    Task<SerializedProductUnit?> FindSerializedProductUnitForUpdateAsync(
+        WarrantyIdentifierType identifierType,
+        int identifierKeyVersion,
+        string identifierFingerprint,
+        CancellationToken cancellationToken = default);
+
+    Task<SerializedProductUnit?> FindSerializedProductUnitByIdForUpdateAsync(
+        Guid unitId,
+        CancellationToken cancellationToken = default);
+
     Task<ShipmentCommandOutbox[]> ClaimDueShipmentCommandsAsync(
         string leaseOwner,
         TimeSpan leaseDuration,
@@ -97,5 +112,21 @@ public interface IAppDbContext : ICatalogReadStore, IOrderReadStore, ILoyaltyRea
     IQueryable<BlogComment> BlogComments { get; }
 
     IQueryable<Review> Reviews { get; }
+
+    IQueryable<WarrantyPlan> WarrantyPlans { get; }
+
+    IQueryable<WarrantyPlanCoverage> WarrantyPlanCoverages { get; }
+
+    IQueryable<ProductVariantWarrantyPlan> ProductVariantWarrantyPlans { get; }
+
+    IQueryable<WarrantyImportBatch> WarrantyImportBatches { get; }
+
+    IQueryable<SerializedProductUnit> SerializedProductUnits { get; }
+
+    IQueryable<WarrantyEntitlement> WarrantyEntitlements { get; }
+
+    IQueryable<WarrantyCoverageSnapshot> WarrantyCoverageSnapshots { get; }
+
+    IQueryable<WarrantyAuditEvent> WarrantyAuditEvents { get; }
 
 }

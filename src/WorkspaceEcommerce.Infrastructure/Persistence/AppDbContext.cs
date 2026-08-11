@@ -12,6 +12,7 @@ using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Payments;
 using WorkspaceEcommerce.Domain.Modules.Reviews;
 using WorkspaceEcommerce.Domain.Modules.Shipments;
+using WorkspaceEcommerce.Domain.Modules.Warranties;
 
 namespace WorkspaceEcommerce.Infrastructure.Persistence;
 
@@ -92,6 +93,22 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<Review> Reviews => Set<Review>();
 
+    public DbSet<WarrantyPlan> WarrantyPlans => Set<WarrantyPlan>();
+
+    public DbSet<WarrantyPlanCoverage> WarrantyPlanCoverages => Set<WarrantyPlanCoverage>();
+
+    public DbSet<ProductVariantWarrantyPlan> ProductVariantWarrantyPlans => Set<ProductVariantWarrantyPlan>();
+
+    public DbSet<WarrantyImportBatch> WarrantyImportBatches => Set<WarrantyImportBatch>();
+
+    public DbSet<SerializedProductUnit> SerializedProductUnits => Set<SerializedProductUnit>();
+
+    public DbSet<WarrantyEntitlement> WarrantyEntitlements => Set<WarrantyEntitlement>();
+
+    public DbSet<WarrantyCoverageSnapshot> WarrantyCoverageSnapshots => Set<WarrantyCoverageSnapshot>();
+
+    public DbSet<WarrantyAuditEvent> WarrantyAuditEvents => Set<WarrantyAuditEvent>();
+
     IQueryable<Category> ICatalogReadStore.Categories => Categories;
 
     IQueryable<Product> ICatalogReadStore.Products => Products;
@@ -158,6 +175,22 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     IQueryable<Review> IAppDbContext.Reviews => Reviews;
 
+    IQueryable<WarrantyPlan> IAppDbContext.WarrantyPlans => WarrantyPlans;
+
+    IQueryable<WarrantyPlanCoverage> IAppDbContext.WarrantyPlanCoverages => WarrantyPlanCoverages;
+
+    IQueryable<ProductVariantWarrantyPlan> IAppDbContext.ProductVariantWarrantyPlans => ProductVariantWarrantyPlans;
+
+    IQueryable<WarrantyImportBatch> IAppDbContext.WarrantyImportBatches => WarrantyImportBatches;
+
+    IQueryable<SerializedProductUnit> IAppDbContext.SerializedProductUnits => SerializedProductUnits;
+
+    IQueryable<WarrantyEntitlement> IAppDbContext.WarrantyEntitlements => WarrantyEntitlements;
+
+    IQueryable<WarrantyCoverageSnapshot> IAppDbContext.WarrantyCoverageSnapshots => WarrantyCoverageSnapshots;
+
+    IQueryable<WarrantyAuditEvent> IAppDbContext.WarrantyAuditEvents => WarrantyAuditEvents;
+
     Task<CustomerRefreshToken?> IAppDbContext.FindCustomerRefreshTokenByHashForUpdateAsync(
         string tokenHash,
         CancellationToken cancellationToken) =>
@@ -182,6 +215,29 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         CancellationToken cancellationToken) =>
         Orders
             .FromSqlInterpolated($"SELECT * FROM ordering.orders WHERE id = {orderId} FOR UPDATE")
+            .FirstOrDefaultAsync(cancellationToken);
+
+    Task<SerializedProductUnit?> IAppDbContext.FindSerializedProductUnitForUpdateAsync(
+        WarrantyIdentifierType identifierType,
+        int identifierKeyVersion,
+        string identifierFingerprint,
+        CancellationToken cancellationToken) =>
+        SerializedProductUnits
+            .FromSqlInterpolated($"""
+                SELECT *
+                FROM warranty.serialized_product_units
+                WHERE identifier_type = {identifierType.ToString()}
+                  AND identifier_key_version = {identifierKeyVersion}
+                  AND identifier_fingerprint = {identifierFingerprint}
+                FOR UPDATE
+                """)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    Task<SerializedProductUnit?> IAppDbContext.FindSerializedProductUnitByIdForUpdateAsync(
+        Guid unitId,
+        CancellationToken cancellationToken) =>
+        SerializedProductUnits
+            .FromSqlInterpolated($"SELECT * FROM warranty.serialized_product_units WHERE id = {unitId} FOR UPDATE")
             .FirstOrDefaultAsync(cancellationToken);
 
     async Task<ShipmentCommandOutbox[]> IAppDbContext.ClaimDueShipmentCommandsAsync(
