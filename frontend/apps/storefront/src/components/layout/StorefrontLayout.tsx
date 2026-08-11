@@ -94,6 +94,24 @@ function StorefrontLayoutContent() {
                       </NavLink>
                       <ProductMegaMenu categories={categoriesQuery.data ?? []} isLoading={categoriesQuery.isLoading} />
                     </div>
+                  ) : item.label === "Warranty" && item.to ? (
+                    <div key={`${item.label}-${item.to}`} className="group relative inline-flex">
+                      <NavLink
+                        to={item.to}
+                        className={({ isActive }) =>
+                          `inline-flex items-center gap-2 rounded-full px-1 py-2 transition ${isHeaderSolid ? "hover:text-[var(--brand)]" : "hover:text-white/70"} ${
+                            isActive && isHeaderSolid ? "text-[var(--brand)]" : ""
+                          }`
+                        }
+                        aria-haspopup="menu"
+                      >
+                        {item.label}
+                        <span className={`mt-0.5 text-[10px] leading-none transition-colors duration-300 ${isHeaderSolid ? "text-slate-900" : "text-white"}`} aria-hidden="true">
+                          v
+                        </span>
+                      </NavLink>
+                      <WarrantyMenu />
+                    </div>
                   ) : item.to ? (
                     <NavLink
                       key={`${item.label}-${item.to}`}
@@ -172,6 +190,21 @@ function StorefrontLayoutContent() {
       </main>
       {hideHeader ? null : <StorefrontFooter />}
       <StorefrontSearchOverlay isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+    </div>
+  );
+}
+
+function WarrantyMenu() {
+  return (
+    <div className="pointer-events-none absolute left-1/2 top-full z-50 w-80 -translate-x-1/2 pt-3 opacity-0 transition duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+      <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white p-2 text-slate-950 shadow-[0_18px_45px_rgba(15,23,42,0.16)]" role="menu" aria-label="Warranty">
+        <NavLink to="/warranty" role="menuitem" className="block rounded-xl px-4 py-3 text-base font-black transition hover:bg-slate-50 hover:text-[var(--brand)]">
+          Activate &amp; check warranty
+        </NavLink>
+        <NavLink to="/warranty-policy" role="menuitem" className="block rounded-xl px-4 py-3 text-base font-black transition hover:bg-slate-50 hover:text-[var(--brand)]">
+          Warranty policy
+        </NavLink>
+      </div>
     </div>
   );
 }
