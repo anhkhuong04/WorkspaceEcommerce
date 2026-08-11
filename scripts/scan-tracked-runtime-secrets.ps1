@@ -1,10 +1,17 @@
 [CmdletBinding()]
 param(
-    [string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot ".."))
+    [string]$RepositoryRoot
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {
+    # Windows PowerShell 5.1 does not populate $PSScriptRoot early enough for
+    # a parameter default expression. Resolve it after parameter binding so the
+    # scanner remains runnable in both Windows PowerShell and PowerShell 7.
+    $RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+}
 
 function Test-PlaceholderOrExternalReference {
     param([string]$Value)
