@@ -7,7 +7,7 @@ import { useAddProductToCart } from "../../features/cart/useAddProductToCart";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
 
-const pageSize = 12;
+const pageSize = 20;
 
 interface SelectableCategory {
   id: string;
@@ -214,8 +214,8 @@ export function ProductListPage() {
       />
 
       <section className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
-        <aside className="hidden lg:block">
-          <div className="sticky top-28">
+        <aside className="hidden self-start lg:block">
+          <div className="sticky top-28 max-h-[calc(100vh-8rem)] overflow-y-auto overscroll-contain pr-2">
             <FilterPanel
               key={`desktop-${filterKey}`}
               categories={selectableCategories}
