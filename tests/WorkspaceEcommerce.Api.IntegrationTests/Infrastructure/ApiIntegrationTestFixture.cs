@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
 using WorkspaceEcommerce.Application.Abstractions.Payments;
 using WorkspaceEcommerce.Application.Abstractions.Shipment;
+using WorkspaceEcommerce.Application.Modules.Shipments;
 using WorkspaceEcommerce.Infrastructure.Persistence;
 
 namespace WorkspaceEcommerce.Api.IntegrationTests.Infrastructure;
@@ -96,6 +97,7 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
                 ordering.orders,
                 cart.cart_items,
                 cart.carts,
+                customer.email_outbox,
                 customer.login_history,
                 customer.customers,
                 catalog.product_specifications,
@@ -129,6 +131,15 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         await using var scope = CreateScope();
 
         return await operation(scope.ServiceProvider);
+    }
+
+    public Task<int> ProcessDueShipmentCommandsAsync(int batchSize = 20)
+    {
+        return ExecuteScopeAsync(async services =>
+        {
+            var shipmentService = services.GetRequiredService<IOrderShipmentService>();
+            return await shipmentService.ProcessDueCommandsAsync(batchSize);
+        });
     }
 
     private AsyncServiceScope CreateScope()

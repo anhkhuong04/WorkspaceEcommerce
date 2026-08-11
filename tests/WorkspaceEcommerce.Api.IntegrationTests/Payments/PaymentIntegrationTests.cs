@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using WorkspaceEcommerce.Api.IntegrationTests.Infrastructure;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Payments;
+using WorkspaceEcommerce.Domain.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Api.IntegrationTests.Payments;
 
@@ -34,6 +35,19 @@ public sealed class PaymentIntegrationTests(ApiIntegrationTestFixture fixture)
         Assert.Equal(
             $"http://localhost:5173/checkout/payment-result?status=success&orderCode={seed.OrderCode}",
             response.Headers.Location?.ToString());
+
+        var queuedCommand = await fixture.ExecuteDbAsync(async dbContext =>
+            await dbContext.ShipmentCommandOutbox
+                .Where(command => command.OrderId == seed.OrderId)
+                .Select(command => new
+                {
+                    command.CommandType,
+                    command.Status
+                })
+                .SingleAsync());
+        Assert.Equal(ShipmentCommandType.Create, queuedCommand.CommandType);
+        Assert.Equal(ShipmentCommandStatus.Pending, queuedCommand.Status);
+        Assert.Equal(1, await fixture.ProcessDueShipmentCommandsAsync());
 
         var persisted = await fixture.ExecuteDbAsync(async dbContext =>
         {
@@ -74,6 +88,19 @@ public sealed class PaymentIntegrationTests(ApiIntegrationTestFixture fixture)
             "valid-hash");
 
         using var firstResponse = await client.GetAsync(callbackUrl);
+        var queuedAfterFirstCallback = await fixture.ExecuteDbAsync(async dbContext =>
+            await dbContext.ShipmentCommandOutbox
+                .Where(command => command.OrderId == seed.OrderId)
+                .Select(command => new
+                {
+                    command.CommandType,
+                    command.Status
+                })
+                .SingleAsync());
+        Assert.Equal(ShipmentCommandType.Create, queuedAfterFirstCallback.CommandType);
+        Assert.Equal(ShipmentCommandStatus.Pending, queuedAfterFirstCallback.Status);
+        Assert.Equal(1, await fixture.ProcessDueShipmentCommandsAsync());
+
         var shipmentAfterFirst = await fixture.ExecuteDbAsync(async dbContext =>
             await dbContext.Orders
                 .Where(order => order.Id == seed.OrderId)
@@ -92,6 +119,19 @@ public sealed class PaymentIntegrationTests(ApiIntegrationTestFixture fixture)
         Assert.Equal("00", (await secondResponse.ReadJsonAsync())["RspCode"]!.GetValue<string>());
         Assert.NotNull(shipmentAfterFirst);
         Assert.Equal(shipmentAfterFirst, shipmentAfterSecond);
+
+        var commandsAfterSecondCallback = await fixture.ExecuteDbAsync(async dbContext =>
+            await dbContext.ShipmentCommandOutbox
+                .Where(command => command.OrderId == seed.OrderId)
+                .Select(command => new
+                {
+                    command.CommandType,
+                    command.Status
+                })
+                .ToArrayAsync());
+        var commandAfterSecondCallback = Assert.Single(commandsAfterSecondCallback);
+        Assert.Equal(ShipmentCommandType.Create, commandAfterSecondCallback.CommandType);
+        Assert.Equal(ShipmentCommandStatus.Completed, commandAfterSecondCallback.Status);
     }
 
     [Fact]
