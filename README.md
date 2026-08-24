@@ -289,73 +289,6 @@ The runtime OpenAPI endpoint is development-only. The release contract, includin
 
 ---
 
-## Testing
-
-Build and run all backend tests:
-
-```powershell
-dotnet build WorkspaceEcommerce.slnx
-dotnet test WorkspaceEcommerce.slnx
-```
-
-Run tests with detailed output:
-
-```powershell
-dotnet test WorkspaceEcommerce.slnx --logger "console;verbosity=detailed"
-```
-
----
-
-## Production Release Gate
-
-The release candidate is verified with pinned .NET/Node tooling, NuGet lock files,
-frontend lock files, and the CI workflow in `.github/workflows/ci.yml`. From a clean
-checkout, run the equivalent local gates before opening a release PR:
-
-```powershell
-dotnet tool restore
-dotnet restore WorkspaceEcommerce.slnx --locked-mode
-dotnet build WorkspaceEcommerce.slnx --no-restore --configuration Release
-dotnet test WorkspaceEcommerce.slnx --no-build --no-restore --configuration Release
-dotnet tool run dotnet-ef migrations has-pending-model-changes --project src/WorkspaceEcommerce.Infrastructure --startup-project src/WorkspaceEcommerce.Api --context AppDbContext --configuration Release --no-build
-./scripts/verify-prh-009-migrations.ps1
-./scripts/scan-tracked-runtime-secrets.ps1
-Push-Location frontend
-corepack pnpm install --frozen-lockfile
-corepack pnpm lint
-corepack pnpm typecheck
-corepack pnpm build
-corepack pnpm audit --prod --audit-level=high
-Pop-Location
-docker build --file src/WorkspaceEcommerce.Api/Dockerfile --target final --tag workspace-ecommerce-api:ci .
-docker build --file src/WorkspaceEcommerce.Api/Dockerfile --target migrate --tag workspace-ecommerce-api-migrate:ci .
-./scripts/verify-prh-010-container.ps1
-```
-
-The final release still requires the staging/topology, credential-rotation,
-multi-replica, backup/restore, load/soak, and sign-off evidence in the production
-runbook. CI artifacts are evidence for one candidate commit; they are not an
-authorization to deploy by themselves.
-
-Run the repeatable local gates before asking the platform owner to deploy:
-
-```powershell
-./scripts/verify-prh-009-regressions.ps1
-./scripts/verify-prh-009-migrations.ps1
-./scripts/verify-prh-009-backup-restore.ps1
-./scripts/scan-tracked-runtime-secrets.ps1
-dotnet list WorkspaceEcommerce.slnx package --vulnerable --include-transitive
-Push-Location frontend
-corepack pnpm audit --prod --audit-level=high
-corepack pnpm typecheck
-corepack pnpm build
-Pop-Location
-```
-
-Do not treat those local checks as approval for production. The remaining topology, multi-instance, object-store retention, alerting, rollback, and evidence requirements are explicit go/no-go steps in the [production release runbook](docs/runbooks/production-release.md). Record the actual deployment evidence in [the PRH-009 completion report](docs/reports/prh-009-completion-report.md).
-
----
-
 ## Environment Variables
 
 Full reference for all variables in `.env.example`:
@@ -386,23 +319,5 @@ Full reference for all variables in `.env.example`:
 | `MiniLogistics__CommandWorkerIntervalSeconds` | `15`                                      |          | Shipment outbox polling interval       |
 | `Payment__VNPay__TmnCode`        | —                                                 | ✅       | VNPay terminal code                    |
 | `Payment__VNPay__HashSecret`     | —                                                 | ✅       | VNPay hash secret                      |
-
-> ⚠️ **Never commit your `.env` file.** It is already listed in `.gitignore`.
-
-Production additionally requires `DataProtection__KeyRingPath`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, explicit `Cors__AllowedOrigins__<n>`, S3 media storage, and SMTP delivery. If the API is behind a reverse proxy, configure only its immediate IPs in `ForwardedHeaders__KnownProxies__<n>`; do not trust caller-supplied forwarding headers. See the release runbook for the full topology verification procedure.
-
----
-
-## Contributing
-
-1. **Fork** the repository and create a feature branch:
-   ```powershell
-   git checkout -b feature/your-feature-name
-   ```
-2. **Make your changes** and ensure all tests pass.
-3. **Verify the frontend** builds without errors.
-4. **Open a Pull Request** against `main` with a clear description of your changes.
-
-Please follow the existing code style and include tests for any new functionality.
 
 ---
