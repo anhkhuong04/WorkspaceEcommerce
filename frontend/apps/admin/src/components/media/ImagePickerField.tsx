@@ -14,6 +14,8 @@ interface ImagePickerFieldProps {
   onChange: (value: string) => void;
 }
 
+const MAX_FILE_BYTES = 2 * 1024 * 1024; // 2 MB
+
 export function ImagePickerField({
   label,
   value,
@@ -40,6 +42,13 @@ export function ImagePickerField({
       return;
     }
 
+    if (file.size > MAX_FILE_BYTES) {
+      setUploadError(`File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum allowed size is 2 MB.`);
+      event.target.value = "";
+      return;
+    }
+
+    setUploadError(null);
     uploadMutation.mutate(file);
     event.target.value = "";
   }
@@ -54,11 +63,12 @@ export function ImagePickerField({
       ) : null}
       <div className="flex flex-col gap-2 sm:flex-row">
         <TextInput value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
-        <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleFileChange} />
+        <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileChange} />
         <Button type="button" disabled={uploadMutation.isPending} onClick={() => inputRef.current?.click()} className="sm:w-36">
           {uploadMutation.isPending ? "Uploading..." : "Choose image"}
         </Button>
       </div>
+      <p className="mt-1 text-xs font-medium text-slate-400">JPEG, PNG or WebP · max 2 MB</p>
       {error ? <span className="mt-1 block text-sm font-semibold text-red-600" role="alert">{error}</span> : null}
       {uploadError ? <span className="mt-1 block text-sm font-semibold text-red-600" role="alert">{uploadError}</span> : null}
     </div>

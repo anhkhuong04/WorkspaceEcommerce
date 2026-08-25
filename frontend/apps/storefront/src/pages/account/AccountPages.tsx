@@ -497,6 +497,9 @@ export function AccountLoyaltyPage() {
 
 export function AccountOrderDetailPage() {
   const { id } = useParams();
+  const queryClient = useQueryClient();
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const orderQuery = useQuery({
     queryKey: ["customer", "order", id],
     queryFn: () => storefrontApi.getCustomerOrder(id ?? ""),
@@ -508,12 +511,42 @@ export function AccountOrderDetailPage() {
     enabled: Boolean(id)
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: (reason: string) => storefrontApi.cancelCustomerOrder(id ?? "", reason),
+    onSuccess: (updated) => {
+      setActionError(null);
+      queryClient.setQueryData(["customer", "order", id], updated);
+      void queryClient.invalidateQueries({ queryKey: ["customer", "orders"] });
+    },
+    onError: (err) => setActionError(getApiErrorMessage(err))
+  });
+
+  const returnMutation = useMutation({
+    mutationFn: (reason: string) => storefrontApi.requestOrderReturn(id ?? "", reason),
+    onSuccess: (updated) => {
+      setActionError(null);
+      queryClient.setQueryData(["customer", "order", id], updated);
+      void queryClient.invalidateQueries({ queryKey: ["customer", "orders"] });
+    },
+    onError: (err) => setActionError(getApiErrorMessage(err))
+  });
+
   return (
     <AccountShell>
       {!id ? <StateMessage tone="error">Missing order id.</StateMessage> : null}
       {orderQuery.isLoading ? <StateMessage>Loading order...</StateMessage> : null}
       {orderQuery.error ? <StateMessage tone="error">{getApiErrorMessage(orderQuery.error)}</StateMessage> : null}
-      {orderQuery.data ? <OrderDetail order={orderQuery.data} tracking={trackingQuery.data ?? null} /> : null}
+      {orderQuery.data ? (
+        <OrderDetail
+          order={orderQuery.data}
+          tracking={trackingQuery.data ?? null}
+          onCancel={cancelMutation.mutate}
+          isCancelling={cancelMutation.isPending}
+          onReturn={returnMutation.mutate}
+          isReturning={returnMutation.isPending}
+          actionError={actionError}
+        />
+      ) : null}
     </AccountShell>
   );
 }
@@ -762,7 +795,23 @@ function TierBadge({ tier }: { tier: LoyaltyTierType }) {
   );
 }
 
-function OrderDetail({ order, tracking }: { order: CustomerOrderDto; tracking: ShipmentTrackingDto | null }) {
+function OrderDetail({
+  order,
+  tracking,
+  onCancel,
+  isCancelling,
+  onReturn,
+  isReturning,
+  actionError
+}: {
+  order: CustomerOrderDto;
+  tracking: ShipmentTrackingDto | null;
+  onCancel: (reason: string) => void;
+  isCancelling: boolean;
+  onReturn: (reason: string) => void;
+  isReturning: boolean;
+  actionError: string | null;
+}) {
   return (
     <div className="grid gap-6">
       <section className="ui-card border border-slate-100 p-6">
@@ -801,6 +850,15 @@ function OrderDetail({ order, tracking }: { order: CustomerOrderDto; tracking: S
               <StatusTimeline order={order} />
             </section>
 
+            <OrderActionPanel
+              order={order}
+              onCancel={onCancel}
+              isCancelling={isCancelling}
+              onReturn={onReturn}
+              isReturning={isReturning}
+              actionError={actionError}
+            />
+
             <Link to="/account/orders" className="ui-control flex h-11 items-center justify-center rounded-[var(--radius-control)] border border-slate-200 text-slate-700 transition hover:border-slate-950 hover:text-slate-950">
               Back to orders
             </Link>
@@ -813,6 +871,147 @@ function OrderDetail({ order, tracking }: { order: CustomerOrderDto; tracking: S
           <h2 className="ui-h3 mt-2 text-slate-950">Carrier tracking</h2>
           <div className="mt-5"><ShipmentTrackingPanel tracking={tracking} /></div>
         </section>
+      ) : null}
+    </div>
+  );
+}
+
+function OrderActionPanel({
+  order,
+  onCancel,
+  isCancelling,
+  onReturn,
+  isReturning,
+  actionError
+}: {
+  order: CustomerOrderDto;
+  onCancel: (reason: string) => void;
+  isCancelling: boolean;
+  onReturn: (reason: string) => void;
+  isReturning: boolean;
+  actionError: string | null;
+}) {
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showReturnDialog, setShowReturnDialog] = useState(false);
+  const [reason, setReason] = useState("");
+
+  const canCancel = order.status === 0 || order.status === 1;
+  const canReturn = order.status === 4;
+
+  if (!canCancel && !canReturn) return null;
+
+  function handleCancel() {
+    onCancel(reason.trim());
+    setShowCancelDialog(false);
+    setReason("");
+  }
+
+  function handleReturn() {
+    onReturn(reason.trim());
+    setShowReturnDialog(false);
+    setReason("");
+  }
+
+  return (
+    <div className="grid gap-3">
+      {actionError ? (
+        <div className="rounded-[var(--radius-card)] bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          {actionError}
+        </div>
+      ) : null}
+
+      {canCancel && !showCancelDialog ? (
+        <button
+          type="button"
+          id="btn-cancel-order"
+          onClick={() => { setShowCancelDialog(true); setReason(""); }}
+          className="ui-control flex h-11 items-center justify-center rounded-[var(--radius-control)] border border-red-200 text-red-700 transition hover:bg-red-50"
+        >
+          Cancel order
+        </button>
+      ) : null}
+
+      {canCancel && showCancelDialog ? (
+        <div className="rounded-[var(--radius-card)] border border-red-100 bg-red-50 p-4">
+          <p className="text-sm font-bold text-red-800">Cancel this order?</p>
+          <p className="mt-1 text-xs font-medium text-red-600">
+            This action cannot be undone. Stock will be restored automatically.
+          </p>
+          <textarea
+            id="cancel-reason"
+            rows={2}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Reason for cancellation (optional)"
+            className="mt-3 w-full rounded-[var(--radius-control)] border border-red-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-200"
+          />
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              id="btn-cancel-order-confirm"
+              disabled={isCancelling}
+              onClick={handleCancel}
+              className="ui-control flex h-10 flex-1 items-center justify-center rounded-[var(--radius-control)] bg-red-600 text-sm text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isCancelling ? "Cancelling..." : "Yes, cancel order"}
+            </button>
+            <button
+              type="button"
+              disabled={isCancelling}
+              onClick={() => setShowCancelDialog(false)}
+              className="ui-control flex h-10 flex-1 items-center justify-center rounded-[var(--radius-control)] border border-slate-200 text-sm text-slate-700 transition hover:border-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Keep order
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {canReturn && !showReturnDialog ? (
+        <button
+          type="button"
+          id="btn-return-order"
+          onClick={() => { setShowReturnDialog(true); setReason(""); }}
+          className="ui-control flex h-11 items-center justify-center rounded-[var(--radius-control)] border border-amber-200 text-amber-700 transition hover:bg-amber-50"
+        >
+          Request return
+        </button>
+      ) : null}
+
+      {canReturn && showReturnDialog ? (
+        <div className="rounded-[var(--radius-card)] border border-amber-100 bg-amber-50 p-4">
+          <p className="text-sm font-bold text-amber-800">Request a return?</p>
+          <p className="mt-1 text-xs font-medium text-amber-600">
+            Please describe the reason for the return so we can process it quickly.
+          </p>
+          <textarea
+            id="return-reason"
+            rows={2}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Reason for return (optional)"
+            className="mt-3 w-full rounded-[var(--radius-control)] border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+          />
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              id="btn-return-order-confirm"
+              disabled={isReturning}
+              onClick={handleReturn}
+              className="ui-control flex h-10 flex-1 items-center justify-center rounded-[var(--radius-control)] bg-amber-500 text-sm text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isReturning ? "Submitting..." : "Yes, request return"}
+            </button>
+            <button
+              type="button"
+              disabled={isReturning}
+              onClick={() => setShowReturnDialog(false)}
+              className="ui-control flex h-10 flex-1 items-center justify-center rounded-[var(--radius-control)] border border-slate-200 text-sm text-slate-700 transition hover:border-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Go back
+            </button>
+          </div>
+        </div>
       ) : null}
     </div>
   );

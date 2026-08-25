@@ -12,7 +12,7 @@ namespace WorkspaceEcommerce.Api.Controllers.Admin;
 public sealed class MediaController(IMediaStorageService mediaStorageService) : ControllerBase
 {
     [HttpPost("api/admin/media")]
-    [RequestSizeLimit(5 * 1024 * 1024)]
+    [RequestSizeLimit(2 * 1024 * 1024 + 512 * 1024)] // 2.5 MB — image cap (2 MB) + multipart overhead
     [ProducesResponseType(typeof(ApiResponse<MediaUploadResult>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]

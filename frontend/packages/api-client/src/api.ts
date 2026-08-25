@@ -34,6 +34,7 @@ import type {
   CustomerOrderListItemDto,
   CustomerOrderListRequest,
   CustomerProfileDto,
+  OrderActionRequest,
   CustomerRegisterRequest,
   CustomerGoogleLoginRequest,
   ConfirmEmailVerificationRequest,
@@ -177,6 +178,10 @@ export function createStorefrontApi(client: ApiClient) {
       client.get<PagedResult<CustomerOrderListItemDto>>(`/api/customer/orders${buildQuery(request)}`),
     getCustomerOrder: (id: string) => client.get<CustomerOrderDto>(`/api/customer/orders/${id}`),
     getCustomerOrderTracking: (id: string) => client.get<ShipmentTrackingDto>(`/api/customer/orders/${id}/tracking`),
+    cancelCustomerOrder: (id: string, reason: string) =>
+      client.post<CustomerOrderDto, OrderActionRequest>(`/api/customer/orders/${id}/cancel`, { reason }),
+    requestOrderReturn: (id: string, reason: string) =>
+      client.post<CustomerOrderDto, OrderActionRequest>(`/api/customer/orders/${id}/return`, { reason }),
     activateWarranty: (request: ActivateWarrantyRequest) =>
       client.post<CustomerWarrantyDto, ActivateWarrantyRequest>("/api/customer/warranties/activate", request),
     getCustomerWarranties: (request: CustomerWarrantyListRequest = {}) =>

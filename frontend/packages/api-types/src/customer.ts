@@ -146,3 +146,7 @@ export interface CustomerOrderDto {
   items: OrderItemDto[];
   statusHistory: CustomerOrderStatusHistoryDto[];
 }
+
+export interface OrderActionRequest {
+  reason: string;
+}
