@@ -23,12 +23,15 @@ public sealed class UpdateProductVariantRequestValidator : AbstractValidator<Upd
             .MaximumLength(100);
 
         RuleFor(request => request.Price)
-            .GreaterThanOrEqualTo(0);
+            .GreaterThanOrEqualTo(0)
+            .Must(price => price == decimal.Truncate(price))
+            .WithMessage("Price must be a whole VND amount.");
 
         RuleFor(request => request.CompareAtPrice)
             .GreaterThanOrEqualTo(request => request.Price)
+            .Must(price => price == decimal.Truncate(price!.Value))
             .When(request => request.CompareAtPrice is not null)
-            .WithMessage("Compare-at price cannot be lower than price.");
+            .WithMessage("Compare-at price must be a whole VND amount and cannot be lower than price.");
 
         RuleFor(request => request.StockQuantity)
             .GreaterThanOrEqualTo(0);

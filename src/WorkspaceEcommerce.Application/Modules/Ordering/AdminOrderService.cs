@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.Extensions.Logging;
+using WorkspaceEcommerce.Application.Abstractions.Notifications;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Localization;
 using WorkspaceEcommerce.Application.Common.Models;
@@ -9,6 +10,7 @@ using WorkspaceEcommerce.Application.Modules.Shipments;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Domain.Modules.Payments;
 
 namespace WorkspaceEcommerce.Application.Modules.Ordering;
 
@@ -19,7 +21,9 @@ internal sealed class AdminOrderService(
     ILoyaltyService loyaltyService,
     ICurrentLanguageProvider languageProvider,
     ILogger<AdminOrderService> logger,
-    IOrderShipmentService? shipmentService = null) : IAdminOrderService
+    IOrderShipmentService? shipmentService = null,
+    INotificationService? notificationService = null,
+    ICustomerEmailOutbox? customerEmailOutbox = null) : IAdminOrderService
 {
     public async Task<Result<PagedResult<AdminOrderListItemDto>>> GetOrdersAsync(
         AdminOrderListRequest request,
@@ -114,24 +118,43 @@ internal sealed class AdminOrderService(
             return Result<AdminOrderDto>.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
-        var order = await dbContext.Orders
-            .Where(existing => existing.Id == id)
-            .FirstOrDefaultAsyncSafe(cancellationToken);
-        if (order is null)
-        {
-            return Result<AdminOrderDto>.NotFound("Order was not found.");
-        }
-
+        Order? order = null;
         try
         {
-            var history = order.ChangeStatus(
-                Guid.NewGuid(),
-                request.Status,
-                request.Note,
-                NormalizeOptional(changedBy));
+            await dbContext.ExecuteInTransactionAsync(async transactionCancellationToken =>
+            {
+                var pendingPaymentTransactions = request.Status == OrderStatus.Cancelled
+                    ? await dbContext.FindPendingPaymentTransactionsForOrderForUpdateAsync(id, transactionCancellationToken)
+                    : [];
+                order = await dbContext.FindOrderForUpdateAsync(id, transactionCancellationToken);
+                if (order is null)
+                {
+                    return;
+                }
 
-            dbContext.Add(history);
-            await dbContext.SaveChangesAsync(cancellationToken);
+                var history = order.ChangeStatus(
+                    Guid.NewGuid(),
+                    request.Status,
+                    NormalizeOptional(request.InternalNote),
+                    request.Status == OrderStatus.Cancelled ? NormalizeOptional(request.CancellationReason) : null,
+                    NormalizeOptional(request.CustomerMessage),
+                    NormalizeOptional(changedBy));
+                dbContext.Add(history);
+
+                if (request.Status == OrderStatus.Cancelled)
+                {
+                    await RestoreInventoryAsync(order.Id, transactionCancellationToken);
+                    CancelOrOpenRefundWorkflow(order, pendingPaymentTransactions, request.CancellationReason!);
+                    EnqueueCancellationEmail(order, request.CancellationReason!, request.CustomerMessage);
+                }
+
+                await dbContext.SaveChangesAsync(transactionCancellationToken);
+            }, cancellationToken);
+
+            if (order is null)
+            {
+                return Result<AdminOrderDto>.NotFound("Order was not found.");
+            }
 
             if (request.Status == OrderStatus.Completed)
             {
@@ -144,15 +167,114 @@ internal sealed class AdminOrderService(
             {
                 await shipmentService.QueueCancelAsync(
                     order.Id,
-                    request.Note ?? "Order cancelled by admin.",
+                    request.CancellationReason!,
                     cancellationToken);
             }
+
+            await NotifyCustomerAfterCommitAsync(order, request, cancellationToken);
 
             return Result<AdminOrderDto>.Success(await ToDetailDtoAsync(order, cancellationToken));
         }
         catch (DomainException exception)
         {
             return Result<AdminOrderDto>.Conflict(exception.Message);
+        }
+    }
+
+    private async Task RestoreInventoryAsync(Guid orderId, CancellationToken cancellationToken)
+    {
+        var orderItems = await dbContext.OrderItems
+            .Where(item => item.OrderId == orderId)
+            .ToArrayAsyncSafe(cancellationToken);
+        var variantIds = orderItems.Select(item => item.ProductVariantId).Distinct().ToArray();
+        var variantsById = (await dbContext.FindProductVariantsForUpdateAsync(variantIds, cancellationToken))
+            .ToDictionary(variant => variant.Id);
+
+        foreach (var item in orderItems)
+        {
+            if (variantsById.TryGetValue(item.ProductVariantId, out var variant))
+            {
+                variant.RestoreStock(item.Quantity);
+            }
+        }
+    }
+
+    private static void CancelOrOpenRefundWorkflow(
+        Order order,
+        IReadOnlyCollection<PaymentTransaction> pendingPaymentTransactions,
+        string cancellationReason)
+    {
+        if (order.PaymentStatus == PaymentStatus.Paid)
+        {
+            order.MarkPaymentRefundPending();
+            return;
+        }
+
+        foreach (var transaction in pendingPaymentTransactions)
+        {
+            transaction.MarkCancelled(
+                gatewayTransactionNo: null,
+                gatewayResponseCode: "ORDER_CANCELLED",
+                gatewayResponseMessage: cancellationReason,
+                secureHash: null,
+                rawResponse: null,
+                processedAt: DateTimeOffset.UtcNow);
+        }
+
+        if (order.PaymentStatus != PaymentStatus.Cancelled)
+        {
+            order.MarkPaymentCancelled();
+        }
+    }
+
+    private void EnqueueCancellationEmail(Order order, string cancellationReason, string? customerMessage)
+    {
+        if (customerEmailOutbox is null || string.IsNullOrWhiteSpace(order.CustomerEmail))
+        {
+            return;
+        }
+
+        var refundMessage = order.PaymentStatus == PaymentStatus.RefundPending
+            ? " Your payment has been queued for refund."
+            : string.Empty;
+        var additionalMessage = NormalizeOptional(customerMessage) is { } message
+            ? $" {message}"
+            : string.Empty;
+        customerEmailOutbox.Enqueue(new CustomerEmailMessage(
+            order.CustomerEmail,
+            $"Order {order.OrderCode} was cancelled",
+            $"Your order {order.OrderCode} was cancelled. Reason: {cancellationReason}.{additionalMessage}{refundMessage}"));
+    }
+
+    private async Task NotifyCustomerAfterCommitAsync(
+        Order order,
+        UpdateOrderStatusRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (notificationService is null || order.CustomerId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await notificationService.NotifyCustomerAsync(
+                order.CustomerId.Value,
+                "order_status_changed",
+                new
+                {
+                    orderId = order.Id,
+                    orderCode = order.OrderCode,
+                    newStatus = (int)order.Status,
+                    paymentStatus = (int)order.PaymentStatus,
+                    cancellationReason = NormalizeOptional(request.CancellationReason),
+                    customerMessage = NormalizeOptional(request.CustomerMessage)
+                },
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning(exception, "Could not send order status notification for order {OrderCode}", order.OrderCode);
         }
     }
 
@@ -230,7 +352,8 @@ internal sealed class AdminOrderService(
                             item.Variant.Sku,
                             item.UnitPrice,
                             item.Quantity,
-                            item.Variant.RequiresInstallation);
+                            item.Variant.RequiresInstallation,
+                            item.ProductImageUrlSnapshot);
                     }
 
                     order.RecordCreated(Guid.NewGuid(), $"Created by admin import ({orderPlan.ExternalOrderCode}).", NormalizeOptional(changedBy));
@@ -297,6 +420,12 @@ internal sealed class AdminOrderService(
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
         var productsById = dbContext.Products.ToDictionary(product => product.Id);
         var categoriesById = dbContext.Categories.ToDictionary(category => category.Id);
+        var primaryImageUrlByProductId = dbContext.ProductImages
+            .ToArray()
+            .GroupBy(image => image.ProductId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderBy(image => image.SortOrder).ThenBy(image => image.Id).First().ImageUrl);
 
         foreach (var row in fileRows)
         {
@@ -355,6 +484,7 @@ internal sealed class AdminOrderService(
                     row,
                     variant,
                     product.Name.Get(languageProvider.CurrentLanguage),
+                    primaryImageUrlByProductId.GetValueOrDefault(product.Id),
                     quantity.Value,
                     unitPrice ?? variant.Price,
                     shippingFee ?? 0m,
@@ -532,12 +662,12 @@ internal sealed class AdminOrderService(
 
     private string GetCurrencyCode()
     {
-        return languageProvider.CurrentLanguage == "vi" ? "VND" : "USD";
+        return CommerceCurrency.Code;
     }
 
     private decimal GetExchangeRate()
     {
-        return languageProvider.CurrentLanguage == "vi" ? 26000m : 1m;
+        return CommerceCurrency.BaseExchangeRate;
     }
 
     private static int? TryParsePositiveInt(string value)
@@ -663,6 +793,7 @@ internal sealed class AdminOrderService(
             item.Id,
             item.ProductVariantId,
             item.ProductNameSnapshot,
+            item.ProductImageUrlSnapshot,
             item.SkuSnapshot,
             item.UnitPrice,
             item.Quantity,
@@ -677,6 +808,8 @@ internal sealed class AdminOrderService(
             history.FromStatus,
             history.ToStatus,
             history.Note,
+            history.CancellationReason,
+            history.CustomerMessage,
             history.ChangedBy,
             history.ChangedAt);
     }
@@ -711,6 +844,7 @@ internal sealed record AdminOrderImportItemPlan(
     AdminOrderImportFileRow Row,
     ProductVariant Variant,
     string ProductNameSnapshot,
+    string? ProductImageUrlSnapshot,
     int Quantity,
     decimal UnitPrice,
     decimal ShippingFee,

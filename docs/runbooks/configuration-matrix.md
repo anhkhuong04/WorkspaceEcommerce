@@ -13,25 +13,29 @@ platform secret/configuration authority.
 | JWT | `Jwt:*` | Ignored local config | Synthetic | Secret manager; documented key rollover window | Application security | Key rollover at least every 90 days or forced session expiry |
 | Data Protection | `DataProtection:KeyRingPath` | Local ignored path | Ephemeral test path | Encrypted, persistent shared mount/managed key store | Platform | Access/key-ring recovery rehearsal quarterly |
 | Google OAuth | `GoogleAuth:*`, frontend `VITE_GOOGLE_CLIENT_ID` | Local public client ID optional | Disabled/synthetic | Server audience list from configuration authority; public client ID in frontend build | Application security | Review on client/domain change; disable/revoke on compromise |
+| Customer security lifecycle | `TwoFactor:*`, `CustomerAccountLifecycle:*` | Repository defaults | Short synthetic lifetimes where needed | Reviewed issuer, expiry, cleanup, and retention policy; no secrets in these sections | Application security + product | Review on auth/session or retention-policy change |
 | Email | `EmailDelivery:*` | Logging provider only | Logging provider only | SMTP sandbox/production secrets from secret manager | Platform + product ops | Provider credential after exposure / quarterly |
 | Durable media | `MediaStorage:*`, `MediaStorage:NoOpMalwareScannerRisk*` | Local or isolated MinIO | Local only | S3-compatible bucket, encryption, restricted workload credential; temporary NoOp scanner exception needs named security owner, risk reference, and <=90-day expiry | Platform + storage owner + application security | Credential / bucket policy on change; security-risk renewal before expiry; quarterly restore review |
 | Payment | `Payment:VNPay:*` | Sandbox only | Synthetic callback values | Provider portal + secret manager | Payments owner | Hash secret/merchant setup on exposure or provider request |
 | MiniLogistics | `MiniLogistics:*` | Local/sandbox only | Fake provider | Provider portal + secret manager | Logistics owner | API/webhook secret on exposure or provider request |
 | Warranty identifiers | `Warranty:*`, especially `Warranty:IdentifierHmacKey` | Feature flags off or ignored local secret | Synthetic HMAC secret with non-production identifiers | Secret manager; flags enabled only after plan/unit reconciliation | Product ops + application security | Rotate with versioned dual-read migration; immediately on exposure |
-| Browser origin and host | `AllowedHosts`, `Cors:AllowedOrigins`, `Storefront:BaseUrl`, `MediaStorage:PublicBaseUrl` | Localhost only | Test-only host | Exact public HTTPS names only | Platform + frontend owner | Review with every domain/ingress change |
+| Loyalty | `Loyalty:*` | Repository defaults | Repository defaults | Versioned business configuration; change with product approval and regression tests | Product owner | Review before changing earn/redemption economics |
+| Receipts | `OrderReceipt:*` | Demo branding and declared license | Synthetic | Approved seller/support identity and QuestPDF license category | Product/legal + application | Review on branding, legal-document scope, or license change |
+| Browser origin and host | `AllowedHosts`, `Cors:AllowedOrigins`, `Storefront:BaseUrl`, `MediaStorage:PublicBaseUrl`, frontend `VITE_API_BASE_URL` | Localhost only | Test-only host | Exact public HTTPS names only | Platform + frontend owner | Review with every domain/ingress change |
 | Proxy / topology | `ForwardedHeaders:KnownProxies`, replica/backplane/edge limiter settings | Empty/direct | Test-only | Platform-controlled immediate proxy IPs and shared service references | Platform/SRE | Review every ingress, network, or scaling change |
 | Process limits | `RuntimeLimits:*` | Repository defaults | Repository defaults | Bounded values, changed only with load-test evidence | Platform/SRE + application | Review after a capacity or upload-policy change |
 | Telemetry | `APPLICATIONINSIGHTS_CONNECTION_STRING` / `ApplicationInsights:ConnectionString` | Optional | Omitted/synthetic | Secret/config authority; redaction policy in code | Platform + observability owner | Access review quarterly; rotate on exposure |
 
 ## Startup safety contract
 
-Outside Development, existing provider validators reject local media storage, logging
-email delivery, an unaccepted/expired NoOp media-scanner exception, missing production
-CORS origins, placeholder credentials, and missing Data Protection/Application Insights
-configuration. In Production,
-`ProductionRuntimeConfigurationValidator` additionally rejects wildcard/localhost
-`AllowedHosts`, a relative/non-external Data Protection key-ring path, an empty or
-placeholder telemetry connection string, and a non-HTTPS storefront URL.
+All environments reject missing or placeholder authentication/provider credentials
+when the corresponding integration is configured. Outside Development, validators
+also reject local media storage, an unaccepted/expired NoOp media-scanner exception,
+missing CORS origins, wildcard/localhost `AllowedHosts`, a relative/non-external Data
+Protection key-ring path, missing telemetry configuration, and a non-HTTPS storefront
+URL. The email validator rejects the `Log` provider in the literal `Production`
+environment; staging policy should require SMTP even though startup does not yet
+enforce that environment name.
 
 Changing a value follows the [credential rotation runbook](credential-rotation.md).
 Changing a public endpoint, proxy, media URL, or cookie/CORS policy requires the

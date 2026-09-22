@@ -139,6 +139,7 @@ export function createStorefrontApi(client: ApiClient) {
     getShippingQuote: (request: GetShippingQuoteRequest) =>
       client.post<GetShippingQuoteResponse, GetShippingQuoteRequest>("/api/checkout/shipping-quote", request),
     lookupOrder: (request: OrderLookupRequest) => client.get<OrderLookupResponse>(`/api/orders/lookup${buildQuery(request)}`),
+    lookupOrderReceipt: (request: OrderLookupRequest) => client.getBlob(`/api/orders/lookup/receipt${buildQuery(request)}`),
     lookupOrderTracking: (request: OrderLookupRequest) =>
       client.get<ShipmentTrackingDto>(`/api/orders/lookup/tracking${buildQuery(request)}`),
     lookupWarranty: (request: WarrantyLookupRequest) =>
@@ -177,6 +178,7 @@ export function createStorefrontApi(client: ApiClient) {
     getCustomerOrders: (request: CustomerOrderListRequest = {}) =>
       client.get<PagedResult<CustomerOrderListItemDto>>(`/api/customer/orders${buildQuery(request)}`),
     getCustomerOrder: (id: string) => client.get<CustomerOrderDto>(`/api/customer/orders/${id}`),
+    getCustomerOrderReceipt: (id: string) => client.getBlob(`/api/customer/orders/${id}/receipt`),
     getCustomerOrderTracking: (id: string) => client.get<ShipmentTrackingDto>(`/api/customer/orders/${id}/tracking`),
     cancelCustomerOrder: (id: string, reason: string) =>
       client.post<CustomerOrderDto, OrderActionRequest>(`/api/customer/orders/${id}/cancel`, { reason }),
@@ -242,6 +244,7 @@ export function createAdminApi(client: ApiClient) {
     getOrders: (request: AdminOrderListRequest = {}) =>
       client.get<PagedResult<AdminOrderListItemDto>>(`/api/admin/orders${buildQuery(request)}`),
     getOrder: (id: string) => client.get<AdminOrderDto>(`/api/admin/orders/${id}`),
+    getOrderReceipt: (id: string) => client.getBlob(`/api/admin/orders/${id}/receipt`),
     updateOrderStatus: (id: string, request: UpdateOrderStatusRequest) =>
       client.put<AdminOrderDto, UpdateOrderStatusRequest>(`/api/admin/orders/${id}/status`, request),
     getOrderShipment: (id: string) => client.get<ShipmentTrackingDto>(`/api/admin/orders/${id}/shipment`),

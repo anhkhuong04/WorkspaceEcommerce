@@ -26,6 +26,35 @@ export class ApiClient {
     return this.send<T>(path, { method: "GET" });
   }
 
+  async getBlob(path: string): Promise<Blob> {
+    const headers = this.createHeaders();
+    headers.set("Accept", "application/pdf");
+
+    const response = await fetch(`${this.options.baseUrl}${path}`, {
+      method: "GET",
+      headers,
+      credentials: "include"
+    });
+
+    if (!response.ok) {
+      let envelope: ApiResponse<unknown> | null = null;
+      try {
+        envelope = (await response.json()) as ApiResponse<unknown>;
+      } catch {
+        // A proxy may return a non-JSON error page. Keep the public error generic.
+      }
+
+      if (response.status === 401) {
+        this.options.onUnauthorized?.();
+      }
+
+      const errors = envelope?.errors?.length ? envelope.errors : ["File download failed."];
+      throw new ApiClientError(errors[0], response.status, errors, envelope?.traceId);
+    }
+
+    return response.blob();
+  }
+
   post<TResponse, TBody>(path: string, body: TBody): Promise<TResponse> {
     return this.send<TResponse>(path, {
       method: "POST",
@@ -59,21 +88,11 @@ export class ApiClient {
   }
 
   private async send<T>(path: string, init: RequestInit): Promise<T> {
-    const headers = new Headers(init.headers);
+    const headers = this.createHeaders(init.headers);
     headers.set("Accept", "application/json");
 
     if (init.body && !(init.body instanceof FormData)) {
       headers.set("Content-Type", "application/json");
-    }
-
-    const accessToken = this.options.getAccessToken?.();
-    if (accessToken) {
-      headers.set("Authorization", `Bearer ${accessToken}`);
-    }
-
-    const language = this.options.getLanguage?.();
-    if (language) {
-      headers.set("Accept-Language", language);
     }
 
     const response = await fetch(`${this.options.baseUrl}${path}`, {
@@ -96,5 +115,20 @@ export class ApiClient {
     }
 
     return envelope.data as T;
+  }
+
+  private createHeaders(initialHeaders?: HeadersInit): Headers {
+    const headers = new Headers(initialHeaders);
+    const accessToken = this.options.getAccessToken?.();
+    if (accessToken) {
+      headers.set("Authorization", `Bearer ${accessToken}`);
+    }
+
+    const language = this.options.getLanguage?.();
+    if (language) {
+      headers.set("Accept-Language", language);
+    }
+
+    return headers;
   }
 }

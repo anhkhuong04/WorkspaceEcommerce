@@ -19,7 +19,7 @@ internal sealed class CheckoutOrderPlacer(
 {
     private readonly CheckoutCartBuilder cartBuilder = new(checkoutStore, languageProvider);
     private readonly CheckoutCouponApplier couponApplier = new(checkoutStore, currentCustomer);
-    private readonly CheckoutOrderFactory orderFactory = new(checkoutStore, languageProvider);
+    private readonly CheckoutOrderFactory orderFactory = new(checkoutStore);
 
     public async Task<Result<CheckoutPlacement>> PlaceAsync(
         CartAggregate cart,

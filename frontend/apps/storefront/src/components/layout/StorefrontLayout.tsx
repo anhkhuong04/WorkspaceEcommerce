@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { StorefrontCategoryDto } from "@workspace-ecommerce/api-types";
+import { useTranslation } from "react-i18next";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { StorefrontCartProvider } from "../../features/cart/StorefrontCartProvider";
 import { useStorefrontCart } from "../../features/cart/StorefrontCartContext";
@@ -8,13 +9,19 @@ import { useCustomerAuth } from "../../features/customer-auth/useCustomerAuth";
 import { storefrontApi } from "../../services/api/storefrontApi";
 import { StorefrontFooter } from "./StorefrontFooter";
 import { StorefrontSearchOverlay } from "./StorefrontSearchOverlay";
+import { LanguageSwitcher } from "./LanguageSwitcher";
+import { CustomerOrderNotifications } from "../notifications/CustomerOrderNotifications";
 
-const navItems = [
-  { to: "/products", label: "Products", hasDropdown: true },
-  { to: "/warranty", label: "Warranty" },
-  { to: "/news", label: "News" },
-  { label: "Showroom" },
-  { to: "/about-us", label: "About us" }
+const navItems: ReadonlyArray<{
+  to?: string;
+  labelKey: "header.products" | "header.warranty" | "header.news" | "header.showroom" | "header.about";
+  menu?: "products" | "warranty";
+}> = [
+  { to: "/products", labelKey: "header.products", menu: "products" },
+  { to: "/warranty", labelKey: "header.warranty", menu: "warranty" },
+  { to: "/news", labelKey: "header.news" },
+  { labelKey: "header.showroom" },
+  { to: "/about-us", labelKey: "header.about" }
 ];
 
 export function StorefrontLayout() {
@@ -26,6 +33,7 @@ export function StorefrontLayout() {
 }
 
 function StorefrontLayoutContent() {
+  const { t } = useTranslation();
   const location = useLocation();
   const { cartItemCount, openCartDrawer } = useStorefrontCart();
   const { isAuthenticated } = useCustomerAuth();
@@ -77,8 +85,8 @@ function StorefrontLayoutContent() {
 
               <nav className={`ui-control flex min-w-0 items-center gap-3 overflow-x-auto whitespace-nowrap scrollbar-hidden sm:gap-5 lg:col-start-2 lg:justify-self-center lg:gap-8 lg:overflow-visible xl:gap-10 transition-colors duration-300 ${textColorClass}`}>
                 {navItems.map((item) =>
-                  item.label === "Products" && item.to ? (
-                    <div key={`${item.label}-${item.to}`} className="group relative inline-flex">
+                  item.menu === "products" && item.to ? (
+                    <div key={`${item.labelKey}-${item.to}`} className="group relative inline-flex">
                       <NavLink
                         to={item.to}
                         className={({ isActive }) =>
@@ -87,15 +95,15 @@ function StorefrontLayoutContent() {
                           }`
                         }
                       >
-                        {item.label}
+                        {t(item.labelKey)}
                         <span className={`mt-0.5 text-[10px] leading-none transition-colors duration-300 ${isHeaderSolid ? "text-slate-900" : "text-white"}`} aria-hidden="true">
                           v
                         </span>
                       </NavLink>
                       <ProductMegaMenu categories={categoriesQuery.data ?? []} isLoading={categoriesQuery.isLoading} />
                     </div>
-                  ) : item.label === "Warranty" && item.to ? (
-                    <div key={`${item.label}-${item.to}`} className="group relative inline-flex">
+                  ) : item.menu === "warranty" && item.to ? (
+                    <div key={`${item.labelKey}-${item.to}`} className="group relative inline-flex">
                       <NavLink
                         to={item.to}
                         className={({ isActive }) =>
@@ -105,7 +113,7 @@ function StorefrontLayoutContent() {
                         }
                         aria-haspopup="menu"
                       >
-                        {item.label}
+                        {t(item.labelKey)}
                         <span className={`mt-0.5 text-[10px] leading-none transition-colors duration-300 ${isHeaderSolid ? "text-slate-900" : "text-white"}`} aria-hidden="true">
                           v
                         </span>
@@ -114,7 +122,7 @@ function StorefrontLayoutContent() {
                     </div>
                   ) : item.to ? (
                     <NavLink
-                      key={`${item.label}-${item.to}`}
+                      key={`${item.labelKey}-${item.to}`}
                       to={item.to}
                       className={({ isActive }) =>
                         `inline-flex items-center gap-2 rounded-full px-1 py-2 transition ${isHeaderSolid ? "hover:text-[var(--brand)]" : "hover:text-white/70"} ${
@@ -122,18 +130,16 @@ function StorefrontLayoutContent() {
                         }`
                       }
                     >
-                      {item.label}
-                      {item.hasDropdown ? <span className={`mt-0.5 text-[10px] leading-none transition-colors duration-300 ${isHeaderSolid ? "text-slate-900" : "text-white"}`} aria-hidden="true">v</span> : null}
+                      {t(item.labelKey)}
                     </NavLink>
                   ) : (
                     <button
-                      key={item.label}
+                      key={item.labelKey}
                       type="button"
                       className="inline-flex cursor-default items-center gap-2 rounded-full px-1 py-2"
                       aria-disabled="true"
                     >
-                      {item.label}
-                      {item.hasDropdown ? <span className={`mt-0.5 text-[10px] leading-none transition-colors duration-300 ${isHeaderSolid ? "text-slate-900" : "text-white"}`} aria-hidden="true">v</span> : null}
+                      {t(item.labelKey)}
                     </button>
                   )
                 )}
@@ -141,11 +147,13 @@ function StorefrontLayoutContent() {
             </div>
 
             <div className={`flex shrink-0 items-center gap-3 sm:gap-5 lg:col-start-3 lg:justify-self-end lg:gap-8 transition-colors duration-300 ${iconColorClass}`}>
+              <LanguageSwitcher isHeaderSolid={isHeaderSolid} />
+
               <button
                 type="button"
                 onClick={() => setIsSearchOpen(true)}
                 className={`grid h-10 w-10 place-items-center rounded-full transition ${isHeaderSolid ? "hover:bg-slate-100" : "hover:bg-white/20"}`}
-                aria-label="Search"
+                aria-label={t("header.search")}
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="2" />
@@ -156,7 +164,7 @@ function StorefrontLayoutContent() {
               <NavLink
                 to={isAuthenticated ? "/account" : "/login"}
                 className={`grid h-10 w-10 place-items-center rounded-full transition ${isHeaderSolid ? "hover:bg-slate-100" : "hover:bg-white/20"}`}
-                aria-label={isAuthenticated ? "Account" : "Login"}
+                aria-label={isAuthenticated ? t("header.account") : t("header.login")}
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="2" />
@@ -168,7 +176,7 @@ function StorefrontLayoutContent() {
                 type="button"
                 onClick={() => openCartDrawer()}
                 className={`relative grid h-10 w-10 place-items-center rounded-full transition ${isHeaderSolid ? "hover:bg-slate-100" : "hover:bg-white/20"}`}
-                aria-label="Cart"
+                aria-label={t("header.cart")}
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M5 6h15l-1.7 8.5a2 2 0 0 1-2 1.5H9a2 2 0 0 1-2-1.6L5 3H2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -190,19 +198,21 @@ function StorefrontLayoutContent() {
       </main>
       {hideHeader ? null : <StorefrontFooter />}
       <StorefrontSearchOverlay isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <CustomerOrderNotifications />
     </div>
   );
 }
 
 function WarrantyMenu() {
+  const { t } = useTranslation();
   return (
     <div className="pointer-events-none absolute left-1/2 top-full z-50 w-80 -translate-x-1/2 pt-3 opacity-0 transition duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
       <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white p-2 text-slate-950 shadow-[0_18px_45px_rgba(15,23,42,0.16)]" role="menu" aria-label="Warranty">
         <NavLink to="/warranty" role="menuitem" className="block rounded-xl px-4 py-3 text-base font-black transition hover:bg-slate-50 hover:text-[var(--brand)]">
-          Activate &amp; check warranty
+          {t("header.activateWarranty")}
         </NavLink>
         <NavLink to="/warranty-policy" role="menuitem" className="block rounded-xl px-4 py-3 text-base font-black transition hover:bg-slate-50 hover:text-[var(--brand)]">
-          Warranty policy
+          {t("header.warrantyPolicy")}
         </NavLink>
       </div>
     </div>
@@ -216,14 +226,15 @@ function ProductMegaMenu({
   categories: StorefrontCategoryDto[];
   isLoading: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="pointer-events-none absolute left-1/2 top-full z-50 w-[min(760px,calc(100vw-2rem))] -translate-x-1/2 pt-3 opacity-0 transition duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
       <div className="max-h-[min(560px,calc(100vh-7rem))] overflow-y-auto rounded-2xl border border-slate-100 bg-white p-5 text-slate-950 shadow-[0_18px_45px_rgba(15,23,42,0.16)]">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {isLoading ? (
-            <div className="text-sm font-semibold text-slate-500">Loading categories...</div>
+            <div className="text-sm font-semibold text-slate-500">{t("header.loadingCategories")}</div>
           ) : categories.length === 0 ? (
-            <div className="text-sm font-semibold text-slate-500">No categories available.</div>
+            <div className="text-sm font-semibold text-slate-500">{t("header.noCategories")}</div>
           ) : (
             categories.map((category) => <CategoryColumn key={category.id} category={category} />)
           )}
@@ -234,6 +245,7 @@ function ProductMegaMenu({
 }
 
 function CategoryColumn({ category }: { category: StorefrontCategoryDto }) {
+  const { t } = useTranslation();
   return (
     <div className="min-w-0">
       <NavLink
@@ -250,7 +262,7 @@ function CategoryColumn({ category }: { category: StorefrontCategoryDto }) {
             to={`/products?categorySlug=${encodeURIComponent(category.slug)}`}
             className="block text-base font-bold text-slate-500 transition hover:text-slate-950"
           >
-            View products
+            {t("header.viewProducts")}
           </NavLink>
         )}
       </div>

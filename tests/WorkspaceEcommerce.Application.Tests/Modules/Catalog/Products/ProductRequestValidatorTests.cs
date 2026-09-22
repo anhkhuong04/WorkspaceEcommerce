@@ -90,6 +90,32 @@ public sealed class ProductRequestValidatorTests
     }
 
     [Fact]
+    public void ProductVariantRequestValidator_FractionalVndPrices_HasValidationErrors()
+    {
+        var createResult = new CreateProductVariantRequestValidator().Validate(new CreateProductVariantRequest
+        {
+            Sku = "DESK-001",
+            Name = "Standing desk",
+            Price = 1_000_000.50m,
+            CompareAtPrice = 1_200_000.25m,
+            StockQuantity = 1
+        });
+        var updateResult = new UpdateProductVariantRequestValidator().Validate(new UpdateProductVariantRequest
+        {
+            Sku = "DESK-001",
+            Name = "Standing desk",
+            Price = 1_000_000.50m,
+            CompareAtPrice = 1_200_000.25m,
+            StockQuantity = 1
+        });
+
+        Assert.Contains(createResult.Errors, error => error.PropertyName == nameof(CreateProductVariantRequest.Price));
+        Assert.Contains(createResult.Errors, error => error.PropertyName == nameof(CreateProductVariantRequest.CompareAtPrice));
+        Assert.Contains(updateResult.Errors, error => error.PropertyName == nameof(UpdateProductVariantRequest.Price));
+        Assert.Contains(updateResult.Errors, error => error.PropertyName == nameof(UpdateProductVariantRequest.CompareAtPrice));
+    }
+
+    [Fact]
     public void ProductImageRequestValidator_InvalidRequest_HasValidationErrors()
     {
         var createValidator = new CreateProductImageRequestValidator();

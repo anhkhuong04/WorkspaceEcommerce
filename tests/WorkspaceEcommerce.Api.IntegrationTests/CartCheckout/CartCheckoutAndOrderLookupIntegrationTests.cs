@@ -78,7 +78,7 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
         Assert.Equal(HttpStatusCode.OK, addCartResponse.StatusCode);
         Assert.True(cartJson["success"]!.GetValue<bool>());
         Assert.Equal(2, cartJson["data"]!["totalQuantity"]!.GetValue<int>());
-        Assert.Equal(246.90m, cartJson["data"]!["totalAmount"]!.GetValue<decimal>());
+        Assert.Equal(6_400_000m, cartJson["data"]!["totalAmount"]!.GetValue<decimal>());
 
         using var checkoutResponse = await client.PostAsJsonAsync(
             "/api/checkout",
@@ -101,7 +101,7 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
         Assert.True(checkoutJson["success"]!.GetValue<bool>());
         var orderCode = checkoutJson["data"]!["order"]!["orderCode"]!.GetValue<string>();
         Assert.StartsWith("ORD-", orderCode, StringComparison.Ordinal);
-        Assert.Equal(246.90m, checkoutJson["data"]!["order"]!["totalAmount"]!.GetValue<decimal>());
+        Assert.Equal(6_400_000m, checkoutJson["data"]!["order"]!["totalAmount"]!.GetValue<decimal>());
 
         var stockQuantity = await fixture.ExecuteDbAsync(dbContext =>
             dbContext.ProductVariants
@@ -121,9 +121,28 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
         Assert.True(lookupJson["success"]!.GetValue<bool>());
         Assert.Equal(orderCode, lookupJson["data"]!["order"]!["orderCode"]!.GetValue<string>());
 
+        using var receiptRequest = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/api/orders/lookup/receipt?orderCode={orderCode}&phone=0900000000");
+        receiptRequest.Headers.AcceptLanguage.ParseAdd("vi-VN");
+        using var receiptResponse = await client.SendAsync(receiptRequest);
+        var receipt = await receiptResponse.Content.ReadAsByteArrayAsync();
+
+        Assert.Equal(HttpStatusCode.OK, receiptResponse.StatusCode);
+        Assert.Equal("application/pdf", receiptResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("no-store", receiptResponse.Headers.CacheControl?.NoStore == true ? "no-store" : null);
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(receipt, 0, 4));
+        var receiptFileName = receiptResponse.Content.Headers.ContentDisposition?.FileNameStar ??
+            receiptResponse.Content.Headers.ContentDisposition?.FileName;
+        Assert.Contains(orderCode, receiptFileName, StringComparison.Ordinal);
+
         using var wrongPhoneLookupResponse = await client.GetAsync($"/api/orders/lookup?orderCode={orderCode}&phone=0900000001");
 
         Assert.Equal(HttpStatusCode.NotFound, wrongPhoneLookupResponse.StatusCode);
+
+        using var wrongPhoneReceiptResponse = await client.GetAsync(
+            $"/api/orders/lookup/receipt?orderCode={orderCode}&phone=0900000001");
+        Assert.Equal(HttpStatusCode.NotFound, wrongPhoneReceiptResponse.StatusCode);
     }
 
     [Fact]
@@ -184,6 +203,20 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
 
         Assert.Equal(customerId, persistedCustomerId);
 
+        using var receiptResponse = await client.GetAsync($"/api/customer/orders/{orderId}/receipt");
+        var receipt = await receiptResponse.Content.ReadAsByteArrayAsync();
+        Assert.Equal(HttpStatusCode.OK, receiptResponse.StatusCode);
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(receipt, 0, 4));
+
+        using var anonymousClient = fixture.CreateClient();
+        using var anonymousReceiptResponse = await anonymousClient.GetAsync($"/api/customer/orders/{orderId}/receipt");
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymousReceiptResponse.StatusCode);
+
+        using var otherCustomerClient = fixture.CreateClient();
+        otherCustomerClient.UseBearerToken(await otherCustomerClient.RegisterCustomerAsync("other-customer@example.com"));
+        using var otherCustomerReceiptResponse = await otherCustomerClient.GetAsync($"/api/customer/orders/{orderId}/receipt");
+        Assert.Equal(HttpStatusCode.NotFound, otherCustomerReceiptResponse.StatusCode);
+
         using var customerOrdersResponse = await client.GetAsync("/api/customer/orders");
         var customerOrdersJson = await customerOrdersResponse.ReadJsonAsync();
 
@@ -228,10 +261,10 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
         Assert.Equal(HttpStatusCode.OK, validateResponse.StatusCode);
         Assert.True(validateJson["success"]!.GetValue<bool>());
         Assert.Equal("SAVE10", validateJson["data"]!["couponCode"]!.GetValue<string>());
-        Assert.Equal(246.90m, validateJson["data"]!["subtotal"]!.GetValue<decimal>());
-        Assert.Equal(246.90m, validateJson["data"]!["eligibleSubtotal"]!.GetValue<decimal>());
-        Assert.Equal(24.69m, validateJson["data"]!["discountAmount"]!.GetValue<decimal>());
-        Assert.Equal(222.21m, validateJson["data"]!["totalAmount"]!.GetValue<decimal>());
+        Assert.Equal(6_400_000m, validateJson["data"]!["subtotal"]!.GetValue<decimal>());
+        Assert.Equal(6_400_000m, validateJson["data"]!["eligibleSubtotal"]!.GetValue<decimal>());
+        Assert.Equal(640_000m, validateJson["data"]!["discountAmount"]!.GetValue<decimal>());
+        Assert.Equal(5_760_000m, validateJson["data"]!["totalAmount"]!.GetValue<decimal>());
 
         var usedCount = await fixture.ExecuteDbAsync(dbContext =>
             dbContext.Coupons
@@ -247,7 +280,7 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
     {
         await fixture.ResetDatabaseAsync();
         var catalog = TestData.CreateVisibleCatalog();
-        var coupon = CreateCoupon("SAVE20", CouponDiscountType.FixedAmount, 20m);
+        var coupon = CreateCoupon("SAVE200K", CouponDiscountType.FixedAmount, 200_000m);
         await fixture.SeedAsync(dbContext =>
         {
             dbContext.AddRange(catalog.Category, catalog.Product, catalog.Variant, coupon);
@@ -280,7 +313,7 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
                 shippingProvince = "Ho Chi Minh",
                 note = "Call before delivery",
                 paymentMethod = 0,
-                couponCode = "save20"
+                couponCode = "save200k"
             });
         var checkoutJson = await checkoutResponse.ReadJsonAsync();
 
@@ -289,9 +322,9 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
         var order = checkoutJson["data"]!["order"]!;
         var orderId = order["id"]!.GetValue<Guid>();
         Assert.Equal(coupon.Id, order["couponId"]!.GetValue<Guid>());
-        Assert.Equal("SAVE20", order["couponCodeSnapshot"]!.GetValue<string>());
-        Assert.Equal(20m, order["discountAmount"]!.GetValue<decimal>());
-        Assert.Equal(226.90m, order["totalAmount"]!.GetValue<decimal>());
+        Assert.Equal("SAVE200K", order["couponCodeSnapshot"]!.GetValue<string>());
+        Assert.Equal(200_000m, order["discountAmount"]!.GetValue<decimal>());
+        Assert.Equal(6_200_000m, order["totalAmount"]!.GetValue<decimal>());
 
         var persisted = await fixture.ExecuteDbAsync(async dbContext =>
         {
@@ -313,9 +346,9 @@ public sealed class CartCheckoutAndOrderLookupIntegrationTests(ApiIntegrationTes
         });
 
         Assert.Equal(coupon.Id, persisted.CouponId);
-        Assert.Equal("SAVE20", persisted.CouponCodeSnapshot);
+        Assert.Equal("SAVE200K", persisted.CouponCodeSnapshot);
         Assert.Equal(coupon.Id, persisted.RedemptionCouponId);
-        Assert.Equal("SAVE20", persisted.CodeSnapshot);
+        Assert.Equal("SAVE200K", persisted.CodeSnapshot);
         Assert.Equal(1, persisted.UsedCount);
     }
 

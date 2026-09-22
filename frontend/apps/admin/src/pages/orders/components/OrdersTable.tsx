@@ -4,7 +4,7 @@ import { Button, EmptyState, Pill } from "../../../components/ui/AdminUi";
 import { formatLocalizedText } from "../../../utils/localizedText";
 
 const statusTones: Record<OrderStatus, "green" | "red" | "blue" | "orange" | "slate"> = { 0: "orange", 1: "slate", 2: "blue", 3: "blue", 4: "green", 5: "orange", 6: "red", 7: "slate" };
-const paymentStatusTones: Record<PaymentStatus, "green" | "red" | "blue" | "orange" | "slate"> = { 0: "slate", 1: "blue", 2: "green", 3: "red", 4: "slate" };
+const paymentStatusTones: Record<PaymentStatus, "green" | "red" | "blue" | "orange" | "slate"> = { 0: "slate", 1: "blue", 2: "green", 3: "red", 4: "slate", 5: "orange" };
 
 type OrdersTableProps = {
   orders: AdminOrderListItemDto[];

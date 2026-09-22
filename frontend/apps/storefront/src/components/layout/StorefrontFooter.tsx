@@ -1,100 +1,6 @@
 import type { FormEvent, ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-
-const faqs = [
-  {
-    question: "What are the payment methods?",
-    answer: (
-      <>
-        <p>WorkspaceEcom accepts payments via:</p>
-        <ul className="mt-3 list-disc space-y-2 pl-5">
-          <li>Online banking transfer</li>
-          <li>Visa and Mastercard credit cards</li>
-          <li>Banking QR Code</li>
-          <li>Cash on Delivery (COD)</li>
-        </ul>
-        <p className="mt-4">
-          Customers who pay in advance by bank transfer may receive special
-          offers.
-        </p>
-      </>
-    ),
-  },
-  {
-    question: "How long does delivery take?",
-    answer: (
-      <>
-        <p>
-          Orders in major cities are usually delivered within 1-2 business days.
-        </p>
-        <p className="mt-4">
-          For other areas, shipping can take 3-7 business days depending on the
-          location.
-        </p>
-      </>
-    ),
-  },
-  {
-    question: "Product inspection and warranty",
-    answer: (
-      <p>
-        You may inspect the package on delivery. Warranty coverage depends on
-        the product and is shown on its detail page.
-      </p>
-    ),
-  },
-  {
-    question: "Product returns process",
-    answer: (
-      <p>
-        Eligible products can be returned within 7 days. Items must remain
-        complete, undamaged, and in their original packaging.
-      </p>
-    ),
-  },
-  {
-    question: "Bulk orders",
-    answer: (
-      <p>
-        Contact our support team for volume pricing, office packages,
-        installation planning, and dedicated business support.
-      </p>
-    ),
-  },
-  {
-    question: "Have any other questions?",
-    answer: (
-      <p>
-        Email us at support@workspaceecom.com or call 1900 636 660. Our team
-        will help you find the right answer.
-      </p>
-    ),
-  },
-];
-
-const footerColumns = [
-  {
-    title: "Support",
-    links: [
-      { label: "Contact Us", to: "/support/contact" },
-      { label: "Terms of Service", to: "/support/terms-of-service" },
-      { label: "Privacy Policy", to: "/support/privacy-policy" },
-      { label: "Shipping Policy", to: "/support/shipping-policy" },
-      { label: "Return Policy", to: "/support/returns-policy" },
-      { label: "Warranty Policy", to: "/warranty-policy" },
-      { label: "Check Warranty", to: "/warranty" },
-    ],
-  },
-  {
-    title: "Explore",
-    links: [
-      { label: "About Us", to: "/about-us" },
-      { label: "Recruitment", to: "#" },
-      { label: "Showroom", to: "#" },
-      { label: "News", to: "/news" },
-    ],
-  },
-];
 
 function ServiceIcon({
   type,
@@ -133,27 +39,42 @@ function ServiceIcon({
 }
 
 function StorefrontFaq() {
+  const { t } = useTranslation();
   const services = [
     {
-      title: "Safe shipping",
-      description: "Absolute protection for the products you order",
+      title: t("footer.services.shippingTitle"),
+      description: t("footer.services.shippingDescription"),
       icon: "shipping" as const,
     },
     {
-      title: "Professional installation",
-      description: "Installation exactly where you want it",
+      title: t("footer.services.installationTitle"),
+      description: t("footer.services.installationDescription"),
       icon: "installation" as const,
     },
     {
-      title: "Site restoration",
-      description: "Clean packaging and the installation space before leaving",
+      title: t("footer.services.restorationTitle"),
+      description: t("footer.services.restorationDescription"),
       icon: "restoration" as const,
     },
     {
-      title: "User manual",
-      description: "Clear guidance to help you master the product",
+      title: t("footer.services.manualTitle"),
+      description: t("footer.services.manualDescription"),
       icon: "manual" as const,
     },
+  ];
+  const faqs = [
+    {
+      question: t("footer.faq.paymentQuestion"),
+      answer: <><p>{t("footer.faq.paymentIntro")}</p><ul className="mt-3 list-disc space-y-2 pl-5"><li>{t("footer.faq.paymentBank")}</li><li>{t("footer.faq.paymentCard")}</li><li>{t("footer.faq.paymentQr")}</li><li>{t("footer.faq.paymentCod")}</li></ul><p className="mt-4">{t("footer.faq.paymentOffer")}</p></>,
+    },
+    {
+      question: t("footer.faq.deliveryQuestion"),
+      answer: <><p>{t("footer.faq.deliveryCities")}</p><p className="mt-4">{t("footer.faq.deliveryOther")}</p></>,
+    },
+    { question: t("footer.faq.inspectionQuestion"), answer: <p>{t("footer.faq.inspectionAnswer")}</p> },
+    { question: t("footer.faq.returnQuestion"), answer: <p>{t("footer.faq.returnAnswer")}</p> },
+    { question: t("footer.faq.bulkQuestion"), answer: <p>{t("footer.faq.bulkAnswer")}</p> },
+    { question: t("footer.faq.otherQuestion"), answer: <p>{t("footer.faq.otherAnswer")}</p> },
   ];
 
   return (
@@ -164,14 +85,13 @@ function StorefrontFaq() {
       <div className="mx-auto grid w-full max-w-[1440px] gap-10 lg:grid-cols-[1fr_1.08fr] lg:gap-12">
         <div>
           <h2 id="faq-title" className="ui-h1 tracking-tight text-slate-950">
-            Have a question?
+            {t("footer.haveQuestion")}
           </h2>
           <p className="ui-body mt-5 max-w-lg text-slate-600">
-            Our FAQs will help you quickly find answers to common questions
-            about our products and services.
+            {t("footer.faqDescription")}
           </p>
           <p className="ui-caption mt-8 text-slate-500">
-            Average response time: 1 hour
+            {t("footer.responseTime")}
           </p>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -233,6 +153,30 @@ function StorefrontFaq() {
 }
 
 export function StorefrontFooter() {
+  const { t } = useTranslation();
+  const footerColumns = [
+    {
+      title: t("footer.support"),
+      links: [
+        { label: t("footer.contact"), to: "/support/contact" },
+        { label: t("footer.terms"), to: "/support/terms-of-service" },
+        { label: t("footer.privacy"), to: "/support/privacy-policy" },
+        { label: t("footer.shipping"), to: "/support/shipping-policy" },
+        { label: t("footer.returns"), to: "/support/returns-policy" },
+        { label: t("header.warrantyPolicy"), to: "/warranty-policy" },
+        { label: t("footer.checkWarranty"), to: "/warranty" },
+      ],
+    },
+    {
+      title: t("footer.explore"),
+      links: [
+        { label: t("header.about"), to: "/about-us" },
+        { label: t("footer.recruitment"), to: "#" },
+        { label: t("header.showroom"), to: "#" },
+        { label: t("header.news"), to: "/news" },
+      ],
+    },
+  ];
   function submitNewsletter(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
   }
@@ -244,29 +188,28 @@ export function StorefrontFooter() {
         <div className="mx-auto w-full max-w-[1440px]">
           <div className="grid gap-10 border-b border-white/10 pb-12 sm:grid-cols-2 lg:grid-cols-[1.7fr_repeat(4,1fr)]">
             <div>
-              <h2 className="text-xl font-semibold">Subscribe to newsletter</h2>
+              <h2 className="text-xl font-semibold">{t("footer.subscribe")}</h2>
               <p className="ui-body mt-4 max-w-xs text-white/65">
-                Stay updated with news, workspace design trends, and our latest
-                products.
+                {t("footer.subscribeDescription")}
               </p>
               <form
                 onSubmit={submitNewsletter}
                 className="mt-5 flex max-w-sm rounded-lg border border-white/20 p-1"
               >
                 <label htmlFor="footer-email" className="sr-only">
-                  Email address
+                  {t("footer.emailAddress")}
                 </label>
                 <input
                   id="footer-email"
                   type="email"
                   required
-                  placeholder="Email"
+                  placeholder={t("footer.email")}
                   className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-white outline-none placeholder:text-white/45"
                 />
                 <button
                   type="submit"
                   className="grid h-8 w-8 place-items-center rounded-full bg-white/10 transition hover:bg-white/20"
-                  aria-label="Subscribe"
+                  aria-label={t("footer.subscribeAction")}
                 >
                   <svg
                     className="h-3 w-3"
@@ -307,7 +250,7 @@ export function StorefrontFooter() {
             ))}
           </div>
           <div className="mt-10 flex flex-col gap-3 border-t border-white/10 pt-6 text-[11px] text-white/45 sm:flex-row sm:items-center sm:justify-between">
-            <p>&copy; 2026 WorkspaceEcom. All rights reserved.</p>
+            <p>&copy; 2026 WorkspaceEcom. {t("footer.rights")}</p>
           </div>
         </div>
       </footer>

@@ -840,6 +840,11 @@
           "Npgsql": "10.0.0"
         }
       },
+      "QuestPDF": {
+        "type": "Transitive",
+        "resolved": "2026.8.0",
+        "contentHash": "6c/YtDiZm8NgxnFdUDom+IWGVXKhiwBVJ3cvlyIXZYH7Wp0HaXWoR2XWj/RAsZfjpW7J5LMVc1EF6JnJFouoXQ=="
+      },
       "SharpZipLib": {
         "type": "Transitive",
         "resolved": "1.4.2",
@@ -1026,6 +1031,7 @@
           "Microsoft.Extensions.Options.ConfigurationExtensions": "[10.0.0, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.0, )",
           "Otp.NET": "[1.4.1, )",
+          "QuestPDF": "[2026.8.0, )",
           "System.IdentityModel.Tokens.Jwt": "[8.14.0, )",
           "WorkspaceEcommerce.Application": "[1.0.0, )",
           "WorkspaceEcommerce.Domain": "[1.0.0, )"

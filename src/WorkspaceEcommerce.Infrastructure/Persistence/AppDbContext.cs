@@ -210,12 +210,26 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 """)
             .FirstOrDefaultAsync(cancellationToken);
 
+    Task<PaymentTransaction[]> IAppDbContext.FindPendingPaymentTransactionsForOrderForUpdateAsync(
+        Guid orderId,
+        CancellationToken cancellationToken) =>
+        PaymentTransactions
+            .FromSqlInterpolated($"SELECT * FROM payments.payment_transactions WHERE order_id = {orderId} AND status = 'Pending' FOR UPDATE")
+            .ToArrayAsync(cancellationToken);
+
     Task<Order?> IAppDbContext.FindOrderForUpdateAsync(
         Guid orderId,
         CancellationToken cancellationToken) =>
         Orders
             .FromSqlInterpolated($"SELECT * FROM ordering.orders WHERE id = {orderId} FOR UPDATE")
             .FirstOrDefaultAsync(cancellationToken);
+
+    Task<ProductVariant[]> IAppDbContext.FindProductVariantsForUpdateAsync(
+        Guid[] variantIds,
+        CancellationToken cancellationToken) =>
+        ProductVariants
+            .FromSqlInterpolated($"SELECT * FROM catalog.product_variants WHERE id = ANY ({variantIds}) ORDER BY id FOR UPDATE")
+            .ToArrayAsync(cancellationToken);
 
     Task<SerializedProductUnit?> IAppDbContext.FindSerializedProductUnitForUpdateAsync(
         WarrantyIdentifierType identifierType,
@@ -433,6 +447,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         CancellationToken cancellationToken)
     {
         return await Products
+            .Include(product => product.Images)
             .FirstOrDefaultAsync(product => product.Id == id, cancellationToken);
     }
 
@@ -477,6 +492,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         CancellationToken cancellationToken)
     {
         return await Products
+            .Include(product => product.Images)
             .FirstOrDefaultAsync(product => product.Id == id, cancellationToken);
     }
 

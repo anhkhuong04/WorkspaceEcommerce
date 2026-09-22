@@ -51,6 +51,13 @@ public sealed class DemoDataSeedIntegrationTests(ApiIntegrationTestFixture fixtu
                 .SelectMany(cart => cart.Items)
                 .CountAsync(),
             DemoOrderCount = await dbContext.Orders.CountAsync(order => order.OrderCode.StartsWith("ORD-DEMO-")),
+            DemoOrdersUseVnd = await dbContext.Orders
+                .Where(order => order.OrderCode.StartsWith("ORD-DEMO-"))
+                .AllAsync(order => order.CurrencyCode == "VND" && order.ExchangeRate == 1m),
+            StandingDeskPrice = await dbContext.ProductVariants
+                .Where(variant => variant.Sku == "DEMO-DESK-OAK-140")
+                .Select(variant => variant.Price)
+                .SingleAsync(),
             CompletedOrderTotal = await dbContext.Orders
                 .Where(order => order.OrderCode == "ORD-DEMO-COMPLETED")
                 .Select(order => order.TotalAmount)
@@ -63,6 +70,8 @@ public sealed class DemoDataSeedIntegrationTests(ApiIntegrationTestFixture fixtu
         Assert.Equal(3, snapshot.BannerCount);
         Assert.Equal(2, snapshot.CheckoutCartItemCount);
         Assert.Equal(3, snapshot.DemoOrderCount);
-        Assert.Equal(457m, snapshot.CompletedOrderTotal);
+        Assert.True(snapshot.DemoOrdersUseVnd);
+        Assert.Equal(18_174_000m, snapshot.StandingDeskPrice);
+        Assert.Equal(11_882_000m, snapshot.CompletedOrderTotal);
     }
 }

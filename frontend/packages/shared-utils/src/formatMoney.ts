@@ -1,25 +1,16 @@
-export function formatMoney(value: number, currency = "USD"): string {
-  // Base currency is USD, but let's check what value represents.
-  // Actually, wait, if the database stores 100 as 100 USD.
-  // If currency is VND, we apply exchange rate. 1 USD = 26,000 VND.
-  let convertedValue = value;
-  let locale = "en-US";
-  let fractionDigits = 0;
+const DEFAULT_CURRENCY = "VND";
 
-  if (currency === "VND") {
-    convertedValue = value * 26000;
-    locale = "vi-VN";
-    fractionDigits = 0;
-  } else {
-    // Default to USD
-    locale = "en-US";
-    fractionDigits = 2;
-  }
+/**
+ * Formats an amount already stored in the requested currency.
+ * No implicit exchange-rate conversion is performed here.
+ */
+export function formatMoney(value: number, currency = DEFAULT_CURRENCY): string {
+  const isVietnameseDong = currency === DEFAULT_CURRENCY;
 
-  return new Intl.NumberFormat(locale, {
+  return new Intl.NumberFormat(isVietnameseDong ? "vi-VN" : "en-US", {
     style: "currency",
     currency,
-    maximumFractionDigits: fractionDigits,
-    minimumFractionDigits: fractionDigits,
-  }).format(convertedValue);
+    minimumFractionDigits: isVietnameseDong ? 0 : 2,
+    maximumFractionDigits: isVietnameseDong ? 0 : 2,
+  }).format(value);
 }

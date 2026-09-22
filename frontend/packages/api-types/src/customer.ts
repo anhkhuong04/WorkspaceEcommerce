@@ -109,13 +109,16 @@ export interface CustomerOrderListItemDto {
   createdAt: string;
   updatedAt: string;
   itemCount: number;
+  trackingCode: string | null;
+  shipmentProvider: string | null;
 }
 
 export interface CustomerOrderStatusHistoryDto {
   id: string;
   fromStatus: OrderStatus | null;
   toStatus: OrderStatus;
-  note: string | null;
+  cancellationReason: string | null;
+  customerMessage: string | null;
   changedAt: string;
 }
 

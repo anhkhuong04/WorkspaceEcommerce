@@ -12,4 +12,6 @@ public sealed record CustomerOrderListItemDto(
     DateTimeOffset? PaidAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    int ItemCount);
+    int ItemCount,
+    string? TrackingCode,
+    string? ShipmentProvider);

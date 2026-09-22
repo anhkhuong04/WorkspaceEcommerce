@@ -1,323 +1,141 @@
 # WorkspaceEcommerce
 
-> A full-stack e-commerce platform built with a **modular monolith** backend (.NET) and a **pnpm monorepo** frontend (React + Vite). Supports catalog management, cart & checkout, VNPay payment, MiniLogistics shipping integration, and a dedicated admin panel.
+WorkspaceEcommerce is a full-stack ecommerce modular monolith with an ASP.NET
+Core API, PostgreSQL, and separate React storefront/admin applications. It
+supports catalog and content management, cart/checkout, coupons, COD/manual
+bank transfer/VNPay, MiniLogistics fulfillment, customer accounts/2FA, loyalty,
+durable media, PDF receipts, and feature-flagged serialized warranties.
 
----
+The canonical product and architecture documentation starts at
+[`docs/README.md`](docs/README.md). Coding-agent instructions start at
+[`AGENTS.md`](AGENTS.md).
 
-## Table of Contents
+## Architecture
 
-- [Architecture Overview](#architecture-overview)
-- [Demo Screenshots](#demo-screenshots)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
-- [Getting Started](#getting-started)
-  - [1. Configure Environment](#1-configure-environment)
-  - [2. Generate HTTPS Dev Certificate](#2-generate-https-dev-certificate)
-  - [3. Run with Docker Compose](#3-run-with-docker-compose)
-  - [4. Apply Migrations & Seed Data](#4-apply-migrations--seed-data)
-- [Frontend](#frontend)
-  - [Install Dependencies](#install-dependencies)
-  - [Run Dev Servers](#run-dev-servers)
-  - [Verify Frontend](#verify-frontend)
-- [API Reference](#api-reference)
-- [Testing](#testing)
-- [Production Release Gate](#production-release-gate)
-- [Environment Variables](#environment-variables)
-- [Contributing](#contributing)
-
----
-
-## Architecture Overview
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                      Frontend (pnpm)                    │
-│  ┌─────────────────┐       ┌─────────────────────────┐  │
-│  │   Storefront    │       │      Admin Panel        │  │
-│  │  (React + Vite) │       │    (React + Vite)       │  │
-│  └────────┬────────┘       └───────────┬─────────────┘  │
-└───────────┼───────────────────────────┼────────────────┘
-            │ REST API                  │ REST API
-┌───────────▼───────────────────────────▼────────────────┐
-│                  .NET API (ASP.NET Core)                │
-│  ┌──────────┐  ┌─────────────┐  ┌──────────────────┐   │
-│  │  Domain  │  │ Application │  │  Infrastructure  │   │
-│  └──────────┘  └─────────────┘  └──────────────────┘   │
-└─────────────────────────┬───────────────────────────────┘
-                          │
-         ┌────────────────┴───────────────┐
-         │         PostgreSQL 17          │
-         └────────────────────────────────┘
-                          │ Webhooks / API
-         ┌────────────────┴───────────────┐
-         │      MiniLogistics Partner     │
-         └────────────────────────────────┘
+```text
+React storefront ----+
+                     +--> ASP.NET Core API/SignalR --> PostgreSQL 17
+React admin ----------+              |
+                                    +--> VNPay / MiniLogistics / SMTP / object storage
 ```
 
-The backend follows **Clean Architecture** with four layers: `Domain`, `Application`, `Infrastructure`, and `Api`. Each business capability (Catalog, Orders, Payments, Logistics) is organized as an independent module within the monolith.
+Backend dependency direction is `Api -> Infrastructure/Application -> Domain`.
+The frontend is a pnpm workspace with two apps and shared API/client/utility
+packages. See the [architecture overview](docs/architecture/overview.md).
 
----
+## Toolchain
 
-## Demo Screenshots
+| Tool | Repository version |
+| --- | --- |
+| .NET SDK | 10.0.202 |
+| PostgreSQL | 17 |
+| Node.js | 22.18.0 |
+| pnpm | 10.24.0 via Corepack |
+| Frontend | React 19, TypeScript 6, Vite 8, Tailwind CSS 4 |
 
-### Storefront (Khách hàng)
+Docker Desktop/Engine with Compose is required for the standard local topology
+and API integration tests.
 
-#### 1. Home & Danh sách sản phẩm
-![Storefront Home](docs/screenshots/storefront-home.png)
+## Quick start
 
-#### 2. Trang chi tiết sản phẩm
-![Product Detail](docs/screenshots/storefront-product-detail.png)
-
-#### 3. Giỏ hàng & Thanh toán (VNPay Demo)
-![Cart & Checkout](docs/screenshots/storefront-checkout.png)
-
----
-
-### Admin Panel (Quản trị viên)
-
-#### 4. Dashboard - Tổng quan hệ thống
-![Admin Dashboard](docs/screenshots/admin-dashboard.png)
-
----
-
-## Tech Stack
-
-| Layer                | Technology                     |
-| -------------------- | ------------------------------ |
-| **Backend**          | .NET 9 / ASP.NET Core          |
-| **Database**         | PostgreSQL 17                  |
-| **ORM / Migrations** | Entity Framework Core          |
-| **Authentication**   | JWT Bearer                     |
-| **Payment**          | VNPay                          |
-| **Logistics**        | MiniLogistics Partner API      |
-| **Frontend**         | React 19 + TypeScript + Vite 8 |
-| **Frontend Tooling** | pnpm 10 (via Corepack), ESLint |
-| **Containerization** | Docker / Docker Compose        |
-
----
-
-## Project Structure
-
-```
-WorkspaceEcommerce/
-├── src/
-│   ├── WorkspaceEcommerce.Api/           # Entry point, controllers, middleware
-│   ├── WorkspaceEcommerce.Application/   # Use cases, DTOs, interfaces
-│   ├── WorkspaceEcommerce.Domain/        # Entities, aggregates, domain events
-│   └── WorkspaceEcommerce.Infrastructure/# EF Core, repositories, external services
-├── frontend/
-│   ├── apps/
-│   │   ├── storefront/                   # Customer-facing shop
-│   │   └── admin/                        # Back-office admin panel
-│   └── packages/                         # Shared UI / utility packages
-├── tests/                                # Integration & unit tests
-├── docs/                                 # Feature specs and architecture notes
-├── docker-compose.yml
-├── .env.example
-└── WorkspaceEcommerce.slnx
-```
-
----
-
-## Prerequisites
-
-| Tool                                                              | Minimum Version | Notes                                |
-| ----------------------------------------------------------------- | --------------- | ------------------------------------ |
-| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | 24+             | Or Docker Engine + Compose plugin    |
-| [.NET SDK](https://dotnet.microsoft.com/download)                 | 9.0             | For local development without Docker |
-| [Node.js](https://nodejs.org/)                                    | 22+             | Required for Corepack / pnpm         |
-| [pnpm](https://pnpm.io/)                                          | via Corepack    | `corepack enable` to activate        |
-
----
-
-## Getting Started
-
-### 1. Configure Environment
-
-Copy the example environment file and fill in the required values:
+Copy the ignored local configuration and replace every required placeholder:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Open `.env` and update the following required values:
-
-| Variable                         | Description                                       |
-| -------------------------------- | ------------------------------------------------- |
-| `POSTGRES_PASSWORD`              | Strong password for the PostgreSQL database       |
-| `AdminAuth__Password`            | Password for the built-in admin account           |
-| `Jwt__SigningKey`                | Secret key — **must be at least 32 bytes**        |
-| `ASPNETCORE_HTTPS_CERT_PASSWORD` | Password used when generating the dev certificate |
-
-The Compose file rejects startup when MiniLogistics or VNPay credentials are absent; configure their `ApiKey`/`WebhookSecret` and `TmnCode`/`HashSecret` values in the ignored `.env` file as well.
-
-For direct `dotnet run` or EF Core tooling outside Docker, copy the API local-settings template and configure it with local values. This file is ignored and is loaded only in the Development environment; an explicit environment variable always takes precedence.
+Create the HTTPS certificate expected by the API container:
 
 ```powershell
-Copy-Item src/WorkspaceEcommerce.Api/appsettings.Local.example.json `
-  src/WorkspaceEcommerce.Api/appsettings.Local.json
-```
-
-`dotnet ef` requires either `ConnectionStrings__DefaultConnection` or this local settings file. It deliberately has no embedded fallback credential.
-Use the [credential rotation runbook](docs/runbooks/credential-rotation.md) when replacing any value that has previously been committed.
-
-Google sign-in is disabled by default. The storefront's `VITE_GOOGLE_CLIENT_ID` is a public browser setting used only to obtain an ID token. To enable the backend, set `GoogleAuth__Enabled=true` and configure one or more server-owned `GoogleAuth__AllowedClientIds__<n>` values. The API accepts only `{ "idToken": "..." }`; it never accepts a caller-provided audience/client ID.
-
-Customer TOTP secrets are protected with ASP.NET Core Data Protection. In Production, set `DataProtection__KeyRingPath` to an access-controlled, persistent directory mounted outside both the repository and PostgreSQL, and share that key ring across API instances. See [ADR 002](docs/adr/002-customer-totp-authentication.md) before enabling or operating 2FA.
-
-Customer verification and recovery email is delivered through a durable outbox. Development uses the metadata-only `Log` provider by default; Production rejects that provider and requires `EmailDelivery__Provider=Smtp`, `EmailDelivery__SenderEmail`, `EmailDelivery__Host`, and the SMTP credentials from a secret store. The browser receives only a short-lived access token in tab-scoped `sessionStorage`; refresh credentials are `HttpOnly` cookies. See [ADR 003](docs/adr/003-customer-account-lifecycle.md) for the retention policy, checkout decision, and deployment requirements.
-
-> **Optional:** `POSTGRES_PORT` (default `5432`) and `API_PORT` (default `5080`) can be changed if the ports are already in use.
-
----
-
-### 2. Generate HTTPS Dev Certificate
-
-The API container expects a `.pfx` certificate in the `.certs/` directory for local HTTPS. Generate one with:
-
-```powershell
-# Create the directory
 New-Item -ItemType Directory -Force .certs
-
-# Generate the certificate (replace YOUR_CERT_PASSWORD with the value from .env)
 dotnet dev-certs https --export-path .certs/workspace-ecommerce-devcert.pfx `
   --password YOUR_CERT_PASSWORD --format pfx
 ```
 
----
-
-### 3. Run with Docker Compose
-
-Start the database:
+Start PostgreSQL, migrate/seed, then run the API:
 
 ```powershell
 docker compose up -d postgres
-```
-
-Start the API (the database will be started automatically as a dependency):
-
-```powershell
+docker compose --profile tools run --rm migrate
+docker compose --profile tools run --rm seed-demo
 docker compose up -d api
 ```
 
-View live logs:
+Default endpoints:
+
+- API: `http://localhost:5080` / `https://localhost:5443`
+- Development OpenAPI: `http://localhost:5080/openapi/v1.json`
+- Liveness/readiness: `/health/live` and `/health/ready`
+- Storefront: `http://localhost:5173`
+- Admin: `http://localhost:5174`
+
+Start the frontend apps:
 
 ```powershell
-docker compose logs -f api
-```
-
-Stop all services:
-
-```powershell
-docker compose down
-```
-
-Reset the database (removes the PostgreSQL volume):
-
-```powershell
-docker compose down -v
-```
-
----
-
-### 4. Apply Migrations & Seed Data
-
-Apply all pending database migrations:
-
-```powershell
-docker compose --profile tools run --rm migrate
-```
-
-Seed demo data (catalog, banners, a checkout-ready cart, and sample orders):
-
-```powershell
-docker compose --profile tools run --rm seed-demo
-```
-
-> The seed command is **idempotent** — safe to run multiple times. Use the session ID `demo-checkout-session` to smoke-test the checkout flow.
-
----
-
-## Frontend
-
-The frontend is a **pnpm monorepo** managed via Corepack. It contains two applications:
-
-- **Storefront** — the customer-facing shop
-- **Admin** — the back-office admin panel
-
-### Install Dependencies
-
-```powershell
-cd frontend
-corepack enable   # only needed once
-corepack pnpm install
-```
-
-### Run Dev Servers
-
-```powershell
-# Storefront (default: http://localhost:5173)
+Push-Location frontend
+corepack pnpm install --frozen-lockfile
 corepack pnpm dev:storefront
-
-# Admin panel (default: http://localhost:5174)
-corepack pnpm dev:admin
+# In another shell: corepack pnpm dev:admin
+Pop-Location
 ```
 
-### Verify Frontend
+For direct `dotnet run`, copy
+`src/WorkspaceEcommerce.Api/appsettings.Local.example.json` to the ignored
+`appsettings.Local.json`, configure local values, then run:
 
 ```powershell
-corepack pnpm typecheck   # TypeScript type checking
-corepack pnpm lint        # ESLint
-corepack pnpm build       # Production build
+dotnet tool restore
+dotnet restore WorkspaceEcommerce.slnx --locked-mode
+dotnet run --project src/WorkspaceEcommerce.Api
 ```
 
----
+Full setup, configuration precedence, migrations, and troubleshooting are in
+the [development guide](docs/development/guide.md).
 
-## API Reference
+## Validation
 
-When running in `Development` mode, the OpenAPI specification is available at:
+```powershell
+dotnet tool restore
+dotnet restore WorkspaceEcommerce.slnx --locked-mode
+dotnet build WorkspaceEcommerce.slnx --no-restore --disable-build-servers -m:1
+dotnet test WorkspaceEcommerce.slnx --no-build --no-restore --disable-build-servers -m:1
 
-| Format    | URL                                      |
-| --------- | ---------------------------------------- |
-| JSON spec | `http://localhost:5080/openapi/v1.json`  |
-| HTTPS     | `https://localhost:5443/openapi/v1.json` |
+Push-Location frontend
+corepack pnpm lint
+corepack pnpm test
+corepack pnpm typecheck
+corepack pnpm build
+Pop-Location
+```
 
-Import the JSON spec into [Postman](https://www.postman.com/), [Insomnia](https://insomnia.rest/), or any OpenAPI-compatible client to explore and test all endpoints.
+API integration tests use PostgreSQL 17 Testcontainers and therefore require a
+running Docker engine. See [testing and quality](docs/development/testing.md)
+for focused tests, migration checks, browser tests, and risk-based expectations.
 
-The runtime OpenAPI endpoint is development-only. The release contract, including health endpoints, customer-authentication trust boundaries, comments, and durable-media behavior, is maintained in the feature ADRs and the [production release runbook](docs/runbooks/production-release.md).
+## Configuration and operations
 
----
+- Never commit `.env`, `appsettings.Local.json`, certificates, provider secrets,
+  tokens, Data Protection keys, or production evidence.
+- Compose requires MiniLogistics and VNPay sandbox credentials even when a local
+  flow does not exercise them.
+- Production startup rejects unsafe placeholder/provider/topology configuration.
+  Do not weaken validators to make deployment pass.
+- Apply production migrations from one migration job, not every API replica.
 
-## Environment Variables
+Use the [configuration matrix](docs/runbooks/configuration-matrix.md) for config
+ownership and the [production release runbook](docs/runbooks/production-release.md)
+for release evidence and operational gates.
 
-Full reference for all variables in `.env.example`:
+## Repository map
 
-| Variable                         | Default                                           | Required | Description                            |
-| -------------------------------- | ------------------------------------------------- | -------- | -------------------------------------- |
-| `POSTGRES_DB`                    | `workspace_ecommerce_dev`                         | ✅       | Database name                          |
-| `POSTGRES_USER`                  | `workspace_ecommerce`                             | ✅       | Database user                          |
-| `POSTGRES_PASSWORD`              | —                                                 | ✅       | Database password                      |
-| `POSTGRES_PORT`                  | `5432`                                            |          | Host port for PostgreSQL               |
-| `API_PORT`                       | `5080`                                            |          | Host port for the HTTP API             |
-| `API_HTTPS_PORT`                 | `5443`                                            |          | Host port for the HTTPS API            |
-| `ASPNETCORE_ENVIRONMENT`         | `Development`                                     |          | `Development` or `Production`          |
-| `ASPNETCORE_HTTPS_CERT_PASSWORD` | —                                                 | ✅       | Password for the dev HTTPS certificate |
-| `AdminAuth__Email`               | `admin@example.com`                               | ✅       | Admin account email                    |
-| `AdminAuth__Password`            | —                                                 | ✅       | Admin account password                 |
-| `Jwt__Issuer`                    | `WorkspaceEcommerce`                              | ✅       | JWT issuer claim                       |
-| `Jwt__Audience`                  | `WorkspaceEcommerce.Admin`                        | ✅       | JWT audience claim                     |
-| `Jwt__SigningKey`                | —                                                 | ✅       | JWT signing secret (min. 32 bytes)     |
-| `Jwt__AccessTokenMinutes`        | `60`                                              |          | Token expiry in minutes                |
-| `MiniLogistics__BaseUrl`         | `http://host.docker.internal:5221/api/v1/partner` |          | MiniLogistics API base URL             |
-| `MiniLogistics__ApiKey`          | —                                                 | ✅       | Partner API key                        |
-| `MiniLogistics__WebhookSecret`   | —                                                 | ✅       | Webhook verification secret            |
-| `MiniLogistics__OperationTimeoutSeconds` | `10`                                     |          | Timeout for each provider attempt      |
-| `MiniLogistics__MaxRetryAttempts` | `2`                                               |          | Transient retries per operation        |
-| `MiniLogistics__CircuitBreakerFailureThreshold` | `5`                                  |          | Failures before opening provider gate  |
-| `MiniLogistics__CircuitBreakerBreakSeconds` | `30`                                       |          | Provider gate open duration            |
-| `MiniLogistics__CommandWorkerIntervalSeconds` | `15`                                      |          | Shipment outbox polling interval       |
-| `Payment__VNPay__TmnCode`        | —                                                 | ✅       | VNPay terminal code                    |
-| `Payment__VNPay__HashSecret`     | —                                                 | ✅       | VNPay hash secret                      |
-
----
+| Path | Purpose |
+| --- | --- |
+| `src/WorkspaceEcommerce.Domain` | Entities and invariants |
+| `src/WorkspaceEcommerce.Application` | Use cases, DTOs, validation, and ports |
+| `src/WorkspaceEcommerce.Infrastructure` | EF/PostgreSQL, providers, storage, workers |
+| `src/WorkspaceEcommerce.Api` | HTTP/SignalR boundary and composition root |
+| `frontend/apps` | Storefront and admin applications |
+| `frontend/packages` | Shared API types/client and utilities |
+| `tests` | Application, infrastructure, and API integration tests |
+| `docs` | Product, architecture, API, development, ADRs, and runbooks |
+| `scripts` | Repeatable validation, migration, performance, and release checks |

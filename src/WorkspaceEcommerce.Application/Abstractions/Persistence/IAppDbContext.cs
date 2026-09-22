@@ -48,11 +48,23 @@ public interface IAppDbContext : ICatalogReadStore, IOrderReadStore, ILoyaltyRea
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Locks pending payment transactions before an order cancellation. The
+    /// payment callback uses the same payment-then-order lock order.
+    /// </summary>
+    Task<PaymentTransaction[]> FindPendingPaymentTransactionsForOrderForUpdateAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Reads an order while holding its PostgreSQL row lock inside the caller's
     /// transaction.
     /// </summary>
     Task<Order?> FindOrderForUpdateAsync(
         Guid orderId,
+        CancellationToken cancellationToken = default);
+
+    Task<ProductVariant[]> FindProductVariantsForUpdateAsync(
+        Guid[] variantIds,
         CancellationToken cancellationToken = default);
 
     /// <summary>

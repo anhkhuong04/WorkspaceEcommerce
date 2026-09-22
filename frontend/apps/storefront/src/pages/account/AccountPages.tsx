@@ -16,13 +16,15 @@ import type {
   ShipmentTrackingDto,
   TwoFactorSetupStartResponse
 } from "@workspace-ecommerce/api-types";
-import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
+import { downloadBlob, formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { Link, NavLink, useNavigate, useParams } from "react-router-dom";
 import { z } from "zod";
 import { ShipmentTrackingPanel } from "../../components/shipment/ShipmentTrackingPanel";
+import { ReceiptPreviewModal } from "../../components/receipt/ReceiptPreviewModal";
 import { useCustomerAuth } from "../../features/customer-auth/useCustomerAuth";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
@@ -50,7 +52,8 @@ const paymentStatusStyles: Record<PaymentStatus, string> = {
   1: "bg-blue-100 text-blue-800",
   2: "bg-emerald-100 text-emerald-800",
   3: "bg-red-100 text-red-800",
-  4: "bg-slate-100 text-slate-700"
+  4: "bg-slate-100 text-slate-700",
+  5: "bg-amber-100 text-amber-800"
 };
 
 const loyaltyVoucherAmountPerPoint = 1000;
@@ -499,6 +502,8 @@ export function AccountOrderDetailPage() {
   const { id } = useParams();
   const queryClient = useQueryClient();
   const [actionError, setActionError] = useState<string | null>(null);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [isReceiptPreviewOpen, setIsReceiptPreviewOpen] = useState(false);
 
   const orderQuery = useQuery({
     queryKey: ["customer", "order", id],
@@ -531,21 +536,42 @@ export function AccountOrderDetailPage() {
     onError: (err) => setActionError(getApiErrorMessage(err))
   });
 
+  const receiptMutation = useMutation({
+    mutationFn: () => storefrontApi.getCustomerOrderReceipt(id ?? ""),
+    onSuccess: (blob) => {
+      setReceiptError(null);
+      const orderCode = orderQuery.data?.orderCode ?? "order";
+      downloadBlob(blob, `order-receipt-${orderCode}.pdf`);
+    },
+    onError: (error) => setReceiptError(getApiErrorMessage(error))
+  });
+
   return (
     <AccountShell>
       {!id ? <StateMessage tone="error">Missing order id.</StateMessage> : null}
       {orderQuery.isLoading ? <StateMessage>Loading order...</StateMessage> : null}
       {orderQuery.error ? <StateMessage tone="error">{getApiErrorMessage(orderQuery.error)}</StateMessage> : null}
       {orderQuery.data ? (
-        <OrderDetail
-          order={orderQuery.data}
-          tracking={trackingQuery.data ?? null}
-          onCancel={cancelMutation.mutate}
-          isCancelling={cancelMutation.isPending}
-          onReturn={returnMutation.mutate}
-          isReturning={returnMutation.isPending}
-          actionError={actionError}
-        />
+        <>
+          <OrderDetail
+            order={orderQuery.data}
+            tracking={trackingQuery.data ?? null}
+            onCancel={cancelMutation.mutate}
+            isCancelling={cancelMutation.isPending}
+            onReturn={returnMutation.mutate}
+            isReturning={returnMutation.isPending}
+            actionError={actionError}
+            onViewReceipt={() => setIsReceiptPreviewOpen(true)}
+          />
+          <ReceiptPreviewModal
+            open={isReceiptPreviewOpen}
+            order={orderQuery.data}
+            isDownloading={receiptMutation.isPending}
+            downloadError={receiptError}
+            onClose={() => setIsReceiptPreviewOpen(false)}
+            onDownload={() => receiptMutation.mutate()}
+          />
+        </>
       ) : null}
     </AccountShell>
   );
@@ -802,7 +828,8 @@ function OrderDetail({
   isCancelling,
   onReturn,
   isReturning,
-  actionError
+  actionError,
+  onViewReceipt
 }: {
   order: CustomerOrderDto;
   tracking: ShipmentTrackingDto | null;
@@ -811,7 +838,10 @@ function OrderDetail({
   onReturn: (reason: string) => void;
   isReturning: boolean;
   actionError: string | null;
+  onViewReceipt: () => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="grid gap-6">
       <section className="ui-card border border-slate-100 p-6">
@@ -849,6 +879,17 @@ function OrderDetail({
               <h2 className="ui-caption uppercase tracking-[0.18em] text-[var(--brand)]">Status timeline</h2>
               <StatusTimeline order={order} />
             </section>
+
+            <div className="grid gap-2">
+              <button
+                type="button"
+                onClick={onViewReceipt}
+                className="ui-control flex h-11 items-center justify-center rounded-[var(--radius-control)] border border-[var(--brand)] bg-white px-4 font-bold text-[var(--brand)] transition hover:bg-[var(--brand)] hover:text-white"
+              >
+                {t("receipt.download")}
+              </button>
+              <p className="ui-caption text-slate-500">{t("receipt.notTaxInvoice")}</p>
+            </div>
 
             <OrderActionPanel
               order={order}
@@ -901,6 +942,7 @@ function OrderActionPanel({
   if (!canCancel && !canReturn) return null;
 
   function handleCancel() {
+    if (!reason.trim()) return;
     onCancel(reason.trim());
     setShowCancelDialog(false);
     setReason("");
@@ -942,14 +984,16 @@ function OrderActionPanel({
             rows={2}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="Reason for cancellation (optional)"
+            maxLength={500}
+            placeholder="Reason for cancellation (required)"
+            required
             className="mt-3 w-full rounded-[var(--radius-control)] border border-red-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-200"
           />
           <div className="mt-3 flex gap-2">
             <button
               type="button"
               id="btn-cancel-order-confirm"
-              disabled={isCancelling}
+              disabled={isCancelling || !reason.trim()}
               onClick={handleCancel}
               className="ui-control flex h-10 flex-1 items-center justify-center rounded-[var(--radius-control)] bg-red-600 text-sm text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -1088,7 +1132,8 @@ function StatusTimeline({ order }: { order: CustomerOrderDto }) {
             id: "created",
             fromStatus: null,
             toStatus: order.status,
-            note: "Order created.",
+            cancellationReason: null,
+            customerMessage: "Order created.",
             changedAt: order.createdAt
           }
         ];
@@ -1101,7 +1146,8 @@ function StatusTimeline({ order }: { order: CustomerOrderDto }) {
           <span className="min-w-0">
             <span className="block text-sm font-bold text-slate-950">{formatTimelineTitle(entry)}</span>
             <span className="mt-0.5 block text-xs font-medium text-slate-500">{formatDate(entry.changedAt)}</span>
-            {entry.note ? <span className="mt-1 block text-sm text-slate-600">{entry.note}</span> : null}
+            {entry.cancellationReason ? <span className="mt-1 block text-sm font-semibold text-red-700">Cancellation reason: {entry.cancellationReason}</span> : null}
+            {entry.customerMessage ? <span className="mt-1 block text-sm text-slate-600">{entry.customerMessage}</span> : null}
           </span>
         </li>
       ))}
@@ -1131,6 +1177,15 @@ function OrderList({ orders }: { orders: CustomerOrderListItemDto[] }) {
             <p className="ui-body mt-1 text-slate-500">
               {formatDate(order.createdAt)} - {order.itemCount} item{order.itemCount === 1 ? "" : "s"} - {formatPaymentMethod(order.paymentMethod)}
             </p>
+            {order.trackingCode ? (
+              <p className="mt-2 text-sm font-semibold text-slate-700">
+                Tracking code: <span className="font-mono text-slate-950">{order.trackingCode}</span>
+                <span className="text-slate-400"> · </span>
+                Carrier: {order.shipmentProvider ?? "MiniLogistics"}
+              </p>
+            ) : (
+              <p className="mt-2 text-sm font-medium text-slate-500">Shipment is being prepared.</p>
+            )}
           </div>
           <div className="text-left sm:text-right">
             <p className="ui-price text-slate-950">{formatMoney(order.totalAmount)}</p>

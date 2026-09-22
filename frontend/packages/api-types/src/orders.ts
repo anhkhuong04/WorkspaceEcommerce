@@ -1,5 +1,5 @@
 export type PaymentMethod = 0 | 1 | 2;
-export type PaymentStatus = 0 | 1 | 2 | 3 | 4;
+export type PaymentStatus = 0 | 1 | 2 | 3 | 4 | 5;
 export type OrderStatus = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export interface CheckoutRequest {
@@ -57,6 +57,7 @@ export interface OrderItemDto {
   id: string;
   productVariantId: string;
   productNameSnapshot: string;
+  productImageUrlSnapshot: string | null;
   skuSnapshot: string;
   unitPrice: number;
   quantity: number;

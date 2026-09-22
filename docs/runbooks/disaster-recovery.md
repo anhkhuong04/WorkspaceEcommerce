@@ -2,7 +2,7 @@
 
 ## Scope and authority
 
-This is the operational procedure for PRH-017. It prepares a repeatable recovery
+This is the operational procedure for a repeatable recovery
 rehearsal; it does not authorize a production restore, credential change, database
 deletion, object deletion, or rollback. A platform/SRE owner controls the recovery
 environment and credentials, while the release manager owns the final go/no-go
@@ -10,7 +10,7 @@ decision.
 
 Until business approval replaces them, the planning targets are **RPO <= 15 minutes**
 and **RTO <= 60 minutes**. Record the approved targets, actual timestamps, and any
-exception in the [PRH-017 evidence template](../reports/prh-017-disaster-recovery-evidence-template.md).
+exception in the external incident/rehearsal record.
 A document-only review is not a pass: an operator who did not write the feature must
 run the rehearsal in an isolated environment.
 
@@ -86,8 +86,8 @@ RPO/RTO. Run it as a code regression check, not as a substitute for this rehears
    and authenticated/authorized application reads to verify the sampled media can be
    served through the intended URL path, with no legacy local-disk URL emitted.
 4. Record object version IDs, checksums, object and metadata restoration timestamps,
-   access/permission result, and any mismatch. A metadata-only restore is a failed
-   PRH-017 object-data test.
+   access/permission result, and any mismatch. A metadata-only restore fails the
+   object-data recovery test.
 
 ### 4. Exercise failure and recovery scenarios
 
@@ -113,7 +113,7 @@ Perform each scenario independently and record its decision/owner:
    unavailable by design and the explicit business owner/date for remediation.
 4. Tear down the isolated environment under the platform retention policy, revoke
    temporary access, and ensure no synthetic recovery data is publicly reachable.
-5. The release manager marks PRH-017 pass only after the evidence template is complete
+5. The release manager marks the rehearsal passed only after the evidence record is complete
    and each failure/recovery discrepancy has an owner and a retest date.
 
 ## Repository regression checks
@@ -139,4 +139,3 @@ production backup workflow.
   rotation procedure.
 - [ADR 004: durable media storage](../adr/004-durable-media-storage.md): media state,
   cleanup, and object/metadata lifecycle.
-- [PRH-017 disaster recovery evidence template](../reports/prh-017-disaster-recovery-evidence-template.md).

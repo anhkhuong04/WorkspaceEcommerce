@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { formatMoney } from "@workspace-ecommerce/shared-utils";
 import type { StorefrontProductListItemDto } from "@workspace-ecommerce/api-types";
+import { useTranslation } from "react-i18next";
 import { useAddProductToCart } from "../../features/cart/useAddProductToCart";
 
 interface ProductCardProps {
@@ -9,6 +10,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, variant = "default" }: ProductCardProps) {
+  const { t } = useTranslation();
   const addProductMutation = useAddProductToCart();
   const canAdd = product.isInStock && product.minPrice !== null;
 
@@ -32,12 +34,12 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
           </Link>
           {hasDiscount && (
             <span className="ui-caption absolute left-2 top-2 rounded-full bg-[#e52b1f] px-2 py-0.5 font-semibold text-white">
-              Sale
+              {t("product.sale")}
             </span>
           )}
           {!product.isInStock && (
             <span className="ui-caption absolute left-2 top-2 rounded-full bg-slate-900 px-2 py-0.5 font-semibold text-white">
-              Sold out
+              {t("product.soldOut")}
             </span>
           )}
           {canAdd ? (
@@ -46,10 +48,10 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
               disabled={addProductMutation.isPending}
               onClick={() => addProductMutation.mutate(product.slug)}
               className="absolute bottom-3 right-3 inline-flex h-11 translate-y-3 items-center justify-center rounded-full bg-[#3a3a3a] px-5 text-sm font-bold text-white opacity-0 shadow-lg transition duration-200 hover:bg-[#242424] disabled:cursor-wait disabled:opacity-70 group-hover:translate-y-0 group-hover:opacity-100 focus:translate-y-0 focus:opacity-100"
-              aria-label={`Add ${product.name} to cart`}
+              aria-label={t("product.addToCartLabel", { name: product.name })}
             >
               <span className="mr-1 text-lg leading-none">+</span>
-              {addProductMutation.isPending ? "Adding" : "Add"}
+              {addProductMutation.isPending ? t("product.adding") : t("product.add")}
             </button>
           ) : null}
         </div>
@@ -62,11 +64,11 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
           <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[12px] sm:text-[13px]">
             {product.minPrice !== null ? (
               <>
-                <span className="font-medium text-slate-700">From {formatMoney(product.minPrice)}</span>
+                <span className="font-medium text-slate-700">{t("product.fromPrice", { price: formatMoney(product.minPrice) })}</span>
                 {hasDiscount && <span className="text-slate-400 line-through">{formatMoney(product.compareAtPrice!)}</span>}
               </>
             ) : (
-              <span className="font-medium text-slate-500">Contact us</span>
+              <span className="font-medium text-slate-500">{t("common.contactUs")}</span>
             )}
           </div>
         </Link>
@@ -91,12 +93,12 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
         </Link>
         {!product.isInStock && (
           <span className="ui-caption absolute left-3 top-3 rounded-full bg-slate-800/80 px-2.5 py-0.5 text-white backdrop-blur">
-            Out of stock
+            {t("product.outOfStock")}
           </span>
         )}
         {product.isFeatured && product.isInStock && (
           <span className="ui-caption absolute left-3 top-3 rounded-full bg-[var(--brand)] px-2.5 py-0.5 text-white">
-            Featured
+            {t("product.featured")}
           </span>
         )}
         {canAdd ? (
@@ -105,10 +107,10 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
             disabled={addProductMutation.isPending}
             onClick={() => addProductMutation.mutate(product.slug)}
             className="absolute bottom-4 right-4 inline-flex h-12 translate-y-3 items-center justify-center rounded-full bg-[#3a3a3a] px-6 text-base font-bold text-white opacity-0 shadow-lg transition duration-200 hover:bg-[#242424] disabled:cursor-wait disabled:opacity-70 group-hover:translate-y-0 group-hover:opacity-100 focus:translate-y-0 focus:opacity-100"
-            aria-label={`Add ${product.name} to cart`}
+            aria-label={t("product.addToCartLabel", { name: product.name })}
           >
             <span className="mr-1 text-xl leading-none">+</span>
-            {addProductMutation.isPending ? "Adding" : "Add"}
+            {addProductMutation.isPending ? t("product.adding") : t("product.add")}
           </button>
         ) : null}
       </div>
@@ -133,7 +135,7 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
               )}
             </>
           ) : (
-            <span className="ui-control text-slate-400">Contact us</span>
+            <span className="ui-control text-slate-400">{t("common.contactUs")}</span>
           )}
         </div>
       </Link>

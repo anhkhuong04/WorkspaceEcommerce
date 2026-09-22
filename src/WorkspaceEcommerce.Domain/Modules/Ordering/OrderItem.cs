@@ -12,16 +12,18 @@ public sealed class OrderItem : Entity
         string skuSnapshot,
         decimal unitPrice,
         int quantity,
-        bool requiresInstallation)
+        bool requiresInstallation,
+        string? productImageUrlSnapshot = null)
         : base(id)
     {
         OrderId = RequiredId(orderId, "Order item order id cannot be empty.");
         ProductVariantId = RequiredId(productVariantId, "Order item product variant id cannot be empty.");
         ProductNameSnapshot = Guard.Required(productNameSnapshot, nameof(ProductNameSnapshot));
         SkuSnapshot = Guard.Required(skuSnapshot, nameof(SkuSnapshot));
-        UnitPrice = Guard.NotNegative(unitPrice, nameof(UnitPrice));
+        UnitPrice = CommerceCurrency.RequireValidAmount(unitPrice, nameof(UnitPrice));
         Quantity = RequiredPositiveQuantity(quantity);
         RequiresInstallation = requiresInstallation;
+        ProductImageUrlSnapshot = Guard.Optional(productImageUrlSnapshot);
     }
 
     public Guid OrderId { get; private set; }
@@ -37,6 +39,12 @@ public sealed class OrderItem : Entity
     public int Quantity { get; private set; }
 
     public bool RequiresInstallation { get; private set; }
+
+    /// <summary>
+    /// The primary product image selected when the order was placed. This keeps
+    /// receipts stable if the catalog gallery is later changed or removed.
+    /// </summary>
+    public string? ProductImageUrlSnapshot { get; private set; }
 
     public decimal LineTotal => UnitPrice * Quantity;
 

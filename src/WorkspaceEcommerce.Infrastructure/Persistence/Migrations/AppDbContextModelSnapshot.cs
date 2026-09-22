@@ -1773,6 +1773,11 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("order_id");
 
+                    b.Property<string>("ProductImageUrlSnapshot")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("product_image_url_snapshot");
+
                     b.Property<string>("ProductNameSnapshot")
                         .IsRequired()
                         .HasMaxLength(250)
@@ -1819,6 +1824,11 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("cancellation_reason");
+
                     b.Property<DateTimeOffset>("ChangedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("changed_at");
@@ -1827,6 +1837,11 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)")
                         .HasColumnName("changed_by");
+
+                    b.Property<string>("CustomerMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("customer_message");
 
                     b.Property<string>("FromStatus")
                         .HasMaxLength(50)

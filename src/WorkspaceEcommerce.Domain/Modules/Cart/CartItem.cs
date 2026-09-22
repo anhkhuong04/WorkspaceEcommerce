@@ -15,7 +15,7 @@ public sealed class CartItem : Entity
         CartId = RequiredId(cartId, "Cart item cart id cannot be empty.");
         ProductVariantId = RequiredId(productVariantId, "Cart item product variant id cannot be empty.");
         Quantity = RequiredPositiveQuantity(quantity);
-        UnitPriceSnapshot = Guard.NotNegative(unitPriceSnapshot, nameof(UnitPriceSnapshot));
+        UnitPriceSnapshot = CommerceCurrency.RequireValidAmount(unitPriceSnapshot, nameof(UnitPriceSnapshot));
     }
 
     public Guid CartId { get; private set; }

@@ -3,6 +3,7 @@ import type { StorefrontBlogPostDto, StorefrontProductListItemDto } from "@works
 import { formatMoney } from "@workspace-ecommerce/shared-utils";
 import type { ChangeEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
@@ -23,6 +24,7 @@ export function StorefrontSearchOverlay({ isOpen, onClose }: StorefrontSearchOve
 }
 
 function StorefrontSearchOverlayContent({ onClose }: Pick<StorefrontSearchOverlayProps, "onClose">) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -100,19 +102,19 @@ function StorefrontSearchOverlayContent({ onClose }: Pick<StorefrontSearchOverla
               value={query}
               onChange={handleQueryChange}
               className="min-w-0 flex-1 border-0 border-b-2 border-slate-900 bg-transparent px-0 pb-4 text-3xl font-black tracking-tight text-slate-900 outline-none placeholder:text-slate-300 sm:text-4xl"
-              placeholder="Search products or blogs"
-              aria-label="Search products or blogs"
+              placeholder={t("search.placeholder")}
+              aria-label={t("search.placeholder")}
             />
             {query ? (
               <button type="button" onClick={clearSearch} className="text-base font-semibold text-slate-500 transition hover:text-slate-900">
-                Clear
+                {t("common.clear")}
               </button>
             ) : null}
             <button
               type="button"
               onClick={onClose}
               className="grid h-10 w-10 place-items-center rounded-lg text-slate-900 transition hover:bg-slate-100"
-              aria-label="Close search"
+              aria-label={t("search.close")}
             >
               <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
@@ -124,15 +126,15 @@ function StorefrontSearchOverlayContent({ onClose }: Pick<StorefrontSearchOverla
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 sm:px-8 sm:pb-8">
           <div className="mb-6 flex flex-wrap items-center gap-6">
             <SearchTabButton active={activeTab === "products"} onClick={() => setActiveTab("products")}>
-              Products
+              {t("header.products")}
             </SearchTabButton>
             <SearchTabButton active={activeTab === "blogs"} onClick={() => setActiveTab("blogs")}>
-              Blog posts
+              {t("search.blogPosts")}
             </SearchTabButton>
           </div>
 
           {!hasQuery ? (
-            <SearchStateMessage>Start typing to search products and blog posts.</SearchStateMessage>
+            <SearchStateMessage>{t("search.startTyping")}</SearchStateMessage>
           ) : activeTab === "products" ? (
             <ProductSearchResults
               isLoading={productsQuery.isFetching}
@@ -156,7 +158,7 @@ function StorefrontSearchOverlayContent({ onClose }: Pick<StorefrontSearchOverla
                 onClick={onClose}
                 className="inline-flex h-11 items-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white transition hover:bg-black"
               >
-                {activeTab === "products" ? "View all products" : "View all blog posts"}
+                {activeTab === "products" ? t("search.viewAllProducts") : t("search.viewAllBlogPosts")}
               </Link>
             </div>
           ) : null}
@@ -189,8 +191,9 @@ function ProductSearchResults({
   products: StorefrontProductListItemDto[];
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   if (isLoading) {
-    return <SearchStateMessage>Searching products...</SearchStateMessage>;
+    return <SearchStateMessage>{t("search.searchingProducts")}</SearchStateMessage>;
   }
 
   if (error) {
@@ -198,7 +201,7 @@ function ProductSearchResults({
   }
 
   if (products.length === 0) {
-    return <SearchStateMessage>No matching products.</SearchStateMessage>;
+    return <SearchStateMessage>{t("search.noProducts")}</SearchStateMessage>;
   }
 
   return (
@@ -215,7 +218,7 @@ function ProductSearchResults({
           <div className="min-w-0 self-center pr-2">
             <p className="truncate text-sm font-semibold text-slate-500 sm:text-base">{product.categoryName}</p>
             <h3 className="mt-1 truncate text-lg font-black text-slate-800 sm:text-2xl">{product.name}</h3>
-            <p className="mt-2 text-lg font-black text-slate-500 sm:text-2xl">{product.minPrice === null ? "Contact us" : formatMoney(product.minPrice)}</p>
+            <p className="mt-2 text-lg font-black text-slate-500 sm:text-2xl">{product.minPrice === null ? t("common.contactUs") : formatMoney(product.minPrice)}</p>
           </div>
         </Link>
       ))}
@@ -234,8 +237,9 @@ function BlogSearchResults({
   posts: StorefrontBlogPostDto[];
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   if (isLoading) {
-    return <SearchStateMessage>Searching blog posts...</SearchStateMessage>;
+    return <SearchStateMessage>{t("search.searchingBlogs")}</SearchStateMessage>;
   }
 
   if (error) {
@@ -243,7 +247,7 @@ function BlogSearchResults({
   }
 
   if (posts.length === 0) {
-    return <SearchStateMessage>No matching blog posts.</SearchStateMessage>;
+    return <SearchStateMessage>{t("search.noBlogs")}</SearchStateMessage>;
   }
 
   return (
@@ -254,11 +258,11 @@ function BlogSearchResults({
             {post.imageUrl ? (
               <img src={post.imageUrl} alt={post.title} className="h-full w-full object-cover" />
             ) : (
-              <span className="text-xs font-bold text-slate-400">Article</span>
+              <span className="text-xs font-bold text-slate-400">{t("search.article")}</span>
             )}
           </div>
           <div className="min-w-0 self-center pr-2">
-            <p className="text-sm font-semibold text-slate-500">Blog post</p>
+            <p className="text-sm font-semibold text-slate-500">{t("search.blogPost")}</p>
             <h3 className="mt-1 line-clamp-1 text-lg font-black text-slate-800 sm:text-2xl">{post.title}</h3>
             <p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-slate-500">{post.summary}</p>
           </div>

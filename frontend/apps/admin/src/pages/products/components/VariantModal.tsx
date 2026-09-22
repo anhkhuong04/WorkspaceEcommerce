@@ -38,8 +38,8 @@ export function VariantModal({ open, variantProduct, editingVariant, form, isPen
           <Controller control={form.control} name="stockQuantity" render={({ field, fieldState }) => <Field label="Stock" error={fieldState.error?.message}><TextInput type="number" min={0} value={field.value} onChange={(event) => field.onChange(Number(event.target.value))} /></Field>} />
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          <Controller control={form.control} name="price" render={({ field, fieldState }) => <Field label="Price" error={fieldState.error?.message}><TextInput type="number" min={0} value={field.value} onChange={(event) => field.onChange(Number(event.target.value))} /></Field>} />
-          <Controller control={form.control} name="compareAtPrice" render={({ field, fieldState }) => <Field label="Compare at" error={fieldState.error?.message}><TextInput type="number" min={0} value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value === "" ? null : Number(event.target.value))} /></Field>} />
+          <Controller control={form.control} name="price" render={({ field, fieldState }) => <Field label="Price (VND)" error={fieldState.error?.message}><TextInput type="number" min={0} step={1000} value={field.value} onChange={(event) => field.onChange(Number(event.target.value))} /></Field>} />
+          <Controller control={form.control} name="compareAtPrice" render={({ field, fieldState }) => <Field label="Compare at (VND)" error={fieldState.error?.message}><TextInput type="number" min={0} step={1000} value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value === "" ? null : Number(event.target.value))} /></Field>} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Controller control={form.control} name="requiresInstallation" render={({ field }) => <Field label="Requires installation"><Toggle checked={field.value} onChange={field.onChange} /></Field>} />

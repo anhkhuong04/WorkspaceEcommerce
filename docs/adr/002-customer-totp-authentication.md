@@ -25,4 +25,4 @@ The earlier customer two-factor endpoint generated a random-looking value and im
 - The migration clears every prior simulated 2FA state, so any customer who had toggled the demo feature must re-enroll. This is intentional: those records are not confirmed authenticators and are not Data Protection payloads.
 - Deploying two or more API instances requires a shared key ring with least-privilege filesystem permissions. An ephemeral container filesystem is not valid production configuration.
 - Recovery codes are an emergency access path; their one-time display means support cannot retrieve them later. A new setup cycle produces a new set.
-- This change does not add refresh tokens, email recovery, device trust, or a cleanup job for expired challenges. Those lifecycle concerns remain in PRH-005.
+- Refresh tokens, email recovery, and cleanup were added later and are governed by [ADR 003](003-customer-account-lifecycle.md). Device trust remains outside the current design.

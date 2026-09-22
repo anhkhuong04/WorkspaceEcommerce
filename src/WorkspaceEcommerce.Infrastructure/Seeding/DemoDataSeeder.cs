@@ -190,11 +190,11 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext, IConfiguration conf
     private async Task<int> SeedVariantsAsync(CancellationToken cancellationToken)
     {
         var count = 0;
-        count += await EnsureVariantAsync(StandingDeskOakVariantId, StandingDeskProductId, "DEMO-DESK-OAK-140", "Oak / 140cm", "Oak", "140cm", 699m, 799m, 18, true, cancellationToken, 35.5m, 140m, 70m, 15m);
-        count += await EnsureVariantAsync(StandingDeskBlackVariantId, StandingDeskProductId, "DEMO-DESK-BLK-160", "Black / 160cm", "Black", "160cm", 749m, 849m, 4, true, cancellationToken, 40m, 160m, 80m, 15m);
-        count += await EnsureVariantAsync(ChairVariantId, ChairProductId, "DEMO-CHAIR-GRAPHITE", "Graphite", "Graphite", null, 329m, 399m, 12, false, cancellationToken, 20m, 70m, 70m, 120m);
-        count += await EnsureVariantAsync(MonitorArmVariantId, MonitorArmProductId, "DEMO-ARM-DUAL", "Dual arm", "Matte Black", null, 189m, 229m, 3, false, cancellationToken, 4.5m, 45m, 25m, 12m);
-        count += await EnsureVariantAsync(DeskLampVariantId, DeskLampProductId, "DEMO-LAMP-WARM", "Warm light", "White", null, 79m, 99m, 25, false, cancellationToken, 1.2m, 35m, 18m, 8m);
+        count += await EnsureVariantAsync(StandingDeskOakVariantId, StandingDeskProductId, "DEMO-DESK-OAK-140", "Oak / 140cm", "Oak", "140cm", 18_174_000m, 20_774_000m, 18, true, cancellationToken, 35.5m, 140m, 70m, 15m);
+        count += await EnsureVariantAsync(StandingDeskBlackVariantId, StandingDeskProductId, "DEMO-DESK-BLK-160", "Black / 160cm", "Black", "160cm", 19_474_000m, 22_074_000m, 4, true, cancellationToken, 40m, 160m, 80m, 15m);
+        count += await EnsureVariantAsync(ChairVariantId, ChairProductId, "DEMO-CHAIR-GRAPHITE", "Graphite", "Graphite", null, 8_554_000m, 10_374_000m, 12, false, cancellationToken, 20m, 70m, 70m, 120m);
+        count += await EnsureVariantAsync(MonitorArmVariantId, MonitorArmProductId, "DEMO-ARM-DUAL", "Dual arm", "Matte Black", null, 4_914_000m, 5_954_000m, 3, false, cancellationToken, 4.5m, 45m, 25m, 12m);
+        count += await EnsureVariantAsync(DeskLampVariantId, DeskLampProductId, "DEMO-LAMP-WARM", "Warm light", "White", null, 2_054_000m, 2_574_000m, 25, false, cancellationToken, 1.2m, 35m, 18m, 8m);
 
         return count;
     }
@@ -328,8 +328,8 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext, IConfiguration conf
         }
 
         var cart = new Cart(Guid.Parse("70000000-0000-0000-0000-000000000001"), null, CheckoutReadySessionId);
-        cart.AddItem(Guid.Parse("71000000-0000-0000-0000-000000000001"), StandingDeskOakVariantId, 1, 699m);
-        cart.AddItem(Guid.Parse("71000000-0000-0000-0000-000000000002"), DeskLampVariantId, 2, 79m);
+        cart.AddItem(Guid.Parse("71000000-0000-0000-0000-000000000001"), StandingDeskOakVariantId, 1, 18_174_000m);
+        cart.AddItem(Guid.Parse("71000000-0000-0000-0000-000000000002"), DeskLampVariantId, 2, 2_054_000m);
         dbContext.Add(cart);
 
         return 1;
@@ -755,9 +755,9 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext, IConfiguration conf
             "12 Nguyen Trai, District 1, Ho Chi Minh City",
             "Demo pending order",
             PaymentMethod.Cod,
-            "USD",
-            1m);
-        order.AddItem(Guid.Parse("81000000-0000-0000-0000-000000000001"), StandingDeskOakVariantId, "Atlas Standing Desk", "DEMO-DESK-OAK-140", 699m, 1, true);
+            CommerceCurrency.Code,
+            CommerceCurrency.BaseExchangeRate);
+        order.AddItem(Guid.Parse("81000000-0000-0000-0000-000000000001"), StandingDeskOakVariantId, "Atlas Standing Desk", "DEMO-DESK-OAK-140", 18_174_000m, 1, true, "/demo/atlas-standing-desk-1.png");
         order.RecordCreated(Guid.Parse("82000000-0000-0000-0000-000000000001"), "Created by demo seed.", null);
 
         return order;
@@ -775,9 +775,9 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext, IConfiguration conf
             "88 Dien Bien Phu, Binh Thanh, Ho Chi Minh City",
             "Demo confirmed order",
             PaymentMethod.ManualBankTransfer,
-            "USD",
-            1m);
-        order.AddItem(Guid.Parse("81000000-0000-0000-0000-000000000002"), ChairVariantId, "Forma Ergonomic Chair", "DEMO-CHAIR-GRAPHITE", 329m, 1, false);
+            CommerceCurrency.Code,
+            CommerceCurrency.BaseExchangeRate);
+        order.AddItem(Guid.Parse("81000000-0000-0000-0000-000000000002"), ChairVariantId, "Forma Ergonomic Chair", "DEMO-CHAIR-GRAPHITE", 8_554_000m, 1, false, "/demo/forma-chair-1.png");
         order.RecordCreated(Guid.Parse("82000000-0000-0000-0000-000000000002"), "Created by demo seed.", null);
         order.ChangeStatus(Guid.Parse("82000000-0000-0000-0000-000000000003"), OrderStatus.Confirmed, "Confirmed by demo seed.", "admin@example.com");
 
@@ -796,10 +796,10 @@ internal sealed class DemoDataSeeder(AppDbContext dbContext, IConfiguration conf
             "25 Le Loi, District 3, Ho Chi Minh City",
             "Demo completed order",
             PaymentMethod.Cod,
-            "USD",
-            1m);
-        order.AddItem(Guid.Parse("81000000-0000-0000-0000-000000000003"), MonitorArmVariantId, "Axis Dual Monitor Arm", "DEMO-ARM-DUAL", 189m, 2, false);
-        order.AddItem(Guid.Parse("81000000-0000-0000-0000-000000000004"), DeskLampVariantId, "Halo Desk Lamp", "DEMO-LAMP-WARM", 79m, 1, false);
+            CommerceCurrency.Code,
+            CommerceCurrency.BaseExchangeRate);
+        order.AddItem(Guid.Parse("81000000-0000-0000-0000-000000000003"), MonitorArmVariantId, "Axis Dual Monitor Arm", "DEMO-ARM-DUAL", 4_914_000m, 2, false, "/demo/axis-monitor-arm-1.png");
+        order.AddItem(Guid.Parse("81000000-0000-0000-0000-000000000004"), DeskLampVariantId, "Halo Desk Lamp", "DEMO-LAMP-WARM", 2_054_000m, 1, false, "/demo/halo-desk-lamp-1.png");
         order.RecordCreated(Guid.Parse("82000000-0000-0000-0000-000000000004"), "Created by demo seed.", null);
         order.ChangeStatus(Guid.Parse("82000000-0000-0000-0000-000000000005"), OrderStatus.Confirmed, "Confirmed by demo seed.", "admin@example.com");
         order.ChangeStatus(Guid.Parse("82000000-0000-0000-0000-000000000006"), OrderStatus.Processing, "Processing by demo seed.", "admin@example.com");

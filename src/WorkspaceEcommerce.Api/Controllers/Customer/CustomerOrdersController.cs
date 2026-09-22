@@ -5,6 +5,7 @@ using WorkspaceEcommerce.Api.Extensions;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Customers.Orders;
+using WorkspaceEcommerce.Application.Modules.Ordering.Receipts;
 using WorkspaceEcommerce.Application.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Api.Controllers.Customer;
@@ -13,7 +14,8 @@ namespace WorkspaceEcommerce.Api.Controllers.Customer;
 [Authorize(Roles = AuthRoles.Customer)]
 public sealed class CustomerOrdersController(
     ICustomerOrderService customerOrderService,
-    IOrderShipmentService shipmentService) : ControllerBase
+    IOrderShipmentService shipmentService,
+    IOrderReceiptService receiptService) : ControllerBase
 {
     [HttpGet("api/customer/orders")]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<CustomerOrderListItemDto>>), StatusCodes.Status200OK)]
@@ -41,6 +43,16 @@ public sealed class CustomerOrdersController(
     {
         var result = await customerOrderService.GetOrderByIdAsync(id, cancellationToken);
         return this.ToApiResponse(result);
+    }
+
+    [HttpGet("api/customer/orders/{id:guid}/receipt")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadReceipt(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await receiptService.GenerateForCustomerAsync(id, cancellationToken);
+        return this.ToOrderReceiptResponse(result);
     }
 
     [HttpGet("api/customer/orders/{id:guid}/tracking")]

@@ -4,6 +4,7 @@ public sealed record OrderItemDto(
     Guid Id,
     Guid ProductVariantId,
     string ProductNameSnapshot,
+    string? ProductImageUrlSnapshot,
     string SkuSnapshot,
     decimal UnitPrice,
     int Quantity,

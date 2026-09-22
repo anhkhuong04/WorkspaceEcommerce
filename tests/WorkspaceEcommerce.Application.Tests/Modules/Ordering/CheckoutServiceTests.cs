@@ -37,6 +37,8 @@ public sealed class CheckoutServiceTests
         Assert.Null(order.CustomerId);
         Assert.Equal(OrderStatus.Pending, order.Status);
         Assert.Equal(PaymentMethod.Cod, order.PaymentMethod);
+        Assert.Equal(CommerceCurrency.Code, store.Orders.Single().CurrencyCode);
+        Assert.Equal(CommerceCurrency.BaseExchangeRate, store.Orders.Single().ExchangeRate);
         Assert.Equal(PaymentStatus.Unpaid, store.Orders.Single().PaymentStatus);
         Assert.False(result.Value.PaymentRequired);
         Assert.Null(result.Value.PaymentUrl);

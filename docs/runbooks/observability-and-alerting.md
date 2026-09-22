@@ -3,7 +3,7 @@
 This document defines the repository-side signal contract for the release
 candidate. Dashboards, retention, sampling, alert routing, and alert exercises
 must be configured by the Platform/Observability owner in the target staging
-environment before PRH-014 or PRH-018 can be closed.
+environment before release approval.
 
 ## Safe telemetry boundary
 

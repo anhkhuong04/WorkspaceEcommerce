@@ -6,6 +6,14 @@ namespace WorkspaceEcommerce.Application.Tests.Domain.Catalog;
 public sealed class ProductVariantTests
 {
     [Fact]
+    public void Constructor_RejectsFractionalVndPrice()
+    {
+        var exception = Assert.Throws<DomainException>(() => CreateVariant(price: 100_000.50m));
+
+        Assert.Equal("Price must be a whole VND amount.", exception.Message);
+    }
+
+    [Fact]
     public void Constructor_NegativePrice_ThrowsDomainException()
     {
         var exception = Assert.Throws<DomainException>(() => CreateVariant(price: -1m));

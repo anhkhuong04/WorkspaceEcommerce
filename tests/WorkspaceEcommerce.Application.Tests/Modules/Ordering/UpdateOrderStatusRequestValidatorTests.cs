@@ -13,7 +13,7 @@ public sealed class UpdateOrderStatusRequestValidatorTests
         var request = new UpdateOrderStatusRequest
         {
             Status = OrderStatus.Confirmed,
-            Note = "Confirmed by admin"
+            InternalNote = "Confirmed by admin"
         };
 
         var result = _validator.Validate(request);
@@ -33,5 +33,18 @@ public sealed class UpdateOrderStatusRequestValidatorTests
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateOrderStatusRequest.Status));
+    }
+
+    [Fact]
+    public void Validate_CancelledWithoutReason_IsInvalid()
+    {
+        var result = _validator.Validate(new UpdateOrderStatusRequest
+        {
+            Status = OrderStatus.Cancelled,
+            CancellationReason = " "
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateOrderStatusRequest.CancellationReason));
     }
 }

@@ -3,7 +3,9 @@ using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Customers.Orders;
 using WorkspaceEcommerce.Application.Tests.Common.Fakes;
 using WorkspaceEcommerce.Application.Abstractions.Notifications;
+using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Domain.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Application.Tests.Modules.Customers;
 
@@ -16,8 +18,21 @@ public sealed class CustomerOrderServiceTests
         var otherCustomerId = Guid.NewGuid();
         var currentCustomerOrder = CreateOrder(Guid.NewGuid(), "ORD-CURRENT-001", currentCustomerId);
         var otherCustomerOrder = CreateOrder(Guid.NewGuid(), "ORD-OTHER-001", otherCustomerId);
+        var shipmentId = Guid.NewGuid();
+        currentCustomerOrder.UpdateShipmentInfo("ML-CURRENT-001", shipmentId);
+        var shipment = new OrderShipment(
+            shipmentId,
+            currentCustomerOrder.Id,
+            "MiniLogistics",
+            Guid.NewGuid(),
+            "ML-CURRENT-001",
+            "Assigned",
+            30_000m,
+            "VND",
+            DateTimeOffset.UtcNow);
         var dbContext = new FakeAppDbContext();
         dbContext.Seed(currentCustomerOrder, otherCustomerOrder);
+        dbContext.Seed(shipment);
         var service = CreateService(dbContext, currentCustomerId);
 
         var result = await service.GetOrdersAsync(new CustomerOrderListRequest());
@@ -26,6 +41,8 @@ public sealed class CustomerOrderServiceTests
         var item = Assert.Single(result.Value!.Items);
         Assert.Equal(currentCustomerOrder.Id, item.Id);
         Assert.Equal(1, item.ItemCount);
+        Assert.Equal("ML-CURRENT-001", item.TrackingCode);
+        Assert.Equal("MiniLogistics", item.ShipmentProvider);
     }
 
     [Fact]
@@ -89,6 +106,35 @@ public sealed class CustomerOrderServiceTests
         var result = await service.GetOrdersAsync(new CustomerOrderListRequest());
 
         Assert.Equal(ResultStatus.Unauthorized, result.Status);
+    }
+
+    [Fact]
+    public async Task CancelOrderAsync_RequiresReasonAndRestoresStockOnlyOnce()
+    {
+        var customerId = Guid.NewGuid();
+        var variant = new ProductVariant(Guid.NewGuid(), Guid.NewGuid(), "DESK-001", "Desk", null, null, 100m, null, 3, false);
+        var order = new Order(
+            Guid.NewGuid(), "ORD-CANCEL-001", customerId, "Nguyen Van A", "0900000000",
+            "customer@example.com", "123 Shipping Street", null, PaymentMethod.Cod, "USD", 1m);
+        order.AddItem(Guid.NewGuid(), variant.Id, "Desk", variant.Sku, 100m, 2, false);
+        order.RecordCreated(Guid.NewGuid(), null, null);
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(variant);
+        dbContext.Seed(order);
+        var service = CreateService(dbContext, customerId);
+
+        var missingReason = await service.CancelOrderAsync(order.Id, " ");
+        var cancelled = await service.CancelOrderAsync(order.Id, "Ordered by mistake");
+        var retry = await service.CancelOrderAsync(order.Id, "Ordered by mistake");
+
+        Assert.Equal(ResultStatus.Validation, missingReason.Status);
+        Assert.True(cancelled.IsSuccess);
+        Assert.Equal(ResultStatus.Failure, retry.Status);
+        Assert.Equal(5, variant.StockQuantity);
+        Assert.Equal(PaymentStatus.Cancelled, order.PaymentStatus);
+        var history = cancelled.Value!.StatusHistory.Last();
+        Assert.Equal("Ordered by mistake", history.CancellationReason);
+        Assert.Null(history.CustomerMessage);
     }
 
     private static CustomerOrderService CreateService(FakeAppDbContext dbContext, Guid? customerId)

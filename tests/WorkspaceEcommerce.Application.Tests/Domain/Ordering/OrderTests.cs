@@ -250,6 +250,19 @@ public sealed class OrderTests
     }
 
     [Fact]
+    public void MarkPaymentRefundPending_WhenPaid_OpensRefundWorkflowAndKeepsPaidTimestamp()
+    {
+        var paidAt = DateTimeOffset.UtcNow;
+        var order = CreateOrder(PaymentMethod.VNPay);
+        order.MarkPaymentPaid(paidAt);
+
+        order.MarkPaymentRefundPending();
+
+        Assert.Equal(PaymentStatus.RefundPending, order.PaymentStatus);
+        Assert.Equal(paidAt, order.PaidAt);
+    }
+
+    [Fact]
     public void MarkPaymentFailed_FromPending_SetsFailedAndClearsPaidAt()
     {
         var order = CreateOrder(PaymentMethod.VNPay);

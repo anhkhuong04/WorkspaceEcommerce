@@ -116,14 +116,16 @@ public sealed class ProductVariant : Entity
 
     public void UpdatePricing(decimal price, decimal? compareAtPrice)
     {
-        Price = Guard.NotNegative(price, nameof(Price));
+        Price = CommerceCurrency.RequireValidAmount(price, nameof(Price));
 
         if (compareAtPrice is not null && compareAtPrice.Value < Price)
         {
             throw new DomainException("Compare-at price cannot be lower than price.");
         }
 
-        CompareAtPrice = compareAtPrice;
+        CompareAtPrice = compareAtPrice is null
+            ? null
+            : CommerceCurrency.RequireValidAmount(compareAtPrice.Value, nameof(CompareAtPrice));
     }
 
     public void UpdateStock(int stockQuantity)

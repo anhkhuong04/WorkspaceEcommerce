@@ -1,5 +1,6 @@
 import { createStorefrontApi, ApiClient } from "@workspace-ecommerce/api-client";
 import type { CustomerAuthResponse, CustomerProfileDto } from "@workspace-ecommerce/api-types";
+import i18n, { normalizeLanguage } from "../../i18n";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
 const customerSessionKey = "workspace-ecommerce-customer-session";
@@ -103,6 +104,10 @@ export function getCustomerToken(): string | null {
   return getCustomerSession()?.accessToken ?? null;
 }
 
+export function getNotificationHubUrl(): string {
+  return `${baseUrl.replace(/\/$/, "")}/hubs/notifications`;
+}
+
 export function setCustomerUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler;
 }
@@ -111,6 +116,7 @@ export const storefrontApi = createStorefrontApi(
   new ApiClient({
     baseUrl,
     getAccessToken: getCustomerToken,
+    getLanguage: () => normalizeLanguage(i18n.resolvedLanguage ?? i18n.language),
     onUnauthorized: () => unauthorizedHandler?.()
   })
 );

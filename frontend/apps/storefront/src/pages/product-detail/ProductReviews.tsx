@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FormEvent } from "react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useCustomerAuth } from "../../features/customer-auth/useCustomerAuth";
 import { getApiErrorMessage } from "../../services/api/errors";
@@ -22,6 +23,7 @@ function StarIcon({ filled, onClick, className = "" }: { filled: boolean; onClic
 }
 
 export function ProductReviews({ slug }: { slug: string }) {
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { isAuthenticated } = useCustomerAuth();
 
@@ -63,7 +65,7 @@ export function ProductReviews({ slug }: { slug: string }) {
   return (
     <section className="grid gap-8 border-t border-slate-100 pt-8 lg:grid-cols-[420px_minmax(0,1fr)]">
       <div className="min-w-0">
-        <h2 className="ui-h2 text-slate-950">Customer Reviews</h2>
+        <h2 className="ui-h2 text-slate-950">{t("reviews.title")}</h2>
         
         {reviewsData ? (
           <div className="mt-6">
@@ -76,7 +78,7 @@ export function ProductReviews({ slug }: { slug: string }) {
                   ))}
                 </div>
                 <span className="mt-1 block text-sm font-semibold text-slate-500">
-                  Based on {reviewsData.reviewCount} {reviewsData.reviewCount === 1 ? "review" : "reviews"}
+                  {t("reviews.basedOn", { count: reviewsData.reviewCount })}
                 </span>
               </div>
             </div>
@@ -86,7 +88,7 @@ export function ProductReviews({ slug }: { slug: string }) {
         ) : null}
 
         <div className="mt-8 rounded-[var(--radius-card)] border border-slate-100 bg-[#f8f9fa] p-6">
-          <h3 className="text-lg font-black text-slate-950">Write a Review</h3>
+          <h3 className="text-lg font-black text-slate-950">{t("reviews.write")}</h3>
           {isAuthenticated ? (
             <form onSubmit={handleSubmit} className="mt-5 grid gap-5">
               {formError && (
@@ -96,12 +98,12 @@ export function ProductReviews({ slug }: { slug: string }) {
               )}
               {formSuccess && (
                 <div className="rounded-[var(--radius-control)] bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">
-                  Your review has been submitted successfully!
+                  {t("reviews.success")}
                 </div>
               )}
               
               <div>
-                <label className="mb-2 block text-sm font-bold text-slate-700">Your Rating</label>
+                <label className="mb-2 block text-sm font-bold text-slate-700">{t("reviews.yourRating")}</label>
                 <div className="flex gap-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <StarIcon
@@ -116,7 +118,7 @@ export function ProductReviews({ slug }: { slug: string }) {
               
               <div>
                 <label htmlFor="review-comment" className="mb-2 block text-sm font-bold text-slate-700">
-                  Your Review <span className="text-slate-400 font-normal">(Optional)</span>
+                  {t("reviews.yourReview")} <span className="text-slate-400 font-normal">({t("reviews.optional")})</span>
                 </label>
                 <textarea
                   id="review-comment"
@@ -124,7 +126,7 @@ export function ProductReviews({ slug }: { slug: string }) {
                   onChange={(e) => setComment(e.target.value)}
                   rows={4}
                   className="ui-control w-full resize-none rounded-[var(--radius-control)] border border-slate-200 bg-white p-3 text-sm focus:border-slate-950 focus:ring-1 focus:ring-slate-950"
-                  placeholder="What did you like or dislike?"
+                  placeholder={t("reviews.placeholder")}
                   disabled={submitReviewMutation.isPending}
                 />
               </div>
@@ -134,17 +136,17 @@ export function ProductReviews({ slug }: { slug: string }) {
                 disabled={submitReviewMutation.isPending}
                 className="ui-control rounded-[var(--radius-control)] bg-slate-950 px-6 py-3 font-bold text-white transition hover:bg-slate-800 disabled:opacity-50"
               >
-                {submitReviewMutation.isPending ? "Submitting..." : "Submit Review"}
+                {submitReviewMutation.isPending ? t("reviews.submitting") : t("reviews.submit")}
               </button>
             </form>
           ) : (
             <div className="mt-4">
-              <p className="text-sm text-slate-600">Please log in to write a review for this product.</p>
+              <p className="text-sm text-slate-600">{t("reviews.loginPrompt")}</p>
               <Link
                 to="/login"
                 className="mt-4 inline-block rounded-[var(--radius-control)] bg-slate-900 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800"
               >
-                Log In
+                {t("header.login")}
               </Link>
             </div>
           )}
@@ -162,8 +164,8 @@ export function ProductReviews({ slug }: { slug: string }) {
 
         {reviewsData && reviewsData.reviews.length === 0 && (
           <div className="rounded-[var(--radius-card)] border border-dashed border-slate-200 bg-white p-12 text-center">
-            <h3 className="text-lg font-black text-slate-900">No reviews yet</h3>
-            <p className="mt-2 text-sm text-slate-500">Be the first to share your experience with this product!</p>
+            <h3 className="text-lg font-black text-slate-900">{t("reviews.empty")}</h3>
+            <p className="mt-2 text-sm text-slate-500">{t("reviews.emptyHint")}</p>
           </div>
         )}
 
@@ -181,7 +183,7 @@ export function ProductReviews({ slug }: { slug: string }) {
                         ))}
                       </div>
                       <time dateTime={review.createdAt} className="text-xs font-semibold text-slate-500">
-                        {new Date(review.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+                        {new Date(review.createdAt).toLocaleDateString(i18n.resolvedLanguage === "vi" ? "vi-VN" : "en-US", { year: "numeric", month: "long", day: "numeric" })}
                       </time>
                     </div>
                   </div>

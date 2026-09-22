@@ -48,6 +48,10 @@ internal sealed class OrderItemConfiguration : IEntityTypeConfiguration<OrderIte
             .HasColumnName("requires_installation")
             .IsRequired();
 
+        builder.Property(item => item.ProductImageUrlSnapshot)
+            .HasColumnName("product_image_url_snapshot")
+            .HasMaxLength(1000);
+
         builder.HasIndex(item => item.OrderId)
             .HasDatabaseName("ix_order_items_order_id");
 

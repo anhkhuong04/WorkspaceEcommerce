@@ -1,4 +1,4 @@
-# PRH-008 PostgreSQL query-plan runbook
+# PostgreSQL query-plan runbook
 
 The read paths that must remain bounded are customer/admin order pages, product review pages, active coupon pages, storefront catalog pages, and the dashboard's grouped aggregates. Their request code filters first, issues a `CountAsync`, and materializes only a deterministic `Skip`/`Take` page; child counts are correlated SQL subqueries or bounded page-ID batches.
 
@@ -23,7 +23,7 @@ The script writes timestamped `EXPLAIN (ANALYZE, BUFFERS)` output to `artifacts/
 
 ## Captured baseline evidence
 
-On 2026-08-09, an isolated PostgreSQL 17 database was populated with 50,000 customer orders, 10,000 reviews distributed across catalog products, and 10,000 coupons. `EXPLAIN (ANALYZE, BUFFERS)` was captured after temporarily removing the PRH-008 indexes and again after restoring them. The generated reports are retained as release artifacts (`prh-008-postgres-20260809-223943.md` and `prh-008-postgres-20260809-223956.md`). Actual executor time, rather than client/`psql` startup time, is compared below.
+On 2026-08-09, an isolated PostgreSQL 17 database was populated with 50,000 customer orders, 10,000 reviews distributed across catalog products, and 10,000 coupons. `EXPLAIN (ANALYZE, BUFFERS)` was captured after temporarily removing the read-path indexes and again after restoring them. Generated reports were retained as candidate-specific release artifacts rather than committed. Actual executor time, rather than client/`psql` startup time, is compared below.
 
 | Query | Before | After | Plan/read evidence |
 | --- | ---: | ---: | --- |

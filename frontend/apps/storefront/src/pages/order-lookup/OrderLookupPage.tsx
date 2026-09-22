@@ -1,12 +1,14 @@
 ﻿import { zodResolver } from "@hookform/resolvers/zod";
 import type { OrderDto, PaymentStatus, ShipmentTrackingDto } from "@workspace-ecommerce/api-types";
-import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
+import { downloadBlob, formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { ShipmentTrackingPanel } from "../../components/shipment/ShipmentTrackingPanel";
+import { ReceiptPreviewModal } from "../../components/receipt/ReceiptPreviewModal";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
 
@@ -32,15 +34,20 @@ const paymentStatusStyles: Record<PaymentStatus, string> = {
   1: "bg-blue-100 text-blue-800",
   2: "bg-emerald-100 text-emerald-800",
   3: "bg-red-100 text-red-800",
-  4: "bg-slate-100 text-slate-700"
+  4: "bg-slate-100 text-slate-700",
+  5: "bg-amber-100 text-amber-800"
 };
 
 export function OrderLookupPage() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const [result, setResult] = useState<OrderDto | null>(null);
+  const [lookupCredentials, setLookupCredentials] = useState<LookupFormValues | null>(null);
   const [tracking, setTracking] = useState<ShipmentTrackingDto | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDownloadingReceipt, setIsDownloadingReceipt] = useState(false);
+  const [isReceiptPreviewOpen, setIsReceiptPreviewOpen] = useState(false);
 
   const {
     register,
@@ -58,17 +65,35 @@ export function OrderLookupPage() {
     setIsLoading(true);
     setLookupError(null);
     setResult(null);
+    setLookupCredentials(null);
+    setIsReceiptPreviewOpen(false);
     setTracking(null);
 
     try {
       const response = await storefrontApi.lookupOrder(values);
       setResult(response.order);
+      setLookupCredentials(values);
       const shipment = await storefrontApi.lookupOrderTracking(values);
       setTracking(shipment);
     } catch (error) {
       setLookupError(getApiErrorMessage(error));
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function downloadReceipt() {
+    if (!result || !lookupCredentials) return;
+
+    setIsDownloadingReceipt(true);
+    setLookupError(null);
+    try {
+      const blob = await storefrontApi.lookupOrderReceipt(lookupCredentials);
+      downloadBlob(blob, `order-receipt-${result.orderCode}.pdf`);
+    } catch (error) {
+      setLookupError(getApiErrorMessage(error));
+    } finally {
+      setIsDownloadingReceipt(false);
     }
   }
 
@@ -118,7 +143,16 @@ export function OrderLookupPage() {
               <p className="font-mono text-2xl font-black text-slate-950">{result.orderCode}</p>
               <p className="ui-body mt-1 text-slate-500">Created on {formatDate(result.createdAt)}</p>
             </div>
-            <span className={`rounded-full px-3 py-1 text-sm font-black ${statusStyles[result.status] ?? "bg-slate-100 text-slate-600"}`}>{formatOrderStatus(result.status)}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsReceiptPreviewOpen(true)}
+                className="ui-control h-10 rounded-[var(--radius-control)] border border-slate-200 bg-white px-4 font-bold text-slate-700 transition hover:border-slate-950 hover:text-slate-950"
+              >
+                {t("receipt.download")}
+              </button>
+              <span className={`rounded-full px-3 py-1 text-sm font-black ${statusStyles[result.status] ?? "bg-slate-100 text-slate-600"}`}>{formatOrderStatus(result.status)}</span>
+            </div>
           </div>
 
           <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -187,6 +221,17 @@ export function OrderLookupPage() {
           <h2 className="ui-h3 mt-2 text-slate-950">Carrier tracking</h2>
           <div className="mt-5"><ShipmentTrackingPanel tracking={tracking} /></div>
         </section>
+      ) : null}
+
+      {result ? (
+        <ReceiptPreviewModal
+          open={isReceiptPreviewOpen}
+          order={result}
+          isDownloading={isDownloadingReceipt}
+          downloadError={lookupError}
+          onClose={() => setIsReceiptPreviewOpen(false)}
+          onDownload={() => void downloadReceipt()}
+        />
       ) : null}
     </div>
   );

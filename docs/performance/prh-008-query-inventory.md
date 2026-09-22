@@ -1,4 +1,4 @@
-# PRH-008 IQueryable inventory and prioritization
+# Bounded query inventory
 
 Run `./scripts/performance/inventory-prh-008-query-terminators.ps1` from the repository root to produce the complete line-level inventory for Application and Infrastructure. The generated report is intentionally an artifact (not source-controlled) so it stays accurate after every query change.
 

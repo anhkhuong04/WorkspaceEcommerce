@@ -5,6 +5,7 @@ using WorkspaceEcommerce.Api.Common;
 using WorkspaceEcommerce.Api.Extensions;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Ordering;
+using WorkspaceEcommerce.Application.Modules.Ordering.Receipts;
 using WorkspaceEcommerce.Application.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Api.Controllers.Admin;
@@ -14,7 +15,8 @@ namespace WorkspaceEcommerce.Api.Controllers.Admin;
 [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
 public sealed class OrdersController(
     IAdminOrderService orderService,
-    IOrderShipmentService shipmentService) : ControllerBase
+    IOrderShipmentService shipmentService,
+    IOrderReceiptService receiptService) : ControllerBase
 {
     [HttpGet("api/admin/orders")]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<AdminOrderListItemDto>>), StatusCodes.Status200OK)]
@@ -41,6 +43,16 @@ public sealed class OrdersController(
         var result = await orderService.GetOrderByIdAsync(id, cancellationToken);
 
         return this.ToApiResponse(result);
+    }
+
+    [HttpGet("api/admin/orders/{id:guid}/receipt")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadReceipt(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await receiptService.GenerateForAdminAsync(id, cancellationToken);
+        return this.ToOrderReceiptResponse(result);
     }
 
     [HttpGet("api/admin/orders/{id:guid}/shipment")]

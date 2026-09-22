@@ -19,6 +19,7 @@ internal static class RateLimiterExtensions
             var catalogPermitLimit = isDevelopment ? 5_000 : 240;
             var warrantyLookupPermitLimit = isDevelopment ? 500 : 15;
             var warrantyActivationPermitLimit = isDevelopment ? 500 : 8;
+            var guestReceiptPermitLimit = isDevelopment ? 500 : 10;
             var defaultPermitLimit = isDevelopment ? 3_000 : 120;
 
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -26,6 +27,18 @@ internal static class RateLimiterExtensions
             {
                 var path = httpContext.Request.Path.Value ?? string.Empty;
                 var partitionKey = GetRateLimitPartitionKey(httpContext);
+
+                if (path.StartsWith("/api/orders/lookup/receipt", StringComparison.OrdinalIgnoreCase))
+                {
+                    return RateLimitPartition.GetFixedWindowLimiter(
+                        $"guest-receipt:{partitionKey}",
+                        _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = guestReceiptPermitLimit,
+                            QueueLimit = 0,
+                            Window = TimeSpan.FromMinutes(1)
+                        });
+                }
 
                 if (path.StartsWith("/api/blog-posts/", StringComparison.OrdinalIgnoreCase) &&
                     path.EndsWith("/comments", StringComparison.OrdinalIgnoreCase) &&

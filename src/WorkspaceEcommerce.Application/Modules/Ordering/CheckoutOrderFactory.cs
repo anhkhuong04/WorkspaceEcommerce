@@ -1,13 +1,11 @@
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
-using WorkspaceEcommerce.Application.Common.Localization;
 using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 
 namespace WorkspaceEcommerce.Application.Modules.Ordering;
 
 internal sealed class CheckoutOrderFactory(
-    ICheckoutStore checkoutStore,
-    ICurrentLanguageProvider languageProvider)
+    ICheckoutStore checkoutStore)
 {
     public async Task<Order> CreateAsync(
         CheckoutRequest request,
@@ -19,9 +17,6 @@ internal sealed class CheckoutOrderFactory(
             ? $"{request.ShippingStreet}, {request.ShippingWard}, {request.ShippingProvince}"
             : request.ShippingAddress;
 
-        var currencyCode = languageProvider.CurrentLanguage == "vi" ? "VND" : "USD";
-        var exchangeRate = languageProvider.CurrentLanguage == "vi" ? 26000m : 1m;
-
         var order = new Order(
             Guid.NewGuid(),
             await GenerateOrderCodeAsync(cancellationToken),
@@ -32,8 +27,8 @@ internal sealed class CheckoutOrderFactory(
             shippingAddress,
             request.Note,
             request.PaymentMethod,
-            currencyCode,
-            exchangeRate);
+            CommerceCurrency.Code,
+            CommerceCurrency.BaseExchangeRate);
         order.SetShippingAddressDetails(
             request.ShippingStreet,
             request.ShippingWard,
@@ -48,7 +43,8 @@ internal sealed class CheckoutOrderFactory(
                 snapshot.SkuSnapshot,
                 snapshot.UnitPrice,
                 snapshot.Quantity,
-                snapshot.RequiresInstallation);
+                snapshot.RequiresInstallation,
+                snapshot.ProductImageUrlSnapshot);
         }
 
         order.RecordCreated(Guid.NewGuid(), "Created by checkout.", changedBy: null);

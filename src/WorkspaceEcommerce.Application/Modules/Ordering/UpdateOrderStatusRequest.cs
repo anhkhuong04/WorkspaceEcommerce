@@ -6,5 +6,9 @@ public sealed class UpdateOrderStatusRequest
 {
     public OrderStatus Status { get; init; }
 
-    public string? Note { get; init; }
+    public string? InternalNote { get; init; }
+
+    public string? CancellationReason { get; init; }
+
+    public string? CustomerMessage { get; init; }
 }

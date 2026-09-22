@@ -6,7 +6,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$WebhookSecret,
     [string]$SessionId = "",
-    [string]$CustomerPhone = "0900000000"
+    [string]$CustomerPhone = "0900000000",
+    [ValidateRange(1, 120)]
+    [int]$ShipmentWaitSeconds = 45
 )
 
 $ErrorActionPreference = "Stop"
@@ -96,11 +98,23 @@ $checkoutResponse = Invoke-RestMethod `
     -Body $checkoutBody
 $checkout = Get-ApiData $checkoutResponse
 $order = $checkout.order
-if ([string]::IsNullOrWhiteSpace($order.trackingCode)) {
-    throw "Checkout completed without a tracking code. Check the provider configuration and shipment outbox."
+
+$query = "orderCode=$([uri]::EscapeDataString($order.orderCode))&phone=$([uri]::EscapeDataString($CustomerPhone))"
+$trackingCode = $order.trackingCode
+$waitDeadline = (Get-Date).AddSeconds($ShipmentWaitSeconds)
+while ([string]::IsNullOrWhiteSpace($trackingCode) -and (Get-Date) -lt $waitDeadline) {
+    Start-Sleep -Seconds 2
+    $trackingLookupResponse = Invoke-RestMethod `
+        -Method Get `
+        -Uri "$ApiBaseUrl/api/orders/lookup/tracking?$query"
+    $trackingLookup = Get-ApiData $trackingLookupResponse
+    $trackingCode = $trackingLookup.trackingCode
 }
 
-$trackingCode = $order.trackingCode
+if ([string]::IsNullOrWhiteSpace($trackingCode)) {
+    throw "Shipment tracking code was not created within $ShipmentWaitSeconds seconds. Check the shipment outbox."
+}
+
 $providerHeaders = @{ Authorization = "Bearer $ProviderApiKey" }
 $providerTracking = Invoke-RestMethod `
     -Method Get `
@@ -145,7 +159,6 @@ Invoke-RestMethod `
     -ContentType "application/json" `
     -Body $webhookPayload | Out-Null
 
-$query = "orderCode=$([uri]::EscapeDataString($order.orderCode))&phone=$([uri]::EscapeDataString($CustomerPhone))"
 $localTrackingResponse = Invoke-RestMethod `
     -Method Get `
     -Uri "$ApiBaseUrl/api/orders/lookup/tracking?$query"

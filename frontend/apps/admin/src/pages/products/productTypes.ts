@@ -26,8 +26,8 @@ export const variantSchema = z.object({
   name: z.string().trim().min(1, "Variant name is required.").max(250, "Variant name is too long."),
   color: z.string().trim().max(100, "Color is too long.").optional(),
   size: z.string().trim().max(100, "Size is too long.").optional(),
-  price: z.number().min(0, "Price cannot be negative."),
-  compareAtPrice: z.number().min(0, "Compare-at price cannot be negative.").nullable(),
+  price: z.number().int("Price must be a whole VND amount.").min(0, "Price cannot be negative."),
+  compareAtPrice: z.number().int("Compare-at price must be a whole VND amount.").min(0, "Compare-at price cannot be negative.").nullable(),
   stockQuantity: z.number().int("Stock must be an integer.").min(0, "Stock cannot be negative."),
   requiresInstallation: z.boolean(),
   isActive: z.boolean()

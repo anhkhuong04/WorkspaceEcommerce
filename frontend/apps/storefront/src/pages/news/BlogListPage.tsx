@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { storefrontApi } from "../../services/api/storefrontApi";
 import { getApiErrorMessage } from "../../services/api/errors";
 
 export function BlogListPage() {
+  const { t, i18n } = useTranslation();
   const blogPostsQuery = useQuery({
     queryKey: ["storefront-blog-posts"],
     queryFn: storefrontApi.getBlogPosts
@@ -13,16 +15,16 @@ export function BlogListPage() {
     <div className="mx-auto max-w-[1400px] px-5 py-12 sm:px-8 lg:px-10 lg:py-20">
       <div className="mb-12 max-w-2xl text-left">
         <h1 className="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">
-          Workspace News & Blogs
+          {t("blog.title")}
         </h1>
         <p className="mt-4 text-base font-semibold text-slate-500 sm:text-lg">
-          Read articles on ergonomic spaces, interior designs, workspace optimization tips, and product guides.
+          {t("blog.description")}
         </p>
       </div>
 
       {blogPostsQuery.isError ? (
         <div className="rounded-2xl border border-red-100 bg-red-50/50 p-6 text-sm text-red-800">
-          <p className="font-bold">Could not load news articles</p>
+          <p className="font-bold">{t("blog.loadError")}</p>
           <p className="mt-1 text-xs text-red-600/80">{getApiErrorMessage(blogPostsQuery.error)}</p>
         </div>
       ) : null}
@@ -64,7 +66,7 @@ export function BlogListPage() {
                   dateTime={post.publishedAt}
                   className="text-xs font-bold text-slate-400"
                 >
-                  {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString() : ""}
+                  {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString(i18n.resolvedLanguage === "vi" ? "vi-VN" : "en-US") : ""}
                 </time>
                 <h2 className="mt-2.5 text-lg font-black leading-tight text-slate-900 group-hover:text-teal-700 transition">
                   <Link to={`/news/${post.slug}`}>{post.title}</Link>
@@ -77,7 +79,7 @@ export function BlogListPage() {
                     to={`/news/${post.slug}`}
                     className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-teal-700 hover:text-teal-900 transition-colors"
                   >
-                    Read Article
+                    {t("blog.readArticle")}
                     <span aria-hidden="true">→</span>
                   </Link>
                 </div>
@@ -87,8 +89,8 @@ export function BlogListPage() {
         </div>
       ) : (
         <div className="rounded-3xl border border-dashed border-slate-200 p-20 text-center">
-          <p className="text-lg font-bold text-slate-800">No articles published yet</p>
-          <p className="mt-1 text-sm font-semibold text-slate-500">Check back later for news and updates.</p>
+          <p className="text-lg font-bold text-slate-800">{t("blog.empty")}</p>
+          <p className="mt-1 text-sm font-semibold text-slate-500">{t("blog.emptyHint")}</p>
         </div>
       )}
     </div>

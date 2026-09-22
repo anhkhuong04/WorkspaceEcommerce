@@ -79,6 +79,7 @@ internal sealed class StorefrontOrderLookupService(
             item.Id,
             item.ProductVariantId,
             item.ProductNameSnapshot,
+            item.ProductImageUrlSnapshot,
             item.SkuSnapshot,
             item.UnitPrice,
             item.Quantity,

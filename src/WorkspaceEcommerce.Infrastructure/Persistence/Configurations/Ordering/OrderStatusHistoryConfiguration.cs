@@ -35,6 +35,14 @@ internal sealed class OrderStatusHistoryConfiguration : IEntityTypeConfiguration
             .HasColumnName("note")
             .HasMaxLength(1000);
 
+        builder.Property(history => history.CancellationReason)
+            .HasColumnName("cancellation_reason")
+            .HasMaxLength(500);
+
+        builder.Property(history => history.CustomerMessage)
+            .HasColumnName("customer_message")
+            .HasMaxLength(1000);
+
         builder.Property(history => history.ChangedBy)
             .HasColumnName("changed_by")
             .HasMaxLength(250);

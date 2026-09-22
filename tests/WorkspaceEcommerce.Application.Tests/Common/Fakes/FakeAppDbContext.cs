@@ -157,12 +157,30 @@ internal sealed class FakeAppDbContext : IAppDbContext
             string.Equals(transaction.TxnRef, txnRef, StringComparison.OrdinalIgnoreCase)));
     }
 
+    public Task<PaymentTransaction[]> FindPendingPaymentTransactionsForOrderForUpdateAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_paymentTransactions
+            .Where(transaction => transaction.OrderId == orderId && transaction.Status == PaymentTransactionStatus.Pending)
+            .ToArray());
+    }
+
     public Task<Order?> FindOrderForUpdateAsync(
         Guid orderId,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(_orders.FirstOrDefault(order => order.Id == orderId));
+    }
+
+    public Task<ProductVariant[]> FindProductVariantsForUpdateAsync(
+        Guid[] variantIds,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_productVariants.Where(variant => variantIds.Contains(variant.Id)).ToArray());
     }
 
     public Task<SerializedProductUnit?> FindSerializedProductUnitForUpdateAsync(

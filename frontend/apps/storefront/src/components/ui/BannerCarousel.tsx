@@ -1,6 +1,7 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { StorefrontBannerDto } from "@workspace-ecommerce/api-types";
+import { useTranslation } from "react-i18next";
 
 interface BannerCarouselProps {
   banners: StorefrontBannerDto[];
@@ -8,6 +9,7 @@ interface BannerCarouselProps {
 }
 
 export function BannerCarousel({ banners, isLoading = false }: BannerCarouselProps) {
+  const { t } = useTranslation();
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -65,8 +67,8 @@ export function BannerCarousel({ banners, isLoading = false }: BannerCarouselPro
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 21h18M3.75 3h16.5M4.5 3v18m15-18v18" />
             </svg>
           </div>
-          <p className="ui-control text-slate-500">No banners yet</p>
-          <p className="ui-body mt-1 text-slate-400">Add banners in the Admin Portal</p>
+          <p className="ui-control text-slate-500">{t("banner.empty")}</p>
+          <p className="ui-body mt-1 text-slate-400">{t("banner.emptyHint")}</p>
         </div>
       </div>
     );
@@ -112,7 +114,7 @@ export function BannerCarousel({ banners, isLoading = false }: BannerCarouselPro
                 to={banner.linkUrl}
                 className="ui-control mt-4 inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-white px-6 py-3 text-slate-900 shadow-[var(--shadow-card)] transition hover:bg-slate-50 hover:shadow-[var(--shadow-card-hover)]"
               >
-                Shop now
+                {t("banner.shopNow")}
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                 </svg>
@@ -127,7 +129,7 @@ export function BannerCarousel({ banners, isLoading = false }: BannerCarouselPro
           <button
             type="button"
             onClick={goPrev}
-            aria-label="Previous banner"
+            aria-label={t("banner.previous")}
             className="absolute left-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white/80 text-slate-800 shadow opacity-0 backdrop-blur transition group-hover:opacity-100 hover:bg-white"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -137,7 +139,7 @@ export function BannerCarousel({ banners, isLoading = false }: BannerCarouselPro
           <button
             type="button"
             onClick={goNext}
-            aria-label="Next banner"
+            aria-label={t("banner.next")}
             className="absolute right-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white/80 text-slate-800 shadow opacity-0 backdrop-blur transition group-hover:opacity-100 hover:bg-white"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -154,7 +156,7 @@ export function BannerCarousel({ banners, isLoading = false }: BannerCarouselPro
               type="button"
               key={i}
               onClick={() => goTo(i)}
-              aria-label={`Go to banner ${i + 1}`}
+              aria-label={t("banner.goTo", { number: i + 1 })}
               className={`h-2 rounded-full transition-all duration-300 ${
                 i === activeIndex ? "w-6 bg-white" : "w-2 bg-white/50 hover:bg-white/80"
               }`}

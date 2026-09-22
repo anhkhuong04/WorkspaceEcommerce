@@ -1,10 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { AdminOrderDto, AdminOrderListRequest, OrderStatus, PaymentStatus, ShipmentTrackingDto } from "@workspace-ecommerce/api-types";
-import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
+import { downloadBlob, formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
@@ -14,19 +14,26 @@ import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { formatLocalizedText } from "../../utils/localizedText";
 import { OrderImportModal } from "./components/OrderImportModal";
+import { AdminReceiptPreviewModal } from "./components/AdminReceiptPreviewModal";
 import { OrdersTable } from "./components/OrdersTable";
 
 const orderStatuses: OrderStatus[] = [0, 1, 2, 3, 4, 5, 6, 7];
-const nextStatusesByStatus: Record<OrderStatus, OrderStatus[]> = { 0: [1, 6], 1: [2], 2: [3], 3: [4, 5], 4: [7], 5: [3, 6], 6: [], 7: [] };
+const nextStatusesByStatus: Record<OrderStatus, OrderStatus[]> = { 0: [1, 6], 1: [2, 6], 2: [3], 3: [4, 5], 4: [7], 5: [3, 6], 6: [], 7: [] };
 const statusSchema = z.object({
   status: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7)]),
-  note: z.string().trim().max(1000, "Note is too long.").optional()
+  internalNote: z.string().trim().max(1000, "Internal note is too long.").optional(),
+  cancellationReason: z.string().trim().max(500, "Cancellation reason is too long.").optional(),
+  customerMessage: z.string().trim().max(1000, "Customer message is too long.").optional()
+}).superRefine((values, context) => {
+  if (values.status === 6 && !values.cancellationReason) {
+    context.addIssue({ code: "custom", path: ["cancellationReason"], message: "Cancellation reason is required." });
+  }
 });
 
 type StatusFormValues = z.infer<typeof statusSchema>;
 
 const statusTones: Record<OrderStatus, "green" | "red" | "blue" | "orange" | "slate"> = { 0: "orange", 1: "slate", 2: "blue", 3: "blue", 4: "green", 5: "orange", 6: "red", 7: "slate" };
-const paymentStatusTones: Record<PaymentStatus, "green" | "red" | "blue" | "orange" | "slate"> = { 0: "slate", 1: "blue", 2: "green", 3: "red", 4: "slate" };
+const paymentStatusTones: Record<PaymentStatus, "green" | "red" | "blue" | "orange" | "slate"> = { 0: "slate", 1: "blue", 2: "green", 3: "red", 4: "slate", 5: "orange" };
 
 function orderStatusPill(status: OrderStatus) {
   return <Pill tone={statusTones[status]}>{formatOrderStatus(status)}</Pill>;
@@ -37,7 +44,12 @@ function paymentStatusPill(status: PaymentStatus) {
 }
 
 function toStatusRequest(values: StatusFormValues) {
-  return { status: values.status, note: values.note?.trim() ? values.note.trim() : null };
+  return {
+    status: values.status,
+    internalNote: values.internalNote?.trim() || null,
+    cancellationReason: values.status === 6 ? values.cancellationReason?.trim() || null : null,
+    customerMessage: values.customerMessage?.trim() || null
+  };
 }
 
 function parseOrderStatus(value: string | null): OrderStatus | undefined {
@@ -56,6 +68,8 @@ export function OrdersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isReceiptPreviewOpen, setIsReceiptPreviewOpen] = useState(false);
+  const [isDownloadingReceipt, setIsDownloadingReceipt] = useState(false);
   const pageNumber = parsePageNumber(searchParams.get("page"));
   const statusFilter = parseOrderStatus(searchParams.get("status"));
   const searchFilter = searchParams.get("search")?.trim() || undefined;
@@ -67,11 +81,15 @@ export function OrdersPage() {
   const order = orderQuery.data;
   const nextStatuses = useMemo(() => order ? nextStatusesByStatus[order.status] : [], [order]);
 
-  const statusForm = useForm<StatusFormValues>({ resolver: zodResolver(statusSchema), defaultValues: { status: 1, note: "" } });
+  const statusForm = useForm<StatusFormValues>({
+    resolver: zodResolver(statusSchema),
+    defaultValues: { status: 1, internalNote: "", cancellationReason: "", customerMessage: "" }
+  });
+  const selectedNextStatus = useWatch({ control: statusForm.control, name: "status" });
 
   useEffect(() => {
     if (nextStatuses.length > 0) {
-      statusForm.reset({ status: nextStatuses[0], note: "" });
+      statusForm.reset({ status: nextStatuses[0], internalNote: "", cancellationReason: "", customerMessage: "" });
     }
   }, [nextStatuses, statusForm]);
 
@@ -145,6 +163,20 @@ export function OrdersPage() {
     setSearchParams(nextParams);
   }
 
+  async function downloadReceipt() {
+    if (!selectedOrderId || !order) return;
+
+    setIsDownloadingReceipt(true);
+    try {
+      const blob = await adminApi.getOrderReceipt(selectedOrderId);
+      downloadBlob(blob, `order-receipt-${order.orderCode}.pdf`);
+    } catch (error) {
+      setNotice({ type: "error", message: getApiErrorMessage(error) });
+    } finally {
+      setIsDownloadingReceipt(false);
+    }
+  }
+
   return (
     <div className="admin-page-grid">
       <AdminPageHeader
@@ -181,13 +213,33 @@ export function OrdersPage() {
         ) : null}
       </section>
 
-      <Drawer title={order ? `Order ${order.orderCode}` : "Order detail"} open={selectedOrderId !== null} onClose={() => setSelectedOrderId(null)}>
+      <Drawer
+        title={order ? `Order ${order.orderCode}` : "Order detail"}
+        open={selectedOrderId !== null}
+        onClose={() => {
+          if (isReceiptPreviewOpen) {
+            setIsReceiptPreviewOpen(false);
+            return;
+          }
+
+          setSelectedOrderId(null);
+        }}
+      >
         {orderQuery.isError ? <Notice type="error" title="Order could not be loaded">{getApiErrorMessage(orderQuery.error)}</Notice> : null}
         {orderQuery.isLoading ? (
           <div className="grid gap-3">{[0, 1, 2].map((item) => <div key={item} className="h-20 animate-pulse rounded-2xl bg-slate-100" />)}</div>
         ) : order ? (
           <div className="grid gap-4">
             <section className="rounded-3xl border border-slate-200 p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-black">Order confirmation</h3>
+                  <p className="mt-1 text-sm text-slate-500">Receipt only; this document is not a VAT invoice.</p>
+                </div>
+                <Button type="button" onClick={() => setIsReceiptPreviewOpen(true)}>
+                  View receipt
+                </Button>
+              </div>
               <div className="grid gap-3 text-sm sm:grid-cols-2">
                 <Info label="Status" value={orderStatusPill(order.status)} />
                 <Info label="Payment" value={formatPaymentMethod(order.paymentMethod)} />
@@ -238,7 +290,11 @@ export function OrdersPage() {
               {nextStatuses.length === 0 ? <EmptyState>This order is in a terminal status</EmptyState> : (
                 <form className="grid gap-4">
                   <Controller control={statusForm.control} name="status" render={({ field, fieldState }) => <Field label="Next status" error={fieldState.error?.message}><SelectInput value={field.value} onChange={(event) => field.onChange(Number(event.target.value) as OrderStatus)}>{nextStatuses.map((status) => <option key={status} value={status}>{formatOrderStatus(status)}</option>)}</SelectInput></Field>} />
-                  <Controller control={statusForm.control} name="note" render={({ field, fieldState }) => <Field label="Internal note" error={fieldState.error?.message}><TextArea {...field} rows={3} placeholder="Optional note for status history" /></Field>} />
+                  {selectedNextStatus === 6 ? (
+                    <Controller control={statusForm.control} name="cancellationReason" render={({ field, fieldState }) => <Field label="Cancellation reason" error={fieldState.error?.message}><TextArea {...field} rows={2} placeholder="Required reason shown to the customer" /></Field>} />
+                  ) : null}
+                  <Controller control={statusForm.control} name="customerMessage" render={({ field, fieldState }) => <Field label="Customer message" error={fieldState.error?.message}><TextArea {...field} rows={3} placeholder="Optional message visible in the customer's order timeline" /></Field>} />
+                  <Controller control={statusForm.control} name="internalNote" render={({ field, fieldState }) => <Field label="Internal note" error={fieldState.error?.message}><TextArea {...field} rows={3} placeholder="Optional; only administrators can see this note" /></Field>} />
                   <Button type="button" variant="primary" disabled={updateStatusMutation.isPending} onClick={statusForm.handleSubmit((values) => updateStatusMutation.mutate(values))}>{updateStatusMutation.isPending ? "Updating..." : "Update status"}</Button>
                 </form>
               )}
@@ -247,12 +303,22 @@ export function OrdersPage() {
             <section className="rounded-3xl border border-slate-200 p-5">
               <h3 className="mb-3 text-lg font-black">Status history</h3>
               {order.statusHistory.length ? (
-                <div className="grid gap-3">{order.statusHistory.map((history) => <div key={history.id} className="border-l-4 border-slate-600 pl-4"><p className="font-bold">{history.fromStatus === null ? "Created" : formatOrderStatus(history.fromStatus)} to {formatOrderStatus(history.toStatus)}</p><p className="text-sm text-slate-500">{formatDate(history.changedAt)} by {history.changedBy ?? "system"}</p>{history.note ? <p className="mt-1 text-sm text-slate-700">{history.note}</p> : null}</div>)}</div>
+                <div className="grid gap-3">{order.statusHistory.map((history) => <div key={history.id} className="border-l-4 border-slate-600 pl-4"><p className="font-bold">{history.fromStatus === null ? "Created" : formatOrderStatus(history.fromStatus)} to {formatOrderStatus(history.toStatus)}</p><p className="text-sm text-slate-500">{formatDate(history.changedAt)} by {history.changedBy ?? "system"}</p>{history.cancellationReason ? <p className="mt-1 text-sm text-red-700"><strong>Cancellation reason:</strong> {history.cancellationReason}</p> : null}{history.customerMessage ? <p className="mt-1 text-sm text-blue-700"><strong>Customer message:</strong> {history.customerMessage}</p> : null}{history.internalNote ? <p className="mt-1 text-sm text-slate-700"><strong>Internal:</strong> {history.internalNote}</p> : null}</div>)}</div>
               ) : <EmptyState>No status history</EmptyState>}
             </section>
           </div>
         ) : null}
       </Drawer>
+
+      {order ? (
+        <AdminReceiptPreviewModal
+          open={isReceiptPreviewOpen}
+          order={order}
+          isDownloading={isDownloadingReceipt}
+          onClose={() => setIsReceiptPreviewOpen(false)}
+          onDownload={() => void downloadReceipt()}
+        />
+      ) : null}
 
       <OrderImportModal
         open={isImportModalOpen}

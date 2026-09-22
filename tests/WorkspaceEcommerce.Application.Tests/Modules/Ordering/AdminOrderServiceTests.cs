@@ -1,11 +1,14 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
+using WorkspaceEcommerce.Application.Abstractions.Notifications;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Loyalty;
 using WorkspaceEcommerce.Application.Modules.Ordering;
 using WorkspaceEcommerce.Application.Tests.Common.Fakes;
 using WorkspaceEcommerce.Domain.Modules.Loyalty;
+using WorkspaceEcommerce.Domain.Modules.Catalog;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Domain.Modules.Payments;
 
 namespace WorkspaceEcommerce.Application.Tests.Modules.Ordering;
 
@@ -88,7 +91,7 @@ public sealed class AdminOrderServiceTests
             new UpdateOrderStatusRequest
             {
                 Status = OrderStatus.Confirmed,
-                Note = "Confirmed by admin"
+                InternalNote = "Confirmed by admin"
             },
             "admin@example.com");
 
@@ -100,7 +103,7 @@ public sealed class AdminOrderServiceTests
         var latestHistory = result.Value.StatusHistory.Last();
         Assert.Equal(OrderStatus.Pending, latestHistory.FromStatus);
         Assert.Equal(OrderStatus.Confirmed, latestHistory.ToStatus);
-        Assert.Equal("Confirmed by admin", latestHistory.Note);
+        Assert.Equal("Confirmed by admin", latestHistory.InternalNote);
         Assert.Equal("admin@example.com", latestHistory.ChangedBy);
     }
 
@@ -121,7 +124,7 @@ public sealed class AdminOrderServiceTests
             new UpdateOrderStatusRequest
             {
                 Status = OrderStatus.Completed,
-                Note = "Delivered"
+                InternalNote = "Delivered"
             },
             "admin@example.com");
 
@@ -219,7 +222,78 @@ public sealed class AdminOrderServiceTests
         Assert.Contains(result.Errors, error => error.Contains("Status", StringComparison.Ordinal));
     }
 
-    private static AdminOrderService CreateService(FakeAppDbContext dbContext, ILoyaltyService? loyaltyService = null)
+    [Fact]
+    public async Task UpdateStatusAsync_CancelConfirmedOrder_RestoresStockOnceAndOpensRefundWorkflow()
+    {
+        var customerId = Guid.NewGuid();
+        var variant = new ProductVariant(Guid.NewGuid(), Guid.NewGuid(), "DESK-CANCEL", "Desk", null, null, 100m, null, 5, false);
+        var order = CreateOrder("ORD-CANCEL-0001", "0900000001", "Nguyen Van A", customerId);
+        order.AddItem(Guid.NewGuid(), variant.Id, "Desk", variant.Sku, 100m, 2, false);
+        order.ChangeStatus(Guid.NewGuid(), OrderStatus.Confirmed, null, "admin@example.com");
+        order.MarkPaymentPaid(DateTimeOffset.UtcNow);
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(variant);
+        dbContext.Seed(order);
+        var notifications = new RecordingNotificationService();
+        var emails = new RecordingEmailOutbox();
+        var service = CreateService(dbContext, notificationService: notifications, emailOutbox: emails);
+        var request = new UpdateOrderStatusRequest
+        {
+            Status = OrderStatus.Cancelled,
+            CancellationReason = "Item is no longer available",
+            CustomerMessage = "We are sorry for the inconvenience.",
+            InternalNote = "Supplier discontinued the SKU."
+        };
+
+        var result = await service.UpdateStatusAsync(order.Id, request, "admin@example.com");
+        var retry = await service.UpdateStatusAsync(order.Id, request, "admin@example.com");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ResultStatus.Conflict, retry.Status);
+        Assert.Equal(OrderStatus.Cancelled, order.Status);
+        Assert.Equal(PaymentStatus.RefundPending, order.PaymentStatus);
+        Assert.Equal(7, variant.StockQuantity);
+        var history = result.Value!.StatusHistory.Last();
+        Assert.Equal("Supplier discontinued the SKU.", history.InternalNote);
+        Assert.Equal("Item is no longer available", history.CancellationReason);
+        Assert.Equal("We are sorry for the inconvenience.", history.CustomerMessage);
+        Assert.Single(emails.Messages);
+        Assert.Single(notifications.Events);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_CancelPendingPayment_CancelsOrderAndGatewayTransaction()
+    {
+        var order = new Order(
+            Guid.NewGuid(), "ORD-CANCEL-0002", null, "Nguyen Van A", "0900000001",
+            "customer@example.com", "123 Shipping Street", null, PaymentMethod.VNPay, "VND", 1m);
+        var transaction = new PaymentTransaction(
+            Guid.NewGuid(), order.Id, PaymentProvider.VNPay, 100_000m, "VND", "TXN-CANCEL-0002");
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(order);
+        dbContext.Seed(transaction);
+        var service = CreateService(dbContext);
+
+        var result = await service.UpdateStatusAsync(
+            order.Id,
+            new UpdateOrderStatusRequest
+            {
+                Status = OrderStatus.Cancelled,
+                CancellationReason = "Payment window expired"
+            },
+            "admin@example.com");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(PaymentStatus.Cancelled, order.PaymentStatus);
+        Assert.Equal(PaymentTransactionStatus.Cancelled, transaction.Status);
+        Assert.Equal("ORDER_CANCELLED", transaction.GatewayResponseCode);
+    }
+
+    private static AdminOrderService CreateService(
+        FakeAppDbContext dbContext,
+        ILoyaltyService? loyaltyService = null,
+        INotificationService? notificationService = null,
+        ICustomerEmailOutbox? emailOutbox = null)
     {
         return new AdminOrderService(
             dbContext,
@@ -227,7 +301,10 @@ public sealed class AdminOrderServiceTests
             new UpdateOrderStatusRequestValidator(),
             loyaltyService ?? new StubLoyaltyService(),
             new StubCurrentLanguageProvider(),
-            NullLogger<AdminOrderService>.Instance);
+            NullLogger<AdminOrderService>.Instance,
+            shipmentService: null,
+            notificationService,
+            emailOutbox);
     }
 
     private static LoyaltyService CreateLoyaltyService(FakeAppDbContext dbContext)
@@ -317,5 +394,23 @@ public sealed class AdminOrderServiceTests
     private sealed class StubCurrentLanguageProvider : WorkspaceEcommerce.Application.Common.Localization.ICurrentLanguageProvider
     {
         public string CurrentLanguage => "en";
+    }
+
+    private sealed class RecordingNotificationService : INotificationService
+    {
+        public List<(Guid CustomerId, string EventType)> Events { get; } = [];
+
+        public Task NotifyCustomerAsync(Guid customerId, string eventType, object payload, CancellationToken cancellationToken = default)
+        {
+            Events.Add((customerId, eventType));
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingEmailOutbox : ICustomerEmailOutbox
+    {
+        public List<CustomerEmailMessage> Messages { get; } = [];
+
+        public void Enqueue(CustomerEmailMessage message) => Messages.Add(message);
     }
 }

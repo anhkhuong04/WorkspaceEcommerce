@@ -53,7 +53,12 @@ internal sealed class CheckoutCartBuilder(
                 variant.WeightKg,
                 variant.LengthCm,
                 variant.WidthCm,
-                variant.HeightCm));
+                variant.HeightCm,
+                product.Images
+                    .OrderBy(image => image.SortOrder)
+                    .ThenBy(image => image.Id)
+                    .Select(image => image.ImageUrl)
+                    .FirstOrDefault()));
         }
 
         return Result<IReadOnlyCollection<CheckoutItemSnapshot>>.Success(snapshots);
@@ -105,7 +110,8 @@ internal sealed record CheckoutItemSnapshot(
     decimal? WeightKg,
     decimal? LengthCm,
     decimal? WidthCm,
-    decimal? HeightCm)
+    decimal? HeightCm,
+    string? ProductImageUrlSnapshot)
 {
     public decimal LineTotal => UnitPrice * Quantity;
 }

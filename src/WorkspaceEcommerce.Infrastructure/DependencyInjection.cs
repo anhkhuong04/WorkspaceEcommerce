@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
+using WorkspaceEcommerce.Application.Abstractions.Documents;
 using WorkspaceEcommerce.Application.Abstractions.Payments;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Abstractions.Notifications;
@@ -15,6 +16,7 @@ using WorkspaceEcommerce.Application.Modules.Loyalty;
 using WorkspaceEcommerce.Application.Abstractions.Warranties;
 using WorkspaceEcommerce.Infrastructure.Authentication;
 using WorkspaceEcommerce.Infrastructure.Configuration;
+using WorkspaceEcommerce.Infrastructure.Documents;
 using WorkspaceEcommerce.Infrastructure.Notifications;
 using WorkspaceEcommerce.Infrastructure.Media;
 using WorkspaceEcommerce.Infrastructure.Payments;
@@ -44,6 +46,9 @@ public static class DependencyInjection
         var emailDeliveryOptions = configuration.GetValidatedEmailDeliveryOptions(environment.EnvironmentName);
         var mediaStorageOptions = configuration.GetValidatedMediaStorageOptions(environment.EnvironmentName);
         var warrantyOptions = configuration.GetValidatedWarrantyOptions();
+        var orderReceiptOptions = configuration
+            .GetSection(OrderReceiptOptions.SectionName)
+            .Get<OrderReceiptOptions>() ?? new OrderReceiptOptions();
 
         services.AddSingleton(_ =>
         {
@@ -78,6 +83,15 @@ public static class DependencyInjection
         services.AddSingleton(emailDeliveryOptions);
         services.AddSingleton(mediaStorageOptions);
         services.AddSingleton(warrantyOptions);
+        services.AddSingleton(orderReceiptOptions);
+        services.AddSingleton<IOrderReceiptRenderer, QuestPdfOrderReceiptRenderer>();
+        services.AddHttpClient<IOrderReceiptImageResolver, OrderReceiptImageResolver>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(5);
+        }).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false
+        });
         services.AddSingleton<IWarrantyIdentifierProtector, HmacWarrantyIdentifierProtector>();
         services.AddSingleton<MediaImageProcessor>();
         services.AddSingleton<IMediaMalwareScanner>(_ =>

@@ -6,6 +6,8 @@ public sealed record AdminOrderStatusHistoryDto(
     Guid Id,
     OrderStatus? FromStatus,
     OrderStatus ToStatus,
-    string? Note,
+    string? InternalNote,
+    string? CancellationReason,
+    string? CustomerMessage,
     string? ChangedBy,
     DateTimeOffset ChangedAt);

@@ -117,6 +117,19 @@ public sealed class OrderingModelConfigurationTests
         Assert.Equal("paid_at", property.GetColumnName());
     }
 
+    [Theory]
+    [InlineData(nameof(OrderStatusHistory.Note), "note", 1000)]
+    [InlineData(nameof(OrderStatusHistory.CancellationReason), "cancellation_reason", 500)]
+    [InlineData(nameof(OrderStatusHistory.CustomerMessage), "customer_message", 1000)]
+    public void OrderStatusHistoryMessages_AreMappedSeparately(string propertyName, string columnName, int maxLength)
+    {
+        var property = GetEntityType(typeof(OrderStatusHistory)).FindProperty(propertyName);
+
+        Assert.NotNull(property);
+        Assert.Equal(columnName, property.GetColumnName());
+        Assert.Equal(maxLength, property.GetMaxLength());
+    }
+
     [Fact]
     public void OrderPaymentStatus_HasIndex()
     {

@@ -30,8 +30,8 @@ internal static class TestData
             "Default",
             "Black",
             "120cm",
-            123.45m,
-            150m,
+            3_200_000m,
+            3_900_000m,
             10,
             requiresInstallation: false,
             isActive: true);
@@ -61,7 +61,7 @@ internal static class TestData
             "123 Shipping Street",
             "Call before delivery",
             PaymentMethod.Cod,
-            "USD",
+            "VND",
             1m);
 
         order.AddItem(
@@ -69,7 +69,7 @@ internal static class TestData
             productVariantId,
             "Standing Desk",
             "DESK-001",
-            100m,
+            3_000_000m,
             2,
             requiresInstallation: false);
         order.RecordCreated(

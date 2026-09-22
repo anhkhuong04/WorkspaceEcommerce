@@ -4,6 +4,7 @@ import type {
   StorefrontCategoryDto,
 } from "@workspace-ecommerce/api-types";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { BannerCarousel } from "../../components/ui/BannerCarousel";
 import { ProductCard } from "../../components/ui/ProductCard";
 import { getApiErrorMessage } from "../../services/api/errors";
@@ -90,6 +91,7 @@ function CategoryCard({
 }
 
 function BlogPostCard({ post }: { post: StorefrontBlogPostDto }) {
+  const { i18n } = useTranslation();
   return (
     <article className="group min-w-0">
       <Link
@@ -134,15 +136,15 @@ function BlogPostCard({ post }: { post: StorefrontBlogPostDto }) {
             <rect x="4" y="5" width="16" height="15" rx="2" />
             <path d="M8 3v4M16 3v4M4 10h16" strokeLinecap="round" />
           </svg>
-          {formatBlogDate(post.publishedAt)}
+          {formatBlogDate(post.publishedAt, i18n.resolvedLanguage)}
         </time>
       ) : null}
     </article>
   );
 }
 
-function formatBlogDate(value: string) {
-  return new Intl.DateTimeFormat("en", {
+function formatBlogDate(value: string, language?: string) {
+  return new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -150,6 +152,7 @@ function formatBlogDate(value: string) {
 }
 
 export function HomePage() {
+  const { t } = useTranslation();
   const bannersQuery = useQuery({
     queryKey: ["storefront", "banners"],
     queryFn: storefrontApi.getBanners,
@@ -180,7 +183,7 @@ export function HomePage() {
 
   return (
     <div className="flex flex-col pb-10">
-      <section aria-label="Hero banners">
+      <section aria-label={t("home.heroBanners")}>
         <BannerCarousel
           banners={bannersQuery.data ?? []}
           isLoading={bannersQuery.isLoading}
@@ -195,13 +198,13 @@ export function HomePage() {
       <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-14 px-5 pt-12 sm:px-8 lg:px-10 lg:pt-16">
         <section aria-labelledby="categories-title">
           <p className="ui-caption font-semibold text-slate-950">
-            What do we have?
+            {t("home.eyebrow")}
           </p>
           <h2
             id="categories-title"
             className="ui-h2 mt-2 tracking-tight text-slate-950"
           >
-            Product categories
+            {t("home.categories")}
           </h2>
 
           <div className="mt-7 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4 lg:gap-6">
@@ -218,7 +221,7 @@ export function HomePage() {
               !categoriesQuery.isError &&
               categories.length === 0 && (
                 <div className="ui-body col-span-full rounded-xl bg-slate-50 px-5 py-8 text-center text-slate-500">
-                  No categories yet.
+                  {t("home.noCategories")}
                 </div>
               )}
             {categories.map((category, index) => (
@@ -237,13 +240,13 @@ export function HomePage() {
               id="new-arrivals-title"
               className="ui-h2 tracking-tight text-slate-950"
             >
-              New Arrivals
+              {t("home.newArrivals")}
             </h2>
             <Link
               to="/products"
               className="ui-caption group inline-flex items-center gap-2 font-semibold text-slate-950"
             >
-              View all
+              {t("common.viewAll")}
               <span
                 className="grid h-5 w-5 place-items-center rounded-full bg-slate-100 transition group-hover:bg-slate-200"
                 aria-hidden="true"
@@ -268,9 +271,9 @@ export function HomePage() {
               !newProductsQuery.isError &&
               newProducts.length === 0 && (
                 <div className="ui-body col-span-full rounded-xl bg-slate-50 px-5 py-8 text-center text-slate-500">
-                  <p className="font-semibold">No products yet.</p>
+                  <p className="font-semibold">{t("home.noProducts")}</p>
                   <p className="mt-1">
-                    Add and activate products in the Admin Portal.
+                    {t("home.addProductsHint")}
                   </p>
                 </div>
               )}
@@ -286,13 +289,13 @@ export function HomePage() {
               id="home-blog-posts-title"
               className="ui-h2 tracking-tight text-slate-950"
             >
-              Blog posts
+              {t("search.blogPosts")}
             </h2>
             <Link
               to="/news"
               className="ui-caption group inline-flex items-center gap-3 font-semibold text-slate-950"
             >
-              View more
+              {t("common.viewMore")}
               <span
                 className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-lg transition group-hover:bg-slate-200"
                 aria-hidden="true"
@@ -317,7 +320,7 @@ export function HomePage() {
               !blogPostsQuery.isError &&
               latestBlogPosts.length === 0 && (
                 <div className="ui-body col-span-full rounded-xl bg-slate-50 px-5 py-8 text-center text-slate-500">
-                  No blog posts published yet.
+                  {t("home.noBlogs")}
                 </div>
               )}
             {latestBlogPosts.map((post) => (

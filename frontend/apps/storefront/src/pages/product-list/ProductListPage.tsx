@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import type { StorefrontCategoryDto, StorefrontProductListItemDto } from "@workspace-ecommerce/api-types";
 import { formatMoney } from "@workspace-ecommerce/shared-utils";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAddProductToCart } from "../../features/cart/useAddProductToCart";
 import { getApiErrorMessage } from "../../services/api/errors";
@@ -29,6 +31,7 @@ interface FilterPanelProps {
 }
 
 export function ProductListPage() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const categorySlug = searchParams.get("categorySlug") ?? "";
@@ -208,8 +211,8 @@ export function ProductListPage() {
   return (
     <div className="grid gap-8">
       <CatalogHero
-        title={selectedCategory?.name ?? "All products"}
-        subtitle="Browse workspace furniture, accessories, and setup essentials from the live catalog."
+        title={selectedCategory?.name ?? t("catalog.allProducts")}
+        subtitle={t("catalog.subtitle")}
         products={heroProducts}
       />
 
@@ -239,27 +242,27 @@ export function ProductListPage() {
                 className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-950 shadow-sm transition hover:border-slate-400 lg:hidden"
               >
                 <FilterIcon />
-                Filters
+                {t("catalog.filters")}
                 {activeFilterCount > 0 && (
                   <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-950 px-1.5 text-[11px] font-bold text-white">
                     {activeFilterCount}
                   </span>
                 )}
               </button>
-              <p className="text-sm font-medium text-slate-500">{formatResultSummary(productsQuery.data)}</p>
+              <p className="text-sm font-medium text-slate-500">{formatResultSummary(productsQuery.data, t)}</p>
             </div>
 
             <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <span className="text-slate-400">Sort by:</span>
+              <span className="text-slate-400">{t("catalog.sortBy")}</span>
               <select
                 value={sortBy}
                 onChange={(event) => updateSort(event.target.value)}
                 className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none transition hover:border-slate-400 focus:border-slate-950"
               >
                 <option value="name-asc">A-Z</option>
-                <option value="price-asc">Price: low to high</option>
-                <option value="price-desc">Price: high to low</option>
-                <option value="updated-desc">Recently updated</option>
+                <option value="price-asc">{t("catalog.priceLowHigh")}</option>
+                <option value="price-desc">{t("catalog.priceHighLow")}</option>
+                <option value="updated-desc">{t("catalog.recentlyUpdated")}</option>
               </select>
             </label>
           </div>
@@ -270,14 +273,14 @@ export function ProductListPage() {
           )}
           {productsQuery.data && productsQuery.data.items.length === 0 && (
             <div className="rounded-lg border border-slate-200 bg-white p-8 text-center">
-              <h2 className="text-lg font-bold text-slate-950">No products found</h2>
-              <p className="mt-2 text-sm text-slate-500">Try clearing filters or using a broader search term.</p>
+              <h2 className="text-lg font-bold text-slate-950">{t("catalog.notFound")}</h2>
+              <p className="mt-2 text-sm text-slate-500">{t("catalog.notFoundHint")}</p>
               <button
                 type="button"
                 onClick={clearFilters}
                 className="mt-5 h-10 rounded-md bg-slate-950 px-4 text-sm font-bold text-white transition hover:bg-slate-800"
               >
-                Clear filters
+                {t("catalog.clearFilters")}
               </button>
             </div>
           )}
@@ -298,10 +301,10 @@ export function ProductListPage() {
                 onClick={() => goToPage(productsQuery.data.pageNumber - 1)}
                 className="h-10 rounded-md border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Previous
+                {t("common.previous")}
               </button>
               <p className="text-sm font-semibold text-slate-500">
-                Page {productsQuery.data.pageNumber} of {productsQuery.data.totalPages}
+                {t("common.pageOf", { page: productsQuery.data.pageNumber, total: productsQuery.data.totalPages })}
               </p>
               <button
                 type="button"
@@ -309,7 +312,7 @@ export function ProductListPage() {
                 onClick={() => goToPage(productsQuery.data.pageNumber + 1)}
                 className="h-10 rounded-md border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Next
+                {t("common.next")}
               </button>
             </div>
           )}
@@ -317,17 +320,17 @@ export function ProductListPage() {
       </section>
 
       {isFilterOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Product filters">
-          <button type="button" aria-label="Close filters" className="absolute inset-0 bg-black/45" onClick={() => setIsFilterOpen(false)} />
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label={t("catalog.productFilters")}>
+          <button type="button" aria-label={t("catalog.closeFilters")} className="absolute inset-0 bg-black/45" onClick={() => setIsFilterOpen(false)} />
           <aside className="relative ml-auto flex h-full w-[min(92vw,380px)] flex-col bg-white shadow-2xl">
             <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-5">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-950">
                 <FilterIcon />
-                Filters
+                {t("catalog.filters")}
               </div>
               <button
                 type="button"
-                aria-label="Close filters"
+                aria-label={t("catalog.closeFilters")}
                 onClick={() => setIsFilterOpen(false)}
                 className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-700 transition hover:border-slate-400"
               >
@@ -364,6 +367,7 @@ function CatalogHero({
   subtitle: string;
   products: StorefrontProductListItemDto[];
 }) {
+  const { t } = useTranslation();
   return (
     <section className="-mt-8 ml-[calc(50%-50vw)] w-screen overflow-hidden bg-slate-950">
       <div className="relative min-h-[220px] px-5 py-12 sm:px-8 lg:min-h-[270px] lg:px-10">
@@ -380,7 +384,7 @@ function CatalogHero({
         </div>
         <div className="absolute inset-0 bg-black/55" />
         <div className="relative mx-auto flex min-h-[124px] max-w-[1440px] flex-col justify-end">
-          <p className="mb-2 text-sm font-semibold text-white/70">Catalog</p>
+          <p className="mb-2 text-sm font-semibold text-white/70">{t("catalog.catalog")}</p>
           <h1 className="max-w-3xl text-4xl font-black leading-tight text-white sm:text-5xl">{title}</h1>
           <p className="mt-3 max-w-xl text-sm leading-6 text-white/75 sm:text-base">{subtitle}</p>
         </div>
@@ -400,16 +404,17 @@ function FilterPanel({
   onSearchChange,
   onInStockChange
 }: FilterPanelProps) {
+  const { t } = useTranslation();
   return (
     <div className="grid gap-6">
       {showHeader && (
         <div className="flex items-center justify-between border-b border-slate-200 pb-4">
           <div className="flex items-center gap-2 text-sm font-bold text-slate-950">
             <FilterIcon />
-            Filters
+            {t("catalog.filters")}
           </div>
           <button type="button" onClick={onClear} className="text-xs font-bold text-slate-500 transition hover:text-slate-950">
-            Reset
+            {t("common.reset")}
           </button>
         </div>
       )}
@@ -417,26 +422,26 @@ function FilterPanel({
       {!showHeader && (
         <div className="flex justify-end">
           <button type="button" onClick={onClear} className="text-xs font-bold text-slate-500 transition hover:text-slate-950">
-            Reset
+            {t("common.reset")}
           </button>
         </div>
       )}
 
       <label className="grid gap-2">
-        <span className="text-sm font-bold text-slate-950">Search</span>
+        <span className="text-sm font-bold text-slate-950">{t("header.search")}</span>
         <span className="flex h-11 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 transition focus-within:border-slate-950">
           <SearchIcon />
           <input
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Desk, chair, lamp..."
+            placeholder={t("catalog.searchPlaceholder")}
             className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-950 outline-none placeholder:text-slate-400"
           />
         </span>
       </label>
 
       <div className="grid gap-3 border-b border-slate-200 pb-6">
-        <h2 className="text-sm font-bold text-slate-950">Product type</h2>
+        <h2 className="text-sm font-bold text-slate-950">{t("catalog.productType")}</h2>
         <div className="grid grid-cols-3 gap-3">
           <CategoryButton category={null} isActive={!categorySlug} onSelect={onCategoryChange} />
           {categories.map((category) => (
@@ -446,7 +451,7 @@ function FilterPanel({
       </div>
 
       <label className="flex cursor-pointer items-center justify-between border-b border-slate-200 pb-6">
-        <span className="text-sm font-bold text-slate-950">Show in stock only</span>
+        <span className="text-sm font-bold text-slate-950">{t("catalog.inStockOnly")}</span>
         <span className="relative inline-flex h-6 w-11 items-center">
           <input
             type="checkbox"
@@ -471,7 +476,8 @@ function CategoryButton({
   isActive: boolean;
   onSelect: (categorySlug: string) => void;
 }) {
-  const label = category?.name ?? "All";
+  const { t } = useTranslation();
+  const label = category?.name ?? t("common.all");
   const value = isActive ? "" : category?.slug ?? "";
 
   return (
@@ -490,6 +496,7 @@ function CategoryButton({
 }
 
 function CatalogProductCard({ product }: { product: StorefrontProductListItemDto }) {
+  const { t } = useTranslation();
   const hasDiscount = product.minPrice !== null && product.compareAtPrice !== null && product.compareAtPrice > product.minPrice;
   const addProductMutation = useAddProductToCart();
   const canAdd = product.isInStock && product.minPrice !== null;
@@ -511,11 +518,11 @@ function CatalogProductCard({ product }: { product: StorefrontProductListItemDto
         </Link>
 
         {!product.isInStock ? (
-          <span className="absolute left-3 top-3 rounded-md bg-slate-950 px-2 py-1 text-[11px] font-bold text-white">Sold out</span>
+          <span className="absolute left-3 top-3 rounded-md bg-slate-950 px-2 py-1 text-[11px] font-bold text-white">{t("product.soldOut")}</span>
         ) : hasDiscount ? (
-          <span className="absolute left-3 top-3 rounded-md bg-[#e52b1f] px-2 py-1 text-[11px] font-bold text-white">Sale</span>
+          <span className="absolute left-3 top-3 rounded-md bg-[#e52b1f] px-2 py-1 text-[11px] font-bold text-white">{t("product.sale")}</span>
         ) : product.isFeatured ? (
-          <span className="absolute left-3 top-3 rounded-md bg-[#e52b1f] px-2 py-1 text-[11px] font-bold text-white">Featured</span>
+          <span className="absolute left-3 top-3 rounded-md bg-[#e52b1f] px-2 py-1 text-[11px] font-bold text-white">{t("product.featured")}</span>
         ) : null}
 
         {canAdd ? (
@@ -524,10 +531,10 @@ function CatalogProductCard({ product }: { product: StorefrontProductListItemDto
             disabled={addProductMutation.isPending}
             onClick={() => addProductMutation.mutate(product.slug)}
             className="absolute bottom-4 right-4 inline-flex h-12 translate-y-3 items-center justify-center rounded-full bg-[#3a3a3a] px-6 text-base font-bold text-white opacity-0 shadow-lg transition duration-200 hover:bg-[#242424] disabled:cursor-wait disabled:opacity-70 group-hover:translate-y-0 group-hover:opacity-100 focus:translate-y-0 focus:opacity-100"
-            aria-label={`Add ${product.name} to cart`}
+            aria-label={t("product.addToCartLabel", { name: product.name })}
           >
             <span className="mr-1 text-xl leading-none">+</span>
-            {addProductMutation.isPending ? "Adding" : "Add"}
+            {addProductMutation.isPending ? t("product.adding") : t("product.add")}
           </button>
         ) : null}
       </div>
@@ -539,12 +546,12 @@ function CatalogProductCard({ product }: { product: StorefrontProductListItemDto
           {product.minPrice !== null ? (
             <>
               <span className={`text-sm font-bold ${hasDiscount ? "text-[#e52b1f]" : "text-slate-950"}`}>
-                From {formatMoney(product.minPrice)}
+                {t("product.fromPrice", { price: formatMoney(product.minPrice) })}
               </span>
               {hasDiscount && <span className="text-xs font-medium text-slate-400 line-through">{formatMoney(product.compareAtPrice!)}</span>}
             </>
           ) : (
-            <span className="text-sm font-bold text-slate-500">Contact for price</span>
+            <span className="text-sm font-bold text-slate-500">{t("catalog.contactForPrice")}</span>
           )}
         </div>
       </Link>
@@ -740,18 +747,18 @@ function normalizeSortBy(value: string | null): string {
   return value === "price-asc" || value === "price-desc" || value === "updated-desc" ? value : "name-asc";
 }
 
-function formatResultSummary(data: { pageNumber: number; pageSize: number; totalCount: number } | undefined): string {
+function formatResultSummary(data: { pageNumber: number; pageSize: number; totalCount: number } | undefined, t: TFunction): string {
   if (!data) {
-    return "Loading catalog";
+    return t("catalog.loading");
   }
 
   if (data.totalCount === 0) {
-    return "No products";
+    return t("catalog.noProducts");
   }
 
   const start = (data.pageNumber - 1) * data.pageSize + 1;
   const end = Math.min(data.pageNumber * data.pageSize, data.totalCount);
-  return `Showing ${start}-${end} of ${data.totalCount} products`;
+  return t("catalog.resultSummary", { start, end, total: data.totalCount });
 }
 
 function isCategoryGlyphMuted(category: SelectableCategory | null): boolean {

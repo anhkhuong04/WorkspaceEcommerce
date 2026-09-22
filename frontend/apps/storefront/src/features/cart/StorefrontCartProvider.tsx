@@ -3,6 +3,7 @@ import type { CartDto, CartItemDto } from "@workspace-ecommerce/api-types";
 import type { ReactNode, RefObject } from "react";
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useCustomerAuth } from "../customer-auth/useCustomerAuth";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
@@ -90,6 +91,7 @@ interface ShoppingCartDrawerProps {
 }
 
 function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLoading, isOpen, onClose }: ShoppingCartDrawerProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { isAuthenticated, isReady } = useCustomerAuth();
@@ -223,7 +225,7 @@ function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLo
                       ) : null}
                     </div>
                     <div className="grid content-start justify-items-end gap-2 py-0.5 sm:py-5">
-                      <label className="sr-only" htmlFor={`cart-quantity-${item.id}`}>Quantity</label>
+                      <label className="sr-only" htmlFor={`cart-quantity-${item.id}`}>{t("cart.quantity")}</label>
                       <input
                         id={`cart-quantity-${item.id}`}
                         type="text"
@@ -244,7 +246,7 @@ function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLo
                         onClick={() => removeItemMutation.mutate(item.id)}
                         className="text-xs font-bold text-slate-500 transition hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm"
                       >
-                        Remove
+                        {t("common.remove")}
                       </button>
                     </div>
                   </article>
@@ -285,10 +287,11 @@ function CartDrawerHeader({
   onClear: () => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between gap-4 px-5 py-5 sm:px-8 sm:py-6">
       <div className="flex items-center gap-2.5">
-        <h2 id="shopping-cart-drawer-title" className="text-2xl font-medium tracking-tight text-slate-800">Cart</h2>
+        <h2 id="shopping-cart-drawer-title" className="text-2xl font-medium tracking-tight text-slate-800">{t("header.cart")}</h2>
         <span className="grid h-7 min-w-7 place-items-center rounded-full bg-[#171717] px-2 text-sm font-bold text-white">{itemCount}</span>
       </div>
       <div className="flex items-center gap-4 sm:gap-6">
@@ -298,7 +301,7 @@ function CartDrawerHeader({
           onClick={onClear}
           className="text-sm font-medium text-slate-400 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 sm:text-base"
         >
-          Clear all
+          {t("common.clearAll")}
         </button>
         <CartCloseButton ref={closeButtonRef} onClose={onClose} />
       </div>
@@ -307,13 +310,14 @@ function CartDrawerHeader({
 }
 
 const CartCloseButton = forwardRef<HTMLButtonElement, { onClose: () => void }>(function CartCloseButton({ onClose }, ref) {
+  const { t } = useTranslation();
   return (
     <button
       ref={ref}
       type="button"
       onClick={onClose}
       className="grid h-9 w-9 place-items-center rounded-lg text-slate-900 transition hover:bg-slate-100"
-      aria-label="Close cart"
+      aria-label={t("cart.close")}
     >
       <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -323,6 +327,7 @@ const CartCloseButton = forwardRef<HTMLButtonElement, { onClose: () => void }>(f
 });
 
 function EmptyCartState({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="grid justify-items-center">
       <div className="relative h-16 w-16 text-slate-800">
@@ -332,13 +337,13 @@ function EmptyCartState({ onClose }: { onClose: () => void }) {
         </svg>
         <span className="absolute right-0.5 top-1.5 grid h-7 w-7 place-items-center rounded-full bg-[#171717] text-sm font-bold text-white">0</span>
       </div>
-      <p className="mt-6 text-xl font-medium text-slate-800">Your cart is empty</p>
+      <p className="mt-6 text-xl font-medium text-slate-800">{t("cart.empty")}</p>
       <Link
         to="/products"
         onClick={onClose}
         className="mt-8 inline-flex h-14 min-w-[220px] items-center justify-center rounded-full bg-[#171717] px-8 text-base font-bold text-white transition hover:bg-black"
       >
-        Continue shopping
+        {t("cart.continueShopping")}
       </Link>
     </div>
   );
@@ -353,9 +358,10 @@ function CartStatusMessages({
   isLoading: boolean;
   mutationError: unknown;
 }) {
+  const { t } = useTranslation();
   return (
     <>
-      {isLoading ? <CartDrawerMessage>Loading cart...</CartDrawerMessage> : null}
+      {isLoading ? <CartDrawerMessage>{t("cart.loading")}</CartDrawerMessage> : null}
       {cartError ? <CartDrawerMessage tone="error">{getApiErrorMessage(cartError)}</CartDrawerMessage> : null}
       {mutationError ? <CartDrawerMessage tone="error">{getApiErrorMessage(mutationError)}</CartDrawerMessage> : null}
     </>
@@ -386,16 +392,17 @@ function CartDrawerFooter({
   isCheckoutDisabled: boolean;
   onCheckout: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="border-t border-slate-200 px-5 py-5 sm:px-8 sm:py-6">
       <div className="flex items-center justify-between gap-6">
-        <p className="text-2xl font-bold tracking-tight text-slate-800">Total</p>
+        <p className="text-2xl font-bold tracking-tight text-slate-800">{t("cart.total")}</p>
         <p className="text-2xl font-bold tracking-tight text-slate-800">{formatCartMoney(totalAmount)}</p>
       </div>
 
       <div className="mt-6 flex h-12 items-center rounded-full border border-slate-200 bg-white pl-5 pr-1.5 text-slate-400">
-        <span className="min-w-0 flex-1 truncate text-sm font-medium sm:text-base">Enter discount code</span>
-        <button type="button" className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-white" aria-label="Apply discount code" disabled>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium sm:text-base">{t("cart.discountCode")}</span>
+        <button type="button" className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-white" aria-label={t("cart.applyDiscount")} disabled>
           <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -413,13 +420,14 @@ function CartDrawerFooter({
           <rect x="5" y="10" width="14" height="10" rx="3" stroke="currentColor" strokeWidth="2" />
           <circle cx="12" cy="15" r="1.5" fill="currentColor" />
         </svg>
-        Checkout
+        {t("cart.checkout")}
       </button>
     </div>
   );
 }
 
 function LoginRequiredDialog({ onCancel, onLogin }: { onCancel: () => void; onLogin: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/45 p-5" role="presentation">
       <section
@@ -434,22 +442,22 @@ function LoginRequiredDialog({ onCancel, onLogin }: { onCancel: () => void; onLo
             <path d="M12 8v4m0 3h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
         </div>
-        <h2 id="login-required-title" className="mt-5 text-2xl font-bold tracking-tight text-slate-950">Vui lòng đăng nhập</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-500">Bạn vui lòng đăng nhập để mua sản phẩm và hoàn tất thanh toán.</p>
+        <h2 id="login-required-title" className="mt-5 text-2xl font-bold tracking-tight text-slate-950">{t("cart.loginRequired")}</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-500">{t("cart.loginRequiredDescription")}</p>
         <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onCancel}
             className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 px-5 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
           >
-            Hủy
+            {t("common.cancel")}
           </button>
           <button
             type="button"
             onClick={onLogin}
             className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-bold text-white transition hover:bg-slate-800"
           >
-            Đăng nhập
+            {t("header.login")}
           </button>
         </div>
       </section>

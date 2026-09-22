@@ -144,7 +144,9 @@ export interface AdminOrderStatusHistoryDto {
   id: string;
   fromStatus: OrderStatus | null;
   toStatus: OrderStatus;
-  note: string | null;
+  internalNote: string | null;
+  cancellationReason: string | null;
+  customerMessage: string | null;
   changedBy: string | null;
   changedAt: string;
 }
@@ -167,7 +169,9 @@ export interface AdminOrderDto extends AdminOrderListItemDto {
 
 export interface UpdateOrderStatusRequest {
   status: OrderStatus;
-  note?: string | null;
+  internalNote?: string | null;
+  cancellationReason?: string | null;
+  customerMessage?: string | null;
 }
 
 export interface AdminOrderImportRowResultDto {

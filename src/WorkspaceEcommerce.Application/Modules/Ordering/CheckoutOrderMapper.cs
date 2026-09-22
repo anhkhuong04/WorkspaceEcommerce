@@ -39,6 +39,7 @@ internal static class CheckoutOrderMapper
             item.Id,
             item.ProductVariantId,
             item.ProductNameSnapshot,
+            item.ProductImageUrlSnapshot,
             item.SkuSnapshot,
             item.UnitPrice,
             item.Quantity,

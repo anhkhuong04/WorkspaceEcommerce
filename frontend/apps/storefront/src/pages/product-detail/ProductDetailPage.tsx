@@ -3,6 +3,7 @@ import type { StorefrontCategoryDto } from "@workspace-ecommerce/api-types";
 import { formatMoney } from "@workspace-ecommerce/shared-utils";
 import type { FormEvent } from "react";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { useStorefrontCart } from "../../features/cart/StorefrontCartContext";
 import { ProductReviews } from "./ProductReviews";
@@ -26,6 +27,7 @@ function createProductSelection(productId: string | null): ProductSelection {
 }
 
 export function ProductDetailPage() {
+  const { t } = useTranslation();
   const { slug = "" } = useParams();
   const queryClient = useQueryClient();
   const { cartQueryKey, cartSessionId, openCartDrawer } = useStorefrontCart();
@@ -123,7 +125,7 @@ export function ProductDetailPage() {
   if (productQuery.isError || !product) {
     return (
       <div className="rounded-[var(--radius-card)] bg-red-50 p-8 font-semibold text-red-700">
-        {productQuery.isError ? getApiErrorMessage(productQuery.error) : "Product was not found."}
+        {productQuery.isError ? getApiErrorMessage(productQuery.error) : t("productDetail.notFound")}
       </div>
     );
   }
@@ -137,13 +139,13 @@ export function ProductDetailPage() {
 
   return (
     <div className="grid gap-8">
-      <nav className="ui-caption flex min-w-0 flex-wrap items-center gap-2 text-slate-500" aria-label="Breadcrumb">
+      <nav className="ui-caption flex min-w-0 flex-wrap items-center gap-2 text-slate-500" aria-label={t("productDetail.breadcrumb")}>
         <Link to="/" className="font-semibold transition hover:text-slate-950">
-          Home
+          {t("productDetail.home")}
         </Link>
         <span aria-hidden="true">/</span>
         <Link to="/products" className="font-semibold transition hover:text-slate-950">
-          Products
+          {t("header.products")}
         </Link>
         <span aria-hidden="true">/</span>
         <Link to={categorySlug ? `/products?categorySlug=${encodeURIComponent(categorySlug)}` : "/products"} className="font-semibold transition hover:text-slate-950">
@@ -164,12 +166,12 @@ export function ProductDetailPage() {
               />
             ) : (
               <div className="grid aspect-square place-items-center bg-slate-100 p-8 text-center text-sm font-semibold text-slate-500">
-                No image available
+                {t("productDetail.noImage")}
               </div>
             )}
             {hasDiscount ? (
               <span className="ui-caption absolute left-4 top-4 rounded-full bg-[#e52b1f] px-3 py-1 font-semibold text-white">
-                Sale
+                {t("product.sale")}
               </span>
             ) : null}
           </div>
@@ -184,7 +186,7 @@ export function ProductDetailPage() {
                   className={`aspect-square overflow-hidden rounded-[var(--radius-control)] border bg-[#f6f6f6] transition ${
                     selectedImageIndex === index ? "border-slate-950 ring-2 ring-slate-950/10" : "border-slate-200 hover:border-slate-400"
                   }`}
-                  aria-label={`View image ${index + 1}`}
+                  aria-label={t("productDetail.viewImage", { number: index + 1 })}
                 >
                   <img
                     src={image.imageUrl}
@@ -223,7 +225,7 @@ export function ProductDetailPage() {
                     ) : null}
                   </div>
                 ) : (
-                  <p className="text-[28px] font-black leading-none text-slate-950">Contact us</p>
+                  <p className="text-[28px] font-black leading-none text-slate-950">{t("common.contactUs")}</p>
                 )}
               </div>
               <span
@@ -231,17 +233,17 @@ export function ProductDetailPage() {
                   isOutOfStock ? "bg-slate-100 text-slate-500" : "bg-emerald-50 text-emerald-700"
                 }`}
               >
-                {isOutOfStock ? "Out of stock" : `${selectedVariant.stockQuantity} in stock`}
+                {isOutOfStock ? t("product.outOfStock") : t("productDetail.inStock", { count: selectedVariant.stockQuantity })}
               </span>
             </div>
 
             <div className="mt-6 grid gap-3">
               <div className="flex items-center justify-between gap-4">
-                <h2 className="ui-h3 text-slate-950">Configuration</h2>
+                <h2 className="ui-h3 text-slate-950">{t("productDetail.configuration")}</h2>
                 {selectedVariant ? <p className="ui-caption text-slate-500">SKU {selectedVariant.sku}</p> : null}
               </div>
 
-              <div className="grid max-h-[320px] gap-3 overflow-y-auto pr-1" role="radiogroup" aria-label="Product variants">
+              <div className="grid max-h-[320px] gap-3 overflow-y-auto pr-1" role="radiogroup" aria-label={t("productDetail.variants")}>
                 {product.variants.map((variant) => {
                   const variantHasDiscount = variant.compareAtPrice !== null && variant.compareAtPrice > variant.price;
                   const variantIsSelected = selectedVariant?.id === variant.id;
@@ -262,8 +264,8 @@ export function ProductDetailPage() {
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-black text-slate-950">{variant.name}</span>
                         <span className="mt-1 block text-xs font-semibold text-slate-500">
-                          {variant.color ?? "Default"}
-                          {variant.size ? ` / ${variant.size}` : ""} / {variant.stockQuantity > 0 ? `${variant.stockQuantity} left` : "Sold out"}
+                          {variant.color ?? t("productDetail.default")}
+                          {variant.size ? ` / ${variant.size}` : ""} / {variant.stockQuantity > 0 ? t("productDetail.leftInStock", { count: variant.stockQuantity }) : t("product.soldOut")}
                         </span>
                       </span>
                       <span className="shrink-0 text-right">
@@ -280,14 +282,14 @@ export function ProductDetailPage() {
 
             <div className="mt-6 grid gap-4 sm:grid-cols-[150px_1fr]">
               <label className="grid gap-2">
-                <span className="ui-caption font-bold uppercase tracking-[0.16em] text-slate-500">Quantity</span>
+                <span className="ui-caption font-bold uppercase tracking-[0.16em] text-slate-500">{t("cart.quantity")}</span>
                 <span className="grid h-12 grid-cols-[40px_1fr_40px] overflow-hidden rounded-[var(--radius-control)] border border-slate-200">
                   <button
                     type="button"
                     onClick={() => setSafeQuantity(quantity - 1)}
                     disabled={quantity <= 1}
                     className="grid place-items-center border-r border-slate-200 text-lg font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    aria-label="Decrease quantity"
+                    aria-label={t("productDetail.decreaseQuantity")}
                   >
                     -
                   </button>
@@ -307,7 +309,7 @@ export function ProductDetailPage() {
                     onClick={() => setSafeQuantity(quantity + 1)}
                     disabled={!selectedVariant || quantity >= selectedVariant.stockQuantity}
                     className="grid place-items-center border-l border-slate-200 text-lg font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    aria-label="Increase quantity"
+                    aria-label={t("productDetail.increaseQuantity")}
                   >
                     +
                   </button>
@@ -320,22 +322,22 @@ export function ProductDetailPage() {
                   disabled={!selectedVariant || selectedVariant.stockQuantity <= 0 || addToCartMutation.isPending}
                   className="ui-control h-12 w-full rounded-[var(--radius-control)] bg-slate-950 px-6 font-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {addToCartMutation.isPending ? "Adding..." : isOutOfStock ? "Out of stock" : "Add to cart"}
+                  {addToCartMutation.isPending ? t("productDetail.adding") : isOutOfStock ? t("product.outOfStock") : t("productDetail.addToCart")}
                 </button>
               </div>
             </div>
 
             {selectedVariant?.requiresInstallation ? (
               <div className="mt-5 rounded-[var(--radius-control)] bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-                Installation required for this configuration.
+                {t("productDetail.installationRequired")}
               </div>
             ) : null}
 
             {addToCartMutation.isSuccess ? (
               <div className="ui-control mt-5 rounded-[var(--radius-control)] bg-emerald-50 p-4 text-emerald-700">
-                Added to cart.{" "}
+                {t("productDetail.addedToCart")} {" "}
                 <button type="button" onClick={() => openCartDrawer()} className="font-black underline">
-                  Review cart
+                  {t("productDetail.reviewCart")}
                 </button>
               </div>
             ) : null}
@@ -350,16 +352,16 @@ export function ProductDetailPage() {
 
       <section className="grid gap-8 border-t border-slate-100 pt-8 lg:grid-cols-[minmax(0,1fr)_420px]">
         <div className="min-w-0">
-          <h2 className="ui-h2 text-slate-950">Description</h2>
+          <h2 className="ui-h2 text-slate-950">{t("productDetail.description")}</h2>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
-            {product.description ?? "No description available."}
+            {product.description ?? t("productDetail.noDescription")}
           </p>
         </div>
 
         <div className="min-w-0">
-          <h2 className="ui-h2 text-slate-950">Specifications</h2>
+          <h2 className="ui-h2 text-slate-950">{t("productDetail.specifications")}</h2>
           {product.specifications.length === 0 ? (
-            <p className="mt-4 text-sm leading-7 text-slate-500">No specifications available.</p>
+            <p className="mt-4 text-sm leading-7 text-slate-500">{t("productDetail.noSpecifications")}</p>
           ) : (
             <div className="mt-4 divide-y divide-slate-100 border-y border-slate-100">
               {product.specifications.map((specification) => (

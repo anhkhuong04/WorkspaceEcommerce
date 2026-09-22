@@ -82,8 +82,13 @@ export function ProductTable({
                       <button type="button" className="mr-2 rounded font-black text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-600 focus-visible:ring-offset-2" onClick={() => onToggleExpanded(product.id)} aria-label={`${isProductExpanded(product.id) ? "Collapse" : "Expand"} ${formatLocalizedText(product.name)}`}>
                         {isProductExpanded(product.id) ? "-" : "+"}
                       </button>
-                      <span className="font-bold text-slate-900">{formatLocalizedText(product.name)}</span>
-                      <p className="mt-0.5 text-xs text-slate-500">{product.slug}</p>
+                      <span className="inline-flex min-w-0 items-center gap-3 align-middle">
+                        <ProductThumbnail image={primaryProductImage(product)} name={formatLocalizedText(product.name)} />
+                        <span className="min-w-0">
+                          <span className="block truncate font-bold text-slate-900">{formatLocalizedText(product.name)}</span>
+                          <span className="mt-0.5 block text-xs text-slate-500">{product.slug}</span>
+                        </span>
+                      </span>
                     </td>
                     <td className="py-3 pr-4 text-slate-600">{product.categoryName ?? "-"}</td>
                     <td className="py-3 pr-4 text-slate-600">{product.variants.length}</td>
@@ -161,7 +166,8 @@ export function ProductTable({
                               <div className="grid gap-3 md:grid-cols-2">
                                 {product.images.map((image) => (
                                   <div key={image.id} className="rounded-2xl border border-slate-200 p-4">
-                                    <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-start gap-3">
+                                      <img src={image.imageUrl} alt={image.altText || ""} className="h-20 w-20 shrink-0 rounded-xl bg-slate-100 object-cover ring-1 ring-slate-200" />
                                       <div className="min-w-0">
                                         <p className="truncate text-sm font-black text-slate-900">{image.imageUrl}</p>
                                         <p className="mt-1 text-xs text-slate-500">Alt: {image.altText || "-"}</p>
@@ -226,4 +232,23 @@ export function ProductTable({
       ) : <EmptyState>No products yet</EmptyState>}
     </section>
   );
+}
+
+function primaryProductImage(product: AdminProductDto): AdminProductImageDto | null {
+  return product.images.reduce<AdminProductImageDto | null>(
+    (primary, image) => (
+      primary === null || image.sortOrder < primary.sortOrder || (image.sortOrder === primary.sortOrder && image.id < primary.id)
+        ? image
+        : primary
+    ),
+    null
+  );
+}
+
+function ProductThumbnail({ image, name }: { image: AdminProductImageDto | null; name: string }) {
+  if (!image) {
+    return <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-slate-100 text-xs font-black text-slate-400 ring-1 ring-slate-200" aria-label="No product image">No image</span>;
+  }
+
+  return <img src={image.imageUrl} alt={image.altText || name} className="h-12 w-12 shrink-0 rounded-xl bg-slate-100 object-cover ring-1 ring-slate-200" />;
 }

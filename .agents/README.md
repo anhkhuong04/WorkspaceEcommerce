@@ -1,34 +1,34 @@
-﻿# Agent Instructions
+# Agent guide
 
-This directory tells coding agents how to work in this repository.
+WorkspaceEcommerce is a .NET 10/PostgreSQL ecommerce modular monolith with React/Vite storefront and admin apps. It covers catalog, cart/checkout, orders, coupons, VNPay, MiniLogistics, customer accounts/2FA, loyalty, media, blogs/reviews, receipts, and feature-flagged warranties.
 
-Primary rule:
+## Source-of-truth order
 
-- Always read `overview.md` before implementing or changing business behavior.
-- Treat `overview.md` as the only source of truth for product scope, modules, APIs, data model, statuses, payment methods, and business rules.
-- Do not copy business requirements from `overview.md` into these files.
-- Use `.agent` files for engineering decisions, code generation rules, review criteria, and workflow.
-- Do not implement out-of-scope features unless the user explicitly changes the product scope.
-- Do not change unrelated files.
+1. Current user request and constraints.
+2. Source, tests, migrations/model snapshot, configuration validators, and CI.
+3. Current-state product/architecture docs, accepted ADRs, and runbooks under `docs/`.
+4. Root README and historical ticket prose, which may lag code.
 
-Read order for feature work:
+`overview.md` is not required. If evidence conflicts, preserve behavior for fixes/refactors; request a product decision only when the choice materially changes money, identity, fulfillment, warranty, retention, or a public contract.
 
-- `project-context.md`
-- `workflow.md`
-- `architecture.md`
-- `coding-rules.md`
-- Relevant specialized files: `backend-rules.md`, `frontend-rules.md`, `data-rules.md`, `api-rules.md`, `quality-standards.md`
-- Relevant skill file under `skills/`
+## Repository map
 
-Files:
+| Path | Purpose |
+|---|---|
+| `src/WorkspaceEcommerce.Domain` | Entities and invariants |
+| `src/WorkspaceEcommerce.Application` | Use cases, DTOs, validation, ports |
+| `src/WorkspaceEcommerce.Infrastructure` | EF/PostgreSQL, providers, hosted workers |
+| `src/WorkspaceEcommerce.Api` | Composition root and HTTP/SignalR boundary |
+| `tests/*` | Application, Infrastructure, API integration tests |
+| `frontend/apps/*` | Storefront and admin React apps |
+| `frontend/packages/*` | API types/client and domain-neutral utilities |
+| `docs/adr`, `docs/runbooks` | Accepted decisions and operations |
 
-- `project-context.md`: How to use `overview.md` without duplicating product requirements.
-- `architecture.md`: Clean Architecture and Modular Monolith boundaries.
-- `coding-rules.md`: General code generation rules for this stack.
-- `quality-standards.md`: Clean Code, SOLID, maintainability, and quality gates.
-- `backend-rules.md`: ASP.NET Core, Application, Domain, Infrastructure, and DI rules.
-- `api-rules.md`: API contract, validation, response, and error-handling rules.
-- `data-rules.md`: EF Core, PostgreSQL, migrations, transactions, and query rules.
-- `frontend-rules.md`: React, TypeScript, forms, API clients, and UI state rules.
-- `workflow.md`: Required process before, during, and after changes.
-- `skills/`: Task-specific execution checklists.
+## Task routing
+
+- Any code change: `architecture.md`, `standards.md`, `workflows.md`.
+- Business/payment/auth/shipping/warranty: also `domain.md` and relevant ADR/tests.
+- Database/migration or frontend: relevant `standards.md` section plus `commands.md`.
+- Work near debt: `known-issues.md`.
+
+Load only relevant guidance; prefer repository evidence over generic framework advice.

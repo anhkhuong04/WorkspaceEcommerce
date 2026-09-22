@@ -111,7 +111,8 @@ public sealed class Order : Entity
         string skuSnapshot,
         decimal unitPrice,
         int quantity,
-        bool requiresInstallation)
+        bool requiresInstallation,
+        string? productImageUrlSnapshot = null)
     {
         if (_items.Any(item => item.ProductVariantId == productVariantId))
         {
@@ -126,7 +127,8 @@ public sealed class Order : Entity
             skuSnapshot,
             unitPrice,
             quantity,
-            requiresInstallation);
+            requiresInstallation,
+            productImageUrlSnapshot);
 
         _items.Add(item);
         RecalculateTotals();
@@ -248,6 +250,17 @@ public sealed class Order : Entity
         Touch();
     }
 
+    public void MarkPaymentRefundPending()
+    {
+        if (PaymentStatus != PaymentStatus.Paid)
+        {
+            throw new DomainException("Only a paid order can enter the refund workflow.");
+        }
+
+        PaymentStatus = PaymentStatus.RefundPending;
+        Touch();
+    }
+
     public OrderStatusHistory RecordCreated(Guid historyId, string? note, string? changedBy)
     {
         if (_statusHistory.Any(history => history.FromStatus is null && history.ToStatus == OrderStatus.Pending))
@@ -265,6 +278,17 @@ public sealed class Order : Entity
         Guid historyId,
         OrderStatus toStatus,
         string? note,
+        string? changedBy)
+    {
+        return ChangeStatus(historyId, toStatus, note, cancellationReason: null, customerMessage: null, changedBy: changedBy);
+    }
+
+    public OrderStatusHistory ChangeStatus(
+        Guid historyId,
+        OrderStatus toStatus,
+        string? internalNote,
+        string? cancellationReason,
+        string? customerMessage,
         string? changedBy)
     {
         if (Status == toStatus)
@@ -285,7 +309,15 @@ public sealed class Order : Entity
         }
         Touch();
 
-        var history = new OrderStatusHistory(historyId, Id, fromStatus, toStatus, note, changedBy);
+        var history = new OrderStatusHistory(
+            historyId,
+            Id,
+            fromStatus,
+            toStatus,
+            internalNote,
+            cancellationReason,
+            customerMessage,
+            changedBy);
         _statusHistory.Add(history);
 
         return history;

@@ -71,8 +71,7 @@ replicas for gauges:
 
 Alert on a sustained oldest-active age above the agreed SLO, any new dead
 letter, a growing retry count, or a queue that is due but has no completed
-counter activity. Validate alert rules and ownership in staging before marking
-PRH-014 or PRH-018 complete.
+counter activity. Validate alert rules and ownership in staging before release.
 
 ## Replica and shutdown checks
 
