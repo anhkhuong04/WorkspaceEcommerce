@@ -191,4 +191,26 @@ describe("customer session storage", () => {
       content: "Please review this update."
     }));
   });
+
+  it("sends payment result possession proof in a header instead of the URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(successfulEnvelope({
+      orderCode: "ORD-PAY-0001",
+      paymentMethod: 2,
+      paymentStatus: 2,
+      paidAt: "2026-09-23T00:00:00.000Z",
+      shipmentCreated: false,
+      trackingCode: null,
+      message: "Payment completed."
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await storefrontApi.getPaymentResult("ORD-PAY-0001", "short-lived-result-proof");
+
+    const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const requestUrl = new URL(path, "https://storefront.example.test");
+    expect(requestUrl.pathname).toBe("/api/payments/result");
+    expect(requestUrl.searchParams.get("orderCode")).toBe("ORD-PAY-0001");
+    expect(requestUrl.toString()).not.toContain("short-lived-result-proof");
+    expect(new Headers(init.headers).get("X-Payment-Result-Token")).toBe("short-lived-result-proof");
+  });
 });

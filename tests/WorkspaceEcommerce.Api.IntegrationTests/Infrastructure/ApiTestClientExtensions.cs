@@ -26,14 +26,15 @@ internal static class ApiTestClientExtensions
     public static async Task<string> RegisterCustomerAsync(
         this HttpClient client,
         string email = "customer@example.com",
-        string password = "customer-password")
+        string password = "customer-password",
+        string phoneNumber = "0900000000")
     {
         using var response = await client.PostAsJsonAsync(
             "/api/customer/auth/register",
             new
             {
                 fullName = "Nguyen Van A",
-                phoneNumber = "0900000000",
+                phoneNumber,
                 email,
                 password
             });

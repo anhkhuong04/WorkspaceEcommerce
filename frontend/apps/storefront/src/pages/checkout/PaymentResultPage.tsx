@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { PaymentResultDto, PaymentStatus } from "@workspace-ecommerce/api-types";
 import { formatDate, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
 import type { ReactNode } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
 
@@ -10,12 +10,14 @@ type PaymentResultStatus = "success" | "failed" | "cancelled";
 
 export function PaymentResultPage() {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const orderCode = searchParams.get("orderCode") ?? "";
+  const resultAccessToken = new URLSearchParams(location.hash.replace(/^#/, "")).get("resultToken");
   const statusParam = normalizeStatus(searchParams.get("status"));
 
   const resultQuery = useQuery({
-    queryKey: ["payment-result", orderCode],
-    queryFn: () => storefrontApi.getPaymentResult(orderCode),
+    queryKey: ["payment-result", orderCode, resultAccessToken ? "with-proof" : "owner"],
+    queryFn: () => storefrontApi.getPaymentResult(orderCode, resultAccessToken),
     enabled: orderCode.length > 0,
     retry: false
   });
@@ -88,8 +90,6 @@ function PaymentResultSummary({ result }: { result: PaymentResultDto }) {
         <InfoBlock label="Order code" value={result.orderCode} mono />
         <InfoBlock label="Method" value={formatPaymentMethod(result.paymentMethod)} />
         <InfoBlock label="Paid at" value={result.paidAt ? formatDate(result.paidAt) : "-"} />
-        <InfoBlock label="Gateway code" value={result.gatewayResponseCode ?? "-"} />
-        <InfoBlock label="Transaction" value={result.transaction?.txnRef ?? "-"} mono />
         <InfoBlock label="Shipment" value={result.shipmentCreated ? result.trackingCode ?? "Created" : "Pending"} />
       </div>
 

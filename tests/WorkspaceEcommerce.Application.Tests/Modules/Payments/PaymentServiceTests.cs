@@ -1,3 +1,4 @@
+using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Payments;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Payments;
@@ -117,13 +118,79 @@ public sealed class PaymentServiceTests
         Assert.Single(setup.DbContext.ShipmentCommandOutbox);
     }
 
+    [Fact]
+    public async Task GetPaymentResultAsync_WithoutOwnershipOrGrant_ReturnsNeutralNotFound()
+    {
+        var setup = CreatePendingPayment();
+        var service = CreateService(setup.DbContext);
+
+        var result = await service.GetPaymentResultAsync(setup.Order.OrderCode);
+
+        Assert.Equal(ResultStatus.NotFound, result.Status);
+        Assert.Equal("Payment result was not found.", result.FirstError);
+    }
+
+    [Fact]
+    public async Task GetPaymentResultAsync_WithMatchingGrant_ReturnsMinimalPublicResult()
+    {
+        var setup = CreatePendingPayment();
+        var grants = new Dictionary<string, PaymentResultAccessGrant>
+        {
+            ["valid-result-token"] = new(setup.Order.Id, setup.Order.OrderCode)
+        };
+        var service = CreateService(setup.DbContext, accessGrants: grants);
+
+        var result = await service.GetPaymentResultAsync(setup.Order.OrderCode, "valid-result-token");
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal(setup.Order.OrderCode, result.Value.OrderCode);
+        Assert.Equal(PaymentStatus.Pending, result.Value.PaymentStatus);
+        Assert.Equal("Payment is being processed.", result.Value.Message);
+    }
+
+    [Fact]
+    public async Task GetPaymentResultAsync_WithGrantForAnotherOrder_ReturnsNeutralNotFound()
+    {
+        var setup = CreatePendingPayment();
+        var grants = new Dictionary<string, PaymentResultAccessGrant>
+        {
+            ["wrong-result-token"] = new(Guid.NewGuid(), "ORD-OTHER")
+        };
+        var service = CreateService(setup.DbContext, accessGrants: grants);
+
+        var result = await service.GetPaymentResultAsync(setup.Order.OrderCode, "wrong-result-token");
+
+        Assert.Equal(ResultStatus.NotFound, result.Status);
+        Assert.Equal("Payment result was not found.", result.FirstError);
+    }
+
+    [Fact]
+    public async Task GetPaymentResultAsync_AuthenticatedOwnerSucceedsAndOtherCustomerGetsNeutralNotFound()
+    {
+        var setup = CreatePendingPayment();
+        var ownerService = CreateService(setup.DbContext, currentCustomerId: setup.Order.CustomerId);
+        var otherCustomerService = CreateService(setup.DbContext, currentCustomerId: Guid.NewGuid());
+
+        var ownerResult = await ownerService.GetPaymentResultAsync(setup.Order.OrderCode);
+        var otherCustomerResult = await otherCustomerService.GetPaymentResultAsync(setup.Order.OrderCode);
+
+        Assert.True(ownerResult.IsSuccess);
+        Assert.Equal(ResultStatus.NotFound, otherCustomerResult.Status);
+        Assert.Equal("Payment result was not found.", otherCustomerResult.FirstError);
+    }
+
     private static PaymentService CreateService(
         FakeAppDbContext dbContext,
-        IVNPayPaymentService? vnPayPaymentService = null)
+        IVNPayPaymentService? vnPayPaymentService = null,
+        Guid? currentCustomerId = null,
+        IReadOnlyDictionary<string, PaymentResultAccessGrant>? accessGrants = null)
     {
         return new PaymentService(
             dbContext,
-            vnPayPaymentService ?? new FakeVNPayPaymentService());
+            vnPayPaymentService ?? new FakeVNPayPaymentService(),
+            new StubCurrentCustomerContext(currentCustomerId),
+            new StubPaymentResultAccessTokenService(accessGrants));
     }
 
     private static PaymentSetup CreatePendingPayment()
@@ -192,6 +259,33 @@ public sealed class PaymentServiceTests
         FakeAppDbContext DbContext,
         Order Order,
         PaymentTransaction Transaction);
+
+    private sealed class StubCurrentCustomerContext(Guid? customerId) : ICurrentCustomerContext
+    {
+        public Guid? CustomerId => customerId;
+
+        public string? Email => null;
+    }
+
+    private sealed class StubPaymentResultAccessTokenService(
+        IReadOnlyDictionary<string, PaymentResultAccessGrant>? grants = null) : IPaymentResultAccessTokenService
+    {
+        public string Issue(Guid orderId, string orderCode)
+        {
+            return "issued-result-token";
+        }
+
+        public bool TryValidate(string? token, out PaymentResultAccessGrant grant)
+        {
+            if (token is not null && grants?.TryGetValue(token, out grant!) == true)
+            {
+                return true;
+            }
+
+            grant = default!;
+            return false;
+        }
+    }
 
     private sealed class FakeVNPayPaymentService : IVNPayPaymentService
     {

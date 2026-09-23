@@ -1,4 +1,5 @@
 using System.Text.Json;
+using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Payments;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
@@ -12,7 +13,9 @@ namespace WorkspaceEcommerce.Application.Modules.Payments;
 
 internal sealed class PaymentService(
     IAppDbContext dbContext,
-    IVNPayPaymentService vnPayPaymentService) : IPaymentService
+    IVNPayPaymentService vnPayPaymentService,
+    ICurrentCustomerContext currentCustomerContext,
+    IPaymentResultAccessTokenService paymentResultAccessTokenService) : IPaymentService
 {
     public async Task<Result<PaymentResultDto>> HandleVNPayReturnAsync(
         VNPayCallbackRequest request,
@@ -59,9 +62,9 @@ internal sealed class PaymentService(
         };
     }
 
-    public async Task<Result<PaymentResultDto>> GetPaymentResultAsync(
+    public async Task<Result<PublicPaymentResultDto>> GetPaymentResultAsync(
         string orderCode,
-        string? phone = null,
+        string? resultAccessToken = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -69,14 +72,32 @@ internal sealed class PaymentService(
         var normalizedOrderCode = NormalizeOrderCode(orderCode);
         if (normalizedOrderCode is null)
         {
-            return Result<PaymentResultDto>.Validation(["Order code is required."]);
+            return PaymentResultNotFound();
         }
 
-        var normalizedPhone = NormalizeOptional(phone);
-        var orders = dbContext.Orders.Where(existing => existing.OrderCode == normalizedOrderCode);
-        if (normalizedPhone is not null)
+        var customerId = currentCustomerContext.CustomerId;
+        var hasValidGrant = paymentResultAccessTokenService.TryValidate(
+            resultAccessToken,
+            out var accessGrant);
+        if (hasValidGrant &&
+            !string.Equals(accessGrant.OrderCode, normalizedOrderCode, StringComparison.Ordinal))
         {
-            orders = orders.Where(existing => existing.CustomerPhone == normalizedPhone);
+            hasValidGrant = false;
+        }
+
+        if (customerId is null && !hasValidGrant)
+        {
+            return PaymentResultNotFound();
+        }
+
+        var orders = dbContext.Orders.Where(existing => existing.OrderCode == normalizedOrderCode);
+        if (hasValidGrant)
+        {
+            orders = orders.Where(existing => existing.Id == accessGrant.OrderId);
+        }
+        else
+        {
+            orders = orders.Where(existing => existing.CustomerId == customerId);
         }
 
         var order = await orders
@@ -84,21 +105,17 @@ internal sealed class PaymentService(
             .FirstOrDefaultAsyncSafe(cancellationToken);
         if (order is null)
         {
-            return Result<PaymentResultDto>.NotFound("Order was not found.");
+            return PaymentResultNotFound();
         }
 
-        var transaction = await dbContext.PaymentTransactions
-            .AsNoTrackingIfEf()
-            .Where(existing => existing.OrderId == order.Id)
-            .OrderByDescending(existing => existing.CreatedAt)
-            .ThenByDescending(existing => existing.Id)
-            .FirstOrDefaultAsyncSafe(cancellationToken);
-
-        return Result<PaymentResultDto>.Success(ToPaymentResultDto(
-            order,
-            transaction,
-            transaction?.GatewayResponseCode,
-            transaction?.GatewayResponseMessage));
+        return Result<PublicPaymentResultDto>.Success(new PublicPaymentResultDto(
+            order.OrderCode,
+            order.PaymentMethod,
+            order.PaymentStatus,
+            order.PaidAt,
+            order.ShipmentId is not null,
+            order.TrackingCode,
+            ToPublicPaymentMessage(order.PaymentStatus)));
     }
 
     private async Task<Result<PaymentResultDto>> ProcessVerifiedVNPayCallbackAsync(
@@ -287,6 +304,22 @@ internal sealed class PaymentService(
                 ? "Payment failed."
                 : $"Payment failed with VNPay response code {responseCode}."
         };
+    }
+
+    private static string ToPublicPaymentMessage(PaymentStatus paymentStatus)
+    {
+        return paymentStatus switch
+        {
+            PaymentStatus.Paid => "Payment completed.",
+            PaymentStatus.Cancelled => "Payment cancelled.",
+            PaymentStatus.Failed => "Payment failed.",
+            _ => "Payment is being processed."
+        };
+    }
+
+    private static Result<PublicPaymentResultDto> PaymentResultNotFound()
+    {
+        return Result<PublicPaymentResultDto>.NotFound("Payment result was not found.");
     }
 
     private static string SerializeParameters(IReadOnlyDictionary<string, string?> parameters)

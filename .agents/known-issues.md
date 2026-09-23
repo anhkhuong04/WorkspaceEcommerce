@@ -4,7 +4,6 @@ Snapshot: 2026-09-22. Re-verify before acting; this is context, not authorizatio
 
 ## Open risks
 
-- Payment result lookup filters by phone only when supplied, so `orderCode` knowledge can expose transaction/shipment data.
 - Shipment webhook duplicate/read work occurs before its transaction and order/shipment lack concurrency protection; concurrent events can break idempotency or monotonic state.
 - Integration tests resolve vulnerable transitive `SSH.NET 2025.1.0` (`GHSA-q939-rpr3-3284`) through Testcontainers and emit `NU1903`.
 - Global rate limiting runs before authentication, so its warranty customer claim is anonymous; state is per process/IP.

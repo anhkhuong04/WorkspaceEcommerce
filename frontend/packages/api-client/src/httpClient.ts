@@ -22,8 +22,8 @@ export class ApiClientError extends Error {
 export class ApiClient {
   constructor(private readonly options: ApiClientOptions) {}
 
-  get<T>(path: string): Promise<T> {
-    return this.send<T>(path, { method: "GET" });
+  get<T>(path: string, headers?: HeadersInit): Promise<T> {
+    return this.send<T>(path, { method: "GET", headers });
   }
 
   async getBlob(path: string): Promise<Blob> {

@@ -23,6 +23,15 @@ public sealed record PaymentResultDto(
     string? GatewayResponseCode,
     string? Message);
 
+public sealed record PublicPaymentResultDto(
+    string OrderCode,
+    PaymentMethod PaymentMethod,
+    PaymentStatus PaymentStatus,
+    DateTimeOffset? PaidAt,
+    bool ShipmentCreated,
+    string? TrackingCode,
+    string Message);
+
 public sealed record PaymentTransactionDto(
     Guid Id,
     PaymentProvider Provider,

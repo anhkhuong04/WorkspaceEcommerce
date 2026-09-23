@@ -34,9 +34,9 @@ Không phát hiện vấn đề mức **Critical** theo nghĩa có thể trực 
 
 Các nhận định đã được đối chiếu lại với source và test tại commit `9e8dc6b` ngày 2026-09-23. Mỗi task chỉ được đánh dấu **Done** khi toàn bộ acceptance criteria đạt và có evidence từ các lệnh verification trên cùng commit sạch. Việc code đã được merge nhưng thiếu test/evidence không được xem là hoàn thành.
 
-| Task | Finding | Priority | Initial status | Completion proof |
+| Task | Finding | Priority | Status | Completion proof |
 |---|---|---|---|---|
-| TASK-01 | F-01 Payment result authorization | P0 | Open | Negative authorization integration tests + legitimate customer/guest flow |
+| TASK-01 | F-01 Payment result authorization | P0 | Done 2026-09-23 | 10 Application tests, 2 token tests, 7 PostgreSQL/API integration tests, 14 frontend tests; build/lint/typecheck pass |
 | TASK-02 | F-02 Shipment webhook concurrency | P0 | Open | Concurrent PostgreSQL tests proving atomic idempotency and monotonic state |
 | TASK-03 | F-03 Vulnerable SSH.NET dependency | P0 | Open | Locked restore, full tests, and zero High/Critical NuGet audit findings |
 | TASK-04 | F-04 VNPay callback validation | P1 | Open | Missing/malformed signed callback tests prove fail-closed behavior |

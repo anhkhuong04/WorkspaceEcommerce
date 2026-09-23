@@ -24,9 +24,6 @@ Re-verify source and tests before changing them.
 
 ## Security and scale gaps
 
-- `GET /api/payments/result` accepts phone as optional. Knowledge of an order
-  code can expose payment/shipment result data; do not copy this authorization
-  pattern to new endpoints.
 - Rate limiting is in-process and runs before authentication. Multi-replica
   deployment needs an edge/distributed limiter and topology testing.
 - SignalR has no shared backplane. Multi-replica notifications are not complete

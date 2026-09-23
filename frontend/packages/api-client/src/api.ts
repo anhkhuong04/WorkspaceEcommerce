@@ -144,8 +144,11 @@ export function createStorefrontApi(client: ApiClient) {
       client.get<ShipmentTrackingDto>(`/api/orders/lookup/tracking${buildQuery(request)}`),
     lookupWarranty: (request: WarrantyLookupRequest) =>
       client.post<PublicWarrantyLookupResponse, WarrantyLookupRequest>("/api/warranties/lookup", request),
-    getPaymentResult: (orderCode: string, phone?: string | null) =>
-      client.get<PaymentResultDto>(`/api/payments/result${buildQuery({ orderCode, phone: phone ?? "" })}`),
+    getPaymentResult: (orderCode: string, resultAccessToken?: string | null) =>
+      client.get<PaymentResultDto>(
+        `/api/payments/result${buildQuery({ orderCode })}`,
+        resultAccessToken ? { "X-Payment-Result-Token": resultAccessToken } : undefined
+      ),
     registerCustomer: (request: CustomerRegisterRequest) =>
       client.post<CustomerAuthResponse, CustomerRegisterRequest>("/api/customer/auth/register", request),
     loginCustomer: (request: CustomerLoginRequest) =>

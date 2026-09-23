@@ -32,9 +32,10 @@ public sealed class PaymentIntegrationTests(ApiIntegrationTestFixture fixture)
             "valid-hash"));
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Equal(
-            $"http://localhost:5173/checkout/payment-result?status=success&orderCode={seed.OrderCode}",
-            response.Headers.Location?.ToString());
+        var redirect = Assert.IsType<Uri>(response.Headers.Location);
+        Assert.Equal("http://localhost:5173/checkout/payment-result", redirect.GetLeftPart(UriPartial.Path));
+        Assert.Contains($"status=success&orderCode={seed.OrderCode}", redirect.Query, StringComparison.Ordinal);
+        Assert.False(string.IsNullOrWhiteSpace(GetResultToken(redirect)));
 
         var queuedCommand = await fixture.ExecuteDbAsync(async dbContext =>
             await dbContext.ShipmentCommandOutbox
@@ -153,9 +154,10 @@ public sealed class PaymentIntegrationTests(ApiIntegrationTestFixture fixture)
             "valid-hash"));
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Equal(
-            $"http://localhost:5173/checkout/payment-result?status=failed&orderCode={seed.OrderCode}",
-            response.Headers.Location?.ToString());
+        var redirect = Assert.IsType<Uri>(response.Headers.Location);
+        Assert.Equal("http://localhost:5173/checkout/payment-result", redirect.GetLeftPart(UriPartial.Path));
+        Assert.Contains($"status=failed&orderCode={seed.OrderCode}", redirect.Query, StringComparison.Ordinal);
+        Assert.False(string.IsNullOrWhiteSpace(GetResultToken(redirect)));
 
         var persisted = await fixture.ExecuteDbAsync(async dbContext =>
         {
@@ -230,23 +232,91 @@ public sealed class PaymentIntegrationTests(ApiIntegrationTestFixture fixture)
     }
 
     [Fact]
-    public async Task GetPaymentResult_ReturnsPaymentEnvelope()
+    public async Task GetPaymentResult_RequiresAndAcceptsShortLivedPossessionProof()
     {
         await fixture.ResetDatabaseAsync();
         var seed = await SeedPendingVNPayPaymentAsync("ORD-PAY-0005");
+        using var callbackClient = fixture.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+        using var callbackResponse = await callbackClient.GetAsync(CreateVNPayCallbackUrl(
+            "/api/payments/vnpay/return",
+            seed.TxnRef,
+            seed.Amount,
+            "00",
+            "00",
+            "valid-hash"));
+        var redirect = Assert.IsType<Uri>(callbackResponse.Headers.Location);
+        var resultToken = GetResultToken(redirect);
+        Assert.False(string.IsNullOrWhiteSpace(resultToken));
+
         using var client = fixture.CreateClient();
 
-        using var response = await client.GetAsync($"/api/payments/result?orderCode={seed.OrderCode}&phone=0900000000");
+        using var missingProofResponse = await client.GetAsync($"/api/payments/result?orderCode={seed.OrderCode}");
+        using var invalidProofRequest = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/api/payments/result?orderCode={seed.OrderCode}");
+        invalidProofRequest.Headers.Add("X-Payment-Result-Token", "invalid-result-proof");
+        using var invalidProofResponse = await client.SendAsync(invalidProofRequest);
+
+        using var validProofRequest = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/api/payments/result?orderCode={seed.OrderCode}");
+        validProofRequest.Headers.Add("X-Payment-Result-Token", resultToken);
+        using var response = await client.SendAsync(validProofRequest);
+        var missingProofJson = await missingProofResponse.ReadJsonAsync();
+        var invalidProofJson = await invalidProofResponse.ReadJsonAsync();
         var json = await response.ReadJsonAsync();
 
+        Assert.Equal(HttpStatusCode.NotFound, missingProofResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, invalidProofResponse.StatusCode);
+        Assert.Equal(
+            missingProofJson["errors"]![0]!.GetValue<string>(),
+            invalidProofJson["errors"]![0]!.GetValue<string>());
+
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("no-store", response.Headers.CacheControl?.ToString());
         Assert.True(json["success"]!.GetValue<bool>());
         Assert.Equal(seed.OrderCode, json["data"]!["orderCode"]!.GetValue<string>());
-        Assert.Equal((int)PaymentStatus.Pending, json["data"]!["paymentStatus"]!.GetValue<int>());
-        Assert.Equal(seed.TxnRef, json["data"]!["transaction"]!["txnRef"]!.GetValue<string>());
+        Assert.Equal((int)PaymentStatus.Paid, json["data"]!["paymentStatus"]!.GetValue<int>());
+        Assert.Null(json["data"]!["orderId"]);
+        Assert.Null(json["data"]!["shipmentId"]);
+        Assert.Null(json["data"]!["transaction"]);
+        Assert.Null(json["data"]!["gatewayResponseCode"]);
     }
 
-    private async Task<PaymentSeed> SeedPendingVNPayPaymentAsync(string orderCode)
+    [Fact]
+    public async Task GetPaymentResult_AuthenticatedCustomerCanReadOnlyOwnedOrder()
+    {
+        await fixture.ResetDatabaseAsync();
+        using var ownerClient = fixture.CreateClient();
+        var ownerToken = await ownerClient.RegisterCustomerAsync(
+            "payment-owner@example.com",
+            phoneNumber: "0900000001");
+        var ownerId = await fixture.ExecuteDbAsync(async dbContext =>
+            await dbContext.Customers
+                .Where(customer => customer.Email == "payment-owner@example.com")
+                .Select(customer => customer.Id)
+                .SingleAsync());
+        var seed = await SeedPendingVNPayPaymentAsync("ORD-PAY-OWNER", ownerId);
+        ownerClient.UseBearerToken(ownerToken);
+
+        using var attackerClient = fixture.CreateClient();
+        attackerClient.UseBearerToken(await attackerClient.RegisterCustomerAsync(
+            "payment-attacker@example.com",
+            phoneNumber: "0900000002"));
+
+        using var ownerResponse = await ownerClient.GetAsync($"/api/payments/result?orderCode={seed.OrderCode}");
+        using var attackerResponse = await attackerClient.GetAsync($"/api/payments/result?orderCode={seed.OrderCode}");
+
+        Assert.Equal(HttpStatusCode.OK, ownerResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, attackerResponse.StatusCode);
+        var attackerJson = await attackerResponse.ReadJsonAsync();
+        Assert.Equal("Payment result was not found.", attackerJson["errors"]![0]!.GetValue<string>());
+    }
+
+    private async Task<PaymentSeed> SeedPendingVNPayPaymentAsync(string orderCode, Guid? customerId = null)
     {
         var orderId = Guid.NewGuid();
         var catalog = TestData.CreateVisibleCatalog();
@@ -260,7 +330,7 @@ public sealed class PaymentIntegrationTests(ApiIntegrationTestFixture fixture)
             var order = new Order(
                 orderId,
                 orderCode,
-                null,
+                customerId,
                 "Nguyen Van A",
                 "0900000000",
                 "customer@example.com",
@@ -320,6 +390,19 @@ public sealed class PaymentIntegrationTests(ApiIntegrationTestFixture fixture)
         };
 
         return $"{path}{QueryString.Create(query)}";
+    }
+
+    private static string? GetResultToken(Uri redirect)
+    {
+        var fragment = redirect.Fragment.TrimStart('#');
+        return QueryString.FromUriComponent($"?{fragment}")
+            .Value?
+            .TrimStart('?')
+            .Split('&', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => part.Split('=', 2))
+            .Where(part => part.Length == 2 && part[0] == "resultToken")
+            .Select(part => Uri.UnescapeDataString(part[1]))
+            .FirstOrDefault();
     }
 
     private sealed record PaymentSeed(

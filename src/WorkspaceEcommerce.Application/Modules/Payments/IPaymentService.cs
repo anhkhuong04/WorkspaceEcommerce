@@ -12,8 +12,8 @@ public interface IPaymentService
         VNPayCallbackRequest request,
         CancellationToken cancellationToken = default);
 
-    Task<Result<PaymentResultDto>> GetPaymentResultAsync(
+    Task<Result<PublicPaymentResultDto>> GetPaymentResultAsync(
         string orderCode,
-        string? phone = null,
+        string? resultAccessToken = null,
         CancellationToken cancellationToken = default);
 }

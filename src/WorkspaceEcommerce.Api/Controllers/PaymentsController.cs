@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using WorkspaceEcommerce.Api.Common;
 using WorkspaceEcommerce.Api.Extensions;
+using WorkspaceEcommerce.Application.Abstractions.Payments;
 using WorkspaceEcommerce.Application.Common.Models;
 using WorkspaceEcommerce.Application.Modules.Payments;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
@@ -10,6 +11,7 @@ namespace WorkspaceEcommerce.Api.Controllers;
 [ApiController]
 public sealed class PaymentsController(
     IPaymentService paymentService,
+    IPaymentResultAccessTokenService paymentResultAccessTokenService,
     IConfiguration configuration) : ControllerBase
 {
     private const string DefaultStorefrontBaseUrl = "http://localhost:5173";
@@ -45,18 +47,18 @@ public sealed class PaymentsController(
     }
 
     [HttpGet("api/payments/result")]
-    [ProducesResponseType(typeof(ApiResponse<PaymentResultDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<PublicPaymentResultDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetPaymentResult(
         [FromQuery] string orderCode,
-        [FromQuery] string? phone,
+        [FromHeader(Name = "X-Payment-Result-Token")] string? resultAccessToken,
         CancellationToken cancellationToken)
     {
+        Response.Headers.CacheControl = "no-store";
         var result = await paymentService.GetPaymentResultAsync(
             orderCode,
-            phone,
+            resultAccessToken,
             cancellationToken);
 
         return this.ToApiResponse(result);
@@ -112,7 +114,11 @@ public sealed class PaymentsController(
             ? DefaultStorefrontBaseUrl
             : baseUrl.Trim().TrimEnd('/');
 
-        return $"{normalizedBaseUrl}/checkout/payment-result{QueryString.Create(query)}";
+        var resultTokenFragment = result.Value is null
+            ? string.Empty
+            : $"#resultToken={Uri.EscapeDataString(paymentResultAccessTokenService.Issue(result.Value.OrderId, result.Value.OrderCode))}";
+
+        return $"{normalizedBaseUrl}/checkout/payment-result{QueryString.Create(query)}{resultTokenFragment}";
     }
 
     private static string ToPaymentResultStatus(PaymentStatus paymentStatus)

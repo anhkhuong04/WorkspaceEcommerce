@@ -113,6 +113,7 @@ public static class DependencyInjection
         services.AddSingleton(configuration.GetSection(LoyaltyOptions.SectionName).Get<LoyaltyOptions>() ?? new LoyaltyOptions());
         services.Configure<VNPayOptions>(configuration.GetSection(VNPayOptions.SectionName));
         services.AddSingleton<IVNPayPaymentService, VNPayPaymentService>();
+        services.AddSingleton<IPaymentResultAccessTokenService, DataProtectionPaymentResultAccessTokenService>();
         services.AddSingleton<IAdminCredentialValidator, ConfiguredAdminCredentialValidator>();
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
