@@ -31,6 +31,9 @@ var runtimeLimits = builder.Configuration
     .GetSection(RuntimeLimitsOptions.SectionName)
     .Get<RuntimeLimitsOptions>() ?? new RuntimeLimitsOptions();
 runtimeLimits.Validate();
+var rateLimitingOptions = builder.Configuration
+    .GetSection(RateLimitingOptions.SectionName)
+    .Get<RateLimitingOptions>() ?? new RateLimitingOptions();
 ProductionRuntimeConfigurationValidator.Validate(builder.Configuration, builder.Environment);
 
 builder.WebHost.ConfigureKestrel(runtimeLimits.ApplyTo);
@@ -72,7 +75,7 @@ builder.Services.AddScoped<ICurrentCustomerContext, CurrentCustomerContext>();
 builder.Services.AddScoped<ICurrentLanguageProvider, CurrentLanguageProvider>();
 builder.Services.AddApplicationCors(builder.Configuration, builder.Environment);
 builder.Services.AddApplicationForwardedHeaders(builder.Configuration);
-builder.Services.AddApplicationRateLimiter(builder.Environment);
+builder.Services.AddApplicationRateLimiter(rateLimitingOptions);
 builder.Services
     .AddHealthChecks()
     .AddCheck<ApplicationLivenessHealthCheck>(
@@ -126,8 +129,8 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 app.UseCors(CorsExtensions.FrontendCorsPolicy);
-app.UseRateLimiter();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {

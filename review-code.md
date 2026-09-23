@@ -40,7 +40,7 @@ Các nhận định đã được đối chiếu lại với source và test t�
 | TASK-02 | F-02 Shipment webhook concurrency | P0 | Done 2026-09-23 | 14 unit tests, 7 PostgreSQL webhook tests, concurrent duplicate test passed 10/10 runs |
 | TASK-03 | F-03 Vulnerable SSH.NET dependency | P0 | Done 2026-09-23 | SSH.NET 2026.0.0; locked restore stable; audit gate clean; 617/617 backend tests pass in Release |
 | TASK-04 | F-04 VNPay callback validation | P1 | Done 2026-09-23 | Signed malformed matrix and 635/635 backend tests prove fail-closed behavior |
-| TASK-05 | F-05 Rate limiting | P1 | Open; production proof depends on Platform | Middleware tests + two-replica/edge evidence |
+| TASK-05 | F-05 Rate limiting | P1 | Repository done 2026-09-23; Platform evidence open | 3 middleware/partition tests and 638/638 backend tests pass; two-replica edge evidence still required |
 | TASK-06 | F-06 Cart/checkout query count | P1 | Open | PostgreSQL command-count regression tests within fixed budgets |
 | TASK-07 | F-07 Email configuration | P1 | Open | Environment matrix tests reject unsafe non-Development settings |
 | TASK-08 | F-08 Cleanup batching | P1 | Open | Large-data integration test proves bounded batches and correct FK order |
@@ -169,6 +169,9 @@ Các nhận định đã được đối chiếu lại với source và test t�
   - Chạy ba test class trên; sau đó chạy toàn bộ backend suite.
 
 ### TASK-05 — Rate limiting đúng identity và scale-out (F-05)
+
+- **Repository completion evidence (2026-09-23):** authentication now precedes rate limiting; authenticated customer/client keys are opaque and canonical; auth, 2FA, checkout, payment, provider webhook, warranty, catalog, and default policies use independent configurable buckets; every rejection emits `Retry-After`. Three API tests prove customer partitioning, policy isolation/limit boundaries, anonymous IP partitioning, and header behavior; all 322 Application, 216 Infrastructure, and 100 PostgreSQL/API integration tests passed in Release.
+- **Remaining Platform gate:** the application limiter is intentionally per process. TASK-05 is not fully Done until Platform/SRE attaches a two-replica staging result proving a shared edge/distributed quota survives replica restart and preserves the separate provider-webhook bucket.
 
 - **Loại:** Risk bảo mật/vận hành
 - **Severity:** **Medium**

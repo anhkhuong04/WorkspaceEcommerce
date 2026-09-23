@@ -24,8 +24,10 @@ Re-verify source and tests before changing them.
 
 ## Security and scale gaps
 
-- Rate limiting is in-process and runs before authentication. Multi-replica
-  deployment needs an edge/distributed limiter and topology testing.
+- Application rate limiting is in-process. Authentication now runs first and
+  security-critical route families have independent identity/client buckets,
+  but multi-replica deployment still needs an edge/distributed limiter and
+  topology testing.
 - SignalR has no shared backplane. Multi-replica notifications are not complete
   until an approved backplane is configured and tested.
 - Media uses a `NoOp` malware scanner. Non-Development use is a time-limited

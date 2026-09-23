@@ -64,6 +64,26 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         return _factory.CreateClient(options);
     }
 
+    public WebApplicationFactory<Program> CreateFactory(
+        IReadOnlyDictionary<string, string?> configuration)
+    {
+        if (_factory is null)
+        {
+            throw new InvalidOperationException("The API test factory has not been initialized.");
+        }
+
+        return _factory.WithWebHostBuilder(builder =>
+        {
+            foreach (var (key, value) in configuration)
+            {
+                if (value is not null)
+                {
+                    builder.UseSetting(key, value);
+                }
+            }
+        });
+    }
+
     public void ResetSqlCommandCount()
     {
         GetSqlCommandCounter().Reset();

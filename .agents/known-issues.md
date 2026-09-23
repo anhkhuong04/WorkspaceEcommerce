@@ -4,7 +4,7 @@ Snapshot: 2026-09-22. Re-verify before acting; this is context, not authorizatio
 
 ## Open risks
 
-- Global rate limiting runs before authentication, so its warranty customer claim is anonymous; state is per process/IP.
+- Application rate limiting remains per process. Multi-replica production requires shared edge/distributed enforcement and topology evidence; do not claim cluster-wide quotas from local middleware tests.
 - Cart DTO/checkout have per-item queries; VNPay checkout builds snapshots twice. Do not copy these query shapes.
 - Account cleanup materializes every expired row before deletion. Do not extend this unbounded worker pattern.
 - Email config permits Log outside literal Production and does not require SMTP TLS outside Development.
