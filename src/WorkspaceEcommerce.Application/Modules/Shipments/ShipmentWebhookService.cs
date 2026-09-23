@@ -33,64 +33,64 @@ internal sealed class ShipmentWebhookService(
             return Result<ShipmentWebhookResult>.Validation(["Shipment webhook contains an unsupported provider status."]);
         }
 
-        var existingEvent = await dbContext.ShipmentEventInbox
-            .Where(entry => entry.Id == payload.EventId)
-            .FirstOrDefaultAsyncSafe(cancellationToken);
-        if (existingEvent is not null)
-        {
-            if (!string.IsNullOrWhiteSpace(existingEvent.ProcessingError))
-            {
-                return Result<ShipmentWebhookResult>.Conflict(existingEvent.ProcessingError);
-            }
-
-            logger.LogInformation("Ignoring duplicate shipment webhook event {EventId}", payload.EventId);
-            ShipmentIntegrationMetrics.RecordDuplicateWebhook();
-            return Result<ShipmentWebhookResult>.Success(new ShipmentWebhookResult(true, false, false));
-        }
-
         var orderCode = payload.ExternalOrderId.Trim().ToUpperInvariant();
         var trackingCode = payload.TrackingCode.Trim();
-        var order = await dbContext.Orders
-            .Where(candidate => candidate.OrderCode == orderCode)
-            .FirstOrDefaultAsyncSafe(cancellationToken);
-        if (order is null)
-        {
-            return Result<ShipmentWebhookResult>.NotFound("Order was not found for shipment webhook.");
-        }
-
-        if (!string.IsNullOrWhiteSpace(order.TrackingCode) &&
-            !string.Equals(order.TrackingCode, trackingCode, StringComparison.OrdinalIgnoreCase))
-        {
-            return Result<ShipmentWebhookResult>.Conflict("Shipment webhook tracking code does not match the order.");
-        }
-
-        var shipment = await dbContext.OrderShipments
-            .Where(candidate => candidate.OrderId == order.Id)
-            .FirstOrDefaultAsyncSafe(cancellationToken);
-        if (shipment is not null &&
-            !string.Equals(shipment.TrackingCode, trackingCode, StringComparison.OrdinalIgnoreCase))
-        {
-            return Result<ShipmentWebhookResult>.Conflict("Shipment webhook tracking code does not match the persisted shipment.");
-        }
-
         var now = timeProvider.GetUtcNow();
-        var inbox = new ShipmentEventInbox(
-            payload.EventId,
-            payload.Event,
-            trackingCode,
-            orderCode,
-            payload.Status,
-            payload.ChangedAtUtc,
-            now);
-
-        var orderUpdated = false;
-        var shipmentUpdated = false;
+        Result<ShipmentWebhookResult>? transactionResult = null;
 
         try
         {
             await dbContext.ExecuteInTransactionAsync(async transactionToken =>
             {
-                dbContext.Add(inbox);
+                // Lock order first and shipment second for every webhook. This
+                // serializes all provider events for one order and makes the
+                // entity state below authoritative for this transaction.
+                var order = await dbContext.FindOrderByCodeForUpdateAsync(orderCode, transactionToken);
+                if (order is null)
+                {
+                    transactionResult = Result<ShipmentWebhookResult>.NotFound(
+                        "Order was not found for shipment webhook.");
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(order.TrackingCode) &&
+                    !string.Equals(order.TrackingCode, trackingCode, StringComparison.OrdinalIgnoreCase))
+                {
+                    transactionResult = Result<ShipmentWebhookResult>.Conflict(
+                        "Shipment webhook tracking code does not match the order.");
+                    return;
+                }
+
+                var shipment = await dbContext.FindOrderShipmentForUpdateAsync(order.Id, transactionToken);
+                if (shipment is not null &&
+                    !string.Equals(shipment.TrackingCode, trackingCode, StringComparison.OrdinalIgnoreCase))
+                {
+                    transactionResult = Result<ShipmentWebhookResult>.Conflict(
+                        "Shipment webhook tracking code does not match the persisted shipment.");
+                    return;
+                }
+
+                var inbox = await dbContext.TryClaimShipmentEventAsync(
+                    new ShipmentEventInbox(
+                        payload.EventId,
+                        payload.Event,
+                        trackingCode,
+                        orderCode,
+                        payload.Status,
+                        payload.ChangedAtUtc,
+                        now),
+                    transactionToken);
+                if (inbox is null)
+                {
+                    logger.LogInformation("Ignoring duplicate shipment webhook event {EventId}", payload.EventId);
+                    ShipmentIntegrationMetrics.RecordDuplicateWebhook();
+                    transactionResult = Result<ShipmentWebhookResult>.Success(
+                        new ShipmentWebhookResult(true, false, false));
+                    return;
+                }
+
+                var orderUpdated = false;
+                var shipmentUpdated = false;
 
                 if (shipment is null)
                 {
@@ -164,6 +164,9 @@ internal sealed class ShipmentWebhookService(
 
                 inbox.MarkProcessed(timeProvider.GetUtcNow());
                 await dbContext.SaveChangesAsync(transactionToken);
+
+                transactionResult = Result<ShipmentWebhookResult>.Success(
+                    new ShipmentWebhookResult(false, orderUpdated, shipmentUpdated));
             }, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -177,6 +180,7 @@ internal sealed class ShipmentWebhookService(
             return Result<ShipmentWebhookResult>.Failure("Shipment webhook could not be processed.");
         }
 
-        return Result<ShipmentWebhookResult>.Success(new ShipmentWebhookResult(false, orderUpdated, shipmentUpdated));
+        return transactionResult ?? Result<ShipmentWebhookResult>.Failure(
+            "Shipment webhook processing did not produce a result.");
     }
 }

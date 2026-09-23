@@ -224,6 +224,43 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             .FromSqlInterpolated($"SELECT * FROM ordering.orders WHERE id = {orderId} FOR UPDATE")
             .FirstOrDefaultAsync(cancellationToken);
 
+    Task<Order?> IAppDbContext.FindOrderByCodeForUpdateAsync(
+        string orderCode,
+        CancellationToken cancellationToken) =>
+        Orders
+            .FromSqlInterpolated($"SELECT * FROM ordering.orders WHERE order_code = {orderCode} FOR UPDATE")
+            .FirstOrDefaultAsync(cancellationToken);
+
+    Task<OrderShipment?> IAppDbContext.FindOrderShipmentForUpdateAsync(
+        Guid orderId,
+        CancellationToken cancellationToken) =>
+        OrderShipments
+            .FromSqlInterpolated($"SELECT * FROM shipping.order_shipments WHERE order_id = {orderId} FOR UPDATE")
+            .FirstOrDefaultAsync(cancellationToken);
+
+    async Task<ShipmentEventInbox?> IAppDbContext.TryClaimShipmentEventAsync(
+        ShipmentEventInbox inbox,
+        CancellationToken cancellationToken)
+    {
+        var inserted = await Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO shipping.shipment_event_inbox
+                (event_id, event_name, tracking_code, external_order_id, provider_status,
+                 changed_at_utc, received_at_utc, processed_at_utc, processing_error)
+            VALUES
+                ({inbox.Id}, {inbox.EventName}, {inbox.TrackingCode}, {inbox.ExternalOrderId},
+                 {inbox.ProviderStatus}, {inbox.ChangedAtUtc}, {inbox.ReceivedAtUtc}, NULL, NULL)
+            ON CONFLICT (event_id) DO NOTHING
+            """, cancellationToken);
+        if (inserted == 0)
+        {
+            return null;
+        }
+
+        return await ShipmentEventInbox
+            .FromSqlInterpolated($"SELECT * FROM shipping.shipment_event_inbox WHERE event_id = {inbox.Id} FOR UPDATE")
+            .SingleAsync(cancellationToken);
+    }
+
     Task<ProductVariant[]> IAppDbContext.FindProductVariantsForUpdateAsync(
         Guid[] variantIds,
         CancellationToken cancellationToken) =>

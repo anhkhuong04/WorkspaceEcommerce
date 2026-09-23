@@ -30,10 +30,6 @@ Re-verify source and tests before changing them.
   until an approved backplane is configured and tested.
 - Media uses a `NoOp` malware scanner. Non-Development use is a time-limited
   accepted risk, not a production scanning capability.
-- Shipment webhook duplicate lookup occurs before the transaction and the
-  order/shipment records do not provide a complete concurrency barrier for
-  simultaneous different events. Preserve inbox/signature/monotonic checks and
-  add a focused design/test before claiming exactly-once processing.
 - Admin warranty activation does not use the same locked transaction as customer
   activation. Warranty remains disabled by default.
 

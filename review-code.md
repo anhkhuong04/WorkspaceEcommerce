@@ -37,7 +37,7 @@ Các nhận định đã được đối chiếu lại với source và test t�
 | Task | Finding | Priority | Status | Completion proof |
 |---|---|---|---|---|
 | TASK-01 | F-01 Payment result authorization | P0 | Done 2026-09-23 | 10 Application tests, 2 token tests, 7 PostgreSQL/API integration tests, 14 frontend tests; build/lint/typecheck pass |
-| TASK-02 | F-02 Shipment webhook concurrency | P0 | Open | Concurrent PostgreSQL tests proving atomic idempotency and monotonic state |
+| TASK-02 | F-02 Shipment webhook concurrency | P0 | Done 2026-09-23 | 14 unit tests, 7 PostgreSQL webhook tests, concurrent duplicate test passed 10/10 runs |
 | TASK-03 | F-03 Vulnerable SSH.NET dependency | P0 | Open | Locked restore, full tests, and zero High/Critical NuGet audit findings |
 | TASK-04 | F-04 VNPay callback validation | P1 | Open | Missing/malformed signed callback tests prove fail-closed behavior |
 | TASK-05 | F-05 Rate limiting | P1 | Open; production proof depends on Platform | Middleware tests + two-replica/edge evidence |
@@ -82,6 +82,8 @@ Các nhận định đã được đối chiếu lại với source và test t�
   - Trong `frontend/`, chạy `corepack pnpm test && corepack pnpm typecheck && corepack pnpm build`.
 
 ### TASK-02 — Atomic shipment webhook và monotonic state (F-02)
+
+- **Completion evidence (2026-09-23):** transaction now starts before authoritative reads; order then shipment rows are locked in a fixed order; inbox ownership uses `INSERT ... ON CONFLICT DO NOTHING`; PostgreSQL tests prove concurrent duplicate delivery creates one inbox/timeline/loyalty earn and an older event committed after a newer event cannot regress state. The concurrent duplicate test passed 10 consecutive runs.
 
 - **Loại:** Bug đồng thời / data consistency
 - **Severity:** **High**

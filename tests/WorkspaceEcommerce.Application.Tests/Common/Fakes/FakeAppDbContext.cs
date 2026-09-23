@@ -175,6 +175,36 @@ internal sealed class FakeAppDbContext : IAppDbContext
         return Task.FromResult(_orders.FirstOrDefault(order => order.Id == orderId));
     }
 
+    public Task<Order?> FindOrderByCodeForUpdateAsync(
+        string orderCode,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_orders.FirstOrDefault(order => order.OrderCode == orderCode));
+    }
+
+    public Task<OrderShipment?> FindOrderShipmentForUpdateAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_orderShipments.FirstOrDefault(shipment => shipment.OrderId == orderId));
+    }
+
+    public Task<ShipmentEventInbox?> TryClaimShipmentEventAsync(
+        ShipmentEventInbox inbox,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_shipmentEventInbox.Any(existing => existing.Id == inbox.Id))
+        {
+            return Task.FromResult<ShipmentEventInbox?>(null);
+        }
+
+        _shipmentEventInbox.Add(inbox);
+        return Task.FromResult<ShipmentEventInbox?>(inbox);
+    }
+
     public Task<ProductVariant[]> FindProductVariantsForUpdateAsync(
         Guid[] variantIds,
         CancellationToken cancellationToken = default)

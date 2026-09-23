@@ -63,6 +63,18 @@ public interface IAppDbContext : ICatalogReadStore, IOrderReadStore, ILoyaltyRea
         Guid orderId,
         CancellationToken cancellationToken = default);
 
+    Task<Order?> FindOrderByCodeForUpdateAsync(
+        string orderCode,
+        CancellationToken cancellationToken = default);
+
+    Task<OrderShipment?> FindOrderShipmentForUpdateAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default);
+
+    Task<ShipmentEventInbox?> TryClaimShipmentEventAsync(
+        ShipmentEventInbox inbox,
+        CancellationToken cancellationToken = default);
+
     Task<ProductVariant[]> FindProductVariantsForUpdateAsync(
         Guid[] variantIds,
         CancellationToken cancellationToken = default);
