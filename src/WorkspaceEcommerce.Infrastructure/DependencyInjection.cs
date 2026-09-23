@@ -43,7 +43,7 @@ public static class DependencyInjection
         var googleAuthOptions = configuration.GetValidatedGoogleAuthOptions();
         var twoFactorOptions = configuration.GetValidatedTwoFactorOptions();
         var customerAccountLifecycleOptions = configuration.GetValidatedCustomerAccountLifecycleOptions();
-        var emailDeliveryOptions = configuration.GetValidatedEmailDeliveryOptions(environment.EnvironmentName);
+        var emailDeliveryOptions = configuration.GetValidatedEmailDeliveryOptions(environment);
         var mediaStorageOptions = configuration.GetValidatedMediaStorageOptions(environment.EnvironmentName);
         var warrantyOptions = configuration.GetValidatedWarrantyOptions();
         var orderReceiptOptions = configuration

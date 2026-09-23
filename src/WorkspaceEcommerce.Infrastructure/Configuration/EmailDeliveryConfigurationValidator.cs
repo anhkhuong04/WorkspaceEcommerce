@@ -1,5 +1,6 @@
 using System.Net.Mail;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace WorkspaceEcommerce.Infrastructure.Configuration;
 
@@ -7,20 +8,22 @@ public static class EmailDeliveryConfigurationValidator
 {
     public static EmailDeliveryOptions GetValidatedEmailDeliveryOptions(
         this IConfiguration configuration,
-        string? environmentName)
+        IHostEnvironment environment)
     {
+        ArgumentNullException.ThrowIfNull(environment);
         var configured = configuration.GetSection(EmailDeliveryOptions.SectionName)
             .Get<EmailDeliveryOptions>() ?? new EmailDeliveryOptions();
         var provider = configured.Provider.Trim();
         var isLog = string.Equals(provider, "Log", StringComparison.OrdinalIgnoreCase);
         var isSmtp = string.Equals(provider, "Smtp", StringComparison.OrdinalIgnoreCase);
+        var isDevelopment = environment.IsDevelopment();
 
         if (!isLog && !isSmtp)
         {
             throw new InvalidOperationException("Configuration 'EmailDelivery:Provider' must be 'Log' or 'Smtp'.");
         }
 
-        if (isLog && string.Equals(environmentName, "Production", StringComparison.OrdinalIgnoreCase))
+        if (isLog && !isDevelopment)
         {
             throw new InvalidOperationException("Configuration 'EmailDelivery:Provider' must be 'Smtp' outside Development.");
         }
@@ -61,6 +64,27 @@ public static class EmailDeliveryConfigurationValidator
             {
                 throw new InvalidOperationException("Configuration 'EmailDelivery:SenderEmail' must be a valid email address.", exception);
             }
+
+            if (!isDevelopment && !configured.EnableSsl)
+            {
+                throw new InvalidOperationException("Configuration 'EmailDelivery:EnableSsl' must be true outside Development.");
+            }
+
+            var hasUserName = !string.IsNullOrWhiteSpace(configured.UserName);
+            var hasPassword = !string.IsNullOrWhiteSpace(configured.Password);
+            if (hasUserName != hasPassword)
+            {
+                throw new InvalidOperationException(
+                    "Configuration 'EmailDelivery:UserName' and 'EmailDelivery:Password' must either both be set or both be omitted.");
+            }
+
+            if (hasUserName &&
+                (ConfigurationPlaceholders.ContainsPlaceholder(configured.UserName!) ||
+                 ConfigurationPlaceholders.ContainsPlaceholder(configured.Password!)))
+            {
+                throw new InvalidOperationException(
+                    "Configuration 'EmailDelivery:UserName' and 'EmailDelivery:Password' must not contain placeholder values.");
+            }
         }
 
         return new EmailDeliveryOptions
@@ -70,7 +94,7 @@ public static class EmailDeliveryConfigurationValidator
             Host = configured.Host?.Trim(),
             Port = configured.Port,
             EnableSsl = configured.EnableSsl,
-            UserName = configured.UserName,
+            UserName = configured.UserName?.Trim(),
             Password = configured.Password,
             WorkerIntervalSeconds = configured.WorkerIntervalSeconds,
             WorkerBatchSize = configured.WorkerBatchSize,

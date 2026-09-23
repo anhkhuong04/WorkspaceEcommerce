@@ -42,7 +42,7 @@ Các nhận định đã được đối chiếu lại với source và test t�
 | TASK-04 | F-04 VNPay callback validation | P1 | Done 2026-09-23 | Signed malformed matrix and 635/635 backend tests prove fail-closed behavior |
 | TASK-05 | F-05 Rate limiting | P1 | Repository done 2026-09-23; Platform evidence open | 3 middleware/partition tests and 638/638 backend tests pass; two-replica edge evidence still required |
 | TASK-06 | F-06 Cart/checkout query count | P1 | Open | PostgreSQL command-count regression tests within fixed budgets |
-| TASK-07 | F-07 Email configuration | P1 | Open | Environment matrix tests reject unsafe non-Development settings |
+| TASK-07 | F-07 Email configuration | P1 | Done 2026-09-24 | 21 configuration/composition tests cover Development, Staging, QA, and Production |
 | TASK-08 | F-08 Cleanup batching | P1 | Open | Large-data integration test proves bounded batches and correct FK order |
 | TASK-09 | F-09 Warranty activation concurrency | P1 | Open; required before enabling warranty admin | Concurrent activation test produces one activation/audit/email set |
 | TASK-10 | F-10 Cart price policy | P1 decision gate | Blocked on Product decision | Approved policy + executable tests for the selected behavior |
@@ -226,6 +226,8 @@ Các nhận định đã được đối chiếu lại với source và test t�
   - Ghi command count 1-item/20-item trước và sau trong PR/task evidence.
 
 ### TASK-07 — Fail-fast email configuration ngoài Development (F-07)
+
+- **Completion evidence (2026-09-24):** `Log` is accepted only when `IHostEnvironment.IsDevelopment()` is true; every other environment requires SMTP with TLS. SMTP credentials must be both present or both absent and may not contain placeholders; error messages name configuration keys without echoing secrets. The environment matrix and an `AddInfrastructure` composition test provide 21 focused passing cases. The Release suite passed all 322 Application and 233 Infrastructure tests; API integration validation was blocked at fixture startup because the local Docker engine was unavailable (14 non-container tests passed, 86 container-dependent tests could not start).
 
 - **Loại:** Bug cấu hình / security risk
 - **Severity:** **Medium**

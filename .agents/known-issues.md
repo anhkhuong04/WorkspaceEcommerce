@@ -7,7 +7,6 @@ Snapshot: 2026-09-22. Re-verify before acting; this is context, not authorizatio
 - Application rate limiting remains per process. Multi-replica production requires shared edge/distributed enforcement and topology evidence; do not claim cluster-wide quotas from local middleware tests.
 - Cart DTO/checkout have per-item queries; VNPay checkout builds snapshots twice. Do not copy these query shapes.
 - Account cleanup materializes every expired row before deletion. Do not extend this unbounded worker pattern.
-- Email config permits Log outside literal Production and does not require SMTP TLS outside Development.
 - Admin warranty activation lacks the locked transaction used by customer activation. Warranty remains disabled by default.
 
 ## Documentation/tooling drift

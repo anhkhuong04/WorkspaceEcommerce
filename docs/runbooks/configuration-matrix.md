@@ -14,7 +14,7 @@ platform secret/configuration authority.
 | Data Protection | `DataProtection:KeyRingPath` | Local ignored path | Ephemeral test path | Encrypted, persistent shared mount/managed key store | Platform | Access/key-ring recovery rehearsal quarterly |
 | Google OAuth | `GoogleAuth:*`, frontend `VITE_GOOGLE_CLIENT_ID` | Local public client ID optional | Disabled/synthetic | Server audience list from configuration authority; public client ID in frontend build | Application security | Review on client/domain change; disable/revoke on compromise |
 | Customer security lifecycle | `TwoFactor:*`, `CustomerAccountLifecycle:*` | Repository defaults | Short synthetic lifetimes where needed | Reviewed issuer, expiry, cleanup, and retention policy; no secrets in these sections | Application security + product | Review on auth/session or retention-policy change |
-| Email | `EmailDelivery:*` | Logging provider only | Logging provider only | SMTP sandbox/production secrets from secret manager | Platform + product ops | Provider credential after exposure / quarterly |
+| Email | `EmailDelivery:*` | Logging provider or local SMTP | Logging provider in Development test host | SMTP with TLS; username/password are both set or both omitted and placeholders are rejected | Platform + product ops | Provider credential after exposure / quarterly |
 | Durable media | `MediaStorage:*`, `MediaStorage:NoOpMalwareScannerRisk*` | Local or isolated MinIO | Local only | S3-compatible bucket, encryption, restricted workload credential; temporary NoOp scanner exception needs named security owner, risk reference, and <=90-day expiry | Platform + storage owner + application security | Credential / bucket policy on change; security-risk renewal before expiry; quarterly restore review |
 | Payment | `Payment:VNPay:*` | Sandbox only | Synthetic callback values | Provider portal + secret manager | Payments owner | Hash secret/merchant setup on exposure or provider request |
 | MiniLogistics | `MiniLogistics:*` | Local/sandbox only | Fake provider | Provider portal + secret manager | Logistics owner | API/webhook secret on exposure or provider request |
@@ -34,9 +34,9 @@ when the corresponding integration is configured. Outside Development, validator
 also reject local media storage, an unaccepted/expired NoOp media-scanner exception,
 missing CORS origins, wildcard/localhost `AllowedHosts`, a relative/non-external Data
 Protection key-ring path, missing telemetry configuration, and a non-HTTPS storefront
-URL. The email validator rejects the `Log` provider in the literal `Production`
-environment; staging policy should require SMTP even though startup does not yet
-enforce that environment name.
+URL. The email validator permits the `Log` provider only in Development. Every
+other environment requires SMTP with TLS and a consistent, non-placeholder
+username/password pair when SMTP authentication is configured.
 
 Changing a value follows the [credential rotation runbook](credential-rotation.md).
 Changing a public endpoint, proxy, media URL, or cookie/CORS policy requires the

@@ -50,9 +50,11 @@ Provider responses and credentials are not part of the public API contract.
 
 Application use cases enqueue Data Protection-protected payloads; they do not
 send SMTP in the request transaction. Development may use the metadata-only
-`Log` provider. Production requires SMTP and bounded leased retries. A crash
-after SMTP accepts a message but before completion commit can duplicate mail;
-account links therefore remain short-lived and one-time.
+`Log` provider. Every other environment requires SMTP with TLS, complete
+non-placeholder credentials when authentication is configured, and bounded
+leased retries. A crash after SMTP accepts a message but before completion
+commit can duplicate mail; account links therefore remain short-lived and
+one-time.
 
 ## Media storage and malware scanning
 
