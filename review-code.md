@@ -38,7 +38,7 @@ Các nhận định đã được đối chiếu lại với source và test t�
 |---|---|---|---|---|
 | TASK-01 | F-01 Payment result authorization | P0 | Done 2026-09-23 | 10 Application tests, 2 token tests, 7 PostgreSQL/API integration tests, 14 frontend tests; build/lint/typecheck pass |
 | TASK-02 | F-02 Shipment webhook concurrency | P0 | Done 2026-09-23 | 14 unit tests, 7 PostgreSQL webhook tests, concurrent duplicate test passed 10/10 runs |
-| TASK-03 | F-03 Vulnerable SSH.NET dependency | P0 | Open | Locked restore, full tests, and zero High/Critical NuGet audit findings |
+| TASK-03 | F-03 Vulnerable SSH.NET dependency | P0 | Done 2026-09-23 | SSH.NET 2026.0.0; locked restore stable; audit gate clean; 617/617 backend tests pass in Release |
 | TASK-04 | F-04 VNPay callback validation | P1 | Open | Missing/malformed signed callback tests prove fail-closed behavior |
 | TASK-05 | F-05 Rate limiting | P1 | Open; production proof depends on Platform | Middleware tests + two-replica/edge evidence |
 | TASK-06 | F-06 Cart/checkout query count | P1 | Open | PostgreSQL command-count regression tests within fixed budgets |
@@ -119,6 +119,8 @@ Các nhận định đã được đối chiếu lại với source và test t�
   - Chạy toàn bộ Application và API integration tests để kiểm tra order, shipment và loyalty regression.
 
 ### TASK-03 — Loại bỏ dependency SSH.NET có lỗ hổng High (F-03)
+
+- **Completion evidence (2026-09-23):** the integration-test project pins patched `SSH.NET 2026.0.0`; two locked restores left the lock file unchanged; the CI audit report contained zero vulnerable entries; all 321 Application, 205 Infrastructure, and 91 PostgreSQL/API integration tests passed in Release. The audit assertion script was also corrected to handle an empty findings set under PowerShell StrictMode.
 
 - **Loại:** Supply-chain risk / release blocker
 - **Severity:** **High** cho pipeline; **Low hơn đối với runtime production** vì dependency nằm trong integration-test project và exploit yêu cầu dùng SCP recursive download với server độc hại.

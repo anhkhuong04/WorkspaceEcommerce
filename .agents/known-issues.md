@@ -4,7 +4,6 @@ Snapshot: 2026-09-22. Re-verify before acting; this is context, not authorizatio
 
 ## Open risks
 
-- Integration tests resolve vulnerable transitive `SSH.NET 2025.1.0` (`GHSA-q939-rpr3-3284`) through Testcontainers and emit `NU1903`.
 - Global rate limiting runs before authentication, so its warranty customer claim is anonymous; state is per process/IP.
 - Cart DTO/checkout have per-item queries; VNPay checkout builds snapshots twice. Do not copy these query shapes.
 - Account cleanup materializes every expired row before deletion. Do not extend this unbounded worker pattern.

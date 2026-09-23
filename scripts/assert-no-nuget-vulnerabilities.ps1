@@ -13,7 +13,7 @@ if (-not (Test-Path -LiteralPath $ReportPath)) {
 
 # `dotnet list package --vulnerable --format json` exits successfully even when it
 # reports vulnerabilities. A severity property only occurs for an actual finding.
-$findings = Select-String -LiteralPath $ReportPath -Pattern '"severity"\s*:'
+$findings = @(Select-String -LiteralPath $ReportPath -Pattern '"severity"\s*:')
 if ($findings.Count -gt 0) {
     throw "NuGet vulnerability audit found $($findings.Count) vulnerable package entry/entries. See '$ReportPath'."
 }
