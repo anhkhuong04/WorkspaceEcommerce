@@ -212,6 +212,97 @@ public sealed class PaymentIntegrationTests(ApiIntegrationTestFixture fixture)
         Assert.Equal(PaymentTransactionStatus.Pending, persisted.TransactionStatus);
     }
 
+    [Theory]
+    [InlineData("vnp_Amount", null)]
+    [InlineData("vnp_Amount", "not-a-number")]
+    [InlineData("vnp_Amount", "-100")]
+    [InlineData("vnp_Amount", "99999999999999999999999999999999999999")]
+    [InlineData("vnp_TransactionStatus", null)]
+    public async Task VNPayIpn_WithSignedInvalidPayload_ReturnsInvalidRequestAndDoesNotMutatePayment(
+        string field,
+        string? value)
+    {
+        await fixture.ResetDatabaseAsync();
+        var seed = await SeedPendingVNPayPaymentAsync("ORD-PAY-INVALID");
+        var parameters = CreateVNPayCallbackParameters(
+            seed.TxnRef,
+            seed.Amount,
+            "00",
+            "00",
+            "valid-hash");
+        if (value is null)
+        {
+            parameters.Remove(field);
+        }
+        else
+        {
+            parameters[field] = value;
+        }
+        using var client = fixture.CreateClient();
+
+        using var response = await client.GetAsync(
+            $"/api/payments/vnpay/ipn{QueryString.Create(parameters)}");
+        var json = await response.ReadJsonAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("99", json["RspCode"]!.GetValue<string>());
+        var persisted = await fixture.ExecuteDbAsync(async dbContext => new
+        {
+            PaymentStatus = await dbContext.Orders
+                .Where(order => order.Id == seed.OrderId)
+                .Select(order => order.PaymentStatus)
+                .SingleAsync(),
+            TransactionStatus = await dbContext.PaymentTransactions
+                .Where(transaction => transaction.TxnRef == seed.TxnRef)
+                .Select(transaction => transaction.Status)
+                .SingleAsync(),
+            CommandCount = await dbContext.ShipmentCommandOutbox
+                .CountAsync(command => command.OrderId == seed.OrderId)
+        });
+        Assert.Equal(PaymentStatus.Pending, persisted.PaymentStatus);
+        Assert.Equal(PaymentTransactionStatus.Pending, persisted.TransactionStatus);
+        Assert.Equal(0, persisted.CommandCount);
+    }
+
+    [Fact]
+    public async Task VNPayReturn_WithSignedInvalidPayload_RedirectsWithoutOrderDataAndDoesNotMutatePayment()
+    {
+        await fixture.ResetDatabaseAsync();
+        var seed = await SeedPendingVNPayPaymentAsync("ORD-PAY-INVALID-RETURN");
+        var parameters = CreateVNPayCallbackParameters(
+            seed.TxnRef,
+            seed.Amount,
+            "00",
+            "00",
+            "valid-hash");
+        parameters.Remove("vnp_TransactionStatus");
+        using var client = fixture.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+
+        using var response = await client.GetAsync(
+            $"/api/payments/vnpay/return{QueryString.Create(parameters)}");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var redirect = Assert.IsType<Uri>(response.Headers.Location);
+        Assert.Equal("?status=failed", redirect.Query);
+        Assert.Empty(redirect.Fragment);
+        var persisted = await fixture.ExecuteDbAsync(async dbContext => new
+        {
+            PaymentStatus = await dbContext.Orders
+                .Where(order => order.Id == seed.OrderId)
+                .Select(order => order.PaymentStatus)
+                .SingleAsync(),
+            TransactionStatus = await dbContext.PaymentTransactions
+                .Where(transaction => transaction.TxnRef == seed.TxnRef)
+                .Select(transaction => transaction.Status)
+                .SingleAsync()
+        });
+        Assert.Equal(PaymentStatus.Pending, persisted.PaymentStatus);
+        Assert.Equal(PaymentTransactionStatus.Pending, persisted.TransactionStatus);
+    }
+
     [Fact]
     public async Task VNPayIpn_WithUnknownTxnRef_ReturnsOrderNotFound()
     {
@@ -377,19 +468,35 @@ public sealed class PaymentIntegrationTests(ApiIntegrationTestFixture fixture)
         string transactionStatus,
         string secureHash)
     {
+        return $"{path}{QueryString.Create(CreateVNPayCallbackParameters(
+            txnRef,
+            amount,
+            responseCode,
+            transactionStatus,
+            secureHash))}";
+    }
+
+    private static Dictionary<string, string?> CreateVNPayCallbackParameters(
+        string txnRef,
+        decimal amount,
+        string responseCode,
+        string transactionStatus,
+        string secureHash)
+    {
         var gatewayAmount = decimal.Round(amount * 100m, 0, MidpointRounding.AwayFromZero)
             .ToString("0", System.Globalization.CultureInfo.InvariantCulture);
-        var query = new Dictionary<string, string?>
+        return new Dictionary<string, string?>
         {
+            ["vnp_TmnCode"] = "TESTTMN",
             ["vnp_TxnRef"] = txnRef,
             ["vnp_Amount"] = gatewayAmount,
+            ["vnp_BankCode"] = "NCB",
+            ["vnp_OrderInfo"] = $"Pay order {txnRef}",
             ["vnp_ResponseCode"] = responseCode,
             ["vnp_TransactionStatus"] = transactionStatus,
             ["vnp_TransactionNo"] = "14123456",
             ["vnp_SecureHash"] = secureHash
         };
-
-        return $"{path}{QueryString.Create(query)}";
     }
 
     private static string? GetResultToken(Uri redirect)

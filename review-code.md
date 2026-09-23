@@ -39,7 +39,7 @@ Các nhận định đã được đối chiếu lại với source và test t�
 | TASK-01 | F-01 Payment result authorization | P0 | Done 2026-09-23 | 10 Application tests, 2 token tests, 7 PostgreSQL/API integration tests, 14 frontend tests; build/lint/typecheck pass |
 | TASK-02 | F-02 Shipment webhook concurrency | P0 | Done 2026-09-23 | 14 unit tests, 7 PostgreSQL webhook tests, concurrent duplicate test passed 10/10 runs |
 | TASK-03 | F-03 Vulnerable SSH.NET dependency | P0 | Done 2026-09-23 | SSH.NET 2026.0.0; locked restore stable; audit gate clean; 617/617 backend tests pass in Release |
-| TASK-04 | F-04 VNPay callback validation | P1 | Open | Missing/malformed signed callback tests prove fail-closed behavior |
+| TASK-04 | F-04 VNPay callback validation | P1 | Done 2026-09-23 | Signed malformed matrix and 635/635 backend tests prove fail-closed behavior |
 | TASK-05 | F-05 Rate limiting | P1 | Open; production proof depends on Platform | Middleware tests + two-replica/edge evidence |
 | TASK-06 | F-06 Cart/checkout query count | P1 | Open | PostgreSQL command-count regression tests within fixed budgets |
 | TASK-07 | F-07 Email configuration | P1 | Open | Environment matrix tests reject unsafe non-Development settings |
@@ -144,6 +144,8 @@ Các nhận định đã được đối chiếu lại với source và test t�
   - Chạy đúng CI gate: xuất `dotnet list WorkspaceEcommerce.slnx package --vulnerable --include-transitive --format json`, sau đó chạy `./scripts/assert-no-nuget-vulnerabilities.ps1` với report vừa tạo.
 
 ### TASK-04 — VNPay callback fail-closed với required fields (F-04)
+
+- **Completion evidence (2026-09-23):** signature validity and payload validity are separate; required VNPay v2.1 callback fields are checked before any database read/mutation; amount must be numeric, positive, within provider length, and equal the stored amount; success requires both response/status `00`. Signed missing/malformed/negative/overflow callbacks return IPN `99` or a neutral failed browser redirect without changing payment/order/outbox state. All 322 Application, 216 Infrastructure, and 97 PostgreSQL/API integration tests passed in Release.
 
 - **Loại:** Risk về payment integrity
 - **Severity:** **Medium**, tác động tiềm năng High nhưng khả năng khai thác trực tiếp thấp do callback vẫn phải có chữ ký hợp lệ

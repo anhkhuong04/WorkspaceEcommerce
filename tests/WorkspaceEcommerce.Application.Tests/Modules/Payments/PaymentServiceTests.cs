@@ -89,6 +89,27 @@ public sealed class PaymentServiceTests
     }
 
     [Fact]
+    public async Task HandleVNPayReturnAsync_InvalidSignedPayload_ReturnsValidationAndDoesNotMutatePayment()
+    {
+        var setup = CreatePendingPayment();
+        var service = CreateService(
+            setup.DbContext,
+            new FakeVNPayPaymentService
+            {
+                ValidationErrors = ["VNPay amount is missing or invalid."]
+            });
+
+        var result = await service.HandleVNPayReturnAsync(
+            CreateCallback(setup.Transaction.TxnRef, "00", "00", setup.Transaction.Amount));
+
+        Assert.Equal(ResultStatus.Validation, result.Status);
+        Assert.Contains("Invalid VNPay callback data.", result.Errors);
+        Assert.Equal(PaymentStatus.Pending, setup.Order.PaymentStatus);
+        Assert.Equal(PaymentTransactionStatus.Pending, setup.Transaction.Status);
+        Assert.Empty(setup.DbContext.ShipmentCommandOutbox);
+    }
+
+    [Fact]
     public async Task HandleVNPayReturnAsync_UnknownTxnRef_ReturnsNotFound()
     {
         var setup = CreatePendingPayment();
@@ -291,6 +312,8 @@ public sealed class PaymentServiceTests
     {
         public bool IsValid { get; init; } = true;
 
+        public IReadOnlyList<string> ValidationErrors { get; init; } = [];
+
         public string CreatePaymentUrl(VNPayCreatePaymentUrlRequest request)
         {
             return "https://vnpay.test/pay";
@@ -307,12 +330,13 @@ public sealed class PaymentServiceTests
                 parameters.GetValueOrDefault("vnp_TransactionNo"),
                 parameters.GetValueOrDefault("vnp_SecureHash"),
                 parameters.GetValueOrDefault("vnp_OrderInfo"),
-                parameters);
+                parameters,
+                ValidationErrors);
         }
 
         public VNPayPaymentOutcome GetPaymentOutcome(string? responseCode, string? transactionStatus)
         {
-            if (responseCode == "00" && (string.IsNullOrWhiteSpace(transactionStatus) || transactionStatus == "00"))
+            if (responseCode == "00" && transactionStatus == "00")
             {
                 return VNPayPaymentOutcome.Success;
             }

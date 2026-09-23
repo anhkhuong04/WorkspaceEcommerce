@@ -55,11 +55,14 @@ public sealed class VNPayPaymentServiceTests
         parameters["vnp_ResponseCode"] = "00";
         parameters["vnp_TransactionStatus"] = "00";
         parameters["vnp_TransactionNo"] = "14123456";
+        parameters["vnp_BankCode"] = "NCB";
         Resign(parameters);
 
         var result = service.VerifyCallback(parameters);
 
-        Assert.True(result.IsValid);
+        Assert.True(result.IsSignatureValid);
+        Assert.True(result.HasValidPayload);
+        Assert.Empty(result.ValidationErrors);
         Assert.Equal("ORD-002", result.TxnRef);
         Assert.Equal(10000m, result.Amount);
         Assert.Equal("00", result.ResponseCode);
@@ -101,13 +104,48 @@ public sealed class VNPayPaymentServiceTests
 
         var result = service.VerifyCallback(parameters);
 
-        Assert.False(result.IsValid);
+        Assert.False(result.IsSignatureValid);
         Assert.Equal(0.01m, result.Amount);
     }
 
     [Theory]
+    [InlineData("vnp_Amount", null)]
+    [InlineData("vnp_Amount", "not-a-number")]
+    [InlineData("vnp_Amount", "-100")]
+    [InlineData("vnp_Amount", "99999999999999999999999999999999999999")]
+    [InlineData("vnp_TransactionStatus", null)]
+    [InlineData("vnp_TxnRef", null)]
+    [InlineData("vnp_ResponseCode", null)]
+    [InlineData("vnp_TransactionNo", null)]
+    [InlineData("vnp_TmnCode", null)]
+    [InlineData("vnp_BankCode", null)]
+    [InlineData("vnp_OrderInfo", null)]
+    public void VerifyCallback_SignedInvalidRequiredField_FailsPayloadValidation(
+        string field,
+        string? value)
+    {
+        var service = CreateService();
+        var parameters = CreateValidCallbackParameters(service);
+        if (value is null)
+        {
+            parameters.Remove(field);
+        }
+        else
+        {
+            parameters[field] = value;
+        }
+        Resign(parameters);
+
+        var result = service.VerifyCallback(parameters);
+
+        Assert.True(result.IsSignatureValid);
+        Assert.False(result.HasValidPayload);
+        Assert.NotEmpty(result.ValidationErrors);
+    }
+
+    [Theory]
     [InlineData("00", "00", VNPayPaymentOutcome.Success)]
-    [InlineData("00", null, VNPayPaymentOutcome.Success)]
+    [InlineData("00", null, VNPayPaymentOutcome.Failed)]
     [InlineData("24", "02", VNPayPaymentOutcome.Cancelled)]
     [InlineData("99", "02", VNPayPaymentOutcome.Failed)]
     public void GetPaymentOutcome_MapsResponseCodes(
@@ -142,6 +180,23 @@ public sealed class VNPayPaymentServiceTests
     private static VNPayPaymentService CreateService()
     {
         return new VNPayPaymentService(Options.Create(CreateOptions()));
+    }
+
+    private static Dictionary<string, string?> CreateValidCallbackParameters(VNPayPaymentService service)
+    {
+        var parameters = ParseQuery(service.CreatePaymentUrl(new VNPayCreatePaymentUrlRequest
+        {
+            TxnRef = "ORD-VALID-CALLBACK",
+            Amount = 10000m,
+            OrderInfo = "Pay order ORD-VALID-CALLBACK",
+            IpAddress = "127.0.0.1"
+        }));
+        parameters["vnp_BankCode"] = "NCB";
+        parameters["vnp_TransactionNo"] = "14123456";
+        parameters["vnp_ResponseCode"] = "00";
+        parameters["vnp_TransactionStatus"] = "00";
+        Resign(parameters);
+        return parameters;
     }
 
     private static VNPayOptions CreateOptions()

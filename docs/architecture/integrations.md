@@ -8,8 +8,10 @@ credentials, availability, and undocumented behavior.
 
 - Checkout creates a pending provider transaction and a redirect URL; card/bank
   credentials never enter WorkspaceEcommerce.
-- Browser return and IPN both verify HMAC data and converge on the same locked,
-  idempotent finalization path. Amount must equal the stored transaction amount.
+- Browser return and IPN both verify HMAC data, reject missing or malformed
+  required provider fields, and converge on the same locked, idempotent
+  finalization path. Amount must be positive and equal the stored transaction
+  amount; success requires both response and transaction status `00`.
 - A successful transaction marks the order paid and inserts shipment-create work
   in the same database transaction.
 - Treat IPN as server evidence and the browser redirect as user navigation. Do

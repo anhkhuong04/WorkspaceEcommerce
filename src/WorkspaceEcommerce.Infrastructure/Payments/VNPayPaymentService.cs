@@ -80,34 +80,50 @@ internal sealed class VNPayPaymentService(IOptions<VNPayOptions> options) : IVNP
         ValidateOptions(configuredOptions);
 
         parameters.TryGetValue(SecureHashParameterName, out var receivedSecureHash);
-        var isValid = !string.IsNullOrWhiteSpace(receivedSecureHash) &&
+        var isSignatureValid = !string.IsNullOrWhiteSpace(receivedSecureHash) &&
             string.Equals(
                 CreateSecureHash(parameters, configuredOptions.HashSecret),
                 receivedSecureHash.Trim(),
                 StringComparison.OrdinalIgnoreCase);
 
-        var amount = TryParseGatewayAmount(GetValue(parameters, "vnp_Amount"));
+        var txnRef = GetValue(parameters, "vnp_TxnRef");
+        var rawAmount = GetValue(parameters, "vnp_Amount");
+        var amount = TryParseGatewayAmount(rawAmount);
+        var responseCode = GetValue(parameters, "vnp_ResponseCode");
+        var transactionStatus = GetValue(parameters, "vnp_TransactionStatus");
+        var gatewayTransactionNo = GetValue(parameters, "vnp_TransactionNo");
+        var orderInfo = GetValue(parameters, "vnp_OrderInfo");
 
         return new VNPayCallbackVerificationResult(
-            isValid,
-            GetValue(parameters, "vnp_TxnRef"),
+            isSignatureValid,
+            txnRef,
             amount,
-            GetValue(parameters, "vnp_ResponseCode"),
-            GetValue(parameters, "vnp_TransactionStatus"),
-            GetValue(parameters, "vnp_TransactionNo"),
+            responseCode,
+            transactionStatus,
+            gatewayTransactionNo,
             receivedSecureHash,
-            GetValue(parameters, "vnp_OrderInfo"),
+            orderInfo,
             parameters.ToDictionary(
                 parameter => parameter.Key,
                 parameter => parameter.Value,
-                StringComparer.Ordinal));
+                StringComparer.Ordinal),
+            ValidateCallbackPayload(
+                configuredOptions,
+                GetValue(parameters, "vnp_TmnCode"),
+                txnRef,
+                rawAmount,
+                amount,
+                GetValue(parameters, "vnp_BankCode"),
+                orderInfo,
+                gatewayTransactionNo,
+                responseCode,
+                transactionStatus));
     }
 
     public VNPayPaymentOutcome GetPaymentOutcome(string? responseCode, string? transactionStatus)
     {
         if (string.Equals(responseCode, "00", StringComparison.Ordinal) &&
-            (string.IsNullOrWhiteSpace(transactionStatus) ||
-             string.Equals(transactionStatus, "00", StringComparison.Ordinal)))
+            string.Equals(transactionStatus, "00", StringComparison.Ordinal))
         {
             return VNPayPaymentOutcome.Success;
         }
@@ -163,6 +179,75 @@ internal sealed class VNPayPaymentService(IOptions<VNPayOptions> options) : IVNP
         }
 
         return gatewayAmount / 100m;
+    }
+
+    private static string[] ValidateCallbackPayload(
+        VNPayOptions configuredOptions,
+        string? tmnCode,
+        string? txnRef,
+        string? rawAmount,
+        decimal? amount,
+        string? bankCode,
+        string? orderInfo,
+        string? gatewayTransactionNo,
+        string? responseCode,
+        string? transactionStatus)
+    {
+        var errors = new List<string>();
+
+        if (!string.Equals(tmnCode, configuredOptions.TmnCode, StringComparison.Ordinal))
+        {
+            errors.Add("VNPay merchant code is missing or invalid.");
+        }
+
+        if (string.IsNullOrWhiteSpace(txnRef) || txnRef.Length > 100)
+        {
+            errors.Add("VNPay transaction reference is missing or invalid.");
+        }
+
+        if (string.IsNullOrWhiteSpace(rawAmount) ||
+            rawAmount.Length > 12 ||
+            rawAmount.Any(character => !char.IsAsciiDigit(character)) ||
+            amount is null ||
+            amount <= 0m)
+        {
+            errors.Add("VNPay amount is missing or invalid.");
+        }
+
+        if (string.IsNullOrWhiteSpace(bankCode) || bankCode.Length is < 3 or > 20)
+        {
+            errors.Add("VNPay bank code is missing or invalid.");
+        }
+
+        if (string.IsNullOrWhiteSpace(orderInfo) || orderInfo.Length > 255)
+        {
+            errors.Add("VNPay order information is missing or invalid.");
+        }
+
+        if (!IsNumericCode(gatewayTransactionNo, 1, 15))
+        {
+            errors.Add("VNPay gateway transaction number is missing or invalid.");
+        }
+
+        if (!IsNumericCode(responseCode, 2, 2))
+        {
+            errors.Add("VNPay response code is missing or invalid.");
+        }
+
+        if (!IsNumericCode(transactionStatus, 2, 2))
+        {
+            errors.Add("VNPay transaction status is missing or invalid.");
+        }
+
+        return [.. errors];
+    }
+
+    private static bool IsNumericCode(string? value, int minimumLength, int maximumLength)
+    {
+        return !string.IsNullOrWhiteSpace(value) &&
+            value.Length >= minimumLength &&
+            value.Length <= maximumLength &&
+            value.All(char.IsAsciiDigit);
     }
 
     private static string ToVNPayDate(DateTimeOffset value)

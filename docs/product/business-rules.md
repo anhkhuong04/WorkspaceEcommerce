@@ -55,9 +55,11 @@ warranty eligibility.
 
 - Supported order payment methods are COD, manual bank transfer, and VNPay.
   COD starts `Unpaid`; bank transfer and VNPay start `Pending`.
-- VNPay callbacks must have a valid signature and matching amount. The payment
-  transaction and order are locked so browser return, IPN, and provider retries
-  cannot finalize the same attempt twice.
+- VNPay callbacks must have a valid signature, all required provider fields, and
+  a positive amount matching the stored transaction. Success requires both
+  provider response/status codes to be `00`. The payment transaction and order
+  are locked so browser return, IPN, and provider retries cannot finalize the
+  same attempt twice.
 - Accepted COD orders enqueue shipment creation during checkout. Successful
   VNPay callbacks enqueue it in the payment transaction. The background worker
   is the only component allowed to mutate MiniLogistics.

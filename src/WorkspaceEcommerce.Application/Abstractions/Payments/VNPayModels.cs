@@ -18,7 +18,7 @@ public sealed class VNPayCreatePaymentUrlRequest
 }
 
 public sealed record VNPayCallbackVerificationResult(
-    bool IsValid,
+    bool IsSignatureValid,
     string? TxnRef,
     decimal? Amount,
     string? ResponseCode,
@@ -26,7 +26,11 @@ public sealed record VNPayCallbackVerificationResult(
     string? GatewayTransactionNo,
     string? SecureHash,
     string? OrderInfo,
-    IReadOnlyDictionary<string, string?> Parameters);
+    IReadOnlyDictionary<string, string?> Parameters,
+    IReadOnlyList<string> ValidationErrors)
+{
+    public bool HasValidPayload => ValidationErrors.Count == 0;
+}
 
 public enum VNPayPaymentOutcome
 {

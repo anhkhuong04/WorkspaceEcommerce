@@ -257,22 +257,24 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
             IReadOnlyDictionary<string, string?> parameters)
         {
             parameters.TryGetValue("vnp_SecureHash", out var secureHash);
+            var amount = TryParseGatewayAmount(GetValue(parameters, "vnp_Amount"));
 
             return new VNPayCallbackVerificationResult(
                 string.Equals(secureHash, "valid-hash", StringComparison.Ordinal),
                 GetValue(parameters, "vnp_TxnRef"),
-                TryParseGatewayAmount(GetValue(parameters, "vnp_Amount")),
+                amount,
                 GetValue(parameters, "vnp_ResponseCode"),
                 GetValue(parameters, "vnp_TransactionStatus"),
                 GetValue(parameters, "vnp_TransactionNo"),
                 secureHash,
                 GetValue(parameters, "vnp_OrderInfo"),
-                parameters);
+                parameters,
+                ValidateCallbackPayload(parameters, amount));
         }
 
         public VNPayPaymentOutcome GetPaymentOutcome(string? responseCode, string? transactionStatus)
         {
-            if (responseCode == "00" && (string.IsNullOrWhiteSpace(transactionStatus) || transactionStatus == "00"))
+            if (responseCode == "00" && transactionStatus == "00")
             {
                 return VNPayPaymentOutcome.Success;
             }
@@ -298,6 +300,37 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
                 out var amount)
                 ? amount / 100m
                 : null;
+        }
+
+        private static string[] ValidateCallbackPayload(
+            IReadOnlyDictionary<string, string?> parameters,
+            decimal? amount)
+        {
+            var requiredFields = new[]
+            {
+                "vnp_TmnCode",
+                "vnp_TxnRef",
+                "vnp_BankCode",
+                "vnp_OrderInfo",
+                "vnp_TransactionNo",
+                "vnp_ResponseCode",
+                "vnp_TransactionStatus"
+            };
+            var errors = requiredFields
+                .Where(field => string.IsNullOrWhiteSpace(GetValue(parameters, field)))
+                .Select(field => $"{field} is required.")
+                .ToList();
+            var rawAmount = GetValue(parameters, "vnp_Amount");
+            if (string.IsNullOrWhiteSpace(rawAmount) ||
+                rawAmount.Length > 12 ||
+                rawAmount.Any(character => !char.IsAsciiDigit(character)) ||
+                amount is null ||
+                amount <= 0m)
+            {
+                errors.Add("vnp_Amount is invalid.");
+            }
+
+            return [.. errors];
         }
     }
 

@@ -574,12 +574,13 @@ public sealed class CheckoutServiceTests
                 parameters.GetValueOrDefault("vnp_TransactionNo"),
                 parameters.GetValueOrDefault("vnp_SecureHash"),
                 parameters.GetValueOrDefault("vnp_OrderInfo"),
-                parameters);
+                parameters,
+                []);
         }
 
         public VNPayPaymentOutcome GetPaymentOutcome(string? responseCode, string? transactionStatus)
         {
-            return responseCode == "00"
+            return responseCode == "00" && transactionStatus == "00"
                 ? VNPayPaymentOutcome.Success
                 : VNPayPaymentOutcome.Failed;
         }

@@ -27,9 +27,14 @@ internal sealed class PaymentService(
         }
 
         var verification = vnPayPaymentService.VerifyCallback(request.Parameters);
-        if (!verification.IsValid)
+        if (!verification.IsSignatureValid)
         {
             return Result<PaymentResultDto>.Validation(["Invalid VNPay secure hash."]);
+        }
+
+        if (!verification.HasValidPayload)
+        {
+            return Result<PaymentResultDto>.Validation(["Invalid VNPay callback data."]);
         }
 
         return await ProcessVerifiedVNPayCallbackAsync(verification, cancellationToken);
@@ -45,9 +50,14 @@ internal sealed class PaymentService(
         }
 
         var verification = vnPayPaymentService.VerifyCallback(request.Parameters);
-        if (!verification.IsValid)
+        if (!verification.IsSignatureValid)
         {
             return Result<VNPayIpnResponseDto>.Success(new VNPayIpnResponseDto("97", "Invalid checksum"));
+        }
+
+        if (!verification.HasValidPayload)
+        {
+            return Result<VNPayIpnResponseDto>.Success(new VNPayIpnResponseDto("99", "Invalid request"));
         }
 
         var result = await ProcessVerifiedVNPayCallbackAsync(verification, cancellationToken);
@@ -157,7 +167,13 @@ internal sealed class PaymentService(
                     return;
                 }
 
-                if (verification.Amount is not null && verification.Amount.Value != transaction.Amount)
+                if (verification.Amount is not { } callbackAmount)
+                {
+                    callbackResult = Result<PaymentResultDto>.Validation(["VNPay amount is required."]);
+                    return;
+                }
+
+                if (callbackAmount != transaction.Amount)
                 {
                     callbackResult = Result<PaymentResultDto>.Conflict("VNPay amount does not match payment transaction amount.");
                     return;
