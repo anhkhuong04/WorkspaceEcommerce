@@ -241,40 +241,55 @@ internal sealed class StorefrontCartService(
         IEnumerable<CartItem> items,
         CancellationToken cancellationToken)
     {
-        var result = new List<CartItemDto>();
-        foreach (var item in items)
+        var materializedItems = items.ToArray();
+        if (materializedItems.Length == 0)
         {
-            result.Add(await ToItemDtoAsync(item, cancellationToken));
+            return [];
         }
 
-        return result;
-    }
+        var variantIds = materializedItems
+            .Select(item => item.ProductVariantId)
+            .Distinct()
+            .OrderBy(id => id)
+            .ToArray();
+        var variantsById = (await cartStore.FindProductVariantsByIdsAsync(variantIds, cancellationToken))
+            .ToDictionary(variant => variant.Id);
+        var productIds = variantsById.Values
+            .Select(variant => variant.ProductId)
+            .Distinct()
+            .OrderBy(id => id)
+            .ToArray();
+        var productsById = (await cartStore.FindProductsByIdsAsync(productIds, cancellationToken))
+            .ToDictionary(product => product.Id);
 
-    private async Task<CartItemDto> ToItemDtoAsync(
-        CartItem item,
-        CancellationToken cancellationToken)
-    {
-        var variant = await cartStore.FindProductVariantByIdAsync(item.ProductVariantId, cancellationToken);
-        var product = variant is null
-            ? null
-            : await cartStore.FindProductByIdAsync(variant.ProductId, cancellationToken);
-        var image = product is null
-            ? null
-            : await cartStore.FindPrimaryProductImageByProductIdAsync(product.Id, cancellationToken);
+        return materializedItems
+            .Select(item =>
+            {
+                variantsById.TryGetValue(item.ProductVariantId, out var variant);
+                var product = variant is not null && productsById.TryGetValue(variant.ProductId, out var matchedProduct)
+                    ? matchedProduct
+                    : null;
+                var primaryImageUrl = product?.Images
+                    .OrderBy(image => image.SortOrder)
+                    .ThenBy(image => image.ImageUrl)
+                    .Select(image => image.ImageUrl)
+                    .FirstOrDefault();
 
-        return new CartItemDto(
-            item.Id,
-            item.ProductVariantId,
-            variant?.ProductId ?? Guid.Empty,
-            product?.Name.Get(languageProvider.CurrentLanguage) ?? "Product",
-            product?.Slug ?? string.Empty,
-            variant?.Name ?? "Variant",
-            variant?.Color,
-            variant?.Size,
-            image?.ImageUrl,
-            item.Quantity,
-            item.UnitPriceSnapshot,
-            item.LineTotal);
+                return new CartItemDto(
+                    item.Id,
+                    item.ProductVariantId,
+                    variant?.ProductId ?? Guid.Empty,
+                    product?.Name.Get(languageProvider.CurrentLanguage) ?? "Product",
+                    product?.Slug ?? string.Empty,
+                    variant?.Name ?? "Variant",
+                    variant?.Color,
+                    variant?.Size,
+                    primaryImageUrl,
+                    item.Quantity,
+                    item.UnitPriceSnapshot,
+                    item.LineTotal);
+            })
+            .ToArray();
     }
 
     private static CartDto EmptyCart(string sessionId)

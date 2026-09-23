@@ -9,9 +9,15 @@ public interface ICartStore
 
     Task<ProductVariant?> FindProductVariantByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<ProductVariant[]> FindProductVariantsByIdsAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken = default);
+
     Task<Product?> FindProductByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
-    Task<ProductImage?> FindPrimaryProductImageByProductIdAsync(Guid productId, CancellationToken cancellationToken = default);
+    Task<Product[]> FindProductsByIdsAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken = default);
 
     Task<Category?> FindCategoryByIdAsync(Guid id, CancellationToken cancellationToken = default);
 

@@ -37,3 +37,5 @@ The actual plan records include the generated SQL, returned rows, filter removal
 ## Automated guardrail
 
 `AdminOrderIntegrationTests.ListOrders_UsesBoundedCountAndPageQueries` captures PostgreSQL commands and allows exactly two selects: count and page. It prevents a return to page-wide child lookup/N+1 behavior.
+
+`CartCheckoutQueryBudgetIntegrationTests` verifies the cart and checkout hot paths with both 1 and 20 distinct items. Cart reads allow exactly 3 selects; COD and manual-bank-transfer checkout allow 5; VNPay checkout allows 8 because its provider quote is built before the transaction and authoritative catalog/stock data is loaded again under the transaction lock. Any item-count-dependent increase fails the suite.

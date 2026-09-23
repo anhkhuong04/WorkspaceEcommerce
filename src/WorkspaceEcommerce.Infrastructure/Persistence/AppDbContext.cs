@@ -479,6 +479,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             .FirstOrDefaultAsync(variant => variant.Id == id, cancellationToken);
     }
 
+    Task<ProductVariant[]> ICartStore.FindProductVariantsByIdsAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken) =>
+        ProductVariants
+            .Where(variant => ids.Contains(variant.Id))
+            .ToArrayAsync(cancellationToken);
+
     async Task<Product?> ICartStore.FindProductByIdAsync(
         Guid id,
         CancellationToken cancellationToken)
@@ -488,15 +495,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             .FirstOrDefaultAsync(product => product.Id == id, cancellationToken);
     }
 
-    async Task<ProductImage?> ICartStore.FindPrimaryProductImageByProductIdAsync(
-        Guid productId,
-        CancellationToken cancellationToken)
-    {
-        return await ProductImages
-            .OrderBy(image => image.SortOrder)
-            .ThenBy(image => image.ImageUrl)
-            .FirstOrDefaultAsync(image => image.ProductId == productId, cancellationToken);
-    }
+    Task<Product[]> ICartStore.FindProductsByIdsAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken) =>
+        Products
+            .Include(product => product.Images)
+            .Where(product => ids.Contains(product.Id))
+            .ToArrayAsync(cancellationToken);
 
     async Task<Category?> ICartStore.FindCategoryByIdAsync(
         Guid id,
@@ -515,31 +520,34 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             .FirstOrDefaultAsync(cart => cart.SessionId == sessionId, cancellationToken);
     }
 
-    async Task<ProductVariant?> ICheckoutStore.FindProductVariantByIdAsync(
-        Guid id,
-        CancellationToken cancellationToken)
-    {
-        return await ProductVariants
-            .FromSqlInterpolated($"SELECT * FROM catalog.product_variants WHERE id = {id} FOR UPDATE")
-            .FirstOrDefaultAsync(cancellationToken);
-    }
+    Task<ProductVariant[]> ICheckoutStore.FindProductVariantsByIdsAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken) =>
+        ProductVariants
+            .Where(variant => ids.Contains(variant.Id))
+            .ToArrayAsync(cancellationToken);
 
-    async Task<Product?> ICheckoutStore.FindProductByIdAsync(
-        Guid id,
-        CancellationToken cancellationToken)
-    {
-        return await Products
+    Task<ProductVariant[]> ICheckoutStore.FindProductVariantsForUpdateAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken) =>
+        ProductVariants
+            .FromSqlInterpolated($"SELECT * FROM catalog.product_variants WHERE id = ANY ({ids}) ORDER BY id FOR UPDATE")
+            .ToArrayAsync(cancellationToken);
+
+    Task<Product[]> ICheckoutStore.FindProductsByIdsAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken) =>
+        Products
             .Include(product => product.Images)
-            .FirstOrDefaultAsync(product => product.Id == id, cancellationToken);
-    }
+            .Where(product => ids.Contains(product.Id))
+            .ToArrayAsync(cancellationToken);
 
-    async Task<Category?> ICheckoutStore.FindCategoryByIdAsync(
-        Guid id,
-        CancellationToken cancellationToken)
-    {
-        return await Categories
-            .FirstOrDefaultAsync(category => category.Id == id, cancellationToken);
-    }
+    Task<Category[]> ICheckoutStore.FindCategoriesByIdsAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken) =>
+        Categories
+            .Where(category => ids.Contains(category.Id))
+            .ToArrayAsync(cancellationToken);
 
     async Task<Coupon?> ICheckoutStore.FindCouponByCodeAsync(
         string code,

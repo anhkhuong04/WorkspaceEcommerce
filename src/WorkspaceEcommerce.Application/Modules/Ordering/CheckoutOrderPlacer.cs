@@ -36,7 +36,10 @@ internal sealed class CheckoutOrderPlacer(
         {
             await checkoutStore.ExecuteInTransactionAsync(async transactionCancellationToken =>
             {
-                var itemSnapshotsResult = await cartBuilder.BuildItemSnapshotsAsync(cart, transactionCancellationToken);
+                var itemSnapshotsResult = await cartBuilder.BuildItemSnapshotsAsync(
+                    cart,
+                    lockVariants: true,
+                    transactionCancellationToken);
                 if (itemSnapshotsResult.IsFailure)
                 {
                     failure = ToPlacementFailure(itemSnapshotsResult);

@@ -54,27 +54,43 @@ internal sealed class FakeCheckoutStore : ICheckoutStore
         return Task.FromResult(_carts.FirstOrDefault(cart => cart.SessionId == sessionId));
     }
 
-    public Task<ProductVariant?> FindProductVariantByIdAsync(
-        Guid id,
+    public Task<ProductVariant[]> FindProductVariantsByIdsAsync(
+        Guid[] ids,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return Task.FromResult(_productVariants.FirstOrDefault(variant => variant.Id == id));
+        return Task.FromResult(_productVariants.Where(variant => ids.Contains(variant.Id)).ToArray());
     }
 
-    public Task<Product?> FindProductByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task<ProductVariant[]> FindProductVariantsForUpdateAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return Task.FromResult(_products.FirstOrDefault(product => product.Id == id));
+        return Task.FromResult(_productVariants
+            .Where(variant => ids.Contains(variant.Id))
+            .OrderBy(variant => variant.Id)
+            .ToArray());
     }
 
-    public Task<Category?> FindCategoryByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task<Product[]> FindProductsByIdsAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return Task.FromResult(_categories.FirstOrDefault(category => category.Id == id));
+        return Task.FromResult(_products.Where(product => ids.Contains(product.Id)).ToArray());
+    }
+
+    public Task<Category[]> FindCategoriesByIdsAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return Task.FromResult(_categories.Where(category => ids.Contains(category.Id)).ToArray());
     }
 
     public Task<Coupon?> FindCouponByCodeAsync(

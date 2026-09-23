@@ -13,26 +13,48 @@ internal sealed class CheckoutCartBuilder(
 {
     public async Task<Result<IReadOnlyCollection<CheckoutItemSnapshot>>> BuildItemSnapshotsAsync(
         CartAggregate cart,
+        bool lockVariants,
         CancellationToken cancellationToken)
     {
+        var cartItems = cart.Items.ToArray();
+        var variantIds = cartItems
+            .Select(item => item.ProductVariantId)
+            .Distinct()
+            .OrderBy(id => id)
+            .ToArray();
+        var variants = lockVariants
+            ? await checkoutStore.FindProductVariantsForUpdateAsync(variantIds, cancellationToken)
+            : await checkoutStore.FindProductVariantsByIdsAsync(variantIds, cancellationToken);
+        var variantsById = variants.ToDictionary(variant => variant.Id);
+        var productIds = variants
+            .Select(variant => variant.ProductId)
+            .Distinct()
+            .OrderBy(id => id)
+            .ToArray();
+        var products = await checkoutStore.FindProductsByIdsAsync(productIds, cancellationToken);
+        var productsById = products.ToDictionary(product => product.Id);
+        var categoryIds = products
+            .Select(product => product.CategoryId)
+            .Distinct()
+            .OrderBy(id => id)
+            .ToArray();
+        var categoriesById = (await checkoutStore.FindCategoriesByIdsAsync(categoryIds, cancellationToken))
+            .ToDictionary(category => category.Id);
         var snapshots = new List<CheckoutItemSnapshot>();
 
-        foreach (var cartItem in cart.Items)
+        foreach (var cartItem in cartItems)
         {
-            var variant = await checkoutStore.FindProductVariantByIdAsync(cartItem.ProductVariantId, cancellationToken);
-            if (variant is null || !variant.IsActive)
+            if (!variantsById.TryGetValue(cartItem.ProductVariantId, out var variant) || !variant.IsActive)
             {
                 return Result<IReadOnlyCollection<CheckoutItemSnapshot>>.NotFound("Product variant was not found.");
             }
 
-            var product = await checkoutStore.FindProductByIdAsync(variant.ProductId, cancellationToken);
-            if (product is null || !product.IsActive)
+            if (!productsById.TryGetValue(variant.ProductId, out var product) || !product.IsActive)
             {
                 return Result<IReadOnlyCollection<CheckoutItemSnapshot>>.NotFound("Product variant was not found.");
             }
 
-            var category = await checkoutStore.FindCategoryByIdAsync(product.CategoryId, cancellationToken);
-            if (category is null || !category.IsActive)
+            if (!categoriesById.TryGetValue(product.CategoryId, out var category) || !category.IsActive)
             {
                 return Result<IReadOnlyCollection<CheckoutItemSnapshot>>.NotFound("Product variant was not found.");
             }

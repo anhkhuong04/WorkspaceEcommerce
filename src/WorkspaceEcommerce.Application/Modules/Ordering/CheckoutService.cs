@@ -36,7 +36,10 @@ internal sealed class CheckoutService(
             return Result<GetShippingQuoteResponse>.Validation(["Cart is empty."]);
         }
 
-        var itemSnapshotsResult = await cartBuilder.BuildItemSnapshotsAsync(cart, cancellationToken);
+        var itemSnapshotsResult = await cartBuilder.BuildItemSnapshotsAsync(
+            cart,
+            lockVariants: false,
+            cancellationToken);
         if (itemSnapshotsResult.IsFailure)
         {
             return itemSnapshotsResult.Status switch
@@ -71,7 +74,10 @@ internal sealed class CheckoutService(
             return Result<CheckoutCouponValidationResponse>.Validation(["Cart is empty."]);
         }
 
-        var itemSnapshotsResult = await cartBuilder.BuildItemSnapshotsAsync(cart, cancellationToken);
+        var itemSnapshotsResult = await cartBuilder.BuildItemSnapshotsAsync(
+            cart,
+            lockVariants: false,
+            cancellationToken);
         if (itemSnapshotsResult.IsFailure)
         {
             return CheckoutResultMapper.ToCouponValidationFailure(itemSnapshotsResult);
@@ -120,7 +126,10 @@ internal sealed class CheckoutService(
 
         if (request.PaymentMethod == PaymentMethod.VNPay)
         {
-            var quoteSnapshotsResult = await cartBuilder.BuildItemSnapshotsAsync(cart, cancellationToken);
+            var quoteSnapshotsResult = await cartBuilder.BuildItemSnapshotsAsync(
+                cart,
+                lockVariants: false,
+                cancellationToken);
             if (quoteSnapshotsResult.IsFailure)
             {
                 return CheckoutResultMapper.ToCheckoutFailure(quoteSnapshotsResult);

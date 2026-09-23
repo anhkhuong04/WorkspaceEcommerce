@@ -33,6 +33,15 @@ internal sealed class FakeCartStore : ICartStore
         return Task.FromResult(_productVariants.FirstOrDefault(variant => variant.Id == id));
     }
 
+    public Task<ProductVariant[]> FindProductVariantsByIdsAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return Task.FromResult(_productVariants.Where(variant => ids.Contains(variant.Id)).ToArray());
+    }
+
     public Task<Product?> FindProductByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -40,16 +49,13 @@ internal sealed class FakeCartStore : ICartStore
         return Task.FromResult(_products.FirstOrDefault(product => product.Id == id));
     }
 
-    public Task<ProductImage?> FindPrimaryProductImageByProductIdAsync(Guid productId, CancellationToken cancellationToken = default)
+    public Task<Product[]> FindProductsByIdsAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return Task.FromResult(
-            _productImages
-                .Where(image => image.ProductId == productId)
-                .OrderBy(image => image.SortOrder)
-                .ThenBy(image => image.ImageUrl)
-                .FirstOrDefault());
+        return Task.FromResult(_products.Where(product => ids.Contains(product.Id)).ToArray());
     }
 
     public Task<Category?> FindCategoryByIdAsync(Guid id, CancellationToken cancellationToken = default)

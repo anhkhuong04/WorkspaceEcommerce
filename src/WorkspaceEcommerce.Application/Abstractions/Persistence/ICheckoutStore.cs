@@ -10,11 +10,21 @@ public interface ICheckoutStore
 {
     Task<Cart?> FindCartBySessionIdAsync(string sessionId, CancellationToken cancellationToken = default);
 
-    Task<ProductVariant?> FindProductVariantByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<ProductVariant[]> FindProductVariantsByIdsAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken = default);
 
-    Task<Product?> FindProductByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<ProductVariant[]> FindProductVariantsForUpdateAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken = default);
 
-    Task<Category?> FindCategoryByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<Product[]> FindProductsByIdsAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken = default);
+
+    Task<Category[]> FindCategoriesByIdsAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken = default);
 
     Task<Coupon?> FindCouponByCodeAsync(string code, CancellationToken cancellationToken = default);
 

@@ -41,7 +41,7 @@ Các nhận định đã được đối chiếu lại với source và test t�
 | TASK-03 | F-03 Vulnerable SSH.NET dependency | P0 | Done 2026-09-23 | SSH.NET 2026.0.0; locked restore stable; audit gate clean; 617/617 backend tests pass in Release |
 | TASK-04 | F-04 VNPay callback validation | P1 | Done 2026-09-23 | Signed malformed matrix and 635/635 backend tests prove fail-closed behavior |
 | TASK-05 | F-05 Rate limiting | P1 | Repository done 2026-09-23; Platform evidence open | 3 middleware/partition tests and 638/638 backend tests pass; two-replica edge evidence still required |
-| TASK-06 | F-06 Cart/checkout query count | P1 | Open | PostgreSQL command-count regression tests within fixed budgets |
+| TASK-06 | F-06 Cart/checkout query count | P1 | Done 2026-09-24 | PostgreSQL budgets: cart 3, COD/bank 5, VNPay 8 SELECTs for both 1 and 20 items |
 | TASK-07 | F-07 Email configuration | P1 | Done 2026-09-24 | 21 configuration/composition tests cover Development, Staging, QA, and Production |
 | TASK-08 | F-08 Cleanup batching | P1 | Open | Large-data integration test proves bounded batches and correct FK order |
 | TASK-09 | F-09 Warranty activation concurrency | P1 | Open; required before enabling warranty admin | Concurrent activation test produces one activation/audit/email set |
@@ -201,6 +201,8 @@ Các nhận định đã được đối chiếu lại với source và test t�
   - Platform chạy two-replica test trên staging: tổng accepted requests không vượt quota toàn cục; restart một replica không reset quota. Đính kèm cấu hình đã redacted và metric/log evidence.
 
 ### TASK-06 — Đặt query budget cho cart/checkout (F-06)
+
+- **Completion evidence (2026-09-24):** cart DTO catalog data is loaded in two batch queries after the cart query; checkout loads variants, products/images, and categories in three fixed queries. Placement locks all sorted variant IDs with one `FOR UPDATE` query and revalidates active/stock state while preserving `UnitPriceSnapshot`. Eight PostgreSQL cases prove identical budgets for 1 and 20 items: cart 3 SELECTs, COD/manual transfer 5, and VNPay 8. All 322 Application, 233 Infrastructure, and 108 API/PostgreSQL integration tests passed in Release.
 
 - **Loại:** Performance bug/risk
 - **Severity:** **Medium**
