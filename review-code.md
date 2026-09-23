@@ -13,7 +13,7 @@ Tuy nhiên, phiên bản hiện tại **chưa nên được coi là production-r
 
 1. Endpoint kết quả thanh toán cho phép truy cập ẩn danh chỉ bằng `orderCode`, vì `phone` là tùy chọn. Đây là lỗi kiểm soát truy cập/tiết lộ thông tin giao dịch.
 2. Shipment webhook đọc `Order` và `OrderShipment` trước khi mở transaction, không khóa hàng và không có concurrency token. Hai webhook đồng thời có thể làm trạng thái shipment/order lùi lại hoặc khiến duplicate event trả lỗi 500 thay vì idempotent.
-3. dependency graph của integration test đang khóa `SSH.NET 2025.1.0`, bị cảnh báo lỗ hổng High `GHSA-q939-rpr3-3284`; CI có bước chặn dependency vulnerability nên nhánh hiện tại có khả năng bị chặn phát hành.
+3. dependency graph của integration test đang khóa `SSH.NET 2025.1.0`, bị hai cảnh báo High `GHSA-q939-rpr3-3284` và `GHSA-mggc-4xg6-vcxf`; CI có bước chặn dependency vulnerability nên nhánh hiện tại có khả năng bị chặn phát hành.
 
 Ngoài ra có các rủi ro đáng ưu tiên: callback VNPay fail-open khi thiếu/sai định dạng amount, rate limiter chạy trước authentication và chỉ lưu trong RAM từng replica, N+1 query ở cart/checkout, cleanup job tải toàn bộ dữ liệu hết hạn vào memory, cấu hình email không nhất quán giữa môi trường, và chính sách giữ nguyên giá snapshot trong cart chưa có thời hạn.
 
@@ -25,17 +25,34 @@ Ngoài ra có các rủi ro đáng ưu tiên: callback VNPay fail-open khi thi�
 | Application tests | **317/317 pass** |
 | Infrastructure tests | **203/203 pass** |
 | API integration tests | Không chạy được vì Docker engine tại máy review không hoạt động; lỗi xảy ra khi Testcontainers khởi tạo, không phải assertion của ứng dụng |
-| NuGet audit trong lần build | Có `NU1903`: `SSH.NET 2025.1.0`, severity High |
+| NuGet audit trong lần build | Có `NU1903`: `SSH.NET 2025.1.0`, hai advisory severity High |
 | Tổng test method trong source | 525: Application 303, Infrastructure 135, API Integration 87; số test case thực thi lớn hơn do `[Theory]` |
 
-## 2. Critical Issues
+## 2. Remediation Tasks for Critical Issues
 
-Không phát hiện vấn đề mức **Critical** theo nghĩa có thể trực tiếp chiếm quyền hệ thống/RCE hoặc làm mất dữ liệu chắc chắn. Có ba vấn đề **High** cần coi là release blocker và các vấn đề **Medium** nên xử lý ngay sau đó.
+Không phát hiện vấn đề mức **Critical** theo nghĩa có thể trực tiếp chiếm quyền hệ thống/RCE hoặc làm mất dữ liệu chắc chắn. Ba vấn đề **High** dưới đây là release blocker; các vấn đề **Medium** là backlog bắt buộc sau P0.
 
-### F-01 — Endpoint payment result thiếu kiểm soát truy cập
+Các nhận định đã được đối chiếu lại với source và test tại commit `9e8dc6b` ngày 2026-09-23. Mỗi task chỉ được đánh dấu **Done** khi toàn bộ acceptance criteria đạt và có evidence từ các lệnh verification trên cùng commit sạch. Việc code đã được merge nhưng thiếu test/evidence không được xem là hoàn thành.
+
+| Task | Finding | Priority | Initial status | Completion proof |
+|---|---|---|---|---|
+| TASK-01 | F-01 Payment result authorization | P0 | Open | Negative authorization integration tests + legitimate customer/guest flow |
+| TASK-02 | F-02 Shipment webhook concurrency | P0 | Open | Concurrent PostgreSQL tests proving atomic idempotency and monotonic state |
+| TASK-03 | F-03 Vulnerable SSH.NET dependency | P0 | Open | Locked restore, full tests, and zero High/Critical NuGet audit findings |
+| TASK-04 | F-04 VNPay callback validation | P1 | Open | Missing/malformed signed callback tests prove fail-closed behavior |
+| TASK-05 | F-05 Rate limiting | P1 | Open; production proof depends on Platform | Middleware tests + two-replica/edge evidence |
+| TASK-06 | F-06 Cart/checkout query count | P1 | Open | PostgreSQL command-count regression tests within fixed budgets |
+| TASK-07 | F-07 Email configuration | P1 | Open | Environment matrix tests reject unsafe non-Development settings |
+| TASK-08 | F-08 Cleanup batching | P1 | Open | Large-data integration test proves bounded batches and correct FK order |
+| TASK-09 | F-09 Warranty activation concurrency | P1 | Open; required before enabling warranty admin | Concurrent activation test produces one activation/audit/email set |
+| TASK-10 | F-10 Cart price policy | P1 decision gate | Blocked on Product decision | Approved policy + executable tests for the selected behavior |
+
+### TASK-01 — Bảo vệ payment result theo ownership/possession proof (F-01)
 
 - **Loại:** Bug bảo mật — Broken Object Level Authorization / information disclosure
 - **Severity:** **High**
+- **Goal:** Chỉ chủ sở hữu đã xác thực hoặc guest có possession proof hợp lệ mới xem được kết quả thanh toán; response public không lộ gateway identifiers không cần thiết.
+- **Scope:** API/Application payment-result contract, callback redirect, storefront/API client tương ứng và regression tests. Không thay đổi contract order lookup/receipt ngoài phần dùng chung đã được chứng minh là cần thiết.
 - **Vị trí:**
   - `src/WorkspaceEcommerce.Api/Controllers/PaymentsController.cs:47-62`
   - `src/WorkspaceEcommerce.Api/Controllers/PaymentsController.cs:95-115`
@@ -45,17 +62,31 @@ Không phát hiện vấn đề mức **Critical** theo nghĩa có thể trực 
 - **Code path:** `GET /api/payments/result?orderCode=...&phone=...`; `phone` là nullable. Service chỉ thêm điều kiện `CustomerPhone` khi caller thực sự gửi phone.
 - **Vấn đề:** người biết `orderCode` có thể lấy `OrderId`, payment status, shipment/tracking ID, transaction ID, `TxnRef`, gateway transaction number và gateway response. `orderCode` còn được đưa vào URL redirect sau callback và chỉ có 8 ký tự hex ngẫu nhiên sau ngày (xấp xỉ 32-bit entropy), nên không được dùng như một bằng chứng sở hữu.
 - **Tác động:** lộ thông tin giao dịch và logistics; URL có thể xuất hiện trong browser history, application log, analytics hoặc được người dùng chia sẻ.
-- **Cách sửa đề xuất:**
+- **Implementation checklist:**
   1. Với khách đã đăng nhập, truy vấn phải luôn ràng buộc `order.CustomerId == currentCustomer.CustomerId`.
   2. Với guest, phát hành một receipt/payment-result token ngẫu nhiên đủ mạnh hoặc token ký HMAC, ngắn hạn, scope theo order và purpose; không coi `orderCode` là secret.
   3. Giải pháp tạm thời: bắt buộc `phone`, nhưng đây vẫn là shared secret yếu và PII nằm trong query string.
   4. Thu hẹp DTO public, không trả identifiers của payment gateway nếu UI không thực sự cần.
   5. Thêm test phủ: thiếu credential, phone sai, token sai/hết hạn, customer khác và enumeration response đồng nhất.
 
-### F-02 — Webhook vận chuyển có race condition và idempotency chưa atomic
+- **Acceptance criteria:**
+  - Request chỉ có `orderCode` không thể đọc dữ liệu payment; credential sai/hết hạn và order không tồn tại có response chống enumeration đồng nhất.
+  - Customer A không đọc được order của customer B; customer đúng owner vẫn đọc được.
+  - Guest hoàn tất VNPay có thể xem kết quả bằng token có entropy/TTL/purpose/order scope rõ ràng; token không chứa PII thô và không dùng lại cho order khác.
+  - DTO anonymous không chứa `PaymentTransaction.Id`, `TxnRef`, gateway transaction number/response nếu UI không cần.
+  - Callback redirect và storefront hoạt động với contract mới; không log token.
+- **Verification:**
+  - Bổ sung/đổi test trong `PaymentServiceTests`, `PaymentIntegrationTests` và storefront `PaymentResultPage` tests cho cả positive/negative cases.
+  - Chạy `dotnet test tests/WorkspaceEcommerce.Application.Tests/WorkspaceEcommerce.Application.Tests.csproj --no-restore --filter "FullyQualifiedName~PaymentServiceTests"`.
+  - Chạy `dotnet test tests/WorkspaceEcommerce.Api.IntegrationTests/WorkspaceEcommerce.Api.IntegrationTests.csproj --no-restore --filter "FullyQualifiedName~PaymentIntegrationTests"` với Docker.
+  - Trong `frontend/`, chạy `corepack pnpm test && corepack pnpm typecheck && corepack pnpm build`.
+
+### TASK-02 — Atomic shipment webhook và monotonic state (F-02)
 
 - **Loại:** Bug đồng thời / data consistency
 - **Severity:** **High**
+- **Goal:** Mỗi provider event được claim atomically và mọi concurrent event chỉ có thể giữ nguyên hoặc tiến trạng thái shipment/order, không tạo duplicate side effect.
+- **Scope:** Shipment inbox claim, transaction/locking strategy, order/shipment mutation, loyalty trigger, PostgreSQL integration tests và metrics conflict/duplicate. Không thay đổi provider signature contract.
 - **Vị trí:**
   - `src/WorkspaceEcommerce.Application/Modules/Shipments/ShipmentWebhookService.cs:36-69`
   - `src/WorkspaceEcommerce.Application/Modules/Shipments/ShipmentWebhookService.cs:89-167`
@@ -68,30 +99,52 @@ Không phát hiện vấn đề mức **Critical** theo nghĩa có thể trực 
   - Hai event khác nhau đến đồng thời có thể cùng đọc `LastEventAtUtc` cũ. Event mới commit trước, event cũ commit sau và ghi đè trạng thái mới. Check `eventAtUtc < LastEventAtUtc` trong Domain chỉ bảo vệ khi xử lý tuần tự, không bảo vệ hai `DbContext` đồng thời.
   - `Order` cũng có thể bị ghi trạng thái `Shipping` sau khi request khác đã ghi `Completed` vì không có row lock/concurrency token.
 - **Tác động:** trạng thái fulfillment sai, timeline/inbox không nhất quán, loyalty có thể được kích hoạt trong một lịch sử chuyển trạng thái khó dự đoán.
-- **Cách sửa đề xuất:**
+- **Implementation checklist:**
   1. Bắt đầu transaction trước mọi read.
   2. Claim event inbox atomically bằng `INSERT ... ON CONFLICT DO NOTHING`; nếu không insert được thì trả duplicate success.
   3. Khóa `Order` và `OrderShipment` bằng `SELECT ... FOR UPDATE` theo thứ tự khóa cố định, hoặc dùng conditional update `WHERE last_event_at_utc <= @eventAt` kết hợp concurrency token/retry.
   4. Không dùng entity đã load trước transaction để mutation.
   5. Thêm integration test thật với hai `DbContext`/hai request `Task.WhenAll`, gồm duplicate event và cặp event cũ/mới có commit order đảo ngược.
 
-### F-03 — Dependency test có lỗ hổng High và có thể làm CI fail
+- **Acceptance criteria:**
+  - Hai request đồng thời cùng `EventId` đều trả semantics thành công/idempotent; database chỉ có một inbox/timeline/side-effect tương ứng và không có 500 do unique violation.
+  - Event cũ commit sau event mới không làm giảm `LastEventAtUtc`, shipment status hoặc order status.
+  - Lock order được cố định và document trong code để tránh deadlock; toàn bộ read dùng để quyết định mutation nằm trong transaction.
+  - Loyalty completion và mọi durable side effect chỉ xảy ra một lần.
+- **Verification:**
+  - Thêm test PostgreSQL dùng hai scope/`DbContext` độc lập và synchronization barrier, không dùng fake để chứng minh race.
+  - Chạy `dotnet test tests/WorkspaceEcommerce.Api.IntegrationTests/WorkspaceEcommerce.Api.IntegrationTests.csproj --no-restore --filter "FullyQualifiedName~ShipmentWebhookIntegrationTests"` với Docker, lặp tối thiểu 10 lần trong CI hoặc harness ổn định tương đương.
+  - Chạy toàn bộ Application và API integration tests để kiểm tra order, shipment và loyalty regression.
+
+### TASK-03 — Loại bỏ dependency SSH.NET có lỗ hổng High (F-03)
 
 - **Loại:** Supply-chain risk / release blocker
 - **Severity:** **High** cho pipeline; **Low hơn đối với runtime production** vì dependency nằm trong integration-test project và exploit yêu cầu dùng SCP recursive download với server độc hại.
+- **Goal:** Locked dependency graph không còn phiên bản SSH.NET bị ảnh hưởng và CI vulnerability gate chạy xanh mà không suppress advisory.
+- **Scope:** Integration-test package references, `packages.lock.json`, restore/test và NuGet audit. Không nâng package ngoài dependency chain này nếu không bắt buộc.
 - **Vị trí:**
   - `tests/WorkspaceEcommerce.Api.IntegrationTests/WorkspaceEcommerce.Api.IntegrationTests.csproj:15`
   - `tests/WorkspaceEcommerce.Api.IntegrationTests/packages.lock.json:853-860`
   - `tests/WorkspaceEcommerce.Api.IntegrationTests/packages.lock.json:940-949`
   - `.github/workflows/ci.yml:72-78`
-- **Bằng chứng:** `Testcontainers.PostgreSql 4.12.0` kéo transitive `SSH.NET 2025.1.0`; `dotnet test` phát `NU1903`. GitHub Advisory xác nhận các version `<= 2025.1.0` bị ảnh hưởng và `2026.0.0` đã vá: [GHSA-q939-rpr3-3284](https://github.com/advisories/GHSA-q939-rpr3-3284).
+- **Bằng chứng:** NuGet audit ngày 2026-09-23 xác nhận `Testcontainers.PostgreSql 4.12.0` kéo transitive `SSH.NET 2025.1.0` và phát hai `NU1903`: [GHSA-q939-rpr3-3284](https://github.com/advisories/GHSA-q939-rpr3-3284), [GHSA-mggc-4xg6-vcxf](https://github.com/advisories/GHSA-mggc-4xg6-vcxf).
 - **Vấn đề:** CI gọi `dotnet list ... --vulnerable --include-transitive` rồi enforce báo cáo không có vulnerability. Vì vậy dependency hiện tại vừa tạo supply-chain exposure trong môi trường build/test, vừa có thể chặn merge/release.
-- **Cách sửa đề xuất:** pin trực tiếp `SSH.NET >= 2026.0.0` trong integration-test project hoặc nâng Testcontainers lên version có dependency graph đã vá; cập nhật lock file, chạy toàn bộ integration test và bước audit. Không suppress `NU1903` nếu chưa có risk acceptance có thời hạn.
+- **Implementation checklist:** pin trực tiếp một phiên bản `SSH.NET` đã vá cả hai advisory hoặc nâng Testcontainers lên version có dependency graph đã vá; cập nhật lock file, chạy toàn bộ integration test và bước audit. Version được chọn phải được NuGet audit hiện tại xác nhận; không suppress `NU1903` nếu chưa có risk acceptance có thời hạn.
+- **Acceptance criteria:**
+  - `packages.lock.json` không resolve phiên bản SSH.NET bị ảnh hưởng; locked restore không tạo diff.
+  - NuGet audit không còn `GHSA-q939-rpr3-3284`, `GHSA-mggc-4xg6-vcxf` và không còn High/Critical finding nào khác.
+  - Toàn bộ backend tests, đặc biệt Testcontainers PostgreSQL, vẫn pass.
+- **Verification:**
+  - Chạy `dotnet restore WorkspaceEcommerce.slnx --locked-mode` hai lần và xác nhận `git diff --exit-code -- '**/packages.lock.json'`.
+  - Chạy `dotnet test WorkspaceEcommerce.slnx --no-restore --configuration Release` với Docker.
+  - Chạy đúng CI gate: xuất `dotnet list WorkspaceEcommerce.slnx package --vulnerable --include-transitive --format json`, sau đó chạy `./scripts/assert-no-nuget-vulnerabilities.ps1` với report vừa tạo.
 
-### F-04 — Callback VNPay chấp nhận amount thiếu hoặc không parse được
+### TASK-04 — VNPay callback fail-closed với required fields (F-04)
 
 - **Loại:** Risk về payment integrity
 - **Severity:** **Medium**, tác động tiềm năng High nhưng khả năng khai thác trực tiếp thấp do callback vẫn phải có chữ ký hợp lệ
+- **Goal:** Callback chỉ được phép mutation khi chữ ký hợp lệ và mọi field bắt buộc đều hiện diện, parse hợp lệ, đúng transaction/amount/currency/status.
+- **Scope:** VNPay verification/result model, Application callback guard, IPN/return response mapping và focused tests. Không thay đổi signing algorithm/provider protocol ngoài contract VNPay.
 - **Vị trí:**
   - `src/WorkspaceEcommerce.Infrastructure/Payments/VNPayPaymentService.cs:74-103`
   - `src/WorkspaceEcommerce.Infrastructure/Payments/VNPayPaymentService.cs:158-165`
@@ -99,12 +152,22 @@ Không phát hiện vấn đề mức **Critical** theo nghĩa có thể trực 
   - `src/WorkspaceEcommerce.Infrastructure/Payments/VNPayPaymentService.cs:106-117`
 - **Code path:** parse lỗi hoặc thiếu `vnp_Amount` trả `null`; Application chỉ reject khi amount khác `null` **và** không bằng expected amount. `GetPaymentOutcome` cũng coi `transactionStatus` rỗng là success nếu `responseCode == "00"`.
 - **Vấn đề:** validation đang fail-open đối với field quan trọng của giao dịch. Attacker ngoài không thể tự ký payload, nhưng payload malformed do provider/proxy/configuration error vẫn có thể đánh dấu đơn đã thanh toán.
-- **Cách sửa đề xuất:** chữ ký hợp lệ là điều kiện cần, không phải đủ. Bắt buộc `TxnRef`, `Amount`, `ResponseCode`, `TransactionStatus` và các field theo contract; amount phải parse được, dương và bằng chính xác expected amount/currency. Payload thiếu field phải trả mã VNPay phù hợp và không mutation. Bổ sung test missing/malformed/negative/overflow amount và missing transaction status.
+- **Implementation checklist:** chữ ký hợp lệ là điều kiện cần, không phải đủ. Bắt buộc `TxnRef`, `Amount`, `ResponseCode`, `TransactionStatus` và các field theo contract; amount phải parse được, dương và bằng chính xác expected amount/currency. Payload thiếu field phải trả mã VNPay phù hợp và không mutation. Bổ sung test missing/malformed/negative/overflow amount và missing transaction status.
+- **Acceptance criteria:**
+  - Signed payload thiếu/sai format/âm/overflow `vnp_Amount`, thiếu status hoặc required field không thay đổi payment/order/shipment.
+  - Success chỉ xảy ra khi cả `vnp_ResponseCode == "00"` và `vnp_TransactionStatus == "00"`; status rỗng không còn được coi là success.
+  - IPN trả đúng response code contract cho invalid/missing data; return flow không tiết lộ raw provider data.
+  - Duplicate callback hợp lệ vẫn idempotent.
+- **Verification:**
+  - Mở rộng `VNPayPaymentServiceTests`, `PaymentServiceTests`, `PaymentIntegrationTests` cho ma trận malformed fields và database non-mutation.
+  - Chạy ba test class trên; sau đó chạy toàn bộ backend suite.
 
-### F-05 — Rate limiter không đạt ý định bảo vệ trong cluster và middleware order sai với customer claim
+### TASK-05 — Rate limiting đúng identity và scale-out (F-05)
 
 - **Loại:** Risk bảo mật/vận hành
 - **Severity:** **Medium**
+- **Goal:** Security-critical quota dùng đúng authenticated identity và có hiệu lực trên toàn deployment; webhook không tranh bucket với checkout/payment.
+- **Scope:** Middleware order, partition keys/policies, response headers, deployment edge/distributed limiter configuration và tests. Không tự thêm distributed framework khi gateway/WAF hiện hữu đã đáp ứng được yêu cầu.
 - **Vị trí:**
   - `src/WorkspaceEcommerce.Api/Program.cs:128-131`
   - `src/WorkspaceEcommerce.Api/Extensions/RateLimiterExtensions.cs:11-26`
@@ -117,12 +180,23 @@ Không phát hiện vấn đề mức **Critical** theo nghĩa có thể trực 
   - limiter là in-memory, mỗi replica có quota riêng; scale-out làm quota nhân lên và restart xóa state.
   - auth chủ yếu partition theo IP: botnet vượt được giới hạn; NAT có thể khóa nhầm nhiều user hợp lệ.
   - checkout, payment và webhook dùng chung bucket `transaction` theo IP; burst webhook hợp lệ có thể bị 429.
-- **Cách sửa đề xuất:** đặt authentication trước limiter đối với partition cần claim; dùng gateway/WAF hoặc distributed store cho quota security-critical; kết hợp normalized account/challenge/customer ID với IP; tách quota webhook theo provider credential/signature và có retry semantics; bổ sung test middleware thật cho claim partition, `Retry-After` và 429.
+- **Implementation checklist:** đặt authentication trước limiter đối với partition cần claim; dùng gateway/WAF hoặc distributed store cho quota security-critical; kết hợp normalized account/challenge/customer ID với IP; tách quota webhook theo provider credential/signature và có retry semantics; bổ sung test middleware thật cho claim partition, `Retry-After` và 429.
+- **Acceptance criteria:**
+  - Authenticated warranty requests partition theo customer claim sau authentication; anonymous requests không dùng chung một global `anonymous` bucket.
+  - Auth, checkout/payment và provider webhook có policy/key riêng; `429` có `Retry-After` và không làm provider retry sai semantics.
+  - Hai replicas chia sẻ cùng quota tại edge/distributed store, hoặc có evidence kiến trúc chứng minh edge là enforcement authority duy nhất.
+  - Key không chứa raw email/phone/token/signature và trusted proxy handling vẫn đúng.
+- **Verification:**
+  - Thêm API middleware tests cho authenticated/anonymous partition, policy separation, limit boundary và `Retry-After`.
+  - Chạy focused API integration tests và full backend suite.
+  - Platform chạy two-replica test trên staging: tổng accepted requests không vượt quota toàn cục; restart một replica không reset quota. Đính kèm cấu hình đã redacted và metric/log evidence.
 
-### F-06 — Cart/checkout có N+1 query và VNPay dựng snapshot hai lần
+### TASK-06 — Đặt query budget cho cart/checkout (F-06)
 
 - **Loại:** Performance bug/risk
 - **Severity:** **Medium**
+- **Goal:** Số SQL round trip của cart và checkout bị chặn bởi một budget cố định, không tăng tuyến tính theo số cart item, trong khi stock/price vẫn được revalidate dưới lock.
+- **Scope:** Cart DTO query, checkout snapshot query/locking, VNPay quote/place flow và PostgreSQL command-count tests. Không cache dữ liệu authoritative qua transaction boundary.
 - **Vị trí:**
   - `src/WorkspaceEcommerce.Application/Modules/Cart/StorefrontCartService.cs:240-277`
   - `src/WorkspaceEcommerce.Application/Modules/Ordering/CheckoutCartBuilder.cs:20-61`
@@ -131,12 +205,23 @@ Không phát hiện vấn đề mức **Critical** theo nghĩa có thể trực 
   - `src/WorkspaceEcommerce.Infrastructure/Persistence/AppDbContext.cs:481-531`
 - **Vấn đề:** cart DTO thực hiện tới ba query cho mỗi item (variant, product, primary image). Checkout thực hiện variant/product/category cho từng item. Với VNPay, bộ snapshot này được dựng một lần để quote shipping trước transaction và thêm một lần trong transaction, tạo khoảng `6N` query cùng dữ liệu liên quan.
 - **Tác động:** latency tăng tuyến tính theo số item, tăng connection pressure và kéo dài transaction trong checkout.
-- **Cách sửa đề xuất:** thêm query batch/projection cho toàn bộ variant IDs, product/category/image trong 1-3 round trip; khóa variants theo danh sách đã sort trong một query (`FindProductVariantsForUpdateAsync` đã tồn tại nhưng chưa được dùng ở flow này); đo command count trong integration test. Quote ngoài transaction có thể dùng snapshot chỉ để gọi provider, nhưng trong transaction vẫn phải revalidate stock/price.
+- **Implementation checklist:** thêm query batch/projection cho toàn bộ variant IDs, product/category/image trong 1-3 round trip; khóa variants theo danh sách đã sort trong một query (`FindProductVariantsForUpdateAsync` đã tồn tại nhưng chưa được dùng ở flow này); đo command count trong integration test. Quote ngoài transaction có thể dùng snapshot chỉ để gọi provider, nhưng trong transaction vẫn phải revalidate stock/price.
+- **Acceptance criteria:**
+  - Cart projection tải catalog/image bằng batch/projection; không có query bên trong vòng lặp item.
+  - Checkout khóa variant theo danh sách ID đã sort trong một batch, revalidate active/stock/price trong transaction và giữ nguyên order snapshots.
+  - Command-count test với 1 và 20 items chứng minh phần catalog của cart/checkout tăng không quá một command; test ghi rõ budget tổng để regression có tín hiệu rõ.
+  - COD, bank transfer và VNPay cho cùng totals/snapshots như trước; VNPay không gọi provider mutation ngoài durable path.
+- **Verification:**
+  - Thêm PostgreSQL integration test dùng command interceptor/counter cho cart và từng payment method.
+  - Chạy `CartCheckoutAndOrderLookupIntegrationTests`, focused Application checkout/cart tests, rồi full backend suite.
+  - Ghi command count 1-item/20-item trước và sau trong PR/task evidence.
 
-### F-07 — Email configuration có thể silently discard mail ngoài Development và cho phép SMTP không TLS
+### TASK-07 — Fail-fast email configuration ngoài Development (F-07)
 
 - **Loại:** Bug cấu hình / security risk
 - **Severity:** **Medium**
+- **Goal:** Mọi environment ngoài Development phải fail startup nếu email có thể bị discard hoặc truyền credential/link qua SMTP không TLS.
+- **Scope:** Email configuration validator, provider registration, configuration tests và runbook/config matrix. Không thay SMTP library/provider nếu validator đủ đáp ứng.
 - **Vị trí:**
   - `src/WorkspaceEcommerce.Infrastructure/Configuration/EmailDeliveryConfigurationValidator.cs:14-26`
   - `src/WorkspaceEcommerce.Infrastructure/Configuration/EmailDeliveryConfigurationValidator.cs:48-78`
@@ -144,33 +229,63 @@ Không phát hiện vấn đề mức **Critical** theo nghĩa có thể trực 
   - `src/WorkspaceEcommerce.Infrastructure/Notifications/CustomerEmailDeliveryServices.cs:21-39`
 - **Vấn đề:** message nói provider `Log` chỉ hợp lệ trong Development, nhưng code chỉ cấm khi environment name đúng bằng `Production`; Staging/QA vẫn chấp nhận Log và worker coi email đã gửi dù chỉ log subject. Với SMTP, validator không yêu cầu `EnableSsl` ngoài Development.
 - **Tác động:** verification/reset email biến mất ở staging hoặc môi trường tên khác; link/token tài khoản có thể truyền qua SMTP không mã hóa nếu cấu hình sai.
-- **Cách sửa đề xuất:** dùng semantic `environment.IsDevelopment()` thay vì so chuỗi Production; ngoài Development bắt buộc provider gửi thật và TLS, trừ một risk-acceptance flag rõ ràng; validate cặp username/password; thêm configuration tests cho Development, Staging, QA và Production.
+- **Implementation checklist:** dùng semantic `environment.IsDevelopment()` thay vì so chuỗi Production; ngoài Development bắt buộc provider gửi thật và TLS, trừ một risk-acceptance flag rõ ràng; validate cặp username/password; thêm configuration tests cho Development, Staging, QA và Production.
+- **Acceptance criteria:**
+  - `Log` provider chỉ hợp lệ trong Development; Staging/QA/Production đều fail startup.
+  - SMTP ngoài Development bắt buộc TLS và cặp username/password nhất quán; placeholder/partial credentials bị từ chối.
+  - Error message nêu đúng key cấu hình nhưng không in secret.
+  - Configuration matrix/runbook phản ánh chính xác rule được test.
+- **Verification:**
+  - Mở rộng `EmailDeliveryConfigurationValidatorTests` thành ma trận Development/Staging/QA/Production × Log/SMTP/TLS/credentials.
+  - Chạy focused Infrastructure tests và khởi động API bằng cấu hình invalid trong test để chứng minh fail-fast.
 
-### F-08 — Cleanup worker materialize toàn bộ dữ liệu hết hạn
+### TASK-08 — Cleanup dữ liệu theo bounded batches (F-08)
 
 - **Loại:** Reliability/performance risk
 - **Severity:** **Medium**
+- **Goal:** Mỗi cleanup cycle có giới hạn rõ về row count/thời gian/transaction và có thể tiếp tục an toàn ở cycle sau mà không materialize toàn bộ backlog.
+- **Scope:** Account cleanup query/delete loop, options validation, metrics và PostgreSQL tests. Giữ advisory lock hiện hữu và retention semantics.
 - **Vị trí:** `src/WorkspaceEcommerce.Infrastructure/Notifications/CustomerAccountCleanupWorker.cs:37-90`
 - **Vấn đề:** worker tải toàn bộ token, refresh family, 2FA challenge/recovery code, login history và delivered email quá hạn vào memory, tracking tất cả entity rồi delete trong một `SaveChanges`. Advisory lock ngăn nhiều replica chạy đồng thời nhưng không giới hạn kích thước batch.
 - **Tác động:** memory spike, transaction/WAL lớn, lock lâu và timeout khi dữ liệu tăng.
-- **Cách sửa đề xuất:** dùng `ExecuteDeleteAsync` theo batch có giới hạn hoặc keyset pagination, commit từng batch, giới hạn thời gian mỗi vòng, phát metric số row/duration/error. Thứ tự xóa phải tôn trọng FK, đặc biệt refresh token trước family.
+- **Implementation checklist:** dùng `ExecuteDeleteAsync` theo batch có giới hạn hoặc keyset pagination, commit từng batch, giới hạn thời gian mỗi vòng, phát metric số row/duration/error. Thứ tự xóa phải tôn trọng FK, đặc biệt refresh token trước family.
+- **Acceptance criteria:**
+  - Batch size và cycle time budget được cấu hình/validate; không query nào materialize toàn bộ expired rows.
+  - Mỗi transaction xóa tối đa batch size đã cấu hình; cancellation dừng giữa các batch mà dữ liệu đã commit vẫn nhất quán.
+  - FK order đúng, dữ liệu chưa hết hạn không bị xóa, backlog lớn được drain qua nhiều batch/cycle.
+  - Metrics có deleted count, duration, remaining/backlog hoặc equivalent signal, và failure count; không chứa PII/token.
+- **Verification:**
+  - Thêm PostgreSQL integration test seed nhiều hơn ít nhất ba lần batch size, kiểm tra giới hạn từng batch, retention boundary, FK và cancellation/resume.
+  - Chạy focused cleanup/configuration tests và full Infrastructure/API integration suite.
 
-### F-09 — Admin warranty activation không có transaction/lock tương đương customer flow
+### TASK-09 — Đồng nhất concurrency boundary cho warranty activation (F-09)
 
 - **Loại:** Risk đồng thời; hiện bị giảm mức độ vì warranty mặc định tắt
 - **Severity:** **Medium** trước khi bật feature
+- **Goal:** Admin và customer activation dùng cùng invariant/lock order; hai request đồng thời chỉ tạo một activation cùng một bộ snapshot/audit/email.
+- **Scope:** Activation coordinator hoặc shared transactional routine, EF lock methods/constraints, migration nếu cần, và concurrent PostgreSQL tests. Không mở rộng sang refactor toàn bộ `AdminWarrantyService`.
 - **Vị trí:**
   - `src/WorkspaceEcommerce.Application/Modules/Warranties/AdminWarrantyService.cs:784-839`
   - `src/WorkspaceEcommerce.Application/Modules/Warranties/CustomerWarrantyService.cs:61-153`
   - `src/WorkspaceEcommerce.Infrastructure/Persistence/Configurations/Warranties/WarrantyEntitlementConfiguration.cs:13-45`
   - `src/WorkspaceEcommerce.Infrastructure/Persistence/Configurations/Warranties/WarrantyCoverageSnapshotConfiguration.cs:11-22`
 - **Vấn đề:** customer flow mở transaction và khóa serialized unit/order; admin flow load entitlement/unit/order/plan bình thường rồi mutation/save, không row lock và không concurrency token. Hai admin request có thể cùng thấy Pending và cùng tạo coverage snapshot/audit/email. Coverage snapshot không có unique constraint theo entitlement/component để chặn bản sao.
-- **Cách sửa đề xuất:** dùng chung một transactional activation coordinator cho admin/customer; khóa unit, entitlement/order theo thứ tự thống nhất; thêm unique constraint phù hợp cho snapshot; bắt và map concurrency conflict. Phải có concurrent integration test trước khi bật `Warranty:AdminEnabled`.
+- **Implementation checklist:** dùng chung một transactional activation coordinator cho admin/customer; khóa unit, entitlement/order theo thứ tự thống nhất; thêm unique constraint phù hợp cho snapshot; bắt và map concurrency conflict. Phải có concurrent integration test trước khi bật `Warranty:AdminEnabled`.
+- **Acceptance criteria:**
+  - Admin activation bắt đầu transaction trước read quyết định và khóa unit/entitlement/order theo cùng thứ tự với customer flow.
+  - Hai activation đồng thời cho cùng entitlement cho kết quả một success + một idempotent/conflict có kiểm soát; không có duplicate coverage snapshot, audit hoặc email outbox.
+  - Unique constraint bảo vệ snapshot identity phù hợp và migration nâng cấp dữ liệu hiện hữu an toàn.
+  - Feature vẫn disabled mặc định cho đến khi concurrent integration test pass.
+- **Verification:**
+  - Thêm PostgreSQL test dùng hai scope/`DbContext` và synchronization barrier cho admin-admin và admin-customer race.
+  - Chạy `WarrantyIntegrationTests`, Application warranty tests, migration pending-model check và migration verification script nếu schema thay đổi.
 
-### F-10 — Giá snapshot trong cart được giữ vô thời hạn
+### TASK-10 — Chốt và mã hóa cart price policy (F-10)
 
 - **Loại:** Business risk, không kết luận là bug vì test hiện tại chủ động kỳ vọng hành vi này
 - **Severity:** **Medium** nếu nghiệp vụ không cam kết price lock
+- **Goal:** Có một policy được Product phê duyệt và test hóa cho thời điểm giá được chốt, thời hạn hiệu lực, UX khi giá đổi và audit source; không còn price lock vô thời hạn do ngầm định kỹ thuật.
+- **Scope:** Trước hết là decision record. Chỉ sau khi được duyệt mới thay Domain/Application/API/frontend/migration cần thiết. Không tự chọn repricing hay price lock thay Product.
 - **Vị trí:**
   - `src/WorkspaceEcommerce.Domain/Modules/Cart/Cart.cs:38-53`
   - `src/WorkspaceEcommerce.Domain/Modules/Cart/CartItem.cs:21-39`
@@ -179,7 +294,17 @@ Không phát hiện vấn đề mức **Critical** theo nghĩa có thể trực 
   - `tests/WorkspaceEcommerce.Application.Tests/Modules/Ordering/CheckoutServiceTests.cs:22-53`
 - **Vấn đề:** khi item đã tồn tại, tăng quantity không cập nhật `UnitPriceSnapshot`; checkout dùng snapshot thay vì `variant.Price`. Cart không có expiration/price-lock deadline. Test đang chứng minh variant giá 150 nhưng order dùng snapshot 120, nên đây là policy hiện hữu chứ không phải tình cờ.
 - **Tác động:** người dùng có thể giữ giá cũ lâu dài sau khi catalog tăng giá; giảm doanh thu hoặc tạo tranh chấp về giá.
-- **Cách sửa đề xuất:** product owner phải xác nhận policy. Thông thường checkout nên reprice bằng giá variant đã khóa và trả danh sách thay đổi để người dùng xác nhận; nếu muốn giữ giá, cần `PriceLockedUntil`, audit nguồn giá và thời hạn cart/reservation rõ ràng.
+- **Decision checklist:** Product owner chọn và ký một trong hai contract: (A) checkout reprice theo catalog hiện tại và yêu cầu user xác nhận thay đổi, hoặc (B) price lock có `PriceLockedUntil`, nguồn giá và expiry/reservation rõ ràng. Decision phải nêu coupon/shipping/tax interaction, guest/customer parity và hành vi khi lock hết hạn.
+- **Implementation checklist sau decision:** cập nhật ADR/domain rules; triển khai đúng một contract end-to-end; thêm migration nếu lưu deadline/source; cập nhật storefront UX/i18n và tests. Không bắt đầu implementation khi decision chưa được phê duyệt.
+- **Acceptance criteria:**
+  - ADR hoặc product rule được owner phê duyệt, nêu ví dụ giá tăng/giảm, add quantity, reopen cart, concurrent checkout và expired lock.
+  - Domain/Application không còn hành vi vô thời hạn ngoài policy; totals server-authoritative và được revalidate trong transaction.
+  - API trả đủ dữ liệu để UI hiển thị/confirm price change hoặc lock expiry; UI không tự quyết định giá.
+  - Tests cố định behavior cho cả tăng và giảm giá, boundary expiry và race với catalog update.
+- **Verification:**
+  - Review ADR/product sign-off là gate đầu tiên.
+  - Chạy focused cart/checkout Domain + Application tests, PostgreSQL checkout integration tests và storefront tests/typecheck/build.
+  - Nếu có migration, chạy pending-model check và `./scripts/verify-prh-009-migrations.ps1`.
 
 ## 3. Architecture Review
 
@@ -376,25 +501,27 @@ Việc integration test không chạy được tại máy review là giới hạ
 
 Fake `IQueryable` chạy LINQ-to-Objects không thể thay thế provider test cho query phức tạp, translation, isolation và concurrency. Những use case đó phải ưu tiên integration test PostgreSQL.
 
-## 8. Refactoring Recommendations
+## 8. Execution Order
 
 ### P0 — Phải hoàn thành trước release
 
-1. **Đóng F-01:** thay orderCode-only access bằng authenticated ownership hoặc short-lived opaque/signed result token; giảm DTO public; thêm negative authorization tests.
-2. **Đóng F-02:** atomic inbox claim + transaction-before-read + row lock/conditional update cho order/shipment; thêm concurrent PostgreSQL tests.
-3. **Đóng F-03:** nâng/pin SSH.NET bản vá, cập nhật lock file và chạy lại audit/CI.
+1. **TASK-01:** chốt payment-result contract trước vì thay đổi API/redirect/storefront và là security boundary public.
+2. **TASK-02:** triển khai độc lập với TASK-01; merge chỉ khi concurrent PostgreSQL tests chứng minh atomic idempotency và monotonic state.
+3. **TASK-03:** có thể thực hiện song song; phải hoàn tất trước khi dùng CI/release evidence của TASK-01 và TASK-02.
+
+P0 hoàn thành khi cả ba task có evidence trên cùng release candidate sạch; không đóng release gate chỉ bằng unit test hoặc code review.
 
 ### P1 — Sprint kế tiếp
 
-1. Siết callback VNPay bắt buộc amount/status/required fields, fail-closed.
-2. Chuyển `ClientIpAddress` khỏi request contract; lấy IP từ trusted server context.
-3. Sửa middleware order và thiết kế distributed/account-aware rate limiting; tách webhook quota.
-4. Batch query cart/checkout, dùng batch row lock và command-count integration test.
-5. Sửa email environment semantics, yêu cầu TLS ngoài Development.
-6. Batch cleanup bằng set-based delete/keyset loop.
-7. Dùng chung transactional warranty activation coordinator trước khi bật feature.
-8. Chốt và mã hóa business policy về cart price snapshot/expiration.
-9. Thêm DB check constraint cho amount, quantity, stock và các date range có giá trị tài chính.
+1. **TASK-04:** payment integrity; thực hiện ngay sau P0.
+2. **TASK-07:** configuration fail-fast, phạm vi nhỏ và giảm rủi ro môi trường.
+3. **TASK-05:** hoàn thành phần code/test trong repo, sau đó Platform cung cấp evidence multi-replica/edge.
+4. **TASK-06:** tối ưu query sau khi payment/checkout correctness đã được khóa bằng regression tests.
+5. **TASK-08:** bounded cleanup và operational metrics.
+6. **TASK-09:** bắt buộc trước khi bật `Warranty:AdminEnabled`.
+7. **TASK-10:** Product decision có thể chạy song song; implementation chỉ bắt đầu sau sign-off.
+
+Backlog liên quan nhưng không phải task đóng các finding trên: chuyển `ClientIpAddress` khỏi request contract sang trusted server context; bổ sung DB check constraints cho amount, quantity, stock và financial date ranges trong một schema-change task riêng.
 
 ### P2 — Cải thiện maintainability có kiểm soát
 
@@ -426,11 +553,11 @@ Fake `IQueryable` chạy LINQ-to-Objects không thể thay thế provider test c
 
 ### Top 5 vấn đề cần xử lý theo thứ tự
 
-1. Payment result authorization/tokenization (F-01).
-2. Shipment webhook concurrency + atomic idempotency (F-02).
-3. Vá dependency SSH.NET và khôi phục CI audit xanh (F-03).
-4. VNPay callback required-field/amount validation fail-closed (F-04).
-5. Rate limiter middleware/distributed strategy, sau đó batch hóa cart/checkout (F-05/F-06).
+1. TASK-01 — Payment result authorization/tokenization.
+2. TASK-02 — Shipment webhook concurrency + atomic idempotency.
+3. TASK-03 — Vá dependency SSH.NET và khôi phục CI audit xanh.
+4. TASK-04 — VNPay callback required-field/amount validation fail-closed.
+5. TASK-05 rồi TASK-06 — Rate limiter middleware/distributed strategy, sau đó batch hóa cart/checkout.
 
 ### Những phần tốt không nên thay đổi chỉ vì “refactor”
 
