@@ -43,7 +43,7 @@ Các nhận định đã được đối chiếu lại với source và test t�
 | TASK-05 | F-05 Rate limiting | P1 | Repository done 2026-09-23; Platform evidence open | 3 middleware/partition tests and 638/638 backend tests pass; two-replica edge evidence still required |
 | TASK-06 | F-06 Cart/checkout query count | P1 | Done 2026-09-24 | PostgreSQL budgets: cart 3, COD/bank 5, VNPay 8 SELECTs for both 1 and 20 items |
 | TASK-07 | F-07 Email configuration | P1 | Done 2026-09-24 | 21 configuration/composition tests cover Development, Staging, QA, and Production |
-| TASK-08 | F-08 Cleanup batching | P1 | Open | Large-data integration test proves bounded batches and correct FK order |
+| TASK-08 | F-08 Cleanup batching | P1 | Done 2026-09-24 | PostgreSQL tests prove bounded commits, time-budget continuation, FK order, retention, and safe metrics |
 | TASK-09 | F-09 Warranty activation concurrency | P1 | Open; required before enabling warranty admin | Concurrent activation test produces one activation/audit/email set |
 | TASK-10 | F-10 Cart price policy | P1 decision gate | Blocked on Product decision | Approved policy + executable tests for the selected behavior |
 
@@ -253,6 +253,8 @@ Các nhận định đã được đối chiếu lại với source và test t�
   - Chạy focused Infrastructure tests và khởi động API bằng cấu hình invalid trong test để chứng minh fail-fast.
 
 ### TASK-08 — Cleanup dữ liệu theo bounded batches (F-08)
+
+- **Completion evidence (2026-09-24):** cleanup now validates a `1..1000` row batch size and `1..300` second cycle budget, elects one replica with the existing advisory lock, and commits each bounded delete batch independently. Refresh tokens are drained before childless expired families; cancellation preserves already committed batches. Two PostgreSQL tests prove a 25-row backlog stops after one 10-row batch when the budget expires, drains the remaining 15 rows on the next cycle, deletes a 25-token/25-family backlog in eight batches, preserves fresh rows, and emits only bounded `dataset`/`outcome` metric tags. All 322 Application, 238 Infrastructure, and 110 API/PostgreSQL integration tests passed in Release.
 
 - **Loại:** Reliability/performance risk
 - **Severity:** **Medium**

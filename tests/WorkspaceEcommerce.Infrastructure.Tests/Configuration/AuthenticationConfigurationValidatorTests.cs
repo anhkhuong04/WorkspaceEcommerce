@@ -145,6 +145,41 @@ public sealed class AuthenticationConfigurationValidatorTests
         Assert.Contains("ChallengeLifetimeMinutes", exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void GetValidatedCustomerAccountLifecycleOptions_WhenCleanupBoundsAreValid_ReturnsOptions()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["CustomerAccountLifecycle:CleanupBatchSize"] = "250",
+            ["CustomerAccountLifecycle:CleanupCycleTimeSeconds"] = "45"
+        });
+
+        var options = configuration.GetValidatedCustomerAccountLifecycleOptions();
+
+        Assert.Equal(250, options.CleanupBatchSize);
+        Assert.Equal(45, options.CleanupCycleTimeSeconds);
+    }
+
+    [Theory]
+    [InlineData("CustomerAccountLifecycle:CleanupBatchSize", "0")]
+    [InlineData("CustomerAccountLifecycle:CleanupBatchSize", "1001")]
+    [InlineData("CustomerAccountLifecycle:CleanupCycleTimeSeconds", "0")]
+    [InlineData("CustomerAccountLifecycle:CleanupCycleTimeSeconds", "301")]
+    public void GetValidatedCustomerAccountLifecycleOptions_WhenCleanupBoundsAreInvalid_Throws(
+        string key,
+        string value)
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            [key] = value
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            configuration.GetValidatedCustomerAccountLifecycleOptions);
+
+        Assert.Contains("CustomerAccountLifecycle", exception.Message, StringComparison.Ordinal);
+    }
+
     private static IConfiguration BuildConfiguration(Dictionary<string, string?>? overrides = null)
     {
         var values = new Dictionary<string, string?>
@@ -154,7 +189,8 @@ public sealed class AuthenticationConfigurationValidatorTests
             ["Jwt:Issuer"] = "WorkspaceEcommerce",
             ["Jwt:Audience"] = "WorkspaceEcommerce.Admin",
             ["Jwt:SigningKey"] = "abcdefghijklmnopqrstuvwxyz1234567890",
-            ["Jwt:AccessTokenMinutes"] = "60"
+            ["Jwt:AccessTokenMinutes"] = "60",
+            ["Storefront:BaseUrl"] = "https://storefront.example.test"
         };
 
         if (overrides is not null)

@@ -5,7 +5,6 @@ Snapshot: 2026-09-22. Re-verify before acting; this is context, not authorizatio
 ## Open risks
 
 - Application rate limiting remains per process. Multi-replica production requires shared edge/distributed enforcement and topology evidence; do not claim cluster-wide quotas from local middleware tests.
-- Account cleanup materializes every expired row before deletion. Do not extend this unbounded worker pattern.
 - Admin warranty activation lacks the locked transaction used by customer activation. Warranty remains disabled by default.
 
 ## Documentation/tooling drift

@@ -131,6 +131,7 @@ public static class DependencyInjection
         {
             services.AddSingleton<ICustomerEmailDeliveryService, LoggingCustomerEmailDeliveryService>();
         }
+        services.AddScoped<CustomerAccountCleanupService>();
         services.AddHostedService<CustomerEmailOutboxWorker>();
         services.AddHostedService<OutboxMetricsWorker>();
         services.AddHostedService<CustomerAccountCleanupWorker>();

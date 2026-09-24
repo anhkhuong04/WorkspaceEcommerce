@@ -22,11 +22,13 @@ public static class CustomerAccountLifecycleConfigurationValidator
             configured.PasswordResetLifetimeMinutes is < 5 or > 1440 ||
             configured.RefreshTokenLifetimeDays is < 1 or > 90 ||
             configured.CleanupIntervalHours is < 1 or > 168 ||
+            configured.CleanupBatchSize is < 1 or > 1000 ||
+            configured.CleanupCycleTimeSeconds is < 1 or > 300 ||
             configured.ExpiredTokenRetentionDays is < 1 or > 365 ||
             configured.LoginHistoryRetentionDays is < 30 or > 3650)
         {
             throw new InvalidOperationException(
-                $"Configuration '{CustomerAccountLifecycleOptions.SectionName}' has a value outside the supported security retention range.");
+                $"Configuration '{CustomerAccountLifecycleOptions.SectionName}' has a value outside the supported lifecycle range.");
         }
 
         return new CustomerAccountLifecycleOptions
@@ -36,6 +38,8 @@ public static class CustomerAccountLifecycleConfigurationValidator
             RefreshTokenLifetimeDays = configured.RefreshTokenLifetimeDays,
             StorefrontBaseUrl = storefrontUri.GetLeftPart(UriPartial.Authority) + storefrontUri.AbsolutePath.TrimEnd('/'),
             CleanupIntervalHours = configured.CleanupIntervalHours,
+            CleanupBatchSize = configured.CleanupBatchSize,
+            CleanupCycleTimeSeconds = configured.CleanupCycleTimeSeconds,
             ExpiredTokenRetentionDays = configured.ExpiredTokenRetentionDays,
             LoginHistoryRetentionDays = configured.LoginHistoryRetentionDays
         };

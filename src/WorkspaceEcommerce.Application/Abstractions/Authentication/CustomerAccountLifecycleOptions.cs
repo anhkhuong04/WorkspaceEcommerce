@@ -14,6 +14,10 @@ public sealed class CustomerAccountLifecycleOptions
 
     public int CleanupIntervalHours { get; init; } = 24;
 
+    public int CleanupBatchSize { get; init; } = 100;
+
+    public int CleanupCycleTimeSeconds { get; init; } = 30;
+
     public int ExpiredTokenRetentionDays { get; init; } = 7;
 
     public int LoginHistoryRetentionDays { get; init; } = 90;

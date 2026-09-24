@@ -31,12 +31,15 @@ telemetry sink.
 | Authentication abuse | Auth/2FA rate-limit rejections and refresh-reuse events | Threshold per trusted client partition | Security owner |
 | Shipment webhook | Rejection/duplicate counters and provider dependency failures | Invalid-signature or reject spike | Logistics owner |
 | Background queues | `workspaceecommerce.outbox.*` metrics | Dead letter > 0, due queue age above SLO, stalled completion | Application on-call |
+| Customer data cleanup | `workspaceecommerce.customer_account_cleanup.*` deleted-row, duration, failure, and budget-exhausted metrics | Failure > 0 or repeated budget exhaustion indicating a growing retention backlog | Application + database owner |
 | Media | Storage failures and cleanup errors | Repeated object-store failure | Content/Platform |
 | PostgreSQL | Pool usage, connection/command latency, readiness | Saturation, timeout, or readiness failure | Database owner |
 
 For outbox gauges, aggregate by **maximum** across replicas. Counters and
 durations should retain the `outbox` tag only; never attach recipient, email,
 token, raw provider response, or unbounded order/customer cardinality.
+Customer cleanup metrics use only bounded `dataset` or `outcome` tags and must
+never include customer, token, recipient, or payload values.
 
 ## Required staging evidence
 
