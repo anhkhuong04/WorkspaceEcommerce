@@ -234,6 +234,29 @@ internal sealed class FakeAppDbContext : IAppDbContext
         return Task.FromResult(_serializedProductUnits.FirstOrDefault(unit => unit.Id == unitId));
     }
 
+    public Task<SerializedProductUnit?> FindSerializedProductUnitByEntitlementIdForUpdateAsync(
+        Guid entitlementId,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var unitId = _warrantyEntitlements
+            .Where(entitlement => entitlement.Id == entitlementId)
+            .Select(entitlement => (Guid?)entitlement.SerializedProductUnitId)
+            .FirstOrDefault();
+        return Task.FromResult(unitId.HasValue
+            ? _serializedProductUnits.FirstOrDefault(unit => unit.Id == unitId.Value)
+            : null);
+    }
+
+    public Task<WarrantyEntitlement?> FindWarrantyEntitlementByUnitIdForUpdateAsync(
+        Guid unitId,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_warrantyEntitlements.FirstOrDefault(entitlement =>
+            entitlement.SerializedProductUnitId == unitId));
+    }
+
     public Task<ShipmentCommandOutbox[]> ClaimDueShipmentCommandsAsync(
         string leaseOwner,
         TimeSpan leaseDuration,

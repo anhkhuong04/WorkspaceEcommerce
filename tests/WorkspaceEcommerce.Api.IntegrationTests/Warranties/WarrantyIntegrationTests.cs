@@ -3,9 +3,11 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using WorkspaceEcommerce.Api.IntegrationTests.Infrastructure;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
 using WorkspaceEcommerce.Domain.Modules.Warranties;
+using WorkspaceEcommerce.Infrastructure.Persistence;
 
 namespace WorkspaceEcommerce.Api.IntegrationTests.Warranties;
 
@@ -99,6 +101,146 @@ public sealed class WarrantyIntegrationTests(ApiIntegrationTestFixture fixture)
         Assert.Equal(emailCountBeforeActivation, state.EmailCount);
     }
 
+    [Fact]
+    public async Task ConcurrentAdminActivations_CreateOneActivationSideEffectSet()
+    {
+        await fixture.ResetDatabaseAsync();
+        using var registrationClient = fixture.CreateClient();
+        await registrationClient.RegisterCustomerAsync();
+        var customerId = await GetCustomerIdAsync();
+        await SeedPendingWarrantyAsync(customerId);
+        var target = await GetWarrantyTargetAsync();
+        var emailCountBefore = await fixture.ExecuteDbAsync(dbContext =>
+            dbContext.CustomerEmailOutboxMessages.CountAsync());
+        using var firstAdmin = fixture.CreateClient();
+        using var secondAdmin = fixture.CreateClient();
+        var adminToken = await firstAdmin.LoginAsAdminAsync();
+        firstAdmin.UseBearerToken(adminToken);
+        secondAdmin.UseBearerToken(adminToken);
+
+        var responses = await RunConcurrentWhileUnitLockedAsync(
+            target.UnitId,
+            () => Task.WhenAll(
+                firstAdmin.PostAsync($"/api/admin/warranties/{target.EntitlementId}/activate", null),
+                secondAdmin.PostAsync($"/api/admin/warranties/{target.EntitlementId}/activate", null)));
+
+        using var firstResponse = responses[0];
+        using var secondResponse = responses[1];
+        Assert.All(responses, response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
+        await AssertSingleActivationSideEffectSetAsync(
+            target.EntitlementId,
+            emailCountBefore,
+            expectedSource: WarrantyActivationSource.Admin);
+    }
+
+    [Fact]
+    public async Task ConcurrentAdminAndCustomerActivation_CreateOneActivationSideEffectSet()
+    {
+        await fixture.ResetDatabaseAsync();
+        using var customerClient = fixture.CreateClient();
+        var customerToken = await customerClient.RegisterCustomerAsync();
+        customerClient.UseBearerToken(customerToken);
+        var customerId = await GetCustomerIdAsync();
+        await SeedPendingWarrantyAsync(customerId);
+        var target = await GetWarrantyTargetAsync();
+        var emailCountBefore = await fixture.ExecuteDbAsync(dbContext =>
+            dbContext.CustomerEmailOutboxMessages.CountAsync());
+        using var adminClient = fixture.CreateClient();
+        adminClient.UseBearerToken(await adminClient.LoginAsAdminAsync());
+
+        var responses = await RunConcurrentWhileUnitLockedAsync(
+            target.UnitId,
+            () => Task.WhenAll(
+                adminClient.PostAsync($"/api/admin/warranties/{target.EntitlementId}/activate", null),
+                customerClient.PostAsJsonAsync("/api/customer/warranties/activate", new { identifier = Identifier })));
+
+        using var adminResponse = responses[0];
+        using var customerResponse = responses[1];
+        Assert.All(responses, response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
+        await AssertSingleActivationSideEffectSetAsync(
+            target.EntitlementId,
+            emailCountBefore,
+            expectedSource: null);
+    }
+
+    private Task<Guid> GetCustomerIdAsync() => fixture.ExecuteDbAsync(dbContext => dbContext.Customers
+        .Where(customer => customer.Email == "customer@example.com")
+        .Select(customer => customer.Id)
+        .SingleAsync());
+
+    private Task<WarrantyTarget> GetWarrantyTargetAsync() => fixture.ExecuteDbAsync(dbContext => dbContext.WarrantyEntitlements
+        .Select(entitlement => new WarrantyTarget(entitlement.Id, entitlement.SerializedProductUnitId))
+        .SingleAsync());
+
+    private async Task<HttpResponseMessage[]> RunConcurrentWhileUnitLockedAsync(
+        Guid unitId,
+        Func<Task<HttpResponseMessage[]>> startRequests)
+    {
+        var lockAcquired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseLock = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var blocker = fixture.ExecuteScopeAsync(async services =>
+        {
+            var dbContext = services.GetRequiredService<AppDbContext>();
+            await using var transaction = await dbContext.Database.BeginTransactionAsync();
+            await dbContext.SerializedProductUnits
+                .FromSqlInterpolated($"SELECT * FROM warranty.serialized_product_units WHERE id = {unitId} FOR UPDATE")
+                .SingleAsync();
+            lockAcquired.SetResult();
+            await releaseLock.Task;
+            await transaction.CommitAsync();
+            return true;
+        });
+
+        await lockAcquired.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var requests = startRequests();
+        try
+        {
+            await Task.Delay(150);
+            Assert.False(requests.IsCompleted, "Activation requests should be waiting on the serialized-unit row lock.");
+        }
+        finally
+        {
+            releaseLock.TrySetResult();
+        }
+
+        var responses = await requests;
+        await blocker;
+        return responses;
+    }
+
+    private async Task AssertSingleActivationSideEffectSetAsync(
+        Guid entitlementId,
+        int emailCountBefore,
+        WarrantyActivationSource? expectedSource)
+    {
+        var state = await fixture.ExecuteDbAsync(async dbContext => new
+        {
+            Entitlement = await dbContext.WarrantyEntitlements.SingleAsync(entitlement => entitlement.Id == entitlementId),
+            SnapshotCount = await dbContext.WarrantyCoverageSnapshots.CountAsync(snapshot =>
+                snapshot.WarrantyEntitlementId == entitlementId),
+            ActivationAuditCount = await dbContext.WarrantyAuditEvents.CountAsync(@event =>
+                @event.WarrantyEntitlementId == entitlementId &&
+                @event.Action == WarrantyAuditAction.Activated),
+            EmailCount = await dbContext.CustomerEmailOutboxMessages.CountAsync()
+        });
+
+        Assert.Equal(WarrantyEntitlementStatus.Active, state.Entitlement.Status);
+        if (expectedSource.HasValue)
+        {
+            Assert.Equal(expectedSource.Value, state.Entitlement.ActivationSource);
+        }
+        else
+        {
+            Assert.Contains(
+                state.Entitlement.ActivationSource,
+                new WarrantyActivationSource?[] { WarrantyActivationSource.Admin, WarrantyActivationSource.Customer });
+        }
+
+        Assert.Equal(2, state.SnapshotCount);
+        Assert.Equal(1, state.ActivationAuditCount);
+        Assert.Equal(emailCountBefore + 1, state.EmailCount);
+    }
+
     private async Task SeedPendingWarrantyAsync(Guid customerId)
     {
         await fixture.SeedAsync(async dbContext =>
@@ -153,4 +295,6 @@ public sealed class WarrantyIntegrationTests(ApiIntegrationTestFixture fixture)
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(IdentifierKey));
         return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes($"v1|{WarrantyIdentifierType.Serial}|{normalizedIdentifier}"))).ToLowerInvariant();
     }
+
+    private sealed record WarrantyTarget(Guid EntitlementId, Guid UnitId);
 }

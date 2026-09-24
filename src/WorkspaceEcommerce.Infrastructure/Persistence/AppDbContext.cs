@@ -291,6 +291,32 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             .FromSqlInterpolated($"SELECT * FROM warranty.serialized_product_units WHERE id = {unitId} FOR UPDATE")
             .FirstOrDefaultAsync(cancellationToken);
 
+    Task<SerializedProductUnit?> IAppDbContext.FindSerializedProductUnitByEntitlementIdForUpdateAsync(
+        Guid entitlementId,
+        CancellationToken cancellationToken) =>
+        SerializedProductUnits
+            .FromSqlInterpolated($"""
+                SELECT unit.*
+                FROM warranty.serialized_product_units AS unit
+                INNER JOIN warranty.warranty_entitlements AS entitlement
+                    ON entitlement.serialized_product_unit_id = unit.id
+                WHERE entitlement.id = {entitlementId}
+                FOR UPDATE OF unit
+                """)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    Task<WarrantyEntitlement?> IAppDbContext.FindWarrantyEntitlementByUnitIdForUpdateAsync(
+        Guid unitId,
+        CancellationToken cancellationToken) =>
+        WarrantyEntitlements
+            .FromSqlInterpolated($"""
+                SELECT *
+                FROM warranty.warranty_entitlements
+                WHERE serialized_product_unit_id = {unitId}
+                FOR UPDATE
+                """)
+            .FirstOrDefaultAsync(cancellationToken);
+
     async Task<ShipmentCommandOutbox[]> IAppDbContext.ClaimDueShipmentCommandsAsync(
         string leaseOwner,
         TimeSpan leaseDuration,

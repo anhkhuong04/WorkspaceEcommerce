@@ -111,7 +111,9 @@ warranty eligibility.
   public lookup. Activation requires an assigned serialized unit, the owning
   authenticated customer, and a completed platform order. Non-COD orders also
   require `PaidAt`; COD uses `CompletedAt` as its purchase timestamp. Coverage
-  is snapshotted when activated.
+  is snapshotted once when activated, with one row per entitlement/component.
+  Concurrent admin/customer retries are idempotent and must not duplicate the
+  activation audit or email.
 - Raw Serial/IMEI values must never be stored or logged. Persist only masked
   identifiers and versioned HMAC fingerprints; key rotation is dual-read and
   requires reconciliation.

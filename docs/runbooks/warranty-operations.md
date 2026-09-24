@@ -2,11 +2,11 @@
 
 ## Enablement order
 
-1. Deploy the additive warranty migration and confirm the recorded migration ID.
+1. Deploy through `20260924001622_EnforceWarrantyCoverageSnapshotIdentity` and confirm the recorded migration ID. Exact duplicate snapshots are collapsed before the unique index is added; conflicting duplicates stop the migration and require reviewed reconciliation.
 2. Configure a non-placeholder `Warranty:IdentifierHmacKey` of at least 32 characters and `Warranty:IdentifierKeyVersion=1` from the secret manager. `IdentifierHmacKeys` remains empty on the first deployment.
 3. Enable `Warranty:Enabled` and `Warranty:AdminEnabled`; keep activation and public lookup disabled.
 4. Create versioned plans, assign them to variants, import units, and reconcile each order-item quantity against assigned units.
-5. Enable `Warranty:ActivationEnabled` for an internal smoke account, then the customer cohort.
+5. Keep the repository defaults off. Before enabling `Warranty:ActivationEnabled`, run concurrent admin-admin and admin-customer activation smoke tests and verify exactly one activation audit, one coverage set, and one activation email.
 6. Observe activation failures, rate-limit events, and email-outbox delivery before enabling `Warranty:PublicLookupEnabled`.
 
 ## Import and correction

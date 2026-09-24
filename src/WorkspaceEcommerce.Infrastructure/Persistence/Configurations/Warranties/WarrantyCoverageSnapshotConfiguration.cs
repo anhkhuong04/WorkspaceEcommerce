@@ -20,5 +20,8 @@ internal sealed class WarrantyCoverageSnapshotConfiguration : IEntityTypeConfigu
         builder.Property(snapshot => snapshot.SortOrder).HasColumnName("sort_order").IsRequired();
         builder.HasIndex(snapshot => new { snapshot.WarrantyEntitlementId, snapshot.SortOrder, snapshot.Id })
             .HasDatabaseName("ix_warranty_coverage_snapshots_entitlement_sort_id");
+        builder.HasIndex(snapshot => new { snapshot.WarrantyEntitlementId, snapshot.ComponentCode })
+            .IsUnique()
+            .HasDatabaseName("ux_warranty_coverage_snapshots_entitlement_component");
     }
 }

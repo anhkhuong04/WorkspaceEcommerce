@@ -19,6 +19,11 @@ internal sealed class CustomerWarrantyService(
     TimeProvider timeProvider,
     IValidator<ActivateWarrantyRequest> activateValidator) : ICustomerWarrantyService
 {
+    private readonly WarrantyActivationCoordinator activationCoordinator = new(
+        dbContext,
+        customerEmailOutbox,
+        timeProvider);
+
     public async Task<Result<CustomerWarrantyDto>> ActivateAsync(
         ActivateWarrantyRequest request,
         CancellationToken cancellationToken = default)
@@ -55,118 +60,24 @@ internal sealed class CustomerWarrantyService(
             return Result<CustomerWarrantyDto>.Validation([exception.Message]);
         }
 
-        Result<CustomerWarrantyDto>? outcome = null;
-        Guid? entitlementId = null;
-        var wasAlreadyActive = false;
-        try
+        var activation = await activationCoordinator.ActivateForCustomerAsync(
+            customerId.Value,
+            identifier.IdentifierType,
+            fingerprintsByKeyVersion,
+            cancellationToken);
+        if (activation.IsFailure)
         {
-            await dbContext.ExecuteInTransactionAsync(async transactionCancellationToken =>
-            {
-                SerializedProductUnit? unit = null;
-                foreach (var (keyVersion, fingerprint) in fingerprintsByKeyVersion)
-                {
-                    unit = await dbContext.FindSerializedProductUnitForUpdateAsync(
-                        identifier.IdentifierType,
-                        keyVersion,
-                        fingerprint,
-                        transactionCancellationToken);
-                    if (unit is not null)
-                    {
-                        break;
-                    }
-                }
-                if (unit is null)
-                {
-                    outcome = Result<CustomerWarrantyDto>.NotFound("Warranty is not available for activation.");
-                    return;
-                }
-
-                var entitlement = await dbContext.WarrantyEntitlements
-                    .Where(candidate => candidate.SerializedProductUnitId == unit.Id)
-                    .FirstOrDefaultAsyncSafe(transactionCancellationToken);
-                if (entitlement is null || entitlement.CustomerId != customerId.Value)
-                {
-                    // Keep the ownership response non-disclosing.
-                    outcome = Result<CustomerWarrantyDto>.NotFound("Warranty is not available for activation.");
-                    return;
-                }
-
-                entitlementId = entitlement.Id;
-                if (entitlement.Status == WarrantyEntitlementStatus.Active)
-                {
-                    wasAlreadyActive = true;
-                    return;
-                }
-
-                if (entitlement.Status != WarrantyEntitlementStatus.PendingActivation)
-                {
-                    outcome = Result<CustomerWarrantyDto>.Validation(["Warranty is not available for activation."]);
-                    return;
-                }
-
-                var order = await dbContext.FindOrderForUpdateAsync(entitlement.OrderId, transactionCancellationToken);
-                var plan = await dbContext.WarrantyPlans
-                    .Where(candidate => candidate.Id == entitlement.WarrantyPlanId)
-                    .FirstOrDefaultAsyncSafe(transactionCancellationToken);
-                if (order is null || plan is null || order.CustomerId != customerId.Value)
-                {
-                    outcome = Result<CustomerWarrantyDto>.NotFound("Warranty is not available for activation.");
-                    return;
-                }
-
-                var coverages = await dbContext.WarrantyPlanCoverages
-                    .Where(coverage => coverage.WarrantyPlanId == plan.Id)
-                    .OrderBy(coverage => coverage.SortOrder)
-                    .ThenBy(coverage => coverage.ComponentCode)
-                    .ToArrayAsyncSafe(transactionCancellationToken);
-                var now = timeProvider.GetUtcNow();
-                var eligibility = WarrantyActivationRules.GetEligibility(order, plan, now);
-                var snapshots = WarrantyActivationRules.CreateCoverageSnapshots(entitlement, coverages, eligibility.PurchasedAt);
-                entitlement.Activate(
-                    eligibility.PurchasedAt,
-                    eligibility.EligibleAt,
-                    eligibility.ActivationDeadline,
-                    now,
-                    WarrantyActivationSource.Customer,
-                    plan.TermsVersion,
-                    snapshots);
-                unit.Activate(now);
-                dbContext.Update(entitlement);
-                dbContext.Update(unit);
-                foreach (var snapshot in snapshots)
-                {
-                    dbContext.Add(snapshot);
-                }
-
-                dbContext.Add(new WarrantyAuditEvent(
-                    Guid.NewGuid(),
-                    entitlement.Id,
-                    unit.Id,
-                    WarrantyAuditAction.Activated,
-                    "Customer",
-                    customerId.Value.ToString("D"),
-                    reason: null,
-                    Guid.NewGuid().ToString("N"),
-                    now));
-                QueueActivationEmail(order.CustomerEmail, unit.MaskedIdentifier, plan.Name, coverages);
-                await dbContext.SaveChangesAsync(transactionCancellationToken);
-            }, cancellationToken);
-        }
-        catch (DomainException exception)
-        {
-            return Result<CustomerWarrantyDto>.Validation([exception.Message]);
+            WarrantyMetrics.RecordActivation("rejected", "customer");
+            return ToCustomerActivationFailure(activation);
         }
 
-        if (outcome is not null)
-        {
-            WarrantyMetrics.RecordActivation(outcome.IsSuccess ? "idempotent" : "rejected", "customer");
-            return outcome;
-        }
-
-        var result = entitlementId.HasValue
-            ? await GetWarrantyAsync(entitlementId.Value, cancellationToken)
-            : Result<CustomerWarrantyDto>.NotFound("Warranty is not available for activation.");
-        WarrantyMetrics.RecordActivation(result.IsSuccess ? wasAlreadyActive ? "idempotent" : "activated" : "rejected", "customer");
+        var activationOutcome = activation.Value!;
+        var result = await GetWarrantyAsync(activationOutcome.Entitlement.Id, cancellationToken);
+        WarrantyMetrics.RecordActivation(
+            result.IsSuccess
+                ? activationOutcome.WasAlreadyActive ? "idempotent" : "activated"
+                : "rejected",
+            "customer");
         return result;
     }
 
@@ -275,22 +186,13 @@ internal sealed class CustomerWarrantyService(
 
     private bool IsActivationEnabled() => options.Enabled && options.ActivationEnabled;
 
-    private void QueueActivationEmail(
-        string? recipientEmail,
-        string maskedIdentifier,
-        string planName,
-        IReadOnlyCollection<WarrantyPlanCoverage> coverages)
-    {
-        if (string.IsNullOrWhiteSpace(recipientEmail))
+    private static Result<CustomerWarrantyDto> ToCustomerActivationFailure(
+        Result<WarrantyActivationOutcome> result) =>
+        result.Status switch
         {
-            return;
-        }
-
-        var coverageText = string.Join(", ", coverages.OrderBy(coverage => coverage.SortOrder)
-            .Select(coverage => $"{coverage.DisplayName}: {coverage.DurationMonths} months"));
-        customerEmailOutbox.Enqueue(new CustomerEmailMessage(
-            recipientEmail,
-            "Your product warranty is active",
-            $"Your warranty for {maskedIdentifier} is active under plan {planName}. Coverage: {coverageText}."));
-    }
+            ResultStatus.Validation => Result<CustomerWarrantyDto>.Validation(result.Errors),
+            ResultStatus.NotFound => Result<CustomerWarrantyDto>.NotFound(result.FirstError ?? "Warranty is not available for activation."),
+            ResultStatus.Conflict => Result<CustomerWarrantyDto>.Conflict(result.FirstError ?? "Warranty activation changed concurrently."),
+            _ => Result<CustomerWarrantyDto>.Failure(result.Errors)
+        };
 }

@@ -44,7 +44,7 @@ Các nhận định đã được đối chiếu lại với source và test t�
 | TASK-06 | F-06 Cart/checkout query count | P1 | Done 2026-09-24 | PostgreSQL budgets: cart 3, COD/bank 5, VNPay 8 SELECTs for both 1 and 20 items |
 | TASK-07 | F-07 Email configuration | P1 | Done 2026-09-24 | 21 configuration/composition tests cover Development, Staging, QA, and Production |
 | TASK-08 | F-08 Cleanup batching | P1 | Done 2026-09-24 | PostgreSQL tests prove bounded commits, time-budget continuation, FK order, retention, and safe metrics |
-| TASK-09 | F-09 Warranty activation concurrency | P1 | Open; required before enabling warranty admin | Concurrent activation test produces one activation/audit/email set |
+| TASK-09 | F-09 Warranty activation concurrency | P1 | Done 2026-09-24; feature remains disabled by default | Admin/admin and admin/customer races produce one activation/audit/email set |
 | TASK-10 | F-10 Cart price policy | P1 decision gate | Blocked on Product decision | Approved policy + executable tests for the selected behavior |
 
 ### TASK-01 — Bảo vệ payment result theo ownership/possession proof (F-01)
@@ -274,6 +274,8 @@ Các nhận định đã được đối chiếu lại với source và test t�
   - Chạy focused cleanup/configuration tests và full Infrastructure/API integration suite.
 
 ### TASK-09 — Đồng nhất concurrency boundary cho warranty activation (F-09)
+
+- **Completion evidence (2026-09-24):** admin and customer activation now share one transactional coordinator and acquire locks in the same `serialized unit → entitlement → order` order. A forward migration safely collapses only identical duplicate snapshots, rejects conflicting history, and adds a unique entitlement/component index. PostgreSQL race tests hold the unit lock as a synchronization barrier, release admin-admin and admin-customer requests together, and prove one activation audit, one two-component snapshot set, and one activation email; both callers receive a controlled success/idempotent response. Pending-model detection and clean/supported-upgrade migration verification pass. All 322 Application, 238 Infrastructure, and 112 API/PostgreSQL integration tests passed in Release. Repository warranty flags remain disabled by default.
 
 - **Loại:** Risk đồng thời; hiện bị giảm mức độ vì warranty mặc định tắt
 - **Severity:** **Medium** trước khi bật feature

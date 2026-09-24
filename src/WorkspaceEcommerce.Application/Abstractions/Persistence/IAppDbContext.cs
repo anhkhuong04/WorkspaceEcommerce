@@ -93,6 +93,14 @@ public interface IAppDbContext : ICatalogReadStore, IOrderReadStore, ILoyaltyRea
         Guid unitId,
         CancellationToken cancellationToken = default);
 
+    Task<SerializedProductUnit?> FindSerializedProductUnitByEntitlementIdForUpdateAsync(
+        Guid entitlementId,
+        CancellationToken cancellationToken = default);
+
+    Task<WarrantyEntitlement?> FindWarrantyEntitlementByUnitIdForUpdateAsync(
+        Guid unitId,
+        CancellationToken cancellationToken = default);
+
     Task<ShipmentCommandOutbox[]> ClaimDueShipmentCommandsAsync(
         string leaseOwner,
         TimeSpan leaseDuration,

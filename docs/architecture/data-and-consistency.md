@@ -36,7 +36,8 @@ depends on the latest value:
 - Coupons before usage reservation.
 - Orders and VNPay transactions before callback/cancellation mutation.
 - Refresh tokens before rotation/reuse detection.
-- Serialized warranty units before assignment/activation.
+- Warranty activation locks the serialized unit, entitlement, then order in that
+  order for both admin and customer entry points.
 
 Acquire collections in deterministic order. Translate expected EF concurrency
 failures to a conflict result; do not retry a non-idempotent use case blindly.

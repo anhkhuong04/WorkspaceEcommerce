@@ -24,6 +24,11 @@ internal sealed class AdminWarrantyService(
     IValidator<AdminWarrantyReasonRequest> reasonValidator,
     IValidator<ReplaceWarrantyRequest> replaceValidator) : IAdminWarrantyService
 {
+    private readonly WarrantyActivationCoordinator activationCoordinator = new(
+        dbContext,
+        customerEmailOutbox,
+        timeProvider);
+
     public async Task<Result<PagedResult<AdminWarrantyPlanDto>>> GetPlansAsync(
         AdminWarrantyPlanListRequest request,
         CancellationToken cancellationToken = default)
@@ -647,7 +652,7 @@ internal sealed class AdminWarrantyService(
     }
 
     public Task<Result<AdminWarrantyEntitlementDto>> ActivateAsync(Guid id, string actorId, CancellationToken cancellationToken = default) =>
-        ActivateCoreAsync(id, WarrantyActivationSource.Admin, actorId, cancellationToken);
+        ActivateCoreAsync(id, actorId, cancellationToken);
 
     public async Task<Result<AdminWarrantyEntitlementDto>> VoidAsync(
         Guid id,
@@ -783,7 +788,6 @@ internal sealed class AdminWarrantyService(
 
     private async Task<Result<AdminWarrantyEntitlementDto>> ActivateCoreAsync(
         Guid id,
-        WarrantyActivationSource source,
         string actorId,
         CancellationToken cancellationToken)
     {
@@ -792,52 +796,20 @@ internal sealed class AdminWarrantyService(
             return Result<AdminWarrantyEntitlementDto>.NotFound("Warranty administration is unavailable.");
         }
 
-        var entitlement = await dbContext.WarrantyEntitlements.Where(candidate => candidate.Id == id).FirstOrDefaultAsyncSafe(cancellationToken);
-        if (entitlement is null)
-        {
-            return Result<AdminWarrantyEntitlementDto>.NotFound("Warranty entitlement was not found.");
-        }
-
-        if (entitlement.Status == WarrantyEntitlementStatus.Active)
-        {
-            WarrantyMetrics.RecordActivation("idempotent", "admin");
-            return Result<AdminWarrantyEntitlementDto>.Success(await ToAdminEntitlementDtoAsync(entitlement, cancellationToken));
-        }
-
-        var unit = await dbContext.SerializedProductUnits.Where(candidate => candidate.Id == entitlement.SerializedProductUnitId).FirstOrDefaultAsyncSafe(cancellationToken);
-        var order = await dbContext.Orders.Where(candidate => candidate.Id == entitlement.OrderId).FirstOrDefaultAsyncSafe(cancellationToken);
-        var plan = await dbContext.WarrantyPlans.Where(candidate => candidate.Id == entitlement.WarrantyPlanId).FirstOrDefaultAsyncSafe(cancellationToken);
-        if (unit is null || order is null || plan is null)
-        {
-            return Result<AdminWarrantyEntitlementDto>.Validation(["Warranty activation data is incomplete."]);
-        }
-
-        var coverages = await GetPlanCoveragesAsync(plan.Id, cancellationToken);
-        var now = timeProvider.GetUtcNow();
-        try
-        {
-            var eligibility = WarrantyActivationRules.GetEligibility(order, plan, now);
-            var snapshots = WarrantyActivationRules.CreateCoverageSnapshots(entitlement, coverages, eligibility.PurchasedAt);
-            entitlement.Activate(eligibility.PurchasedAt, eligibility.EligibleAt, eligibility.ActivationDeadline, now, source, plan.TermsVersion, snapshots);
-            unit.Activate(now);
-            dbContext.Update(entitlement);
-            dbContext.Update(unit);
-            foreach (var snapshot in snapshots)
-            {
-                dbContext.Add(snapshot);
-            }
-
-            AddAudit(entitlement.Id, unit.Id, WarrantyAuditAction.Activated, "Admin", actorId, null, now);
-            QueueActivationEmail(order, unit, plan, coverages);
-            await dbContext.SaveChangesAsync(cancellationToken);
-            WarrantyMetrics.RecordActivation("activated", "admin");
-            return Result<AdminWarrantyEntitlementDto>.Success(await ToAdminEntitlementDtoAsync(entitlement, cancellationToken));
-        }
-        catch (DomainException exception)
+        var activation = await activationCoordinator.ActivateForAdminAsync(
+            id,
+            actorId,
+            cancellationToken);
+        if (activation.IsFailure)
         {
             WarrantyMetrics.RecordActivation("rejected", "admin");
-            return Result<AdminWarrantyEntitlementDto>.Validation([exception.Message]);
+            return ToAdminActivationFailure(activation);
         }
+
+        var outcome = activation.Value!;
+        WarrantyMetrics.RecordActivation(outcome.WasAlreadyActive ? "idempotent" : "activated", "admin");
+        return Result<AdminWarrantyEntitlementDto>.Success(
+            await ToAdminEntitlementDtoAsync(outcome.Entitlement, cancellationToken));
     }
 
     private async Task<AdminWarrantyEntitlementDto> ToAdminEntitlementDtoAsync(WarrantyEntitlement entitlement, CancellationToken cancellationToken)
@@ -870,19 +842,15 @@ internal sealed class AdminWarrantyService(
     private void AddAudit(Guid? entitlementId, Guid? unitId, WarrantyAuditAction action, string actorType, string actorId, string? reason, DateTimeOffset now) =>
         dbContext.Add(new WarrantyAuditEvent(Guid.NewGuid(), entitlementId, unitId, action, actorType, NormalizeActor(actorId), reason, Guid.NewGuid().ToString("N"), now));
 
-    private void QueueActivationEmail(Order order, SerializedProductUnit unit, WarrantyPlan plan, IReadOnlyCollection<WarrantyPlanCoverage> coverages)
-    {
-        if (string.IsNullOrWhiteSpace(order.CustomerEmail))
+    private static Result<AdminWarrantyEntitlementDto> ToAdminActivationFailure(
+        Result<WarrantyActivationOutcome> result) =>
+        result.Status switch
         {
-            return;
-        }
-
-        var coverageText = string.Join(", ", coverages.OrderBy(coverage => coverage.SortOrder).Select(coverage => $"{coverage.DisplayName}: {coverage.DurationMonths} months"));
-        customerEmailOutbox.Enqueue(new CustomerEmailMessage(
-            order.CustomerEmail,
-            "Your product warranty is active",
-            $"Your warranty for {unit.MaskedIdentifier} is active under plan {plan.Name}. Coverage: {coverageText}."));
-    }
+            ResultStatus.Validation => Result<AdminWarrantyEntitlementDto>.Validation(result.Errors),
+            ResultStatus.NotFound => Result<AdminWarrantyEntitlementDto>.NotFound(result.FirstError ?? "Warranty entitlement was not found."),
+            ResultStatus.Conflict => Result<AdminWarrantyEntitlementDto>.Conflict(result.FirstError ?? "Warranty activation changed concurrently."),
+            _ => Result<AdminWarrantyEntitlementDto>.Failure(result.Errors)
+        };
 
     private ParsedImportRow ParseImportRow(WarrantyUnitImportRow row)
     {
