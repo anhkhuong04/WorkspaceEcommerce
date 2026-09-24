@@ -45,7 +45,7 @@ Các nhận định đã được đối chiếu lại với source và test t�
 | TASK-07 | F-07 Email configuration | P1 | Done 2026-09-24 | 21 configuration/composition tests cover Development, Staging, QA, and Production |
 | TASK-08 | F-08 Cleanup batching | P1 | Done 2026-09-24 | PostgreSQL tests prove bounded commits, time-budget continuation, FK order, retention, and safe metrics |
 | TASK-09 | F-09 Warranty activation concurrency | P1 | Done 2026-09-24; feature remains disabled by default | Admin/admin and admin/customer races produce one activation/audit/email set |
-| TASK-10 | F-10 Cart price policy | P1 decision gate | Blocked on Product decision | Approved policy + executable tests for the selected behavior |
+| TASK-10 | F-10 Cart price policy | P1 decision gate | Blocked confirmed 2026-09-24 | No approved ADR/product sign-off; preserve current `UnitPriceSnapshot` behavior |
 
 ### TASK-01 — Bảo vệ payment result theo ownership/possession proof (F-01)
 
@@ -298,6 +298,8 @@ Các nhận định đã được đối chiếu lại với source và test t�
   - Chạy `WarrantyIntegrationTests`, Application warranty tests, migration pending-model check và migration verification script nếu schema thay đổi.
 
 ### TASK-10 — Chốt và mã hóa cart price policy (F-10)
+
+- **Blocked evidence (2026-09-24):** repository review found accepted ADRs 001–006 only; no owner-approved repricing or time-bound price-lock contract exists. `.agents/domain.md`, `docs/product/business-rules.md`, current Domain/Application code, and regression tests all explicitly preserve the existing `UnitPriceSnapshot` behavior until Product approves a replacement. No source, API, frontend, or schema change was made. Product must still choose contract A or B and supply the examples, expiry/confirmation UX, coupon/shipping/tax interaction, guest/customer parity, audit source, and owner sign-off listed below.
 
 - **Loại:** Business risk, không kết luận là bug vì test hiện tại chủ động kỳ vọng hành vi này
 - **Severity:** **Medium** nếu nghiệp vụ không cam kết price lock
