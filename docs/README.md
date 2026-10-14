@@ -1,50 +1,78 @@
-# WorkspaceEcommerce documentation
+# Tài liệu WorkspaceEcommerce
 
-This directory is the long-lived source of truth for product behavior, domain
-rules, architecture decisions, integration boundaries, and operations. The
-root `README.md` is the quick start; `.agents/` contains short operational
-instructions for coding agents and must not become a second product manual.
+Tài liệu dành cho developer đọc và bảo trì hệ thống đang được triển khai trong repository. Bắt đầu bằng [hướng dẫn chạy local](backend/development/guide.md), sau đó chọn phần công việc bên dưới.
 
-When documents conflict, use this order:
+## Ba điểm đọc chính
 
-1. Executable source, tests, migrations/model snapshot, configuration validators, and CI.
-2. Accepted architecture decision records (ADRs).
-3. The current-state documents linked below.
-4. Historical tickets, generated artifacts, and external-provider documentation.
+| Phần | Nội dung | Đọc tiếp khi cần |
+| --- | --- | --- |
+| [Backend](backend/README.md) | Kiến trúc, trách nhiệm module, luồng request và checkout | Business rules, data/consistency, API conventions |
+| [Frontend](frontend/README.md) | Storefront/admin, tổ chức code, API, session và cache | Shared packages, router và testing |
+| [Services](services/README.md) | VNPay, MiniLogistics, SMTP, Google, object storage và telemetry | Configuration matrix, outbox và runbook |
 
-## Read by intent
+```text
+React storefront/admin
+        | HTTP / SignalR
+ASP.NET Core API + hosted workers
+        |                    |
+   PostgreSQL         External services
+```
 
-| Need | Start here |
+Services ở đây là các dịch vụ bên ngoài được web tích hợp. Application services và hosted workers thuộc Backend; SignalR là endpoint của API.
+
+## Cấu trúc thư mục
+
+```text
+docs/
+├── README.md
+├── backend/
+│   ├── README.md
+│   ├── api/
+│   ├── architecture/
+│   ├── product/
+│   ├── adr/
+│   ├── development/
+│   ├── performance/
+│   ├── runbooks/
+│   ├── currency-and-money.md
+│   └── order-receipts.md
+├── frontend/
+│   ├── README.md
+│   └── ui-ux-style.md
+└── services/
+    ├── README.md
+    └── runbooks/
+```
+
+`backend/development` chứa hướng dẫn chạy và kiểm thử toàn repository, bao gồm frontend, để tránh nhân bản tài liệu dùng chung. `backend/runbooks` quản lý triển khai, phục hồi và bảo hành; `services/runbooks` quản lý tích hợp, cấu hình, credentials, media, outbox và telemetry. ADR nằm cùng Backend và giữ nguyên nội dung quyết định.
+
+## Tài liệu tham chiếu
+
+| Cần tra cứu | Tài liệu sở hữu nội dung |
 | --- | --- |
-| Product scope, users, terminology | [Product overview](product/overview.md) |
-| Commerce invariants and lifecycle rules | [Business rules](product/business-rules.md) |
-| End-to-end customer and operator behavior | [User flows](product/user-flows.md) |
-| Components and dependency direction | [Architecture overview](architecture/overview.md) |
-| Transactions, locking, snapshots, outbox/inbox | [Data and consistency](architecture/data-and-consistency.md) |
-| VNPay, MiniLogistics, email, media, Google, SignalR | [Integrations](architecture/integrations.md) |
-| HTTP envelope, errors, auth, paging, localization | [API conventions](api/conventions.md) |
-| Local setup, configuration, migrations, troubleshooting | [Development guide](development/guide.md) |
-| Test strategy and validation commands | [Testing and quality](development/testing.md) |
-| Known limitations and protected areas | [Known limitations](development/known-limitations.md) |
-| Production procedures | [Runbooks](runbooks/) |
-| Why a significant decision was made | [ADR index](adr/README.md) |
+| Quy tắc tiền, checkout, trạng thái đơn, loyalty, identity, bảo hành | [Business rules](backend/product/business-rules.md) |
+| Schema, transaction, locking, snapshot, outbox/inbox, migration | [Data and consistency](backend/architecture/data-and-consistency.md) |
+| Route families, envelope, lỗi, auth/ownership, paging và file | [API conventions](backend/api/conventions.md) |
+| Định hướng hình ảnh và tiêu chí review UI/UX (đề xuất) | [Frontend UI/UX style](frontend/ui-ux-style.md) |
+| Cài đặt, chạy local, cấu hình và xử lý lỗi môi trường | [Development guide](backend/development/guide.md) |
+| Test layers, lệnh kiểm tra và yêu cầu coverage | [Testing and quality](backend/development/testing.md) |
+| Chức năng còn thiếu và giới hạn hiện tại | [Known limitations](backend/development/known-limitations.md) |
+| Kiểu dữ liệu và định dạng tiền | [Currency and money](backend/currency-and-money.md) |
+| Quyền truy cập, render và cấu hình biên nhận PDF | [Order receipts](backend/order-receipts.md) |
+| Lý do cho quyết định kiến trúc đã được chấp nhận | [ADR index](backend/adr/README.md) |
 
-Focused references:
+## Vận hành
 
-- [Currency and money](currency-and-money.md)
-- [Order receipts](order-receipts.md)
-- [PostgreSQL query measurement](performance/prh-008-query-plan-runbook.md)
-- [Load and resilience testing](performance/prh-016-load-resilience-runbook.md)
+- [Configuration matrix](services/runbooks/configuration-matrix.md), [credential rotation](services/runbooks/credential-rotation.md).
+- [Production release](backend/runbooks/production-release.md), [disaster recovery](backend/runbooks/disaster-recovery.md), [observability](services/runbooks/observability-and-alerting.md).
+- [Outbox operations](services/runbooks/background-outbox-operations.md), [media scanning policy](services/runbooks/media-malware-scanning.md), [warranty operations](backend/runbooks/warranty-operations.md).
+- [Query measurement](backend/performance/prh-008-query-plan-runbook.md), [load/resilience](backend/performance/prh-016-load-resilience-runbook.md).
 
-## Documentation policy
+## Quy tắc bảo trì tài liệu
 
-- Current-state documents describe behavior that exists now. Planned features belong in
-  an issue or explicitly labelled proposal, not in the canonical product docs.
-- ADRs preserve decision context. Do not silently rewrite an accepted decision; add a
-  supersession note or a new ADR.
-- Runbooks contain executable operational steps and safety boundaries. Environment
-  evidence, credentials, customer data, and generated reports stay outside Git.
-- Document rules whose reason or cross-module impact is difficult to infer. Do not mirror
-  every controller, DTO, or folder listing.
-- A change to money, identity, order state, external side effects, retention, or a public
-  API contract must update the relevant document and tests in the same change.
+- Source, tests, migrations, configuration validators và CI là bằng chứng hiện trạng; tiếp theo là ADR đã chấp nhận, rồi tài liệu hiện trạng. Ticket cũ và báo cáo mô phỏng không xác định hành vi hiện tại.
+- Mỗi nội dung có một nơi sở hữu trong bảng trên. Các guide giới thiệu và dẫn link; không chép lại lệnh, toàn bộ DTO, option hay danh sách endpoint.
+- Thay đổi một quy tắc hoặc contract thì cập nhật tài liệu sở hữu cùng code/tests. Khi di chuyển tài liệu, cập nhật các link trong repository.
+- ADR giữ nguyên bối cảnh quyết định; dùng ADR mới hoặc ghi chú supersession khi quyết định thay đổi. Runbook giữ các bước thao tác và kiểm tra vận hành.
+- Tính năng dự kiến thuộc issue/proposal có nhãn rõ ràng. Credentials, dữ liệu khách hàng và evidence của từng lần chạy không đưa vào tài liệu Git.
+- [README gốc](../README.md) chỉ dẫn đường; `.agents/` chỉ chứa hướng dẫn cho agent. Không dùng hai nơi này làm bản sao của tài liệu sản phẩm.

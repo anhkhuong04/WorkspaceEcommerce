@@ -40,7 +40,7 @@ username/password pair when SMTP authentication is configured.
 
 Changing a value follows the [credential rotation runbook](credential-rotation.md).
 Changing a public endpoint, proxy, media URL, or cookie/CORS policy requires the
-staging ingress smoke in the [production release runbook](production-release.md).
+staging ingress smoke in the [production release runbook](../../backend/runbooks/production-release.md).
 
 ## Environment hand-off record
 

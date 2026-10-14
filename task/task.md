@@ -133,11 +133,11 @@ Then run the isolated browser E2E, approved PRH-016/017 staging exercises, and t
 
 ## Release evidence locations
 
-- [Production release runbook](docs/runbooks/production-release.md)
-- [Configuration matrix](docs/runbooks/configuration-matrix.md)
-- [Credential rotation](docs/runbooks/credential-rotation.md)
-- [Observability and alerting](docs/runbooks/observability-and-alerting.md)
-- [Media scanning policy](docs/runbooks/media-malware-scanning.md)
-- [Load/resilience](docs/performance/prh-016-load-resilience-runbook.md)
-- [Disaster recovery](docs/runbooks/disaster-recovery.md)
+- [Production release runbook](../docs/backend/runbooks/production-release.md)
+- [Configuration matrix](../docs/services/runbooks/configuration-matrix.md)
+- [Credential rotation](../docs/services/runbooks/credential-rotation.md)
+- [Observability and alerting](../docs/services/runbooks/observability-and-alerting.md)
+- [Media scanning policy](../docs/services/runbooks/media-malware-scanning.md)
+- [Load/resilience](../docs/backend/performance/prh-016-load-resilience-runbook.md)
+- [Disaster recovery](../docs/backend/runbooks/disaster-recovery.md)
 - [PRH-018 candidate gate](docs/reports/prh-018-release-candidate-gate.md)

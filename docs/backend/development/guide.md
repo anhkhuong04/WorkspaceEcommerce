@@ -1,7 +1,8 @@
 # Development guide
 
-The root [README](../../README.md) is the shortest setup path. This guide records
-the commands and configuration behavior that contributors need to preserve.
+This guide owns local setup and migration commands. Start here to run the
+project; use [Backend](../README.md), [Frontend](../../frontend/README.md)
+and [Services](../../services/README.md) to understand the implementation.
 
 ## Toolchain
 
@@ -63,10 +64,9 @@ corepack pnpm dev:storefront   # http://localhost:5173
 Pop-Location
 ```
 
-Frontend configuration is build-time `VITE_*` data. `VITE_API_BASE_URL` points
-both apps at the API; `VITE_GOOGLE_CLIENT_ID` is public client configuration,
-not a secret. Google remains disabled server-side until the allowed audience is
-configured.
+Each app has an `.env.example`; copy it to an ignored `.env.local` when local
+overrides are needed. Variable meanings, proxy behavior and session handling are
+in the [Frontend guide](../../frontend/README.md).
 
 ## EF Core migrations
 
@@ -92,7 +92,7 @@ look clean; add a forward migration.
 
 ## Configuration ownership
 
-Use [the configuration matrix](../runbooks/configuration-matrix.md) for the
+Use [the configuration matrix](../../services/runbooks/configuration-matrix.md) for the
 authoritative sections, environment policy, owner, and rotation expectation.
 Important groups are `ConnectionStrings`, `AdminAuth`, `Jwt`, `GoogleAuth`,
 `TwoFactor`, `CustomerAccountLifecycle`, `EmailDelivery`, `MediaStorage`,
@@ -117,4 +117,4 @@ start; fix the deployment authority.
 | Media upload is unavailable | size/dimensions, object-store access, lifecycle row, and active NoOp risk metadata outside Development |
 | Integration tests cannot start | Docker is running and PostgreSQL Testcontainers can pull/start `postgres:17-alpine` |
 
-Operational recovery belongs in [runbooks](../runbooks/), not ad-hoc database edits.
+Operational recovery belongs in [runbooks](../../README.md#vận-hành), not ad-hoc database edits.

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CartDto, CartItemDto } from "@workspace-ecommerce/api-types";
 import type { ReactNode, RefObject } from "react";
-import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useCustomerAuth } from "../customer-auth/useCustomerAuth";
@@ -9,6 +9,7 @@ import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
 import { getCartSessionId, resetCartSessionId } from "../../services/cartSession";
 import { StorefrontCartContext, type CartQueryKey, type StorefrontCartContextValue } from "./StorefrontCartContext";
+import { useModalDialog } from "../../hooks/useModalDialog";
 
 function createCartQueryKey(sessionId: string): CartQueryKey {
   return ["storefront", "cart", sessionId];
@@ -19,13 +20,15 @@ export function StorefrontCartProvider({ children }: { children: ReactNode }) {
   const [cartSessionId, setCartSessionId] = useState(() => getCartSessionId());
   const cartQueryKey = useMemo(() => createCartQueryKey(cartSessionId), [cartSessionId]);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
   const cartQuery = useQuery({
     queryKey: cartQueryKey,
     queryFn: () => storefrontApi.getCart(cartSessionId)
   });
 
-  const openCartDrawer = useCallback((cartData?: CartDto) => {
+  const openCartDrawer = useCallback((cartData?: CartDto, returnFocusTo?: HTMLElement) => {
+    returnFocusRef.current = returnFocusTo ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     if (cartData) {
       queryClient.setQueryData(cartQueryKey, cartData);
     }
@@ -69,6 +72,7 @@ export function StorefrontCartProvider({ children }: { children: ReactNode }) {
     <StorefrontCartContext.Provider value={contextValue}>
       {children}
       <ShoppingCartDrawer
+        returnFocusRef={returnFocusRef}
         cart={cartQuery.data}
         cartError={cartQuery.error}
         cartQueryKey={cartQueryKey}
@@ -81,6 +85,7 @@ export function StorefrontCartProvider({ children }: { children: ReactNode }) {
   );
 }
 interface ShoppingCartDrawerProps {
+  returnFocusRef: RefObject<HTMLElement | null>;
   cart: CartDto | undefined;
   cartError: unknown;
   cartQueryKey: CartQueryKey;
@@ -90,7 +95,7 @@ interface ShoppingCartDrawerProps {
   onClose: () => void;
 }
 
-function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLoading, isOpen, onClose }: ShoppingCartDrawerProps) {
+function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLoading, isOpen, onClose, returnFocusRef }: ShoppingCartDrawerProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -101,6 +106,7 @@ function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLo
     setIsLoginPromptOpen(false);
     onClose();
   }, [onClose]);
+  const dialog = useModalDialog(isOpen, closeDrawer, closeButtonRef, returnFocusRef);
   const items = cart?.items ?? [];
   const totalQuantity = cart?.totalQuantity ?? 0;
   const totalAmount = cart?.totalAmount ?? 0;
@@ -135,28 +141,6 @@ function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLo
     }
   });
 
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    window.setTimeout(() => closeButtonRef.current?.focus(), 0);
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        closeDrawer();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [closeDrawer, isOpen]);
-
   if (!isOpen) {
     return null;
   }
@@ -186,12 +170,10 @@ function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLo
   }
 
   return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-black/35 p-3 sm:p-6" role="presentation">
-      <aside
-        className="flex h-[min(88vh,760px)] w-full max-w-[min(94vw,900px)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl outline-none"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="shopping-cart-drawer-title"
+    <>
+      <dialog {...dialog}
+        className="storefront-modal storefront-drawer flex flex-col"
+        aria-label={t("header.cart")}
       >
         {hasItems ? (
           <CartDrawerHeader
@@ -217,8 +199,8 @@ function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLo
                   <article key={item.id} className="grid grid-cols-[86px_minmax(0,1fr)_60px] gap-3 sm:grid-cols-[118px_minmax(0,1fr)_76px] sm:gap-5">
                     <CartItemImage item={item} />
                     <div className="min-w-0 py-0.5 sm:py-3">
-                      <p className="truncate text-sm font-medium text-slate-500 sm:text-base">{item.productName}</p>
-                      <h3 className="mt-0.5 truncate text-base font-bold text-slate-800 sm:text-lg">{item.variantName}</h3>
+                      <p className="line-clamp-2 text-sm font-medium text-slate-600">{item.productName}</p>
+                      <h3 className="mt-1 break-words text-base font-semibold text-slate-950">{item.variantName}</h3>
                       <p className="mt-2 text-sm font-medium text-slate-500 sm:text-base">{formatCartMoney(item.unitPriceSnapshot, false)}</p>
                       {formatVariantOptions(item) ? (
                         <p className="mt-1 truncate text-sm font-medium text-slate-500 sm:text-base">{formatVariantOptions(item)}</p>
@@ -244,7 +226,7 @@ function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLo
                         type="button"
                         disabled={isBusy}
                         onClick={() => removeItemMutation.mutate(item.id)}
-                        className="text-xs font-bold text-slate-500 transition hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm"
+                        className="min-h-11 text-sm font-medium text-slate-600 transition hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         {t("common.remove")}
                       </button>
@@ -268,9 +250,9 @@ function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLo
             </div>
           </div>
         )}
-      </aside>
+      </dialog>
       {isLoginPromptOpen ? <LoginRequiredDialog onCancel={() => setIsLoginPromptOpen(false)} onLogin={handleLogin} /> : null}
-    </div>
+    </>
   );
 }
 
@@ -299,7 +281,7 @@ function CartDrawerHeader({
           type="button"
           disabled={isBusy}
           onClick={onClear}
-          className="text-sm font-medium text-slate-400 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 sm:text-base"
+          className="min-h-11 text-sm font-medium text-slate-600 transition hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {t("common.clearAll")}
         </button>
@@ -316,7 +298,7 @@ const CartCloseButton = forwardRef<HTMLButtonElement, { onClose: () => void }>(f
       ref={ref}
       type="button"
       onClick={onClose}
-      className="grid h-9 w-9 place-items-center rounded-lg text-slate-900 transition hover:bg-slate-100"
+      className="grid h-11 w-11 place-items-center rounded-full text-slate-900 transition hover:bg-slate-100"
       aria-label={t("cart.close")}
     >
       <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -396,8 +378,8 @@ function CartDrawerFooter({
   return (
     <div className="border-t border-slate-200 px-5 py-5 sm:px-8 sm:py-6">
       <div className="flex items-center justify-between gap-6">
-        <p className="text-2xl font-bold tracking-tight text-slate-800">{t("cart.total")}</p>
-        <p className="text-2xl font-bold tracking-tight text-slate-800">{formatCartMoney(totalAmount)}</p>
+        <p className="text-lg font-semibold text-slate-950">{t("cart.total")}</p>
+        <p className="min-w-0 break-words text-right text-xl font-semibold text-slate-950">{formatCartMoney(totalAmount)}</p>
       </div>
 
       <div className="mt-6 flex h-12 items-center rounded-full border border-slate-200 bg-white pl-5 pr-1.5 text-slate-400">
@@ -428,12 +410,10 @@ function CartDrawerFooter({
 
 function LoginRequiredDialog({ onCancel, onLogin }: { onCancel: () => void; onLogin: () => void }) {
   const { t } = useTranslation();
+  const dialog = useModalDialog(true, onCancel);
   return (
-    <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/45 p-5" role="presentation">
-      <section
-        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8"
-        role="dialog"
-        aria-modal="true"
+      <dialog {...dialog}
+        className="storefront-modal w-[calc(100%-2rem)] max-w-md rounded-2xl !p-6 sm:!p-8"
         aria-labelledby="login-required-title"
       >
         <div className="grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-slate-800" aria-hidden="true">
@@ -460,14 +440,13 @@ function LoginRequiredDialog({ onCancel, onLogin }: { onCancel: () => void; onLo
             {t("header.login")}
           </button>
         </div>
-      </section>
-    </div>
+      </dialog>
   );
 }
 
 function CartDrawerMessage({ children, tone = "info" }: { children: ReactNode; tone?: "info" | "error" }) {
   return (
-    <div className={`mb-4 rounded-lg px-5 py-4 text-sm font-semibold ${tone === "error" ? "bg-red-50 text-red-700" : "bg-slate-50 text-slate-500"}`}>
+    <div role={tone === "error" ? "alert" : "status"} className={`mb-4 rounded-lg px-5 py-4 text-sm font-semibold ${tone === "error" ? "bg-red-50 text-red-700" : "bg-slate-50 text-slate-500"}`}>
       {children}
     </div>
   );

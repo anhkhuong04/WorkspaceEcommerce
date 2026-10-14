@@ -57,8 +57,8 @@ Email delivery and shipment mutations use PostgreSQL outboxes. Workers lease a
 bounded due batch with `FOR UPDATE SKIP LOCKED`, commit the lease before the
 provider request, and complete/retry only when the lease token still matches.
 This is at-least-once delivery: consumers/provider calls must be idempotent where
-possible. Shipment create uses the order code as idempotency key and cancel uses
-`<order-code>:cancel`.
+possible. Provider idempotency keys and callback protocols are owned by the
+[Services guide](../../services/README.md#minilogistics).
 
 MiniLogistics callbacks use a durable inbox/timeline. Duplicate event IDs are
 acknowledged without reapplying state, and provider event time cannot regress the

@@ -17,7 +17,7 @@ run the rehearsal in an isolated environment.
 Never put database passwords, Data Protection keys, JWTs, refresh tokens, TOTP
 secrets/recovery codes, SMTP credentials, S3 credentials, webhook bodies, or customer
 data in a command line, log, artifact, ticket, or this document. If a secret is exposed,
-stop the rehearsal and follow the [credential rotation runbook](credential-rotation.md).
+stop the rehearsal and follow the [credential rotation runbook](../../services/runbooks/credential-rotation.md).
 
 ## Recovery prerequisites
 
@@ -135,7 +135,7 @@ production backup workflow.
 
 - [Production release runbook](production-release.md): migration/release gates,
   topology checks, and rollback boundaries.
-- [Credential rotation runbook](credential-rotation.md): external secret and key
+- [Credential rotation runbook](../../services/runbooks/credential-rotation.md): external secret and key
   rotation procedure.
 - [ADR 004: durable media storage](../adr/004-durable-media-storage.md): media state,
   cleanup, and object/metadata lifecycle.

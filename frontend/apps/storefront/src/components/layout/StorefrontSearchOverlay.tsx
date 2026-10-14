@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
+import { useModalDialog } from "../../hooks/useModalDialog";
 
 type SearchTab = "products" | "blogs";
 
@@ -26,28 +27,11 @@ export function StorefrontSearchOverlay({ isOpen, onClose }: StorefrontSearchOve
 function StorefrontSearchOverlayContent({ onClose }: Pick<StorefrontSearchOverlayProps, "onClose">) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialog = useModalDialog(true, onClose, inputRef);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [activeTab, setActiveTab] = useState<SearchTab>("products");
   const normalizedQuery = debouncedQuery.trim();
-
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    window.setTimeout(() => inputRef.current?.focus(), 0);
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [onClose]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -88,32 +72,30 @@ function StorefrontSearchOverlayContent({ onClose }: Pick<StorefrontSearchOverla
   }
 
   return (
-    <div className="fixed inset-0 z-[80] grid place-items-start bg-black/35 p-3 pt-16 sm:p-6 sm:pt-20" role="presentation">
-      <aside
-        className="mx-auto flex max-h-[min(84vh,760px)] w-full max-w-[min(94vw,920px)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl outline-none"
-        role="dialog"
-        aria-modal="true"
+      <dialog {...dialog}
+        className="storefront-modal flex max-h-[min(90dvh,760px)] w-[calc(100%-2rem)] max-w-[920px] flex-col overflow-hidden rounded-2xl"
         aria-labelledby="storefront-search-title"
       >
         <div className="px-5 py-5 sm:px-8 sm:py-6">
+          <h2 id="storefront-search-title" className="mb-4 text-sm font-medium text-slate-600">{t("header.search")}</h2>
           <div className="flex items-center gap-4">
             <input
               ref={inputRef}
               value={query}
               onChange={handleQueryChange}
-              className="min-w-0 flex-1 border-0 border-b-2 border-slate-900 bg-transparent px-0 pb-4 text-3xl font-black tracking-tight text-slate-900 outline-none placeholder:text-slate-300 sm:text-4xl"
+              className="min-w-0 flex-1 border-0 border-b-2 border-slate-900 bg-transparent px-0 pb-3 text-slate-900 placeholder:text-slate-500"
               placeholder={t("search.placeholder")}
               aria-label={t("search.placeholder")}
             />
             {query ? (
-              <button type="button" onClick={clearSearch} className="text-base font-semibold text-slate-500 transition hover:text-slate-900">
+              <button type="button" onClick={clearSearch} className="min-h-11 text-sm font-semibold text-slate-600 transition hover:text-slate-900">
                 {t("common.clear")}
               </button>
             ) : null}
             <button
               type="button"
               onClick={onClose}
-              className="grid h-10 w-10 place-items-center rounded-lg text-slate-900 transition hover:bg-slate-100"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-slate-900 transition hover:bg-slate-100"
               aria-label={t("search.close")}
             >
               <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -163,8 +145,7 @@ function StorefrontSearchOverlayContent({ onClose }: Pick<StorefrontSearchOverla
             </div>
           ) : null}
         </div>
-      </aside>
-    </div>
+      </dialog>
   );
 }
 
@@ -173,7 +154,8 @@ function SearchTabButton({ active, children, onClick }: { active: boolean; child
     <button
       type="button"
       onClick={onClick}
-      className={`text-2xl font-black transition sm:text-3xl ${active ? "text-slate-900" : "text-slate-300 hover:text-slate-500"}`}
+      aria-pressed={active}
+      className={`min-h-11 border-b-2 text-lg font-semibold transition ${active ? "border-slate-950 text-slate-950" : "border-transparent text-slate-500 hover:text-slate-950"}`}
     >
       {children}
     </button>
@@ -217,8 +199,8 @@ function ProductSearchResults({
           </div>
           <div className="min-w-0 self-center pr-2">
             <p className="truncate text-sm font-semibold text-slate-500 sm:text-base">{product.categoryName}</p>
-            <h3 className="mt-1 truncate text-lg font-black text-slate-800 sm:text-2xl">{product.name}</h3>
-            <p className="mt-2 text-lg font-black text-slate-500 sm:text-2xl">{product.minPrice === null ? t("common.contactUs") : formatMoney(product.minPrice)}</p>
+            <h3 className="mt-1 line-clamp-2 text-base font-semibold text-slate-950 sm:text-lg">{product.name}</h3>
+            <p className="mt-2 text-lg font-semibold text-slate-950">{product.minPrice === null ? t("common.contactUs") : formatMoney(product.minPrice)}</p>
           </div>
         </Link>
       ))}

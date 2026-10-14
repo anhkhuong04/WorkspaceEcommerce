@@ -61,6 +61,13 @@
     }
   },
   "header": {
+    "home": "Về trang chủ",
+    "navigation": "Điều hướng",
+    "openNavigation": "Mở điều hướng",
+    "closeNavigation": "Đóng điều hướng",
+    "browseCategories": "Xem danh mục",
+    "warrantyLinks": "Liên kết bảo hành",
+    "skipToContent": "Chuyển đến nội dung",
     "products": "Sản phẩm",
     "warranty": "Bảo hành",
     "news": "Tin tức",
@@ -115,6 +122,7 @@
     "fromPrice": "Từ {{price}}"
   },
   "catalog": {
+    "showResults": "Xem kết quả",
     "allProducts": "Tất cả sản phẩm",
     "subtitle": "Khám phá nội thất, phụ kiện và vật dụng thiết yếu cho không gian làm việc từ danh mục hiện có.",
     "catalog": "Danh mục",
@@ -175,6 +183,11 @@
     "emptyHint": "Hãy là người đầu tiên chia sẻ trải nghiệm về sản phẩm này!"
   },
   "banner": {
+    "pause": "Dừng trình chiếu",
+    "resume": "Tiếp tục trình chiếu",
+    "loading": "Đang tải banner",
+    "carousel": "Trình chiếu",
+    "slides": "Chọn banner",
     "empty": "Chưa có banner",
     "emptyHint": "Thêm banner trong trang quản trị",
     "shopNow": "Mua ngay",

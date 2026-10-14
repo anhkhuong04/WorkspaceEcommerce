@@ -48,5 +48,5 @@ must not apply the same transition twice or regress recorded state.
 - Every new external mutation must either join this pattern or record a separate
   ADR explaining its consistency and recovery model.
 - Operators recover through authenticated inspection/replay APIs and the
-  [outbox runbook](../runbooks/background-outbox-operations.md), never through
+  [outbox runbook](../../services/runbooks/background-outbox-operations.md), never through
   direct row edits.

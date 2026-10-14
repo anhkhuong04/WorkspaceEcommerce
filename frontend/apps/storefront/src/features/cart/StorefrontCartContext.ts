@@ -9,7 +9,7 @@ export interface StorefrontCartContextValue {
   cartQueryKey: CartQueryKey;
   cartSessionId: string;
   isCartDrawerOpen: boolean;
-  openCartDrawer: (cartData?: CartDto) => void;
+  openCartDrawer: (cartData?: CartDto, returnFocusTo?: HTMLElement) => void;
   closeCartDrawer: () => void;
   resetCartSession: () => string;
 }

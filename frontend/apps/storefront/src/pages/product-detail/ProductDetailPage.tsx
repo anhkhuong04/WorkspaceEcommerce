@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { StorefrontCategoryDto } from "@workspace-ecommerce/api-types";
 import { formatMoney } from "@workspace-ecommerce/shared-utils";
 import type { FormEvent } from "react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { useStorefrontCart } from "../../features/cart/StorefrontCartContext";
@@ -32,6 +32,7 @@ export function ProductDetailPage() {
   const queryClient = useQueryClient();
   const { cartQueryKey, cartSessionId, openCartDrawer } = useStorefrontCart();
   const [selection, setSelection] = useState<ProductSelection>(() => createProductSelection(null));
+  const addButtonRef = useRef<HTMLButtonElement>(null);
 
   const productQuery = useQuery({
     queryKey: ["storefront", "product", slug],
@@ -72,7 +73,7 @@ export function ProductDetailPage() {
       }),
     onSuccess: (cart) => {
       queryClient.setQueryData(cartQueryKey, cart);
-      openCartDrawer(cart);
+      openCartDrawer(cart, addButtonRef.current ?? undefined);
     }
   });
 
@@ -114,7 +115,7 @@ export function ProductDetailPage() {
     return (
       <div className="grid gap-8">
         <div className="h-4 w-72 animate-pulse rounded bg-slate-100" />
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(380px,460px)]">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
           <div className="aspect-square animate-pulse rounded-[var(--radius-card)] bg-slate-100" />
           <div className="h-[520px] animate-pulse rounded-[var(--radius-card)] bg-slate-100" />
         </div>
@@ -155,13 +156,15 @@ export function ProductDetailPage() {
         <span className="min-w-0 max-w-full truncate text-slate-950">{product.name}</span>
       </nav>
 
-      <section className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(380px,460px)] lg:items-start">
+      <section className="grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start">
         <div className="grid min-w-0 gap-4">
           <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-slate-100 bg-[#f6f6f6]">
             {selectedImage ? (
               <img
                 src={selectedImage.imageUrl}
                 alt={selectedImage.altText ?? product.name}
+                width={800}
+                height={800}
                 className="aspect-square w-full object-contain p-4 sm:p-8"
               />
             ) : (
@@ -186,6 +189,7 @@ export function ProductDetailPage() {
                   className={`aspect-square overflow-hidden rounded-[var(--radius-control)] border bg-[#f6f6f6] transition ${
                     selectedImageIndex === index ? "border-slate-950 ring-2 ring-slate-950/10" : "border-slate-200 hover:border-slate-400"
                   }`}
+                  aria-pressed={selectedImageIndex === index}
                   aria-label={t("productDetail.viewImage", { number: index + 1 })}
                 >
                   <img
@@ -201,7 +205,7 @@ export function ProductDetailPage() {
         </div>
 
         <aside className="lg:sticky lg:top-28">
-          <form onSubmit={addToCart} className="rounded-[var(--radius-card)] border border-slate-100 bg-white p-5 shadow-[var(--shadow-card)] md:p-7">
+          <form onSubmit={addToCart} aria-busy={addToCartMutation.isPending} className="min-w-0 rounded-[var(--radius-panel)] border border-slate-200 bg-white p-5 md:p-7">
             <Link
               to={categorySlug ? `/products?categorySlug=${encodeURIComponent(categorySlug)}` : "/products"}
               className="ui-caption font-bold uppercase tracking-[0.16em] text-slate-500 transition hover:text-slate-950"
@@ -243,7 +247,16 @@ export function ProductDetailPage() {
                 {selectedVariant ? <p className="ui-caption text-slate-500">SKU {selectedVariant.sku}</p> : null}
               </div>
 
-              <div className="grid max-h-[320px] gap-3 overflow-y-auto pr-1" role="radiogroup" aria-label={t("productDetail.variants")}>
+              <div className="grid max-h-[320px] gap-3 overflow-y-auto p-1" onKeyDown={(event) => {
+                if (!["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                event.preventDefault();
+                const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button[role="radio"]:not(:disabled)'));
+                const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+                const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 :
+                  (current + (["ArrowUp", "ArrowLeft"].includes(event.key) ? -1 : 1) + buttons.length) % buttons.length;
+                buttons[next]?.focus();
+                buttons[next]?.click();
+              }} role="radiogroup" aria-label={t("productDetail.variants")}>
                 {product.variants.map((variant) => {
                   const variantHasDiscount = variant.compareAtPrice !== null && variant.compareAtPrice > variant.price;
                   const variantIsSelected = selectedVariant?.id === variant.id;
@@ -255,6 +268,7 @@ export function ProductDetailPage() {
                       type="button"
                       role="radio"
                       aria-checked={variantIsSelected}
+                      tabIndex={variantIsSelected || (isOutOfStock && product.variants.find((item) => item.stockQuantity > 0)?.id === variant.id) ? 0 : -1}
                       disabled={variantIsOutOfStock}
                       onClick={() => selectVariant(variant.id, variant.stockQuantity)}
                       className={`flex min-w-0 items-start justify-between gap-4 rounded-[var(--radius-control)] border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
@@ -262,7 +276,7 @@ export function ProductDetailPage() {
                       }`}
                     >
                       <span className="min-w-0">
-                        <span className="block truncate text-sm font-black text-slate-950">{variant.name}</span>
+                        <span className="block break-words text-sm font-semibold text-slate-950">{variant.name}</span>
                         <span className="mt-1 block text-xs font-semibold text-slate-500">
                           {variant.color ?? t("productDetail.default")}
                           {variant.size ? ` / ${variant.size}` : ""} / {variant.stockQuantity > 0 ? t("productDetail.leftInStock", { count: variant.stockQuantity }) : t("product.soldOut")}
@@ -318,9 +332,10 @@ export function ProductDetailPage() {
 
               <div className="flex items-end">
                 <button
+                  ref={addButtonRef}
                   type="submit"
                   disabled={!selectedVariant || selectedVariant.stockQuantity <= 0 || addToCartMutation.isPending}
-                  className="ui-control h-12 w-full rounded-[var(--radius-control)] bg-slate-950 px-6 font-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="ui-control h-12 w-full rounded-full bg-slate-950 px-6 font-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {addToCartMutation.isPending ? t("productDetail.adding") : isOutOfStock ? t("product.outOfStock") : t("productDetail.addToCart")}
                 </button>
@@ -334,7 +349,7 @@ export function ProductDetailPage() {
             ) : null}
 
             {addToCartMutation.isSuccess ? (
-              <div className="ui-control mt-5 rounded-[var(--radius-control)] bg-emerald-50 p-4 text-emerald-700">
+              <div role="status" className="ui-control mt-5 rounded-[var(--radius-control)] bg-emerald-50 p-4 text-emerald-700">
                 {t("productDetail.addedToCart")} {" "}
                 <button type="button" onClick={() => openCartDrawer()} className="font-black underline">
                   {t("productDetail.reviewCart")}
@@ -342,7 +357,7 @@ export function ProductDetailPage() {
               </div>
             ) : null}
             {addToCartMutation.isError ? (
-              <div className="ui-control mt-5 rounded-[var(--radius-control)] bg-red-50 p-4 text-red-700">
+              <div role="alert" className="ui-control mt-5 rounded-[var(--radius-control)] bg-red-50 p-4 text-red-700">
                 {getApiErrorMessage(addToCartMutation.error)}
               </div>
             ) : null}

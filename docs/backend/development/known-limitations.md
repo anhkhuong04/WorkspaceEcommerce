@@ -32,15 +32,12 @@ Re-verify source and tests before changing them.
   until an approved backplane is configured and tested.
 - Media uses a `NoOp` malware scanner. Non-Development use is a time-limited
   accepted risk, not a production scanning capability.
-- Admin warranty activation does not use the same locked transaction as customer
-  activation. Warranty remains disabled by default.
 
 ## Performance and maintainability
 
-- Cart/checkout still contain per-item reads, and VNPay checkout rebuilds item
-  snapshots. Do not reproduce these query shapes; measure before refactoring.
-- Account cleanup materializes expired rows before deletion; do not extend this
-  unbounded pattern to new retention jobs.
+- VNPay checkout builds item snapshots before the shipping quote and again under
+  locks during placement. Cart/checkout now use batched reads with query-budget
+  integration coverage; preserve the locked revalidation when optimizing.
 - The Admin frontend has lint/typecheck/build scripts but no unit-test script.
 - The built-in JWT validator accepts one HMAC key at a time, so signing-key
   rotation is a planned session-expiry window, not transparent rollover.

@@ -3,6 +3,8 @@
 
 :root {
   --surface-soft: var(--surface);
+  --storefront-width: 1440px;
+  --storefront-gutter: 16px;
   color: var(--ink);
   background: var(--surface-soft);
 }
@@ -15,7 +17,7 @@ body {
   margin: 0;
   min-width: 320px;
   background: var(--surface-soft);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 400;
   line-height: 1.5;
   font-family: var(--font-sans);
@@ -58,7 +60,7 @@ textarea {
 }
 
 .ui-body {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 400;
   line-height: 1.5;
 }
@@ -69,7 +71,7 @@ textarea {
 }
 
 .ui-caption {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 400;
   line-height: 1.4;
 }
@@ -114,7 +116,7 @@ textarea {
   }
 
   .ui-body {
-    font-size: 15px;
+    font-size: 16px;
   }
 
   .ui-control {
@@ -122,7 +124,72 @@ textarea {
   }
 
   .ui-caption {
-    font-size: 12px;
+    font-size: 13px;
+  }
+}
+
+.storefront-container {
+  width: 100%;
+  max-width: var(--storefront-width);
+  margin-inline: auto;
+  padding-inline: var(--storefront-gutter);
+}
+
+@media (min-width: 640px) {
+  :root { --storefront-gutter: 32px; }
+}
+
+@media (min-width: 1024px) {
+  :root { --storefront-gutter: 40px; }
+}
+
+html { scroll-padding-top: 96px; }
+
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 4px;
+}
+
+input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; }
+
+.storefront-hero { height: clamp(340px, 45vw, 620px); }
+
+.storefront-hero-title { font-size: clamp(32px, 4vw, 56px); line-height: 1.15; font-weight: 600; }
+
+.product-card-action { opacity: 1; transform: none; transition: opacity 180ms ease, transform 180ms ease; }
+
+@media (hover: hover) and (pointer: fine) {
+  .product-card-action { opacity: 0; transform: translateY(6px); }
+  .group:hover .product-card-action, .group:focus-within .product-card-action { opacity: 1; transform: none; }
+}
+
+dialog:not([open]) { display: none; }
+dialog::backdrop { background: rgb(17 17 17 / 0.4); }
+
+.storefront-modal {
+  margin: auto;
+  padding: 0;
+  border: 0;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-panel);
+}
+
+.storefront-drawer {
+  margin: 0 0 0 auto;
+  width: min(100%, 520px);
+  max-width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

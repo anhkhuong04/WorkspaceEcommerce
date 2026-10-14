@@ -4,7 +4,7 @@ These are high-cost rules that are easy to violate. Inspect the owning entity, u
 
 ## Commerce and orders
 
-- Currency is VND: backend `decimal`, actual đồng, whole non-negative values, exchange rate `1`; no implicit conversion. See `docs/currency-and-money.md`.
+- Currency is VND: backend `decimal`, actual đồng, whole non-negative values, exchange rate `1`; no implicit conversion. See `docs/backend/currency-and-money.md`.
 - Price, totals, discounts, fees, stock, payment state, and identity are server-authoritative.
 - Checkout revalidates active catalog state and stock inside a transaction using PostgreSQL locks. Stock changes through domain methods.
 - Cart currently stores and checkout uses `UnitPriceSnapshot`. Preserve this existing policy unless a product decision and tests explicitly change repricing/expiry.
@@ -26,4 +26,4 @@ These are high-cost rules that are easy to violate. Inspect the owning entity, u
 - Warranty is disabled by default. Activation requires the authenticated owner and a Completed platform order; coverage is snapshotted. Raw Serial/IMEI is never stored/logged—only versioned HMAC fingerprints and masks (ADR 005).
 - Admin media upload goes through `IMediaStorageService` for validation, canonical WebP encoding, lifecycle persistence, and configured URLs. The current NoOp malware scanner is accepted risk, not real scanning.
 
-Relevant accepted decisions: `docs/adr/001-005*.md`, plus module tests and source.
+Relevant accepted decisions: `docs/backend/adr/001-005*.md`, plus module tests and source.

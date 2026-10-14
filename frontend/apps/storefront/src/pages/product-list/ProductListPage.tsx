@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import type { StorefrontCategoryDto, StorefrontProductListItemDto } from "@workspace-ecommerce/api-types";
-import { formatMoney } from "@workspace-ecommerce/shared-utils";
+import type { StorefrontCategoryDto } from "@workspace-ecommerce/api-types";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { Link, useSearchParams } from "react-router-dom";
-import { useAddProductToCart } from "../../features/cart/useAddProductToCart";
+import { useSearchParams } from "react-router-dom";
+import { ProductCard } from "../../components/ui/ProductCard";
+import { useModalDialog } from "../../hooks/useModalDialog";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
 
@@ -34,6 +34,7 @@ export function ProductListPage() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const filterDialog = useModalDialog(isFilterOpen, () => setIsFilterOpen(false));
   const categorySlug = searchParams.get("categorySlug") ?? "";
   const search = searchParams.get("search") ?? "";
   const sortBy = normalizeSortBy(searchParams.get("sortBy"));
@@ -69,25 +70,8 @@ export function ProductListPage() {
     () => findCategoryBySlug(categoriesQuery.data ?? [], categorySlug),
     [categoriesQuery.data, categorySlug]
   );
-  const heroProducts = useMemo(
-    () => productsQuery.data?.items.filter((product) => product.imageUrl).slice(0, 8) ?? [],
-    [productsQuery.data]
-  );
   const activeFilterCount = [categorySlug, search, inStock ? "inStock" : ""].filter(Boolean).length;
   const filterKey = `${categorySlug}|${search}|${inStock}`;
-
-  useEffect(() => {
-    if (!isFilterOpen) {
-      return;
-    }
-
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [isFilterOpen]);
 
   useEffect(() => {
     return () => {
@@ -213,7 +197,6 @@ export function ProductListPage() {
       <CatalogHero
         title={selectedCategory?.name ?? t("catalog.allProducts")}
         subtitle={t("catalog.subtitle")}
-        products={heroProducts}
       />
 
       <section className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
@@ -239,7 +222,7 @@ export function ProductListPage() {
               <button
                 type="button"
                 onClick={() => setIsFilterOpen(true)}
-                className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-950 shadow-sm transition hover:border-slate-400 lg:hidden"
+                className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-950 shadow-sm transition hover:border-slate-400 lg:hidden"
               >
                 <FilterIcon />
                 {t("catalog.filters")}
@@ -253,11 +236,11 @@ export function ProductListPage() {
             </div>
 
             <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <span className="text-slate-400">{t("catalog.sortBy")}</span>
+              <span className="text-slate-600">{t("catalog.sortBy")}</span>
               <select
                 value={sortBy}
                 onChange={(event) => updateSort(event.target.value)}
-                className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none transition hover:border-slate-400 focus:border-slate-950"
+                className="h-11 rounded-[var(--radius-control)] border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none transition hover:border-slate-400 focus:border-slate-950"
               >
                 <option value="name-asc">A-Z</option>
                 <option value="price-asc">{t("catalog.priceLowHigh")}</option>
@@ -278,7 +261,7 @@ export function ProductListPage() {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="mt-5 h-10 rounded-md bg-slate-950 px-4 text-sm font-bold text-white transition hover:bg-slate-800"
+                className="mt-5 h-11 rounded-[var(--radius-control)] bg-slate-950 px-4 text-sm font-bold text-white transition hover:bg-slate-800"
               >
                 {t("catalog.clearFilters")}
               </button>
@@ -288,7 +271,7 @@ export function ProductListPage() {
           {productsQuery.data && productsQuery.data.items.length > 0 && (
             <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 xl:grid-cols-4 xl:gap-x-5">
               {productsQuery.data.items.map((product) => (
-                <CatalogProductCard key={product.id} product={product} />
+                <ProductCard key={product.id} product={product} />
               ))}
             </div>
           )}
@@ -299,7 +282,7 @@ export function ProductListPage() {
                 type="button"
                 disabled={!productsQuery.data.hasPreviousPage}
                 onClick={() => goToPage(productsQuery.data.pageNumber - 1)}
-                className="h-10 rounded-md border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
+                className="h-11 rounded-[var(--radius-control)] border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {t("common.previous")}
               </button>
@@ -310,7 +293,7 @@ export function ProductListPage() {
                 type="button"
                 disabled={!productsQuery.data.hasNextPage}
                 onClick={() => goToPage(productsQuery.data.pageNumber + 1)}
-                className="h-10 rounded-md border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
+                className="h-11 rounded-[var(--radius-control)] border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {t("common.next")}
               </button>
@@ -320,9 +303,7 @@ export function ProductListPage() {
       </section>
 
       {isFilterOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label={t("catalog.productFilters")}>
-          <button type="button" aria-label={t("catalog.closeFilters")} className="absolute inset-0 bg-black/45" onClick={() => setIsFilterOpen(false)} />
-          <aside className="relative ml-auto flex h-full w-[min(92vw,380px)] flex-col bg-white shadow-2xl">
+        <dialog {...filterDialog} className="storefront-modal storefront-drawer flex !max-w-[380px] flex-col" aria-label={t("catalog.productFilters")}>
             <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-5">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-950">
                 <FilterIcon />
@@ -332,7 +313,7 @@ export function ProductListPage() {
                 type="button"
                 aria-label={t("catalog.closeFilters")}
                 onClick={() => setIsFilterOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-700 transition hover:border-slate-400"
+                className="flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 text-slate-700 transition hover:border-slate-400"
               >
                 <CloseIcon />
               </button>
@@ -351,44 +332,22 @@ export function ProductListPage() {
                 onInStockChange={updateInStock}
               />
             </div>
-          </aside>
-        </div>
+            <div className="border-t border-slate-100 p-5">
+              <button type="button" onClick={() => setIsFilterOpen(false)} className="min-h-12 w-full rounded-full bg-[var(--ink)] px-5 text-sm font-semibold text-white">{t("catalog.showResults")}</button>
+            </div>
+        </dialog>
       )}
     </div>
   );
 }
 
-function CatalogHero({
-  title,
-  subtitle,
-  products
-}: {
-  title: string;
-  subtitle: string;
-  products: StorefrontProductListItemDto[];
-}) {
+function CatalogHero({ title, subtitle }: { title: string; subtitle: string }) {
   const { t } = useTranslation();
   return (
-    <section className="-mt-8 ml-[calc(50%-50vw)] w-screen overflow-hidden bg-slate-950">
-      <div className="relative min-h-[220px] px-5 py-12 sm:px-8 lg:min-h-[270px] lg:px-10">
-        <div className="absolute inset-0 grid grid-cols-4 grid-rows-2 gap-px opacity-45 sm:grid-cols-6">
-          {products.length > 0
-            ? products.map((product, index) => (
-                <div key={`${product.id}-${index}`} className="min-h-0 bg-slate-800">
-                  <img src={product.imageUrl ?? ""} alt="" className="h-full w-full object-cover" loading="eager" />
-                </div>
-              ))
-            : Array.from({ length: 8 }).map((_, index) => (
-                <div key={index} className="bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900" />
-              ))}
-        </div>
-        <div className="absolute inset-0 bg-black/55" />
-        <div className="relative mx-auto flex min-h-[124px] max-w-[1440px] flex-col justify-end">
-          <p className="mb-2 text-sm font-semibold text-white/70">{t("catalog.catalog")}</p>
-          <h1 className="max-w-3xl text-4xl font-black leading-tight text-white sm:text-5xl">{title}</h1>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-white/75 sm:text-base">{subtitle}</p>
-        </div>
-      </div>
+    <section className="rounded-[var(--radius-panel)] bg-[var(--brand-soft)] px-6 py-8 sm:px-10 sm:py-12">
+      <p className="ui-caption mb-3 font-medium text-[var(--muted-strong)]">{t("catalog.catalog")}</p>
+      <h1 className="ui-h1 max-w-3xl text-[var(--ink)]">{title}</h1>
+      <p className="ui-body mt-4 max-w-2xl text-[var(--muted-strong)]">{subtitle}</p>
     </section>
   );
 }
@@ -459,7 +418,7 @@ function FilterPanel({
             onChange={(event) => onInStockChange(event.target.checked)}
             className="peer sr-only"
           />
-          <span className="absolute inset-0 rounded-full bg-slate-200 transition peer-checked:bg-slate-950" />
+          <span className="absolute inset-0 rounded-full bg-slate-200 transition peer-checked:bg-slate-950 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-slate-950" />
           <span className="relative ml-1 h-4 w-4 rounded-full bg-white transition peer-checked:translate-x-5" />
         </span>
       </label>
@@ -483,6 +442,7 @@ function CategoryButton({
   return (
     <button
       type="button"
+      aria-pressed={isActive}
       onClick={() => onSelect(value)}
       title={category?.groupName ? `${category.groupName} / ${label}` : label}
       className={`relative flex aspect-square min-h-[74px] flex-col items-center justify-center gap-2 rounded-lg border p-2 text-center transition ${
@@ -490,72 +450,8 @@ function CategoryButton({
       }`}
     >
       <CategoryGlyph category={category} />
-      <span className="line-clamp-2 text-[11px] font-semibold leading-4">{label}</span>
+      <span className="line-clamp-2 text-xs font-semibold leading-4">{label}</span>
     </button>
-  );
-}
-
-function CatalogProductCard({ product }: { product: StorefrontProductListItemDto }) {
-  const { t } = useTranslation();
-  const hasDiscount = product.minPrice !== null && product.compareAtPrice !== null && product.compareAtPrice > product.minPrice;
-  const addProductMutation = useAddProductToCart();
-  const canAdd = product.isInStock && product.minPrice !== null;
-
-  return (
-    <article className="group min-w-0">
-      <div className="relative aspect-square overflow-hidden rounded-lg bg-[#f1f1f1]">
-        <Link to={`/products/${product.slug}`} className="block h-full w-full">
-          {product.imageUrl ? (
-            <img
-              src={product.imageUrl}
-              alt={product.name}
-              className="h-full w-full object-contain p-4 transition duration-300 group-hover:scale-[1.03]"
-              loading="lazy"
-            />
-          ) : (
-            <div className="h-full w-full bg-gradient-to-br from-[#f6f6f6] to-[#e8e8e8]" />
-          )}
-        </Link>
-
-        {!product.isInStock ? (
-          <span className="absolute left-3 top-3 rounded-md bg-slate-950 px-2 py-1 text-[11px] font-bold text-white">{t("product.soldOut")}</span>
-        ) : hasDiscount ? (
-          <span className="absolute left-3 top-3 rounded-md bg-[#e52b1f] px-2 py-1 text-[11px] font-bold text-white">{t("product.sale")}</span>
-        ) : product.isFeatured ? (
-          <span className="absolute left-3 top-3 rounded-md bg-[#e52b1f] px-2 py-1 text-[11px] font-bold text-white">{t("product.featured")}</span>
-        ) : null}
-
-        {canAdd ? (
-          <button
-            type="button"
-            disabled={addProductMutation.isPending}
-            onClick={() => addProductMutation.mutate(product.slug)}
-            className="absolute bottom-4 right-4 inline-flex h-12 translate-y-3 items-center justify-center rounded-full bg-[#3a3a3a] px-6 text-base font-bold text-white opacity-0 shadow-lg transition duration-200 hover:bg-[#242424] disabled:cursor-wait disabled:opacity-70 group-hover:translate-y-0 group-hover:opacity-100 focus:translate-y-0 focus:opacity-100"
-            aria-label={t("product.addToCartLabel", { name: product.name })}
-          >
-            <span className="mr-1 text-xl leading-none">+</span>
-            {addProductMutation.isPending ? t("product.adding") : t("product.add")}
-          </button>
-        ) : null}
-      </div>
-
-      <Link to={`/products/${product.slug}`} className="block pt-3">
-        <p className="truncate text-xs font-medium text-slate-500">{product.categoryName}</p>
-        <h2 className="mt-1 min-h-10 text-sm font-bold leading-5 text-slate-950 transition group-hover:text-[#e52b1f]">{product.name}</h2>
-        <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          {product.minPrice !== null ? (
-            <>
-              <span className={`text-sm font-bold ${hasDiscount ? "text-[#e52b1f]" : "text-slate-950"}`}>
-                {t("product.fromPrice", { price: formatMoney(product.minPrice) })}
-              </span>
-              {hasDiscount && <span className="text-xs font-medium text-slate-400 line-through">{formatMoney(product.compareAtPrice!)}</span>}
-            </>
-          ) : (
-            <span className="text-sm font-bold text-slate-500">{t("catalog.contactForPrice")}</span>
-          )}
-        </div>
-      </Link>
-    </article>
   );
 }
 

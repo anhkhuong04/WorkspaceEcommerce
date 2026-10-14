@@ -299,7 +299,7 @@ Các nhận định đã được đối chiếu lại với source và test t�
 
 ### TASK-10 — Chốt và mã hóa cart price policy (F-10)
 
-- **Blocked evidence (2026-09-24):** repository review found accepted ADRs 001–006 only; no owner-approved repricing or time-bound price-lock contract exists. `.agents/domain.md`, `docs/product/business-rules.md`, current Domain/Application code, and regression tests all explicitly preserve the existing `UnitPriceSnapshot` behavior until Product approves a replacement. No source, API, frontend, or schema change was made. Product must still choose contract A or B and supply the examples, expiry/confirmation UX, coupon/shipping/tax interaction, guest/customer parity, audit source, and owner sign-off listed below.
+- **Blocked evidence (2026-09-24):** repository review found accepted ADRs 001–006 only; no owner-approved repricing or time-bound price-lock contract exists. `.agents/domain.md`, `docs/backend/product/business-rules.md`, current Domain/Application code, and regression tests all explicitly preserve the existing `UnitPriceSnapshot` behavior until Product approves a replacement. No source, API, frontend, or schema change was made. Product must still choose contract A or B and supply the examples, expiry/confirmation UX, coupon/shipping/tax interaction, guest/customer parity, audit source, and owner sign-off listed below.
 
 - **Loại:** Business risk, không kết luận là bug vì test hiện tại chủ động kỳ vọng hành vi này
 - **Severity:** **Medium** nếu nghiệp vụ không cam kết price lock

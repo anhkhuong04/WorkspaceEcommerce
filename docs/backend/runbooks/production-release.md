@@ -4,7 +4,7 @@
 
 This is the operational release gate. A release manager owns the final decision; the application team supplies the local evidence and the platform/SRE owner supplies deployed-topology evidence. A missing evidence item is a **no-go**, not an implicit pass.
 
-Never put passwords, JWTs, refresh cookies, TOTP recovery codes, OAuth ID tokens, webhook bodies, or object-store credentials in tickets, logs, dashboards, or this document. Rotate an exposed value through the [credential rotation runbook](credential-rotation.md).
+Never put passwords, JWTs, refresh cookies, TOTP recovery codes, OAuth ID tokens, webhook bodies, or object-store credentials in tickets, logs, dashboards, or this document. Rotate an exposed value through the [credential rotation runbook](../../services/runbooks/credential-rotation.md).
 
 ## Pre-deploy local evidence
 

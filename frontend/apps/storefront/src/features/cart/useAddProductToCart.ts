@@ -1,8 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
+import type { RefObject } from "react";
 import { storefrontApi } from "../../services/api/storefrontApi";
 import { useStorefrontCart } from "./StorefrontCartContext";
 
-export function useAddProductToCart() {
+export function useAddProductToCart(returnFocusRef?: RefObject<HTMLElement | null>) {
   const { cartSessionId, openCartDrawer } = useStorefrontCart();
 
   return useMutation({
@@ -21,7 +22,7 @@ export function useAddProductToCart() {
       });
     },
     onSuccess: (nextCart) => {
-      openCartDrawer(nextCart);
+      openCartDrawer(nextCart, returnFocusRef?.current ?? undefined);
     }
   });
 }

@@ -22,7 +22,9 @@ WorkspaceEcommerce is a .NET 10/PostgreSQL ecommerce modular monolith with React
 | `tests/*` | Application, Infrastructure, API integration tests |
 | `frontend/apps/*` | Storefront and admin React apps |
 | `frontend/packages/*` | API types/client and domain-neutral utilities |
-| `docs/adr`, `docs/runbooks` | Accepted decisions and operations |
+| `docs/backend/adr` | Accepted architecture decisions |
+| `docs/backend/runbooks` | Deployment, recovery, and warranty operations |
+| `docs/services/runbooks` | Provider, configuration, credentials, media, and telemetry operations |
 
 ## Task routing
 

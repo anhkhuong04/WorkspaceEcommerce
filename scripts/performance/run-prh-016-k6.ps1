@@ -50,7 +50,7 @@ function Restore-ProcessEnvironmentValues([hashtable]$PreviousValues) {
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $k6Command = Get-Command k6 -ErrorAction SilentlyContinue
 if ($null -eq $k6Command) {
-    throw 'k6 was not found on PATH. Install Grafana k6, then rerun this command. See docs/performance/prh-016-load-resilience-runbook.md.'
+    throw 'k6 was not found on PATH. Install Grafana k6, then rerun this command. See docs/backend/performance/prh-016-load-resilience-runbook.md.'
 }
 
 try {

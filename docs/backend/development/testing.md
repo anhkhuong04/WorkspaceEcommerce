@@ -60,6 +60,13 @@ production services.
 
 ## Additional gates
 
+- Inside `frontend/`, `corepack pnpm test:ui` runs storefront UI regression tests
+  with synthetic API fixtures on loopback only; Docker and external providers
+  are not needed. It covers responsive layouts, modal focus, touch quick-add,
+  carousel controls/reduced motion, URL filters, and variant keyboard selection.
+  Screenshots/traces go under ignored `artifacts/frontend/ui/`. This complements
+  the seeded browser smoke and does not prove backend/provider behavior.
+
 - `./scripts/verify-prh-009-regressions.ps1` runs focused concurrency/payment/
   loyalty/shipment regressions.
 - `./scripts/verify-prh-009-migrations.ps1` checks clean and upgrade migrations.

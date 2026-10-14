@@ -183,7 +183,7 @@ export function HomePage() {
 
   return (
     <div className="flex flex-col pb-10">
-      <section aria-label={t("home.heroBanners")}>
+      <section>
         <BannerCarousel
           banners={bannersQuery.data ?? []}
           isLoading={bannersQuery.isLoading}
@@ -195,7 +195,7 @@ export function HomePage() {
         )}
       </section>
 
-      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-14 px-5 pt-12 sm:px-8 lg:px-10 lg:pt-16">
+      <div className="storefront-container flex flex-col gap-14 pt-12 lg:gap-20 lg:pt-16">
         <section aria-labelledby="categories-title">
           <p className="ui-caption font-semibold text-slate-950">
             {t("home.eyebrow")}
@@ -262,7 +262,7 @@ export function HomePage() {
             </div>
           )}
 
-          <div className="mt-7 grid grid-cols-2 gap-x-3 gap-y-9 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-5 lg:gap-x-6">
+          <div className="mt-7 grid grid-cols-2 gap-x-3 gap-y-9 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 lg:gap-x-6">
             {newProductsQuery.isLoading &&
               Array.from({ length: 10 }).map((_, index) => (
                 <ProductSkeleton key={index} />
@@ -293,7 +293,7 @@ export function HomePage() {
             </h2>
             <Link
               to="/news"
-              className="ui-caption group inline-flex items-center gap-3 font-semibold text-slate-950"
+              className="ui-caption group inline-flex min-h-11 items-center gap-3 font-semibold text-slate-950"
             >
               {t("common.viewMore")}
               <span

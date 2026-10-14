@@ -37,7 +37,9 @@ export function LanguageSwitcher({ isHeaderSolid }: LanguageSwitcherProps) {
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        event.preventDefault();
         setIsOpen(false);
+        containerRef.current?.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')?.focus();
       }
     }
 
@@ -64,7 +66,7 @@ export function LanguageSwitcher({ isHeaderSolid }: LanguageSwitcherProps) {
       <button
         type="button"
         onClick={() => setIsOpen((open) => !open)}
-        className={`grid h-10 w-10 place-items-center rounded-full transition ${isHeaderSolid ? "hover:bg-slate-100" : "hover:bg-white/20"}`}
+        className={`grid h-11 w-11 place-items-center rounded-full transition ${isHeaderSolid ? "hover:bg-slate-100" : "hover:bg-white/20"}`}
         aria-label={t("language.select")}
         aria-haspopup="menu"
         aria-expanded={isOpen}

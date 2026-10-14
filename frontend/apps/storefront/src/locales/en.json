@@ -61,6 +61,13 @@
     }
   },
   "header": {
+    "home": "Go to homepage",
+    "navigation": "Navigation",
+    "openNavigation": "Open navigation",
+    "closeNavigation": "Close navigation",
+    "browseCategories": "Browse categories",
+    "warrantyLinks": "Warranty links",
+    "skipToContent": "Skip to content",
     "products": "Products",
     "warranty": "Warranty",
     "news": "News",
@@ -115,6 +122,7 @@
     "fromPrice": "From {{price}}"
   },
   "catalog": {
+    "showResults": "Show results",
     "allProducts": "All products",
     "subtitle": "Browse workspace furniture, accessories, and setup essentials from the live catalog.",
     "catalog": "Catalog",
@@ -178,6 +186,11 @@
     "emptyHint": "Be the first to share your experience with this product!"
   },
   "banner": {
+    "pause": "Pause slideshow",
+    "resume": "Resume slideshow",
+    "loading": "Loading banners",
+    "carousel": "Slideshow",
+    "slides": "Select a slide",
     "empty": "No banners yet",
     "emptyHint": "Add banners in the Admin Portal",
     "shopNow": "Shop now",

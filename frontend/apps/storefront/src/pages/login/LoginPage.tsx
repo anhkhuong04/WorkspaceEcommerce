@@ -258,19 +258,14 @@ export function LoginPage() {
   }
 
   return (
-    <section className="min-h-screen bg-[#fafafa] text-slate-950">
-      <div className="flex min-h-screen items-center justify-center px-5 py-6 sm:px-10 lg:px-[4vw] lg:py-8">
-        <div className="w-full max-w-[660px]">
-          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-[0_14px_45px_rgba(0,0,0,0.07)] sm:px-9 lg:px-10 lg:py-7">
-            <div className="mb-6 grid grid-cols-2 border-b border-slate-200" role="tablist" aria-label="Account access">
-              <button type="button" role="tab" aria-selected={!isRegister} onClick={() => switchMode("login")} className={`border-b-2 pb-3 text-sm font-semibold transition ${!isRegister ? "border-slate-950 text-slate-950" : "border-transparent text-slate-400 hover:text-slate-700"}`}>
-                Sign in
-              </button>
-              <button type="button" role="tab" aria-selected={isRegister} onClick={() => switchMode("register")} className={`border-b-2 pb-3 text-sm font-semibold transition ${isRegister ? "border-slate-950 text-slate-950" : "border-transparent text-slate-400 hover:text-slate-700"}`}>
-                Register
-              </button>
-            </div>
-
+    <section
+      className="relative min-h-screen bg-[#fafafa] bg-cover bg-center bg-no-repeat text-slate-950"
+      style={{ backgroundImage: "url('/demo/bg-login.png')" }}
+    >
+      <div className="absolute inset-0 bg-black/20"></div>
+      <div className="relative z-10 flex min-h-screen items-center justify-center lg:justify-end px-5 py-6 sm:px-10 lg:px-[10vw] xl:px-[15vw] lg:py-8">
+        <div className="w-full max-w-[500px]">
+          <div className="rounded-2xl border border-white/30 bg-white/95 px-6 py-6 shadow-2xl backdrop-blur-sm sm:px-9 lg:px-10 lg:py-7">
             <div>
               <h1 className="text-2xl font-bold sm:text-3xl">{isRegister ? "Create your account" : "Sign in"}</h1>
               <p className="mt-1.5 text-sm text-slate-500">{isRegister ? "Save your details and track every order from one place." : "View your orders and continue checkout faster."}</p>
@@ -309,7 +304,14 @@ export function LoginPage() {
                       </>
                     ) : null}
                     <TextField label="Email" type="email" placeholder="Enter your email" autoComplete="email" icon="mail" error={errors.email?.message} registration={register("email")} />
-                    <TextField label="Password" type="password" placeholder="Enter your password" autoComplete={isRegister ? "new-password" : "current-password"} icon="lock" error={errors.password?.message} showPassword={showPassword} onTogglePassword={() => setShowPassword((visible) => !visible)} registration={register("password")} />
+                    <div>
+                      <TextField label="Password" type="password" placeholder="Enter your password" autoComplete={isRegister ? "new-password" : "current-password"} icon="lock" error={errors.password?.message} showPassword={showPassword} onTogglePassword={() => setShowPassword((visible) => !visible)} registration={register("password")} />
+                      {!isRegister ? (
+                        <Link to="/reset-password" className="mt-2 block text-left text-xs font-semibold text-slate-600 underline underline-offset-4 hover:text-slate-900">
+                          Forgot your password?
+                        </Link>
+                      ) : null}
+                    </div>
                     {isRegister ? (
                       <TextField label="Confirm password" type="password" placeholder="Confirm your password" autoComplete="new-password" icon="lock" error={errors.confirmPassword?.message} showPassword={showConfirmPassword} onTogglePassword={() => setShowConfirmPassword((visible) => !visible)} registration={register("confirmPassword")} />
                     ) : null}
@@ -320,11 +322,6 @@ export function LoginPage() {
                   <button type="submit" disabled={isSubmitting} className="mt-5 h-12 w-full rounded-md bg-[#111111] text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
                     {isSubmitting ? "Please wait..." : isRegister ? "Create account" : "Sign in"}
                   </button>
-                  {!isRegister ? (
-                    <Link to="/reset-password" className="mt-4 block text-center text-sm font-semibold text-slate-700 underline underline-offset-4">
-                      Forgot your password?
-                    </Link>
-                  ) : null}
                 </form>
 
                 {googleLoginEnabled ? (
@@ -363,7 +360,7 @@ export function LoginPage() {
             <p className="mt-5 text-center text-[11px] text-slate-400">&copy; 2026 WorkspaceEcom. All rights reserved.</p>
           </div>
 
-          <Link to="/" className="mx-auto mt-4 block w-fit text-xs font-medium text-slate-500 transition hover:text-slate-950">Back to storefront</Link>
+          <Link to="/" className="mx-auto mt-6 block w-fit text-sm font-medium text-white/80 transition hover:text-white drop-shadow-md">Back to storefront</Link>
         </div>
       </div>
     </section>
