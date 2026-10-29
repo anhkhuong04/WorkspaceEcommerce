@@ -152,7 +152,7 @@ Checkbox được cập nhật theo kết quả triển khai trong nhật ký m�
 - API dự kiến dưới `api/admin/shipping/...`; giữ envelope/error conventions và bounded paging. Public API không lộ chi phí nội bộ/audit.
 - **Nghiệm thu:** integration 401/403/validation/409; publish thiếu vùng, concurrent publish, edit Published bị chặn; đơn/quote cũ không bị rewrite.
 
-### [ ] SHIP-05 — Admin UI vùng, bảng phí và công cụ thử giá
+### [x] SHIP-05 — Admin UI vùng, bảng phí và công cụ thử giá
 
 - **Ưu tiên:** P1. **Phụ thuộc:** SHIP-04.
 - Thêm lazy route/nav “Vận chuyển”; trang bảng giá, vùng/thành viên, form phí/cân nặng và trang lịch sử. Chia page/component/query hook vừa đủ, không dồn vào `OrdersPage.tsx`.
@@ -332,3 +332,7 @@ Bản kế hoạch ban đầu chưa thay đổi code; nhật ký dưới đây g
 - Frontend: typecheck toàn workspace pass; 14 Vitest pass; lint pass với 1 warning `react-hooks/incompatible-library` tại checkout đã tồn tại trước task; build hai app pass với cảnh báo bundle >500 kB đã có trước. Catalog generator `--check` pass, đã chuẩn hóa hash CRLF/LF cho Windows/CI.
 - Kiểm tra trước commit: scoped diff không có lỗi whitespace; tài liệu UTF-8/link/code fence hợp lệ; tracked runtime secret scan pass (958 file, không in giá trị secrets).
 - Browser E2E, load/soak, triển khai production và các luồng mới SHIP-05–14 chưa chạy/triển khai trong phạm vi này. Không coi API preview là bằng chứng đã giao hàng WorkspaceEC end-to-end.
+
+## SHIP-05 validation (2026-10-29)
+
+Admin shipping lazy page, draft zones/rates, coverage, persisted preview, publish/retire confirmation, clone, paged history and weight readiness are implemented. Playwright mock UI: 3/3 pass (edit/preview/publish, revision conflict retaining edits, keyboard/empty/validation). Admin typecheck/build and workspace lint pass; existing storefront watch and bundle warnings remain. This does not enable storefront checkout.

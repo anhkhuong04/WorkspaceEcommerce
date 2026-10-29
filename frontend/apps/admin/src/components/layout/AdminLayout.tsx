@@ -13,6 +13,7 @@ const menuItems: { to: string; label: string; icon: AdminNavIconName }[] = [
   { to: "/products", label: "Products", icon: "products" },
   { to: "/coupons", label: "Coupons", icon: "coupons" },
   { to: "/orders", label: "Orders", icon: "orders" },
+  { to: "/shipping", label: "Shipping", icon: "orders" },
   { to: "/warranties", label: "Warranties", icon: "warranties" },
   { to: "/banners", label: "Banners", icon: "banners" },
   { to: "/blogs", label: "News/Blogs", icon: "blogs" },
