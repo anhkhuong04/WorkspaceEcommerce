@@ -113,7 +113,7 @@ Mọi checkbox đang chưa hoàn thành. Mỗi task phải có diff nhỏ, test 
 - Ghi baseline test về checkout/payment/cancel/outbox, gồm đơn cũ/import. Không coi fixture hiện có là bằng chứng mọi tình huống mới đã được bảo vệ.
 - **Nghiệm thu:** quyết định có chủ thể xác nhận; ví dụ tính phí và state matrix nhất quán; không còn câu hỏi tiền/fulfillment chặn SHIP-01/03/07/09.
 
-### [ ] SHIP-01 — Domain model và migration có tương thích lịch sử
+### [x] SHIP-01 — Domain model và migration có tương thích lịch sử
 
 - **Ưu tiên:** P0. **Phụ thuộc:** SHIP-00.
 - Thêm model rate plan/version/zone/rate, quote, order shipping snapshots và audit trong module/schema đang sở hữu.
@@ -320,3 +320,5 @@ Lượt lập kế hoạch này chỉ đọc source và tạo tài liệu; chưa
 - 2026-10-29 — SHIP-00: product owner xác nhận D01–D08 theo đề xuất. [ADR 007](../docs/backend/adr/007-workspace-shipping-rates.md) chốt công thức/cân thực, TTL quote dự kiến 10 phút, snapshot tiền/địa chỉ/parcel, lifecycle và compatibility. Giá thương mại/origin cụ thể do admin nhập, không seed giả.
 - Baseline trước sửa code: `dotnet test WorkspaceEcommerce.slnx --no-restore --configuration Release --verbosity minimal`: 682 pass (330 Application, 238 Infrastructure, 114 API integration). EF pending-model check Release/no-build: không có thay đổi model trước triển khai.
 - SHIP-01–04: đang triển khai; checkout/fulfillment mới chưa bật.
+- SHIP-01: đã thêm model bảng giá/vùng/audit, quote consumption và snapshot lựa chọn đơn; local shipment có ID riêng, provider ID nullable có constraint, actual cost nullable tách trường legacy. Không sửa ID/tổng tiền đơn cũ. Migration mới `20261029041328_AddWorkspaceShippingFoundation` có guard chống Down khi đã có dữ liệu mới.
+- Validation SHIP-01: 9 domain tests, 1 mapping test và 10 integration tests tập trung pass (upgrade có dữ liệu cũ, constraints/quote race, webhook regression); script `verify-prh-009-migrations.ps1 -PostgresPort 55438` pass clean + upgrade; sẽ chạy lại full regression ở cuối SHIP-04.

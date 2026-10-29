@@ -238,6 +238,27 @@ public sealed class ShipmentWebhookIntegrationTests(ApiIntegrationTestFixture fi
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task PartnerWebhook_CannotMutateWorkspaceShipment()
+    {
+        var order = CreateOrder();
+        var shipment = OrderShipment.CreateWorkspace(Guid.NewGuid(), order.Id, order.TrackingCode!, DateTimeOffset.UtcNow);
+        await fixture.SeedAsync(context =>
+        {
+            context.AddRange(order, shipment);
+            return Task.CompletedTask;
+        });
+        using var client = fixture.CreateClient();
+        using var response = await SendWebhookAsync(client,
+            new ShipmentWebhookPayload(Guid.NewGuid(), ShipmentProviderContract.ShipmentStatusChangedEvent,
+                shipment.TrackingCode, order.OrderCode, "Delivered", DateTimeOffset.UtcNow),
+            DateTimeOffset.UtcNow, validSignature: true);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("AwaitingRelease", await fixture.ExecuteDbAsync(context =>
+            Task.FromResult(context.OrderShipments.Single().ProviderStatus)));
+        Assert.Equal(0, await fixture.ExecuteDbAsync(context => Task.FromResult(context.ShipmentEventInbox.Count())));
+    }
+
     private static async Task<HttpResponseMessage> SendWebhookAsync(
         HttpClient client,
         ShipmentWebhookPayload payload,

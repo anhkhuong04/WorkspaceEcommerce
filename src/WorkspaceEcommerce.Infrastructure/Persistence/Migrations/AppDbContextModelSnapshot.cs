@@ -2014,6 +2014,11 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<decimal?>("ActualCostAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("actual_cost_amount");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -2042,7 +2047,7 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("provider");
 
-                    b.Property<Guid>("ProviderShipmentId")
+                    b.Property<Guid?>("ProviderShipmentId")
                         .HasColumnType("uuid")
                         .HasColumnName("provider_shipment_id");
 
@@ -2084,7 +2089,68 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_order_shipments_provider_shipment_id");
 
-                    b.ToTable("order_shipments", "shipping");
+                    b.ToTable("order_shipments", "shipping", t =>
+                        {
+                            t.HasCheckConstraint("ck_shipment_actual_cost", "actual_cost_amount IS NULL OR actual_cost_amount >= 0");
+
+                            t.HasCheckConstraint("ck_shipment_provider_identity", "(provider = 'WorkspaceEC' AND provider_shipment_id IS NULL) OR (provider <> 'WorkspaceEC' AND provider_shipment_id IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.OrderShippingSelection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("CustomerCharge")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)")
+                        .HasColumnName("customer_charge");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("method");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid>("QuoteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("quote_id");
+
+                    b.Property<Guid?>("RatePlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rate_plan_id");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("snapshot_json");
+
+                    b.Property<int>("WeightGrams")
+                        .HasColumnType("integer")
+                        .HasColumnName("weight_grams");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique();
+
+                    b.HasIndex("QuoteId")
+                        .IsUnique();
+
+                    b.HasIndex("RatePlanId");
+
+                    b.ToTable("order_selections", "shipping", t =>
+                        {
+                            t.HasCheckConstraint("ck_shipping_selection_method", "method IN ('WorkspaceEC', 'MiniLogistics')");
+
+                            t.HasCheckConstraint("ck_shipping_selection_values", "customer_charge >= 0 AND weight_grams > 0");
+                        });
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShipmentCommandOutbox", b =>
@@ -2281,6 +2347,290 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ux_shipment_timeline_state_time");
 
                     b.ToTable("shipment_timeline_entries", "shipping");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingQuote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<decimal>("CustomerCharge")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)")
+                        .HasColumnName("customer_charge");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<string>("InputFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("input_fingerprint");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("method");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid?>("RatePlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rate_plan_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<DateTimeOffset?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at_utc");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("snapshot_json");
+
+                    b.Property<string>("SubjectHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("subject_hash");
+
+                    b.Property<int>("WeightGrams")
+                        .HasColumnType("integer")
+                        .HasColumnName("weight_grams");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAtUtc");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique();
+
+                    b.HasIndex("RatePlanId");
+
+                    b.ToTable("quotes", "shipping", t =>
+                        {
+                            t.HasCheckConstraint("ck_shipping_quote_method", "method IN ('WorkspaceEC', 'MiniLogistics')");
+
+                            t.HasCheckConstraint("ck_shipping_quote_values", "customer_charge >= 0 AND weight_grams > 0 AND revision > 0 AND expires_at_utc > created_at_utc");
+                        });
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingRateAudit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("ChangesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("changes_json");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<Guid>("RatePlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rate_plan_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RatePlanId", "Revision")
+                        .IsUnique();
+
+                    b.ToTable("rate_audits", "shipping");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingRatePlan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CatalogVersion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("catalog_version");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("OriginProvinceCode")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("origin_province_code");
+
+                    b.Property<DateTimeOffset?>("PublishedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at_utc");
+
+                    b.Property<DateTimeOffset?>("RetiredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("retired_at_utc");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status")
+                        .IsUnique()
+                        .HasDatabaseName("ux_shipping_rate_plan_published")
+                        .HasFilter("status = 'Published'");
+
+                    b.HasIndex("CreatedAtUtc", "Id")
+                        .HasDatabaseName("ix_shipping_rate_plan_created");
+
+                    b.ToTable("rate_plans", "shipping", t =>
+                        {
+                            t.HasCheckConstraint("ck_shipping_rate_plan_revision", "revision > 0");
+                        });
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingRateZone", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("BaseFee")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)")
+                        .HasColumnName("base_fee");
+
+                    b.Property<int>("BaseWeightGrams")
+                        .HasColumnType("integer")
+                        .HasColumnName("base_weight_grams");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
+                    b.Property<int?>("MaximumWeightGrams")
+                        .HasColumnType("integer")
+                        .HasColumnName("maximum_weight_grams");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("RatePlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rate_plan_id");
+
+                    b.Property<decimal>("StepFee")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)")
+                        .HasColumnName("step_fee");
+
+                    b.Property<int>("StepWeightGrams")
+                        .HasColumnType("integer")
+                        .HasColumnName("step_weight_grams");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RatePlanId", "Code")
+                        .IsUnique();
+
+                    b.ToTable("rate_zones", "shipping", t =>
+                        {
+                            t.HasCheckConstraint("ck_shipping_zone_fees", "base_fee >= 0 AND step_fee >= 0");
+
+                            t.HasCheckConstraint("ck_shipping_zone_weight", "base_weight_grams > 0 AND step_weight_grams > 0 AND (maximum_weight_grams IS NULL OR maximum_weight_grams >= base_weight_grams)");
+                        });
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingZoneProvince", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ProvinceCode")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("province_code");
+
+                    b.Property<Guid>("RatePlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rate_plan_id");
+
+                    b.Property<Guid>("ZoneId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("zone_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RatePlanId", "ProvinceCode")
+                        .IsUnique()
+                        .HasDatabaseName("ux_shipping_zone_plan_province");
+
+                    b.HasIndex("ZoneId", "RatePlanId");
+
+                    b.ToTable("zone_provinces", "shipping");
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Warranties.ProductVariantWarrantyPlan", b =>
@@ -3008,6 +3358,26 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.OrderShippingSelection", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Ordering.Order", null)
+                        .WithOne()
+                        .HasForeignKey("WorkspaceEcommerce.Domain.Modules.Shipments.OrderShippingSelection", "OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingQuote", null)
+                        .WithOne()
+                        .HasForeignKey("WorkspaceEcommerce.Domain.Modules.Shipments.OrderShippingSelection", "QuoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingRatePlan", null)
+                        .WithMany()
+                        .HasForeignKey("RatePlanId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShipmentCommandOutbox", b =>
                 {
                     b.HasOne("WorkspaceEcommerce.Domain.Modules.Ordering.Order", null)
@@ -3022,6 +3392,47 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                     b.HasOne("WorkspaceEcommerce.Domain.Modules.Shipments.OrderShipment", null)
                         .WithMany()
                         .HasForeignKey("OrderShipmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingQuote", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Ordering.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingRatePlan", null)
+                        .WithMany()
+                        .HasForeignKey("RatePlanId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingRateAudit", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingRatePlan", null)
+                        .WithMany()
+                        .HasForeignKey("RatePlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingRateZone", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingRatePlan", null)
+                        .WithMany("Zones")
+                        .HasForeignKey("RatePlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingZoneProvince", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingRateZone", null)
+                        .WithMany("Provinces")
+                        .HasForeignKey("ZoneId", "RatePlanId")
+                        .HasPrincipalKey("Id", "RatePlanId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -3158,6 +3569,16 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                     b.Navigation("Items");
 
                     b.Navigation("StatusHistory");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingRatePlan", b =>
+                {
+                    b.Navigation("Zones");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.ShippingRateZone", b =>
+                {
+                    b.Navigation("Provinces");
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Warranties.WarrantyEntitlement", b =>

@@ -62,6 +62,12 @@ internal sealed class ShipmentWebhookService(
                 }
 
                 var shipment = await dbContext.FindOrderShipmentForUpdateAsync(order.Id, transactionToken);
+                if (shipment is not null && shipment.Provider != ShipmentProviderContract.ProviderName)
+                {
+                    transactionResult = Result<ShipmentWebhookResult>.Conflict(
+                        "Partner webhook does not belong to this shipment provider.");
+                    return;
+                }
                 if (shipment is not null &&
                     !string.Equals(shipment.TrackingCode, trackingCode, StringComparison.OrdinalIgnoreCase))
                 {

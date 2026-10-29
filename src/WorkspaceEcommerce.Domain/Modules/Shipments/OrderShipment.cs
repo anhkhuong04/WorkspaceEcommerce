@@ -41,6 +41,7 @@ public sealed class OrderShipment : Entity
         TrackingCode = Guard.Required(trackingCode, nameof(TrackingCode));
         ProviderStatus = Guard.Required(providerStatus, nameof(ProviderStatus));
         ShippingFeeAmount = Guard.NotNegative(shippingFeeAmount, nameof(ShippingFeeAmount));
+        ActualCostAmount = ShippingFeeAmount;
         Currency = Guard.Required(currency, nameof(Currency)).ToUpperInvariant();
         LastSyncedAtUtc = observedAtUtc;
         LastEventAtUtc = observedAtUtc;
@@ -52,13 +53,17 @@ public sealed class OrderShipment : Entity
 
     public string Provider { get; private set; } = string.Empty;
 
-    public Guid ProviderShipmentId { get; private set; }
+    public Guid? ProviderShipmentId { get; private set; }
 
     public string TrackingCode { get; private set; } = string.Empty;
 
     public string ProviderStatus { get; private set; } = string.Empty;
 
+    // Legacy provider field retained for existing contracts. New money views use
+    // order selection for the customer charge and ActualCostAmount for cost.
     public decimal ShippingFeeAmount { get; private set; }
+
+    public decimal? ActualCostAmount { get; private set; }
 
     public string Currency { get; private set; } = string.Empty;
 
@@ -70,6 +75,25 @@ public sealed class OrderShipment : Entity
 
     public DateTimeOffset UpdatedAtUtc { get; private set; }
 
+    public static OrderShipment CreateWorkspace(Guid id, Guid orderId, string trackingCode, DateTimeOffset now)
+    {
+        if (id == Guid.Empty || orderId == Guid.Empty || now == default)
+            throw new DomainException("Local shipment identifiers and timestamp are required.");
+        return new OrderShipment
+        {
+            Id = id,
+            OrderId = orderId,
+            Provider = nameof(ShippingMethod.WorkspaceEC),
+            TrackingCode = Guard.Required(trackingCode, nameof(TrackingCode)),
+            ProviderStatus = "AwaitingRelease",
+            Currency = "VND",
+            LastSyncedAtUtc = now,
+            LastEventAtUtc = now,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+    }
+
     public bool ApplyProviderState(
         string providerStatus,
         decimal shippingFeeAmount,
@@ -77,6 +101,8 @@ public sealed class OrderShipment : Entity
         DateTimeOffset syncedAtUtc,
         DateTimeOffset eventAtUtc)
     {
+        if (Provider == nameof(ShippingMethod.WorkspaceEC))
+            throw new DomainException("Partner state cannot be applied to a WorkspaceEC shipment.");
         if (syncedAtUtc == default || eventAtUtc == default)
         {
             throw new DomainException("Shipment synchronization timestamps are required.");
@@ -92,6 +118,7 @@ public sealed class OrderShipment : Entity
 
         ProviderStatus = Guard.Required(providerStatus, nameof(ProviderStatus));
         ShippingFeeAmount = Guard.NotNegative(shippingFeeAmount, nameof(ShippingFeeAmount));
+        ActualCostAmount = ShippingFeeAmount;
         Currency = Guard.Required(currency, nameof(Currency)).ToUpperInvariant();
         LastEventAtUtc = eventAtUtc;
         return true;
