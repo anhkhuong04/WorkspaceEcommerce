@@ -121,6 +121,7 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
                 shipping.shipment_command_outbox,
                 shipping.order_shipments,
                 payments.payment_transactions,
+                payments.order_payment_receipts,
                 loyalty.loyalty_transactions,
                 loyalty.customer_loyalty_accounts,
                 promotions.coupon_redemptions,

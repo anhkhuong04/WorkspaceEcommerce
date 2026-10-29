@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using WorkspaceEcommerce.Domain.Modules.Payments;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Domain.Modules.Cart;
 using WorkspaceEcommerce.Domain.Modules.Shipments;
@@ -9,6 +11,13 @@ internal sealed class EfShippingCheckoutStore(AppDbContext context) : IShippingC
 {
     public IQueryable<ShippingQuote> Quotes => context.Set<ShippingQuote>();
     public IQueryable<OrderShippingSelection> Selections => context.Set<OrderShippingSelection>();
+    public IQueryable<OrderPaymentReceipt> PaymentReceipts => context.Set<OrderPaymentReceipt>();
+    public async Task SavePaymentReceiptAsync(CancellationToken cancellationToken)
+    {
+        try { await context.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        { throw new PersistenceConcurrencyException("This payment reference or confirmation has already been recorded.", exception); }
+    }
     public Task<ShippingQuote?> LockQuoteAsync(Guid id, CancellationToken cancellationToken) =>
         context.Set<ShippingQuote>().FromSqlInterpolated($"SELECT * FROM shipping.quotes WHERE id = {id} FOR UPDATE")
             .SingleOrDefaultAsync(cancellationToken);

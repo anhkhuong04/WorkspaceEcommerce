@@ -1874,6 +1874,71 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                     b.ToTable("order_status_history", "ordering");
                 });
 
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Payments.OrderPaymentReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("actor");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("reference");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Kind", "Reference")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId", "Kind")
+                        .IsUnique();
+
+                    b.ToTable("order_payment_receipts", "payments", t =>
+                        {
+                            t.HasCheckConstraint("ck_order_payment_receipt_amount", "amount >= 0 AND currency = 'VND'");
+
+                            t.HasCheckConstraint("ck_order_payment_receipt_kind", "kind IN ('ManualTransfer', 'CodCollected', 'CodRemitted')");
+                        });
+                });
+
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Payments.PaymentTransaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3352,6 +3417,15 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .WithMany("StatusHistory")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Payments.OrderPaymentReceipt", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Ordering.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

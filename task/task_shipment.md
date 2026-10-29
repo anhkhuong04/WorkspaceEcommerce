@@ -1,6 +1,6 @@
 # Kế hoạch vận chuyển WorkspaceEC và đối tác
 
-Ngày lập: 2026-10-29. Trạng thái: **đã hoàn tất SHIP-00–08; luồng mới mặc định tắt, SHIP-09–14 chưa hoàn tất**.
+Ngày lập: 2026-10-29. Trạng thái: **đã hoàn tất SHIP-00–09; luồng mới mặc định tắt, SHIP-10–14 chưa hoàn tất**.
 
 ## 1. Yêu cầu đã xác nhận và phạm vi
 
@@ -191,7 +191,7 @@ Checkbox được cập nhật theo kết quả triển khai trong nhật ký m�
 - Feature/config phân biệt ngừng nhận đơn external mới với khả năng xử lý backlog/callback đơn external cũ. Khi không có external work, local-only boot/checkout/tracking không cần MiniLogistics khỏe hay có credentials hoạt động.
 - **Nghiệm thu:** fake provider đếm 0 call cho WorkspaceEC xuyên quote/create/cancel/refresh/replay/payment; external contracts và concurrency tests cũ pass; disable nhận mới không làm mất callback/backlog.
 
-### [ ] SHIP-09 — Xác nhận thanh toán chuyển khoản và thu COD tối thiểu
+### [x] SHIP-09 — Xác nhận thanh toán chuyển khoản và thu COD tối thiểu
 
 - **Ưu tiên:** P0 nếu bật đủ ba payment method. **Phụ thuộc:** SHIP-00, SHIP-07, SHIP-08.
 - Thêm admin command xác nhận chuyển khoản đúng order/method/amount/currency, tham chiếu giao dịch/lý do/actor/time; duplicate confirmation idempotent, concurrent cancel/payment dùng lock order thống nhất.
@@ -344,3 +344,11 @@ Server-owned quotes/options, bounded external deadline, default 10-minute validi
 ## SHIP-07/08 validation (2026-10-29)
 
 Quoted checkout consumes a locked subject/input-bound quote atomically with order, cart removal, stock/coupon reservation, frozen payment amount and selected fulfillment. Exact accepted-request retries return the same order after cart removal. WorkspaceEC work is local; external work keeps the durable outbox, idempotency and provider protocol. Worker pricing/parcel rebuild is legacy-only; new fees and parcels are frozen. Partner creation response rechecks cancellation under the order lock and durably compensates in-flight cancellation. New prepaid dispatch is guarded, local direct delivery transitions remain blocked until SHIP-10. Legacy regressions pass. Focused PostgreSQL coverage includes quote/session/customer tampering, input/weight/payment/expiry/revocation, duplicate requests, last-stock race, rollback after intermediate save, callbacks, replay, cancellation-in-flight and disabled-intake backlog. Local-only DI resolves without partner credentials. Full regression (including SHIP-09 working implementation) passed 752 tests; task-specific tests live with these changes.
+
+## SHIP-09 validation (2026-10-29)
+
+Admin-only exact-amount manual-transfer, COD collection and separate COD-remittance commands persist immutable actor/reference/reason/time facts. Duplicate confirmations are idempotent; conflicting references and partial/excess amounts are rejected. Payment confirmation and eligible work commit together with payment/order/shipment lock order matching cancellation. New COD Delivered events alone do not mark Paid or Completed; full collection completes a previously delivered order through existing history/loyalty semantics. Legacy orders keep their prior workflow. An order-detail payment panel supports review/confirmation and receipt history.
+
+Validation: full backend 752/752 passed (354 Application, 241 Infrastructure, 157 API integration), no skips; frontend 14 Vitest and 5 Playwright shipping/admin scenarios passed, workspace lint/typecheck/build passed. Existing storefront React Hook Form watch warning and >500 kB bundle warnings remain. PostgreSQL clean/upgrade migrations and EF pending-model check passed; catalog drift check passed. No provider-real calls, user/production database migration, production enablement, load/soak or complete storefront shipping E2E were performed. SHIP-10-14 remain release gates.
+
+Commit-isolation check: copied the staged frontend into an ignored isolated directory, installed its own frozen lockfile, and passed admin lint/build plus all 5 Playwright scenarios without the user's unrelated UI/package changes. Shipping route has a hydration loading state. No changes to the original user files were detected outside the three intentional route/menu/order-panel integration files.

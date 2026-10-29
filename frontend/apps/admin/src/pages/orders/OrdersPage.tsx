@@ -16,6 +16,7 @@ import { formatLocalizedText } from "../../utils/localizedText";
 import { OrderImportModal } from "./components/OrderImportModal";
 import { AdminReceiptPreviewModal } from "./components/AdminReceiptPreviewModal";
 import { OrdersTable } from "./components/OrdersTable";
+import { OrderPaymentPanel } from "./components/OrderPaymentPanel";
 
 const orderStatuses: OrderStatus[] = [0, 1, 2, 3, 4, 5, 6, 7];
 const nextStatusesByStatus: Record<OrderStatus, OrderStatus[]> = { 0: [1, 6], 1: [2, 6], 2: [3], 3: [4, 5], 4: [7], 5: [3, 6], 6: [], 7: [] };
@@ -273,6 +274,7 @@ export function OrdersPage() {
               {shipmentQuery.isLoading ? <div className="h-24 animate-pulse rounded-2xl bg-slate-100" /> : null}
               {shipmentQuery.isError ? <Notice type="error" title="Shipment could not be loaded">{getApiErrorMessage(shipmentQuery.error)}</Notice> : null}
               {shipmentQuery.data ? <AdminShipmentPanel shipment={shipmentQuery.data} /> : null}
+              <OrderPaymentPanel key={order.id} orderId={order.id} />
             </section>
 
             <section className="rounded-3xl border border-slate-200 p-5">

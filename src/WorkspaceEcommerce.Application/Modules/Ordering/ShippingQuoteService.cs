@@ -66,7 +66,8 @@ internal sealed class ShippingQuoteService(ICheckoutStore checkout, IShippingChe
                 providerQuote = await provider.GetShippingQuoteAsync(new ShippingQuoteRequest
                 {
                     DeliveryAddress = new ShippingAddress { Street = input.ShippingStreet.Trim(), Ward = destination.WardName, Province = destination.ProvinceName },
-                    Parcel = parcel, GoodsValueAmount = items.Sum(x => x.LineTotal),
+                    Parcel = parcel,
+                    GoodsValueAmount = items.Sum(x => x.LineTotal),
                     CodAmount = input.PaymentMethod == Domain.Modules.Ordering.PaymentMethod.Cod ? items.Sum(x => x.LineTotal) - discount : 0
                 }, timeout.Token);
                 if (providerQuote.Currency != "VND") return Result<ShippingQuoteDto>.Conflict("Unsupported provider quote currency.");

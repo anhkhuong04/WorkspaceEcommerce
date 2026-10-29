@@ -83,4 +83,6 @@ consumers, integration tests, and this document when it changes a convention.
 
 WorkspaceEC rate administration is documented in [Shipping rates](shipping-rates.md).
 These Admin-only endpoints provide versioned configuration and simulation;
-customer quote issuance and new checkout selection are separate implementation tasks.
+customer offers/acceptance are documented in [Shipping checkout](shipping-checkout.md)
+and audited transfer/COD facts in [Payment confirmations](order-payment-confirmations.md).
+New issuance is disabled by default until delivery/storefront rollout gates are complete.

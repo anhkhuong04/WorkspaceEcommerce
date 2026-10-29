@@ -22,7 +22,7 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { path: "shipping", lazy: async () => ({ Component: (await import("../pages/shipping/ShippingRatesPage")).ShippingRatesPage }) },
+      { path: "shipping", HydrateFallback: () => <p role="status">Loading shipping...</p>, lazy: async () => ({ Component: (await import("../pages/shipping/ShippingRatesPage")).ShippingRatesPage }) },
       { index: true, element: <DashboardPage /> },
       { path: "categories", element: <CategoriesPage /> },
       { path: "products", element: <ProductsPage /> },

@@ -1,7 +1,14 @@
 import type { PagedResult } from "./common";
 
-export enum ShippingRatePlanStatus { Draft = 0, Published = 1, Retired = 2 }
-export enum ShippingMethod { WorkspaceEC = 0, MiniLogistics = 1 }
+export enum ShippingRatePlanStatus {
+  Draft = 0,
+  Published = 1,
+  Retired = 2,
+}
+export enum ShippingMethod {
+  WorkspaceEC = 0,
+  MiniLogistics = 1,
+}
 export interface ShippingQuoteInput {
   sessionId: string;
   shippingStreet: string;
@@ -11,12 +18,53 @@ export interface ShippingQuoteInput {
   couponCode?: string | null;
   method: ShippingMethod;
 }
-export interface ShippingMethodOption { method: ShippingMethod; available: boolean; reason: string | null; }
-export interface ShippingQuoteDto {
-  id: string; method: ShippingMethod; customerCharge: number; currency: string;
-  weightGrams: number; expiresAtUtc: string; ratePlanId: string | null;
+export interface ShippingMethodOption {
+  method: ShippingMethod;
+  available: boolean;
+  reason: string | null;
 }
-export interface ShippingWard { code: string; name: string; }
+export interface ShippingQuoteDto {
+  id: string;
+  method: ShippingMethod;
+  customerCharge: number;
+  currency: string;
+  weightGrams: number;
+  expiresAtUtc: string;
+  ratePlanId: string | null;
+}
+export type OrderPaymentReceiptKind = 0 | 1 | 2;
+export interface ConfirmOrderPaymentRequest {
+  amount: number;
+  currency: string;
+  reference: string;
+  reason: string;
+}
+export interface OrderPaymentReceiptDto {
+  id: string;
+  kind: OrderPaymentReceiptKind;
+  amount: number;
+  currency: string;
+  reference: string;
+  reason: string;
+  actor: string;
+  occurredAtUtc: string;
+}
+export interface OrderPaymentSummaryDto {
+  orderId: string;
+  paymentMethod: number;
+  paymentStatus: number;
+  totalAmount: number;
+  currency: string;
+  shippingMethod: ShippingMethod | null;
+  canConfirmTransfer: boolean;
+  canCollectCod: boolean;
+  canRemitCod: boolean;
+  receipts: OrderPaymentReceiptDto[];
+}
+export interface ShippingWard {
+  code: string;
+  name: string;
+}
 export interface ShippingCatalogSummary {
   version: string;
   provinces: { code: string; name: string }[];
@@ -39,12 +87,19 @@ export interface SaveShippingRatePlanRequest {
   expectedRevision: number;
   reason: string;
 }
-export interface ShippingRateActionRequest { expectedRevision: number; reason: string; }
-export interface PublishShippingRatePlanRequest extends ShippingRateActionRequest {
+export interface ShippingRateActionRequest {
+  expectedRevision: number;
+  reason: string;
+}
+export interface PublishShippingRatePlanRequest
+  extends ShippingRateActionRequest {
   expectedActivePlanId: string | null;
   expectedActiveRevision: number | null;
 }
-export interface CloneShippingRatePlanRequest extends ShippingRateActionRequest { name: string; }
+export interface CloneShippingRatePlanRequest
+  extends ShippingRateActionRequest {
+  name: string;
+}
 export interface ShippingRateCoverage {
   isComplete: boolean;
   missingProvinceCodes: string[];
@@ -67,7 +122,10 @@ export interface ShippingRatePlan extends ShippingRatePlanSummary {
   zones: ShippingRateZoneInput[];
   coverage: ShippingRateCoverage;
 }
-export interface ShippingWeightLine { weightKg: number | null; quantity: number; }
+export interface ShippingWeightLine {
+  weightKg: number | null;
+  quantity: number;
+}
 export interface ShippingRatePreviewRequest {
   provinceCode: string;
   wardCode: string;
@@ -81,8 +139,21 @@ export interface ShippingRatePreview {
   isPreview: true;
   canPublish: boolean;
   zoneCode: string;
-  destination: { catalogVersion: string; provinceCode: string; provinceName: string; wardCode: string; wardName: string };
-  calculation: { weightGrams: number; extraSteps: number; baseFee: number; extraWeightFee: number; totalFee: number; currency: string };
+  destination: {
+    catalogVersion: string;
+    provinceCode: string;
+    provinceName: string;
+    wardCode: string;
+    wardName: string;
+  };
+  calculation: {
+    weightGrams: number;
+    extraSteps: number;
+    baseFee: number;
+    extraWeightFee: number;
+    totalFee: number;
+    currency: string;
+  };
 }
 export interface ShippingRateAudit {
   id: string;
