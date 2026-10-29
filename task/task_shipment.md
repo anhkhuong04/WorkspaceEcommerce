@@ -134,7 +134,7 @@ Mọi checkbox đang chưa hoàn thành. Mỗi task phải có diff nhỏ, test 
 - Có báo cáo địa bàn thiếu rule/địa chỉ chưa ánh xạ; chốt phạm vi địa bàn đặc biệt theo D02.
 - **Nghiệm thu:** test code sai/cha-con sai/duplicate/thiếu coverage/version thay đổi; không hard-code số lượng đơn vị hành chính; không đổi địa chỉ đơn cũ.
 
-### [ ] SHIP-03 — Bộ tính phí vùng và trọng lượng
+### [x] SHIP-03 — Bộ tính phí vùng và trọng lượng
 
 - **Ưu tiên:** P0. **Phụ thuộc:** SHIP-00, SHIP-01, SHIP-02.
 - Implement calculator thuần trong Application/Domain thích hợp; đọc rule Published theo version, tổng trọng lượng nhân đủ quantity, trả breakdown có thể giải thích.
@@ -324,3 +324,5 @@ Lượt lập kế hoạch này chỉ đọc source và tạo tài liệu; chưa
 - Validation SHIP-01: 9 domain tests, 1 mapping test và 10 integration tests tập trung pass (upgrade có dữ liệu cũ, constraints/quote race, webhook regression); script `verify-prh-009-migrations.ps1 -PostgresPort 55438` pass clean + upgrade; sẽ chạy lại full regression ở cuối SHIP-04.
 - SHIP-02: danh mục canonical có version, đối chiếu mã từ hai tập Công báo QĐ 19/2025 và cập nhật Đồng Nai theo NQ 237/2026 + NQ 30/2026. Backend validate code/parent; TypeScript sinh từ cùng JSON và CI kiểm tra drift. Không sửa địa chỉ lịch sử. Coverage dùng danh mục, không hard-code số tỉnh/xã. Chi tiết nguồn tại [catalog provenance](../docs/backend/architecture/shipping-administrative-catalog.md).
 - Validation SHIP-02: 2 Application coverage tests + 1 Infrastructure catalog test pass; `node scripts/generate-shipping-catalog.mjs --check` và storefront typecheck pass. API expose catalog/coverage được nối trong SHIP-04.
+- SHIP-03: calculator thuần tính cân thực theo quantity, làm tròn tổng lên gram đúng một lần, tính bước vượt cân và trả breakdown VND. Từ chối thiếu/sai cân nặng, vượt giới hạn/cỡ số tiền; không fallback miễn phí hoặc 0,5 kg. Snapshot parcel đã có schema từ SHIP-01; nối calculator vào checkout tạo snapshot thuộc SHIP-06/07, không đổi luồng cũ ở lượt này.
+- Validation SHIP-03: 13 calculator tests pass (ngưỡng base/step, tổng gram lẻ/quantity, dữ liệu thiếu/sai, overflow/maximum và phí 0 chỉ khi cấu hình tường minh); cùng 2 coverage tests tạo thành 15 Application tests tập trung pass.
