@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Shipping\Data\vietnam-administrative-catalog.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="AWSSDK.S3" Version="4.0.13.1" />
     <ProjectReference Include="..\WorkspaceEcommerce.Application\WorkspaceEcommerce.Application.csproj" />
     <ProjectReference Include="..\WorkspaceEcommerce.Domain\WorkspaceEcommerce.Domain.csproj" />

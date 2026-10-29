@@ -124,7 +124,7 @@ Mọi checkbox đang chưa hoàn thành. Mỗi task phải có diff nhỏ, test 
 - **Điểm sửa:** `Domain/Modules/Shipments`, `Domain/Modules/Ordering`, `Infrastructure/Persistence/Configurations`, `AppDbContext`, migrations mới; focused persistence ports.
 - **Nghiệm thu:** domain/mapping tests; clean + upgrade migration với seed đơn cũ/paid/outbox pending; historical totals/IDs giữ nguyên; pending-model check pass trên diff liên quan.
 
-### [ ] SHIP-02 — Danh mục địa chỉ và vùng giao toàn quốc
+### [x] SHIP-02 — Danh mục địa chỉ và vùng giao toàn quốc
 
 - **Ưu tiên:** P0. **Phụ thuộc:** SHIP-01.
 - Kiểm chứng nguồn danh mục hành chính với nguồn chính thức phù hợp tại thời điểm triển khai; ghi nguồn/version/date. Dataset đang nằm ở frontend chỉ là điểm xuất phát.
@@ -322,3 +322,5 @@ Lượt lập kế hoạch này chỉ đọc source và tạo tài liệu; chưa
 - SHIP-01–04: đang triển khai; checkout/fulfillment mới chưa bật.
 - SHIP-01: đã thêm model bảng giá/vùng/audit, quote consumption và snapshot lựa chọn đơn; local shipment có ID riêng, provider ID nullable có constraint, actual cost nullable tách trường legacy. Không sửa ID/tổng tiền đơn cũ. Migration mới `20261029041328_AddWorkspaceShippingFoundation` có guard chống Down khi đã có dữ liệu mới.
 - Validation SHIP-01: 9 domain tests, 1 mapping test và 10 integration tests tập trung pass (upgrade có dữ liệu cũ, constraints/quote race, webhook regression); script `verify-prh-009-migrations.ps1 -PostgresPort 55438` pass clean + upgrade; sẽ chạy lại full regression ở cuối SHIP-04.
+- SHIP-02: danh mục canonical có version, đối chiếu mã từ hai tập Công báo QĐ 19/2025 và cập nhật Đồng Nai theo NQ 237/2026 + NQ 30/2026. Backend validate code/parent; TypeScript sinh từ cùng JSON và CI kiểm tra drift. Không sửa địa chỉ lịch sử. Coverage dùng danh mục, không hard-code số tỉnh/xã. Chi tiết nguồn tại [catalog provenance](../docs/backend/architecture/shipping-administrative-catalog.md).
+- Validation SHIP-02: 2 Application coverage tests + 1 Infrastructure catalog test pass; `node scripts/generate-shipping-catalog.mjs --check` và storefront typecheck pass. API expose catalog/coverage được nối trong SHIP-04.

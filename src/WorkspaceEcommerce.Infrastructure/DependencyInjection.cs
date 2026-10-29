@@ -24,6 +24,7 @@ using WorkspaceEcommerce.Infrastructure.Persistence;
 using WorkspaceEcommerce.Infrastructure.Persistence.Queries;
 using WorkspaceEcommerce.Infrastructure.Seeding;
 using WorkspaceEcommerce.Infrastructure.Shipment;
+using WorkspaceEcommerce.Infrastructure.Shipping;
 using WorkspaceEcommerce.Infrastructure.Warranties;
 
 namespace WorkspaceEcommerce.Infrastructure;
@@ -74,6 +75,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminDashboardQuery, EfAdminDashboardQuery>();
         services.AddScoped<ICartStore>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddScoped<ICheckoutStore>(provider => provider.GetRequiredService<AppDbContext>());
+        services.AddSingleton<IShippingAdministrativeCatalog, VietnamShippingAdministrativeCatalog>();
         services.AddScoped<IDemoDataSeeder, DemoDataSeeder>();
         services.AddSingleton(adminAuthOptions);
         services.AddSingleton(jwtOptions);

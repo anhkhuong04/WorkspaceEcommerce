@@ -125,7 +125,8 @@ jobs:
         run: pnpm test
 
       - name: Typecheck
-        run: pnpm typecheck
+        # The storefront must use the same pinned address catalog as the backend.
+        run: node ../scripts/generate-shipping-catalog.mjs --check && pnpm typecheck
 
       - name: Build
         run: pnpm build
