@@ -30,5 +30,6 @@ public sealed class CheckoutRequest
 
     public string? CouponCode { get; init; }
 
-    public string? ClientIpAddress { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? ClientIpAddress { get; set; }
 }

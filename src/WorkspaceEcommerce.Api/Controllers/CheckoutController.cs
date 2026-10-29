@@ -47,6 +47,7 @@ public sealed class CheckoutController(ICheckoutService checkoutService) : Contr
         [FromBody] CheckoutRequest request,
         CancellationToken cancellationToken)
     {
+        request.ClientIpAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
         var result = await checkoutService.CheckoutAsync(request, cancellationToken);
 
         return this.ToApiResponse(result, StatusCodes.Status201Created);

@@ -11,11 +11,14 @@ using WorkspaceEcommerce.Domain.Modules.Shipments;
 
 namespace WorkspaceEcommerce.Application.Modules.Payments;
 
+using WorkspaceEcommerce.Application.Modules.Shipments;
+
 internal sealed class PaymentService(
     IAppDbContext dbContext,
     IVNPayPaymentService vnPayPaymentService,
     ICurrentCustomerContext currentCustomerContext,
-    IPaymentResultAccessTokenService paymentResultAccessTokenService) : IPaymentService
+    IPaymentResultAccessTokenService paymentResultAccessTokenService,
+    IFulfillmentCoordinator? fulfillment = null) : IPaymentService
 {
     public async Task<Result<PaymentResultDto>> HandleVNPayReturnAsync(
         VNPayCallbackRequest request,
@@ -262,11 +265,18 @@ internal sealed class PaymentService(
         return callbackResult ?? Result<PaymentResultDto>.Failure("Payment callback processing did not produce a result.");
     }
 
-    private Task EnqueueShipmentCreateAsync(
+    private async Task EnqueueShipmentCreateAsync(
         Guid orderId,
         CancellationToken cancellationToken)
     {
-        return dbContext.TryEnqueueShipmentCommandAsync(
+        if (fulfillment is not null)
+        {
+            var order = await dbContext.FindOrderForUpdateAsync(orderId, cancellationToken);
+            if (order is not null) await fulfillment.AcceptAsync(order, null, cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return;
+        }
+        await dbContext.TryEnqueueShipmentCommandAsync(
             orderId,
             ShipmentCommandType.Create,
             reason: null,

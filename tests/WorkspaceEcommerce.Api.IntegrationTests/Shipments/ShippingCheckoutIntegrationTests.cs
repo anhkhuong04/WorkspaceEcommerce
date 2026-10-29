@@ -23,15 +23,22 @@ public sealed partial class ShippingCheckoutIntegrationTests(ApiIntegrationTestF
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static ShippingQuoteInput Input(string session = "shipping-test") => new()
     {
-        SessionId = session, ShippingStreet = "1 Synthetic Street", ProvinceCode = "01", WardCode = "00004",
-        Method = ShippingMethod.WorkspaceEC, PaymentMethod = Domain.Modules.Ordering.PaymentMethod.Cod
+        SessionId = session,
+        ShippingStreet = "1 Synthetic Street",
+        ProvinceCode = "01",
+        WardCode = "00004",
+        Method = ShippingMethod.WorkspaceEC,
+        PaymentMethod = Domain.Modules.Ordering.PaymentMethod.Cod
     };
     private WebApplicationFactory<Program> Factory(CountingCarrier carrier, bool external = true) => fixture.CreateFactory(new Dictionary<string, string?>
     {
-        ["ShippingCheckout:Enabled"] = "true", ["ShippingCheckout:ExternalEnabled"] = external.ToString(),
+        ["ShippingCheckout:Enabled"] = "true",
+        ["ShippingCheckout:ExternalEnabled"] = external.ToString(),
     }).WithWebHostBuilder(builder => builder.ConfigureServices(services =>
     {
         services.RemoveAll<IShipmentService>(); services.AddSingleton<IShipmentService>(carrier);
+        foreach (var worker in services.Where(x => x.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)
+            && x.ImplementationType?.Name == "ShipmentCommandWorker").ToArray()) services.Remove(worker);
     }));
 
     [Fact]
@@ -119,12 +126,20 @@ public sealed partial class ShippingCheckoutIntegrationTests(ApiIntegrationTestF
         public int Calls;
         public bool Available { get; set; }
         public decimal Charge = 33000;
+        public CreateShipmentRequest? LastCreate;
+        public Func<Task>? BeforeCreate;
         public Task<ShippingQuoteResponse> GetShippingQuoteAsync(ShippingQuoteRequest request, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref Calls);
             return Available ? Task.FromResult(new ShippingQuoteResponse { TotalFeeAmount = Charge, Currency = "VND" }) : Task.FromException<ShippingQuoteResponse>(new HttpRequestException("Synthetic outage"));
         }
-        public Task<CreateShipmentResponse> CreateShipmentAsync(CreateShipmentRequest request, string idempotencyKey, CancellationToken cancellationToken = default) => Fail<CreateShipmentResponse>();
+        public async Task<CreateShipmentResponse> CreateShipmentAsync(CreateShipmentRequest request, string idempotencyKey, CancellationToken cancellationToken = default)
+        {
+            if (!Available) return await Fail<CreateShipmentResponse>();
+            Interlocked.Increment(ref Calls); LastCreate = request;
+            if (BeforeCreate is not null) await BeforeCreate();
+            return new CreateShipmentResponse { ShipmentId = Guid.NewGuid(), ExternalOrderId = request.ExternalOrderId, TrackingCode = "SYNTHETIC-TRACKING", Status = "Draft", ShippingFeeAmount = Charge, Currency = "VND" };
+        }
         public Task<TrackingResponse> GetTrackingAsync(string trackingCode, CancellationToken cancellationToken = default) => Fail<TrackingResponse>();
         public Task<TrackingResponse> CancelShipmentAsync(string trackingCode, string reason, CancellationToken cancellationToken = default) => Fail<TrackingResponse>();
         private Task<T> Fail<T>() { Interlocked.Increment(ref Calls); return Task.FromException<T>(new HttpRequestException("Synthetic outage")); }

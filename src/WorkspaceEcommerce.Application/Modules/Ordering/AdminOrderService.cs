@@ -23,7 +23,8 @@ internal sealed class AdminOrderService(
     ILogger<AdminOrderService> logger,
     IOrderShipmentService? shipmentService = null,
     INotificationService? notificationService = null,
-    ICustomerEmailOutbox? customerEmailOutbox = null) : IAdminOrderService
+    ICustomerEmailOutbox? customerEmailOutbox = null,
+    IFulfillmentCoordinator? fulfillment = null) : IAdminOrderService
 {
     public async Task<Result<PagedResult<AdminOrderListItemDto>>> GetOrdersAsync(
         AdminOrderListRequest request,
@@ -132,6 +133,7 @@ internal sealed class AdminOrderService(
                     return;
                 }
 
+                if (fulfillment is not null) await fulfillment.GuardStatusAsync(order, request.Status, transactionCancellationToken);
                 var history = order.ChangeStatus(
                     Guid.NewGuid(),
                     request.Status,
@@ -146,6 +148,8 @@ internal sealed class AdminOrderService(
                     await RestoreInventoryAsync(order.Id, transactionCancellationToken);
                     CancelOrOpenRefundWorkflow(order, pendingPaymentTransactions, request.CancellationReason!);
                     EnqueueCancellationEmail(order, request.CancellationReason!, request.CustomerMessage);
+                    if (fulfillment is not null && await fulfillment.MethodAsync(order.Id, transactionCancellationToken) is not null)
+                        await fulfillment.CancelAsync(order, request.CancellationReason!, transactionCancellationToken);
                 }
 
                 await dbContext.SaveChangesAsync(transactionCancellationToken);
@@ -163,7 +167,7 @@ internal sealed class AdminOrderService(
 
             if (request.Status == OrderStatus.Cancelled &&
                 !string.IsNullOrWhiteSpace(order.TrackingCode) &&
-                shipmentService is not null)
+                shipmentService is not null && (fulfillment is null || await fulfillment.MethodAsync(order.Id, cancellationToken) is null))
             {
                 await shipmentService.QueueCancelAsync(
                     order.Id,

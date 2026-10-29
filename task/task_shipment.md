@@ -1,6 +1,6 @@
 # Kế hoạch vận chuyển WorkspaceEC và đối tác
 
-Ngày lập: 2026-10-29. Trạng thái: **đã hoàn tất SHIP-00–04; chưa bật checkout/fulfillment mới**.
+Ngày lập: 2026-10-29. Trạng thái: **đã hoàn tất SHIP-00–08; luồng mới mặc định tắt, SHIP-09–14 chưa hoàn tất**.
 
 ## 1. Yêu cầu đã xác nhận và phạm vi
 
@@ -11,7 +11,7 @@ Ngày lập: 2026-10-29. Trạng thái: **đã hoàn tất SHIP-00–04; chưa b
 - WorkspaceEC phải hoạt động khi service vận chuyển bên ngoài bị lỗi hoặc được tắt.
 - Phí và tổng tiền do backend quyết định; frontend chỉ gửi lựa chọn và hiển thị báo giá.
 
-Phạm vi bản đầu đã chốt tại SHIP-00: một phương thức/phương án giao cho mỗi đơn; một điểm xuất hàng cấu hình; trọng lượng thực; bảng phí theo vùng; quản lý giao nội bộ qua admin; tích hợp COD, VNPay và chuyển khoản theo điều kiện thanh toán được duyệt. SHIP-00–04 chỉ triển khai nền dữ liệu, calculator và API cấu hình; UI/checkout/fulfillment thuộc các task tiếp theo.
+Phạm vi bản đầu đã chốt tại SHIP-00: một phương thức/phương án giao cho mỗi đơn; một điểm xuất hàng cấu hình; trọng lượng thực; bảng phí theo vùng; quản lý giao nội bộ qua admin; tích hợp COD, VNPay và chuyển khoản theo điều kiện thanh toán được duyệt. SHIP-00–09 đã có nền dữ liệu, calculator, API/UI bảng phí, quote và checkout nguyên tử, routing fulfillment, xác nhận chuyển khoản/thu và nộp COD. Lifecycle giao nội bộ, storefront, read models đầy đủ và release gates thuộc SHIP-10–14; chưa enable nhận đơn mới thực tế.
 
 Chưa bao gồm: nhiều kho/điểm xuất hàng, chia kiện/chia chuyến, định tuyến GPS, app riêng cho shipper, tối ưu tuyến, tự động đối soát ngân hàng, hoàn tiền tự động, bảo hiểm/phí lắp đặt/khuyến mãi miễn ship mới. Nếu các chính sách này cần ngay bản đầu, điều chỉnh SHIP-00 trước khi code.
 
@@ -171,7 +171,7 @@ Checkbox được cập nhật theo kết quả triển khai trong nhật ký m�
 - Chốt API mới/additive và hành vi endpoint quote hiện tại theo D07; OpenAPI/các DTO dùng chung cập nhật cùng lượt.
 - **Nghiệm thu:** WorkspaceEC quote thành công khi provider timeout/throw; cross-customer/session bị chặn; stale input/rule/expiry có kết quả rõ; list options không bị lỗi toàn bộ do một provider.
 
-### [ ] SHIP-07 — Checkout chốt phí và tổng tiền nguyên tử
+### [x] SHIP-07 — Checkout chốt phí và tổng tiền nguyên tử
 
 - **Ưu tiên:** P0. **Phụ thuộc:** SHIP-01, SHIP-03, SHIP-06.
 - Mở rộng request bằng method/quote selection và địa chỉ code theo contract đã chốt. Bảo vệ raw frontend fee/status/customer/method tampering.
@@ -181,7 +181,7 @@ Checkbox được cập nhật theo kết quả triển khai trong nhật ký m�
 - Audit mọi nơi `SetShippingFee` và chặn worker/admin/import gọi sai semantics với đơn mới. Đơn legacy đi nhánh được D07 quy định, không bị sửa snapshot âm thầm.
 - **Nghiệm thu:** quote bị sửa/hết hạn/đã dùng, 2 request cùng quote, stock cuối cùng, publish đồng thời; failure không còn order/payment/outbox/stock/coupon dở dang. Số tiền response/DB/VNPay trùng nhau.
 
-### [ ] SHIP-08 — Điều phối fulfillment theo phương thức và bảo vệ đối tác
+### [x] SHIP-08 — Điều phối fulfillment theo phương thức và bảo vệ đối tác
 
 - **Ưu tiên:** P0. **Phụ thuộc:** SHIP-01, SHIP-07.
 - Dùng một coordinator/use case nhỏ để chọn local hoặc external từ order snapshot; không phân tán `if WorkspaceEC` trong mọi controller và callback.
@@ -340,3 +340,7 @@ Admin shipping lazy page, draft zones/rates, coverage, persisted preview, publis
 ## SHIP-06 validation (2026-10-29)
 
 Server-owned quotes/options, bounded external deadline, default 10-minute validity, subject/input binding, explicit unavailability, audited emergency revocation and unused-quote retention are implemented behind a default-off issuance flag. Three PostgreSQL/API cases pass: local independence/outage, disabled external/geography rejection, admin-only revocation with persisted actor/reason. Acceptance/fulfillment checks follow in SHIP-07/08. New migration adds only nullable quote audit/acceptance fields; no user database was migrated.
+
+## SHIP-07/08 validation (2026-10-29)
+
+Quoted checkout consumes a locked subject/input-bound quote atomically with order, cart removal, stock/coupon reservation, frozen payment amount and selected fulfillment. Exact accepted-request retries return the same order after cart removal. WorkspaceEC work is local; external work keeps the durable outbox, idempotency and provider protocol. Worker pricing/parcel rebuild is legacy-only; new fees and parcels are frozen. Partner creation response rechecks cancellation under the order lock and durably compensates in-flight cancellation. New prepaid dispatch is guarded, local direct delivery transitions remain blocked until SHIP-10. Legacy regressions pass. Focused PostgreSQL coverage includes quote/session/customer tampering, input/weight/payment/expiry/revocation, duplicate requests, last-stock race, rollback after intermediate save, callbacks, replay, cancellation-in-flight and disabled-intake backlog. Local-only DI resolves without partner credentials. Full regression (including SHIP-09 working implementation) passed 752 tests; task-specific tests live with these changes.

@@ -3,6 +3,10 @@ export type PaymentStatus = 0 | 1 | 2 | 3 | 4 | 5;
 export type OrderStatus = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export interface CheckoutRequest {
+  shippingQuoteId?: string | null;
+  shippingMethod?: import("./shipping").ShippingMethod | null;
+  shippingProvinceCode?: string | null;
+  shippingWardCode?: string | null;
   sessionId: string;
   customerName: string;
   customerPhone: string;

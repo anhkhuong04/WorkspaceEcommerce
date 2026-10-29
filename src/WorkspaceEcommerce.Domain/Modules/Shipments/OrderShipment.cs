@@ -123,4 +123,14 @@ public sealed class OrderShipment : Entity
         LastEventAtUtc = eventAtUtc;
         return true;
     }
+
+    public bool CancelWorkspace(DateTimeOffset now)
+    {
+        if (Provider != nameof(ShippingMethod.WorkspaceEC)) throw new DomainException("This is not a WorkspaceEC shipment.");
+        if (ProviderStatus == "Cancelled") return false;
+        if (ProviderStatus != "AwaitingRelease") throw new DomainException("WorkspaceEC shipment cannot be cancelled at this stage.");
+        ProviderStatus = "Cancelled";
+        UpdatedAtUtc = LastEventAtUtc = LastSyncedAtUtc = now;
+        return true;
+    }
 }

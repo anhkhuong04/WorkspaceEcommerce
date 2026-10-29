@@ -9,5 +9,6 @@ public interface IShippingCheckoutStore
     IQueryable<OrderShippingSelection> Selections { get; }
     Task<ShippingQuote?> LockQuoteAsync(Guid id, CancellationToken cancellationToken);
     Task<Cart?> LockCartAsync(string sessionId, CancellationToken cancellationToken);
+    Task<Domain.Modules.Ordering.Order?> ReloadOrderForUpdateAsync(Guid id, CancellationToken cancellationToken);
     Task<T> TransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken);
 }

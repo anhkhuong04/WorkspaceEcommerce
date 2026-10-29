@@ -17,7 +17,8 @@ internal sealed class CustomerOrderService(
     ICurrentCustomerContext currentCustomer,
     INotificationService notificationService,
     IValidator<CustomerOrderListRequest> listValidator,
-    IOrderShipmentService? shipmentService = null) : ICustomerOrderService
+    IOrderShipmentService? shipmentService = null,
+    IFulfillmentCoordinator? fulfillment = null) : ICustomerOrderService
 {
     public async Task<Result<PagedResult<CustomerOrderListItemDto>>> GetOrdersAsync(
         CustomerOrderListRequest request,
@@ -156,6 +157,8 @@ internal sealed class CustomerOrderService(
 
                 await RestoreInventoryAsync(order.Id, transactionCancellationToken);
                 CancelOrOpenRefundWorkflow(order, pendingPaymentTransactions, cancellationReason);
+                if (fulfillment is not null && await fulfillment.MethodAsync(order.Id, transactionCancellationToken) is not null)
+                    await fulfillment.CancelAsync(order, cancellationReason, transactionCancellationToken);
                 await dbContext.SaveChangesAsync(transactionCancellationToken);
             }, cancellationToken);
         }
@@ -174,7 +177,8 @@ internal sealed class CustomerOrderService(
             return Result<CustomerOrderDto>.Failure("Order cannot be cancelled at this stage. Only Pending or Confirmed orders can be cancelled.");
         }
 
-        if (!string.IsNullOrWhiteSpace(order.TrackingCode) && shipmentService is not null)
+        if (!string.IsNullOrWhiteSpace(order.TrackingCode) && shipmentService is not null
+            && (fulfillment is null || await fulfillment.MethodAsync(order.Id, cancellationToken) is null))
         {
             await shipmentService.QueueCancelAsync(order.Id, cancellationReason, cancellationToken);
         }

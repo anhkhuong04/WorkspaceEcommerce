@@ -12,7 +12,8 @@ internal sealed class ShipmentWebhookService(
     IAppDbContext dbContext,
     ILoyaltyService loyaltyService,
     TimeProvider timeProvider,
-    ILogger<ShipmentWebhookService> logger) : IShipmentWebhookService
+    ILogger<ShipmentWebhookService> logger,
+    IFulfillmentCoordinator? fulfillment = null) : IShipmentWebhookService
 {
     public async Task<Result<ShipmentWebhookResult>> HandleAsync(
         ShipmentWebhookPayload payload,
@@ -61,6 +62,11 @@ internal sealed class ShipmentWebhookService(
                     return;
                 }
 
+                if (fulfillment is not null && await fulfillment.MethodAsync(order.Id, transactionToken) == ShippingMethod.WorkspaceEC)
+                {
+                    transactionResult = Result<ShipmentWebhookResult>.Conflict("Partner webhook cannot mutate WorkspaceEC work.");
+                    return;
+                }
                 var shipment = await dbContext.FindOrderShipmentForUpdateAsync(order.Id, transactionToken);
                 if (shipment is not null && shipment.Provider != ShipmentProviderContract.ProviderName)
                 {
@@ -148,6 +154,7 @@ internal sealed class ShipmentWebhookService(
                 }
 
                 var targetStatus = ShipmentProviderContract.MapOrderStatus(payload.Status);
+                if (fulfillment is not null) targetStatus = await fulfillment.ProviderTargetAsync(order, targetStatus, transactionToken);
                 if (shipmentUpdated && targetStatus.HasValue)
                 {
                     orderUpdated = ShipmentOrderStatusTransitioner.TryTransition(

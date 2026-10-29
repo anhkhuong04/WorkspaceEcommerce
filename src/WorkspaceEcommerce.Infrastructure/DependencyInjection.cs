@@ -152,8 +152,12 @@ public static class DependencyInjection
             .Get<MiniLogisticsOptions>() ?? new MiniLogisticsOptions();
         services.Configure<MiniLogisticsOptions>(configuration.GetSection(MiniLogisticsOptions.SectionName));
         services.AddSingleton<MiniLogisticsFailureGate>();
-        services.AddHttpClient<IShipmentService, MiniLogisticsClient>(client =>
+        services.AddScoped<IShipmentService, DeferredShipmentService>();
+        services.AddHttpClient<MiniLogisticsClient>(client =>
         {
+            if (!Uri.TryCreate(miniLogisticsOptions.BaseUrl, UriKind.Absolute, out var address)
+                || address.Scheme is not ("http" or "https") || string.IsNullOrWhiteSpace(miniLogisticsOptions.ApiKey))
+                throw new HttpRequestException("MiniLogistics is not configured for partner operations.");
             client.BaseAddress = new Uri(miniLogisticsOptions.BaseUrl.TrimEnd('/') + "/");
             client.DefaultRequestHeaders.Authorization =
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", miniLogisticsOptions.ApiKey);

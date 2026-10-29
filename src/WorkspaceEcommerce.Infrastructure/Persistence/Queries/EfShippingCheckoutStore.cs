@@ -24,6 +24,15 @@ internal sealed class EfShippingCheckoutStore(AppDbContext context) : IShippingC
         }
         return cart;
     }
+    public async Task<Domain.Modules.Ordering.Order?> ReloadOrderForUpdateAsync(Guid id, CancellationToken ct)
+    {
+        var order = await context.Set<Domain.Modules.Ordering.Order>()
+            .FromSqlInterpolated($"SELECT * FROM ordering.orders WHERE id = {id} FOR UPDATE").SingleOrDefaultAsync(ct);
+        // A worker may have tracked the order before its HTTP call. Refresh it
+        // under the lock so a concurrent cancellation is never overwritten.
+        if (order is not null) await context.Entry(order).ReloadAsync(ct);
+        return order;
+    }
     public async Task<T> TransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
     {
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);

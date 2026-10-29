@@ -18,7 +18,8 @@ internal sealed class CheckoutService(
     IVNPayPaymentService vnPayPaymentService,
     ILogger<CheckoutService> logger,
     IValidator<CheckoutRequest> validator,
-    IValidator<ValidateCheckoutCouponRequest> couponValidator) : ICheckoutService
+    IValidator<ValidateCheckoutCouponRequest> couponValidator,
+    IQuotedCheckoutService? quotedCheckout = null) : ICheckoutService
 {
     private readonly CheckoutCartBuilder cartBuilder = new(checkoutStore, languageProvider);
     private readonly CheckoutCouponApplier couponApplier = new(checkoutStore, currentCustomer);
@@ -109,6 +110,9 @@ internal sealed class CheckoutService(
         CheckoutRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (request.ShippingQuoteId.HasValue || request.ShippingMethod.HasValue || request.ShippingProvinceCode is not null || request.ShippingWardCode is not null)
+            return quotedCheckout is null ? Result<CheckoutResponse>.Conflict("Quoted checkout is unavailable.")
+                : await quotedCheckout.CheckoutAsync(request, cancellationToken);
         var validationResult = await validator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {

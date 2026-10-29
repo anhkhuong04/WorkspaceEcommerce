@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Text.Json;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Abstractions.Shipment;
@@ -18,7 +19,9 @@ internal sealed class OrderShipmentService(
     ICurrentCustomerContext currentCustomer,
     ILoyaltyService loyaltyService,
     TimeProvider timeProvider,
-    ILogger<OrderShipmentService> logger) : IOrderShipmentService
+    ILogger<OrderShipmentService> logger,
+    IShippingCheckoutStore? shipping = null,
+    IFulfillmentCoordinator? fulfillment = null) : IOrderShipmentService
 {
     private const int ShipmentCommandLeaseSeconds = 120;
     private const int MaxShipmentCommandAttempts = 8;
@@ -102,6 +105,8 @@ internal sealed class OrderShipmentService(
             return Result<ShipmentTrackingDto>.Conflict("Order does not have a shipment to refresh.");
         }
 
+        if (shipment.Provider != ShipmentProviderContract.ProviderName)
+            return Result<ShipmentTrackingDto>.Success(await ToDtoAsync(order, cancellationToken));
         try
         {
             var tracking = await provider.GetTrackingAsync(shipment.TrackingCode, cancellationToken);
@@ -164,6 +169,9 @@ internal sealed class OrderShipmentService(
             return Result<ShipmentTrackingDto>.Conflict("Order does not have a shipment to cancel.");
         }
 
+        if (shipment.Provider != ShipmentProviderContract.ProviderName)
+            return Result<ShipmentTrackingDto>.Conflict("Cancel WorkspaceEC delivery through the order cancellation workflow.");
+
         if (!CanCancel(order, shipment))
         {
             return Result<ShipmentTrackingDto>.Conflict("Shipment cannot be cancelled at its current order or provider status.");
@@ -173,12 +181,22 @@ internal sealed class OrderShipmentService(
         return Result<ShipmentTrackingDto>.Success(await ToDtoAsync(order, cancellationToken));
     }
 
-    public Task QueueCancelAsync(
+    public async Task QueueCancelAsync(
         Guid orderId,
         string reason,
         CancellationToken cancellationToken = default)
     {
-        return EnqueueCommandAsync(orderId, ShipmentCommandType.Cancel, NormalizeCancelReason(reason), cancellationToken);
+        if (fulfillment is not null && await fulfillment.MethodAsync(orderId, cancellationToken) == ShippingMethod.WorkspaceEC)
+        {
+            await dbContext.ExecuteInTransactionAsync(async ct =>
+            {
+                var order = await dbContext.FindOrderForUpdateAsync(orderId, ct);
+                if (order is not null && order.Status == OrderStatus.Cancelled) await fulfillment.CancelAsync(order, NormalizeCancelReason(reason), ct);
+                await dbContext.SaveChangesAsync(ct);
+            }, cancellationToken);
+            return;
+        }
+        await EnqueueCommandAsync(orderId, ShipmentCommandType.Cancel, NormalizeCancelReason(reason), cancellationToken);
     }
 
     public async Task<int> ProcessDueCommandsAsync(
@@ -227,7 +245,13 @@ internal sealed class OrderShipmentService(
             }
 
             Result operationResult;
-            if (command.CommandType == ShipmentCommandType.Create)
+            if (fulfillment is not null && await fulfillment.MethodAsync(order.Id, cancellationToken) == ShippingMethod.WorkspaceEC)
+            {
+                // Local work never enters the provider pipeline, even when an old
+                // or manually replayed external command references this order.
+                operationResult = Result.Conflict("WorkspaceEC work cannot execute a partner command.");
+            }
+            else if (command.CommandType == ShipmentCommandType.Create)
             {
                 operationResult = await dbContext.OrderShipments
                     .Where(shipment => shipment.OrderId == order.Id)
@@ -330,6 +354,7 @@ internal sealed class OrderShipmentService(
         bool queueOnFailure,
         CancellationToken cancellationToken)
     {
+        if (!await CanCreateAsync(order, cancellationToken)) return Result.Conflict("Shipment is not eligible for creation.");
         var requestResult = await BuildCreateRequestAsync(order, cancellationToken);
         if (requestResult.IsFailure)
         {
@@ -339,20 +364,24 @@ internal sealed class OrderShipmentService(
         try
         {
             var initialRequest = requestResult.Value!;
-            var quote = await provider.GetShippingQuoteAsync(new ShippingQuoteRequest
+            var frozen = shipping is not null && await shipping.Selections.Where(x => x.OrderId == order.Id).AnyAsyncSafe(cancellationToken);
+            if (!frozen)
             {
-                ExternalOrderId = order.OrderCode,
-                DeliveryAddress = initialRequest.DeliveryAddress,
-                Parcel = initialRequest.Parcel,
-                GoodsValueAmount = initialRequest.GoodsValueAmount,
-                CodAmount = initialRequest.CodAmount
-            }, cancellationToken);
-            order.SetShippingFee(quote.TotalFeeAmount);
+                var quote = await provider.GetShippingQuoteAsync(new ShippingQuoteRequest
+                {
+                    ExternalOrderId = order.OrderCode,
+                    DeliveryAddress = initialRequest.DeliveryAddress,
+                    Parcel = initialRequest.Parcel,
+                    GoodsValueAmount = initialRequest.GoodsValueAmount,
+                    CodAmount = initialRequest.CodAmount
+                }, cancellationToken);
+                order.SetShippingFee(quote.TotalFeeAmount);
 
-            requestResult = await BuildCreateRequestAsync(order, cancellationToken);
-            if (requestResult.IsFailure)
-            {
-                return Result.Validation(requestResult.Errors);
+                requestResult = await BuildCreateRequestAsync(order, cancellationToken);
+                if (requestResult.IsFailure)
+                {
+                    return Result.Validation(requestResult.Errors);
+                }
             }
 
             var response = await provider.CreateShipmentAsync(
@@ -363,59 +392,69 @@ internal sealed class OrderShipmentService(
             if (response.ShipmentId == Guid.Empty ||
                 string.IsNullOrWhiteSpace(response.TrackingCode) ||
                 !string.Equals(response.ExternalOrderId, order.OrderCode, StringComparison.OrdinalIgnoreCase) ||
+                (frozen && response.Currency != order.CurrencyCode) ||
                 !ShipmentProviderContract.IsKnownStatus(response.Status))
             {
                 return Result.Conflict("Shipment provider returned an invalid order mapping.");
             }
 
-            var now = timeProvider.GetUtcNow();
-            var shipment = new OrderShipment(
-                Guid.NewGuid(),
-                order.Id,
-                ShipmentProviderContract.ProviderName,
-                response.ShipmentId,
-                response.TrackingCode,
-                response.Status,
-                response.ShippingFeeAmount,
-                response.Currency,
-                now);
-            order.UpdateShipmentInfo(response.TrackingCode, response.ShipmentId);
-            dbContext.Add(shipment);
-            dbContext.Add(new ShipmentTimelineEntry(
-                Guid.NewGuid(),
-                shipment.Id,
-                response.Status,
-                "Shipment created.",
-                now,
-                ShipmentTimelineSource.ShipmentCreated,
-                providerEventId: null,
-                now));
-            await dbContext.SaveChangesAsync(cancellationToken);
+            if (frozen)
+            {
+                return await shipping!.TransactionAsync(async ct =>
+                {
+                    var locked = await shipping.ReloadOrderForUpdateAsync(order.Id, ct);
+                    if (locked is null) return Result.NotFound("Order was not found.");
+                    if (await dbContext.OrderShipments.Where(x => x.OrderId == order.Id).AnyAsyncSafe(ct)) return Result.Success();
+                    await PersistCreatedShipmentAsync(locked, response, ct);
+                    if (locked.Status == OrderStatus.Cancelled)
+                        await dbContext.TryEnqueueShipmentCommandAsync(order.Id, ShipmentCommandType.Cancel,
+                            "Order cancelled while partner creation was in flight.", timeProvider.GetUtcNow(), ct);
+                    return Result.Success();
+                }, cancellationToken);
+            }
+            await PersistCreatedShipmentAsync(order, response, cancellationToken);
             return Result.Success();
         }
         catch (HttpRequestException exception) when (ShipmentProviderFailure.IsTransient(exception))
         {
             ShipmentIntegrationMetrics.RecordCreateFailure();
             logger.LogWarning(exception, "Shipment creation failed for order {OrderCode}", order.OrderCode);
-            if (queueOnFailure)
-            {
-                await EnqueueCommandAsync(order.Id, ShipmentCommandType.Create, reason: null, cancellationToken);
-            }
-
-            return Result.Failure(queueOnFailure
-                ? "Shipment provider is unavailable. Creation was queued for retry."
-                : "Shipment provider is unavailable.");
+            if (queueOnFailure) await EnqueueCommandAsync(order.Id, ShipmentCommandType.Create, reason: null, cancellationToken);
+            return Result.Failure(queueOnFailure ? "Shipment provider is unavailable. Creation was queued for retry." : "Shipment provider is unavailable.");
         }
         catch (HttpRequestException exception)
         {
             ShipmentIntegrationMetrics.RecordCreateFailure();
-            logger.LogWarning(
-                exception,
-                "Shipment creation was rejected for order {OrderCode} with status {StatusCode}",
-                order.OrderCode,
-                exception.StatusCode);
+            logger.LogWarning(exception, "Shipment creation was rejected for order {OrderCode} with status {StatusCode}", order.OrderCode, exception.StatusCode);
             return Result.Conflict("Shipment provider rejected the create request.");
         }
+    }
+
+    private async Task PersistCreatedShipmentAsync(Order order, CreateShipmentResponse response, CancellationToken cancellationToken)
+    {
+        var now = timeProvider.GetUtcNow();
+        var shipment = new OrderShipment(
+            Guid.NewGuid(),
+            order.Id,
+            ShipmentProviderContract.ProviderName,
+            response.ShipmentId,
+            response.TrackingCode,
+            response.Status,
+            response.ShippingFeeAmount,
+            response.Currency,
+            now);
+        order.UpdateShipmentInfo(response.TrackingCode, response.ShipmentId);
+        dbContext.Add(shipment);
+        dbContext.Add(new ShipmentTimelineEntry(
+            Guid.NewGuid(),
+            shipment.Id,
+            response.Status,
+            "Shipment created.",
+            now,
+            ShipmentTimelineSource.ShipmentCreated,
+            providerEventId: null,
+            now));
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<Result> TryCancelFromOutboxAsync(
@@ -430,6 +469,7 @@ internal sealed class OrderShipmentService(
         {
             return Result.Success();
         }
+        if (shipment.Provider != ShipmentProviderContract.ProviderName) return Result.Conflict("Partner cancellation cannot mutate WorkspaceEC work.");
 
         try
         {
@@ -514,6 +554,7 @@ internal sealed class OrderShipmentService(
         }
 
         var targetStatus = ShipmentProviderContract.MapOrderStatus(tracking.Status);
+        if (fulfillment is not null) targetStatus = await fulfillment.ProviderTargetAsync(order, targetStatus, cancellationToken);
         var orderUpdated = stateApplied && targetStatus.HasValue &&
             ShipmentOrderStatusTransitioner.TryTransition(order, targetStatus.Value, tracking.Status, dbContext);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -534,6 +575,23 @@ internal sealed class OrderShipmentService(
         Order order,
         CancellationToken cancellationToken)
     {
+        var selection = shipping is null ? null : await shipping.Selections.Where(x => x.OrderId == order.Id).FirstOrDefaultAsyncSafe(cancellationToken);
+        if (selection is not null)
+        {
+            if (selection.Method != ShippingMethod.MiniLogistics) return Result<CreateShipmentRequest>.Conflict("This order does not use MiniLogistics.");
+            var frozen = JsonSerializer.Deserialize<ShippingInputSnapshot>(selection.SnapshotJson);
+            if (frozen is null || frozen.Version != 1) return Result<CreateShipmentRequest>.Conflict("Unsupported shipment snapshot.");
+            return Result<CreateShipmentRequest>.Success(new CreateShipmentRequest
+            {
+                ExternalOrderId = order.OrderCode,
+                Receiver = new ShipmentContact { Name = order.CustomerName, Phone = order.CustomerPhone },
+                DeliveryAddress = new ShippingAddress { Street = frozen.Street, Ward = frozen.Destination.WardName, Province = frozen.Destination.ProvinceName },
+                Parcel = frozen.Parcel,
+                GoodsValueAmount = frozen.GoodsValue,
+                CodAmount = order.PaymentMethod == PaymentMethod.Cod ? order.TotalAmount : 0,
+                Note = order.Note
+            });
+        }
         if (string.IsNullOrWhiteSpace(order.ShippingWard) || string.IsNullOrWhiteSpace(order.ShippingProvince))
         {
             return Result<CreateShipmentRequest>.Validation(["Structured shipping address is required to create a shipment."]);
@@ -608,6 +666,7 @@ internal sealed class OrderShipmentService(
 
     private async Task<ShipmentTrackingDto> ToDtoAsync(Order order, CancellationToken cancellationToken)
     {
+        var quoted = shipping is not null && await shipping.Selections.Where(x => x.OrderId == order.Id).AnyAsyncSafe(cancellationToken);
         var shipment = await dbContext.OrderShipments
             .AsNoTrackingIfEf()
             .Where(candidate => candidate.OrderId == order.Id)
@@ -640,22 +699,27 @@ internal sealed class OrderShipmentService(
             order.OrderCode,
             order.Status,
             order.ShipmentId,
-            order.TrackingCode,
+            shipment?.TrackingCode ?? order.TrackingCode,
             shipment?.Provider,
             shipment?.ProviderStatus,
-            shipment?.ShippingFeeAmount,
+            quoted ? order.ShippingFee : shipment?.ShippingFeeAmount,
             shipment?.Currency,
             shipment?.LastSyncedAtUtc,
             shipment?.LastEventAtUtc,
             await CanCreateAsync(order, cancellationToken),
-            shipment is not null,
-            shipment is not null && CanCancel(order, shipment),
+            shipment is not null && shipment.Provider == ShipmentProviderContract.ProviderName,
+            shipment is not null && shipment.Provider == ShipmentProviderContract.ProviderName && CanCancel(order, shipment),
             activeCommand?.LastError,
             timeline);
     }
 
     private async Task<bool> CanCreateAsync(Order order, CancellationToken cancellationToken)
     {
+        if (fulfillment is not null)
+        {
+            var method = await fulfillment.MethodAsync(order.Id, cancellationToken);
+            if (method == ShippingMethod.WorkspaceEC || method.HasValue && order.PaymentMethod != PaymentMethod.Cod && order.PaymentStatus != PaymentStatus.Paid) return false;
+        }
         return string.IsNullOrWhiteSpace(order.TrackingCode) &&
             !order.ShipmentId.HasValue &&
             !await dbContext.OrderShipments

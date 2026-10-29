@@ -24,6 +24,7 @@ public sealed class MiniLogisticsWebhookController(
     [RequestSizeLimit(64 * 1024)]
     public async Task<IActionResult> HandleWebhook(CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(options.Value.WebhookSecret)) return Unauthorized("Webhook authentication is not configured.");
         if (!Request.Headers.TryGetValue("X-MiniLogistics-Signature", out var signatureHeader) ||
             !Request.Headers.TryGetValue("X-MiniLogistics-Timestamp", out var timestampHeader))
         {
