@@ -161,7 +161,7 @@ Checkbox được cập nhật theo kết quả triển khai trong nhật ký m�
 - Publish/retire có thông tin tác động và xác nhận thao tác; invalidate đúng cache. Không hiển thị preview draft như bảng giá đã áp dụng.
 - **Nghiệm thu:** Playwright UI với API mock cho edit/preview/publish/conflict, keyboard/error/loading/empty; lint/typecheck/build. Không tự thêm framework/unit-test runner admin.
 
-### [ ] SHIP-06 — API phương thức khả dụng và quote server-side
+### [x] SHIP-06 — API phương thức khả dụng và quote server-side
 
 - **Ưu tiên:** P0. **Phụ thuộc:** SHIP-02, SHIP-03, SHIP-04.
 - API trả các lựa chọn cho giỏ/địa chỉ/payment context: WorkspaceEC tính local; MiniLogistics timeout/retry có giới hạn. Không bắt WorkspaceEC chờ provider mới hiển thị/chấp nhận được.
@@ -336,3 +336,7 @@ Bản kế hoạch ban đầu chưa thay đổi code; nhật ký dưới đây g
 ## SHIP-05 validation (2026-10-29)
 
 Admin shipping lazy page, draft zones/rates, coverage, persisted preview, publish/retire confirmation, clone, paged history and weight readiness are implemented. Playwright mock UI: 3/3 pass (edit/preview/publish, revision conflict retaining edits, keyboard/empty/validation). Admin typecheck/build and workspace lint pass; existing storefront watch and bundle warnings remain. This does not enable storefront checkout.
+
+## SHIP-06 validation (2026-10-29)
+
+Server-owned quotes/options, bounded external deadline, default 10-minute validity, subject/input binding, explicit unavailability, audited emergency revocation and unused-quote retention are implemented behind a default-off issuance flag. Three PostgreSQL/API cases pass: local independence/outage, disabled external/geography rejection, admin-only revocation with persisted actor/reason. Acceptance/fulfillment checks follow in SHIP-07/08. New migration adds only nullable quote audit/acceptance fields; no user database was migrated.

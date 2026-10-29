@@ -3,7 +3,7 @@ using WorkspaceEcommerce.Domain.Common;
 
 namespace WorkspaceEcommerce.Domain.Modules.Shipments;
 
-/// <summary>Storage groundwork. Issuance and ownership checks are implemented by SHIP-06/07.</summary>
+/// <summary>Server-owned offer, consumed atomically with an accepted order.</summary>
 public sealed class ShippingQuote : Entity
 {
     private ShippingQuote() { }
@@ -38,20 +38,26 @@ public sealed class ShippingQuote : Entity
     public DateTimeOffset? RevokedAtUtc { get; private set; }
     public Guid? OrderId { get; private set; }
     public long Revision { get; private set; }
+    public string? CheckoutRequestHash { get; private set; }
+    public string? RevocationActor { get; private set; }
+    public string? RevocationReason { get; private set; }
 
-    public void Consume(Guid orderId, DateTimeOffset now)
+    public void Consume(Guid orderId, DateTimeOffset now, string? checkoutRequestHash = null)
     {
         if (orderId == Guid.Empty || OrderId.HasValue || RevokedAtUtc.HasValue || now < CreatedAtUtc || now >= ExpiresAtUtc)
             throw new DomainException("Shipping quote is not available for consumption.");
         OrderId = orderId;
+        CheckoutRequestHash = checkoutRequestHash is null ? null : ShippingRatePlan.Required(checkoutRequestHash, 64, nameof(CheckoutRequestHash));
         Revision++;
     }
 
-    public void Revoke(DateTimeOffset now)
+    public void Revoke(DateTimeOffset now, string? actor = null, string? reason = null)
     {
         if (OrderId.HasValue || now < CreatedAtUtc)
             throw new DomainException("A consumed quote cannot be revoked.");
         RevokedAtUtc = now;
+        RevocationActor = actor is null ? null : ShippingRatePlan.Required(actor, 256, nameof(RevocationActor));
+        RevocationReason = reason is null ? null : ShippingRatePlan.Required(reason, 500, nameof(RevocationReason));
         Revision++;
     }
 }

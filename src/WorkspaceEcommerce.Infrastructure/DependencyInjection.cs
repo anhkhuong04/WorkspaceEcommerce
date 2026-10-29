@@ -77,6 +77,13 @@ public static class DependencyInjection
         services.AddScoped<ICheckoutStore>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddSingleton<IShippingAdministrativeCatalog, VietnamShippingAdministrativeCatalog>();
         services.AddScoped<IShippingRateStore, EfShippingRateStore>();
+        services.AddScoped<IShippingCheckoutStore, EfShippingCheckoutStore>();
+        services.AddHostedService<ShippingQuoteCleanupWorker>();
+        services.AddOptions<WorkspaceEcommerce.Application.Modules.Shipments.ShippingCheckoutOptions>()
+            .Bind(configuration.GetSection("ShippingCheckout"))
+            .Validate(x => x.QuoteLifetimeMinutes is >= 1 and <= 60 && x.UnusedQuoteRetentionDays is >= 1 and <= 365
+                && x.ExternalQuoteTimeoutSeconds is >= 1 and <= 60, "Shipping quote lifetime, retention or timeout is out of range.")
+            .ValidateOnStart();
         services.AddScoped<IDemoDataSeeder, DemoDataSeeder>();
         services.AddSingleton(adminAuthOptions);
         services.AddSingleton(jwtOptions);

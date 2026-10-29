@@ -1,0 +1,13 @@
+using WorkspaceEcommerce.Domain.Modules.Cart;
+using WorkspaceEcommerce.Domain.Modules.Shipments;
+
+namespace WorkspaceEcommerce.Application.Abstractions.Persistence;
+
+public interface IShippingCheckoutStore
+{
+    IQueryable<ShippingQuote> Quotes { get; }
+    IQueryable<OrderShippingSelection> Selections { get; }
+    Task<ShippingQuote?> LockQuoteAsync(Guid id, CancellationToken cancellationToken);
+    Task<Cart?> LockCartAsync(string sessionId, CancellationToken cancellationToken);
+    Task<T> TransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken);
+}

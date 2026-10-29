@@ -4,6 +4,10 @@ namespace WorkspaceEcommerce.Application.Modules.Ordering;
 
 public sealed class CheckoutRequest
 {
+    public Guid? ShippingQuoteId { get; init; }
+    public Domain.Modules.Shipments.ShippingMethod? ShippingMethod { get; init; }
+    public string? ShippingProvinceCode { get; init; }
+    public string? ShippingWardCode { get; init; }
     public string SessionId { get; init; } = string.Empty;
 
     public string CustomerName { get; init; } = string.Empty;

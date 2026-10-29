@@ -25,6 +25,9 @@ internal sealed class ShippingQuoteConfiguration : IEntityTypeConfiguration<Ship
         builder.Property(x => x.RatePlanId).HasColumnName("rate_plan_id");
         builder.Property(x => x.OrderId).HasColumnName("order_id");
         builder.Property(x => x.Revision).HasColumnName("revision").IsConcurrencyToken();
+        builder.Property(x => x.CheckoutRequestHash).HasColumnName("checkout_request_hash").HasMaxLength(64);
+        builder.Property(x => x.RevocationActor).HasColumnName("revocation_actor").HasMaxLength(256);
+        builder.Property(x => x.RevocationReason).HasColumnName("revocation_reason").HasMaxLength(500);
         builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc");
         builder.Property(x => x.ExpiresAtUtc).HasColumnName("expires_at_utc");
         builder.Property(x => x.RevokedAtUtc).HasColumnName("revoked_at_utc");

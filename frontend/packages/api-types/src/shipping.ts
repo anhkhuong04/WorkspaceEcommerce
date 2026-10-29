@@ -1,6 +1,21 @@
 import type { PagedResult } from "./common";
 
 export enum ShippingRatePlanStatus { Draft = 0, Published = 1, Retired = 2 }
+export enum ShippingMethod { WorkspaceEC = 0, MiniLogistics = 1 }
+export interface ShippingQuoteInput {
+  sessionId: string;
+  shippingStreet: string;
+  provinceCode: string;
+  wardCode: string;
+  paymentMethod: number;
+  couponCode?: string | null;
+  method: ShippingMethod;
+}
+export interface ShippingMethodOption { method: ShippingMethod; available: boolean; reason: string | null; }
+export interface ShippingQuoteDto {
+  id: string; method: ShippingMethod; customerCharge: number; currency: string;
+  weightGrams: number; expiresAtUtc: string; ratePlanId: string | null;
+}
 export interface ShippingWard { code: string; name: string; }
 export interface ShippingCatalogSummary {
   version: string;
