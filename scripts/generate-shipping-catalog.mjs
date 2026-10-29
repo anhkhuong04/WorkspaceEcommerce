@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 
 const source = new URL("../src/WorkspaceEcommerce.Infrastructure/Shipping/Data/vietnam-administrative-catalog.json", import.meta.url);
 const target = new URL("../frontend/apps/storefront/src/constants/vietnamAdministrativeUnits.ts", import.meta.url);
-const bytes = readFileSync(source);
+// Git checkouts may use CRLF locally; the pinned hash is over canonical LF bytes.
+const bytes = readFileSync(source, "utf8").replace(/\r\n/g, "\n");
 const catalog = JSON.parse(bytes);
 const provinces = new Set();
 const wards = new Set();
@@ -25,7 +26,7 @@ export const VIETNAM_ADMINISTRATIVE_CATALOG_VERSION = ${JSON.stringify(catalog.v
 export const VIETNAM_ADMINISTRATIVE_UNITS: VietnamProvince[] = ${JSON.stringify(catalog.provinces, null, 2)};
 `;
 if (process.argv.includes("--check")) {
-  if (readFileSync(target, "utf8") !== generated) throw new Error("Shipping catalog artifact is stale; regenerate it.");
+  if (readFileSync(target, "utf8").replace(/\r\n/g, "\n") !== generated) throw new Error("Shipping catalog artifact is stale; regenerate it.");
   process.stdout.write("Shipping administrative catalog artifact is current.\n");
 } else {
   writeFileSync(fileURLToPath(target), generated);

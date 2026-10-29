@@ -76,6 +76,7 @@ public static class DependencyInjection
         services.AddScoped<ICartStore>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddScoped<ICheckoutStore>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddSingleton<IShippingAdministrativeCatalog, VietnamShippingAdministrativeCatalog>();
+        services.AddScoped<IShippingRateStore, EfShippingRateStore>();
         services.AddScoped<IDemoDataSeeder, DemoDataSeeder>();
         services.AddSingleton(adminAuthOptions);
         services.AddSingleton(jwtOptions);

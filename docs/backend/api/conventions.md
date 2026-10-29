@@ -80,3 +80,7 @@ request-size limits and route all media through `IMediaStorageService`.
 Development exposes `/openapi/v1.json`; production does not expose runtime
 OpenAPI. Any public contract change must update shared frontend API types,
 consumers, integration tests, and this document when it changes a convention.
+
+WorkspaceEC rate administration is documented in [Shipping rates](shipping-rates.md).
+These Admin-only endpoints provide versioned configuration and simulation;
+customer quote issuance and new checkout selection are separate implementation tasks.

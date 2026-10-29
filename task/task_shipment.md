@@ -1,6 +1,6 @@
 # Kế hoạch vận chuyển WorkspaceEC và đối tác
 
-Ngày lập: 2026-10-29. Trạng thái: **đang triển khai SHIP-00–04 theo xác nhận ngày 2026-10-29**.
+Ngày lập: 2026-10-29. Trạng thái: **đã hoàn tất SHIP-00–04; chưa bật checkout/fulfillment mới**.
 
 ## 1. Yêu cầu đã xác nhận và phạm vi
 
@@ -11,11 +11,11 @@ Ngày lập: 2026-10-29. Trạng thái: **đang triển khai SHIP-00–04 theo x
 - WorkspaceEC phải hoạt động khi service vận chuyển bên ngoài bị lỗi hoặc được tắt.
 - Phí và tổng tiền do backend quyết định; frontend chỉ gửi lựa chọn và hiển thị báo giá.
 
-Phạm vi bản đầu: một phương thức/phương án giao cho mỗi đơn; một điểm xuất hàng cấu hình; trọng lượng thực; bảng phí theo vùng; quản lý giao nội bộ qua admin; tích hợp COD, VNPay và chuyển khoản theo điều kiện thanh toán được duyệt. Đây là đề xuất phạm vi, cần xác nhận tại SHIP-00.
+Phạm vi bản đầu đã chốt tại SHIP-00: một phương thức/phương án giao cho mỗi đơn; một điểm xuất hàng cấu hình; trọng lượng thực; bảng phí theo vùng; quản lý giao nội bộ qua admin; tích hợp COD, VNPay và chuyển khoản theo điều kiện thanh toán được duyệt. SHIP-00–04 chỉ triển khai nền dữ liệu, calculator và API cấu hình; UI/checkout/fulfillment thuộc các task tiếp theo.
 
 Chưa bao gồm: nhiều kho/điểm xuất hàng, chia kiện/chia chuyến, định tuyến GPS, app riêng cho shipper, tối ưu tuyến, tự động đối soát ngân hàng, hoàn tiền tự động, bảo hiểm/phí lắp đặt/khuyến mãi miễn ship mới. Nếu các chính sách này cần ngay bản đầu, điều chỉnh SHIP-00 trước khi code.
 
-## 2. Phân tích source hiện tại
+## 2. Phân tích source trước triển khai (baseline)
 
 | Điểm đọc | Hiện trạng và ảnh hưởng |
 | --- | --- |
@@ -32,7 +32,7 @@ Chưa bao gồm: nhiều kho/điểm xuất hàng, chia kiện/chia chuyến, đ
 
 Giữ kiến trúc modular monolith, direct EF qua focused stores, transaction và outbox/inbox hiện có. Không thêm microservice, generic repository, MediatR hoặc event bus. Đối chiếu [architecture](../.agents/architecture.md), [data/consistency](../docs/backend/architecture/data-and-consistency.md), [ADR 006](../docs/backend/adr/006-durable-external-side-effects.md).
 
-## 3. Thiết kế đích đề xuất
+## 3. Thiết kế đích đã chốt, triển khai theo từng task
 
 ### 3.1. Tách báo giá, tiền trên đơn và thực hiện giao
 
@@ -85,24 +85,24 @@ Các tên dưới đây là đề xuất để phân việc; chốt model/DTO tr
 
 `Order.ShipmentId` đang nhận ID phía provider; phải làm rõ mapping với local shipment ID ở SHIP-01, giữ tương thích các consumer cũ và không bulk-rename ID trong dữ liệu lịch sử.
 
-## 4. Quyết định cần chốt trước các task phụ thuộc
+## 4. Quyết định đã xác nhận tại SHIP-00
 
-Ba yêu cầu đầu mục 1 đã được xác nhận. Các lựa chọn sau **chưa được người dùng chốt**; có thể phân tích/làm test characterization trước, nhưng không tự áp dụng chính sách tiền/trạng thái khi code.
+Product owner đã xác nhận triển khai D01–D08 theo đề xuất ngày 2026-10-29. [ADR 007](../docs/backend/adr/007-workspace-shipping-rates.md) là bản ghi quyết định. Giá thương mại, origin và giới hạn theo vùng là dữ liệu admin nhập, không phải các con số được tự seed từ ví dụ/test. Việc đã chốt thiết kế không có nghĩa mọi luồng sau SHIP-04 đã được triển khai.
 
-| ID | Quyết định | Đề xuất để duyệt |
+| ID | Quyết định | Nội dung được duyệt |
 | --- | --- | --- |
 | D01 | Điểm xuất hàng, định nghĩa các vùng và bảng phí thật | Bản đầu một origin; admin nhóm mã tỉnh vào vùng; không giới hạn sẵn Bắc/Trung/Nam. |
-| D02 | Công thức, đơn vị/bước làm tròn, dữ liệu thiếu cân nặng, trọng lượng tối đa/địa bàn đặc biệt | Công thức mục 3.2, trọng lượng thực; cần giá trị và phạm vi được business xác nhận. Không tự chuyển sang cân quy đổi. |
-| D03 | Quote expiry, publish mới, tạm dừng phương thức | Đề xuất TTL ngắn có cấu hình; quote hợp lệ giữ giá đến hết hạn khi chỉ publish mới; tạm dừng khẩn có thể thu hồi quote chưa dùng với lý do. |
-| D04 | Phí đối tác và chênh lệch chi phí lúc tạo vận đơn | Chốt giá khách tại checkout; website xử lý chênh lệch vận hành. Nếu không chấp nhận phải định nghĩa lại chính sách trước triển khai. |
+| D02 | Công thức, đơn vị/bước làm tròn, dữ liệu thiếu cân nặng, trọng lượng tối đa/địa bàn đặc biệt | Cân thực, tổng kg × quantity rồi làm tròn lên gram một lần; công thức mục 3.2. Admin cấu hình giá/giới hạn từng vùng, bao gồm địa bàn đặc biệt; không fallback cân giả hoặc tự dùng cân quy đổi. |
+| D03 | Quote expiry, publish mới, tạm dừng phương thức | TTL dự kiến mặc định 10 phút, có cấu hình tại SHIP-06; quote hợp lệ giữ giá đến hết hạn khi publish mới; tạm dừng khẩn có thể thu hồi quote chưa dùng với lý do. |
+| D04 | Phí đối tác và chênh lệch chi phí lúc tạo vận đơn | Chốt giá khách tại checkout; website xử lý chênh lệch vận hành; không ghi đè tổng tiền/amount đã cam kết. |
 | D05 | Thời điểm tạo phiếu/cho xuất giao; VNPay/chuyển khoản/COD | Có thể tạo phiếu chờ sớm nhưng chỉ xuất giao prepaid khi Paid; COD theo xác nhận đơn. Chuyển khoản cần thao tác xác nhận thu tiền có audit. |
-| D06 | COD: ghi nhận tiền thu, tiền nộp về và Completed | Đề xuất ghi nhận thu đủ để hoàn tất COD; giao thành công và nộp tiền về là hai sự kiện riêng. Chốt partial/thiếu/thừa/thu thất bại; không giả lập Paid chỉ vì bấm Delivered. |
-| D07 | Đơn cũ/client cũ/admin import, lựa chọn mặc định | Giữ snapshot/luồng cũ được nhận diện rõ. Không mặc định tất cả đơn chưa có method thành WorkspaceEC; chốt mở rộng contract hay route version mới. |
+| D06 | COD: ghi nhận tiền thu, tiền nộp về và Completed | Thu đủ mới hoàn tất COD; thu tiền và nộp tiền là hai sự kiện riêng. Thiếu/thừa/partial cần luồng ngoại lệ, không sửa tổng tiền hoặc giả lập Paid chỉ vì bấm Delivered. |
+| D07 | Đơn cũ/client cũ/admin import, lựa chọn mặc định | Giữ snapshot/luồng cũ, contract mới additive; không mặc định đơn thiếu selection thành WorkspaceEC. Local shipment ID khác nghĩa legacy external ID. |
 | D08 | Giao thất bại, giao lại, hủy và đổi phương thức | Giữ chuyển trạng thái order hiện có. Bản đầu không tự đổi carrier/địa chỉ/tổng tiền sau nhận đơn; quy định việc giao lại và chi phí phát sinh. |
 
 ## 5. Danh sách task triển khai
 
-Mọi checkbox đang chưa hoàn thành. Mỗi task phải có diff nhỏ, test liên quan và cập nhật trạng thái/validation ngay trong tài liệu khi thực hiện. Không ghi Done dựa vào kế hoạch hoặc test của working tree trước đó.
+Checkbox được cập nhật theo kết quả triển khai trong nhật ký mục 10. Mỗi task phải có diff nhỏ, test liên quan và validation thực tế; không ghi Done dựa vào kế hoạch hoặc test của working tree trước đó.
 
 ### [x] SHIP-00 — Chốt nghiệp vụ, contract và ADR
 
@@ -143,7 +143,7 @@ Mọi checkbox đang chưa hoàn thành. Mỗi task phải có diff nhỏ, test 
 - Không thêm miễn ship, phụ phí COD/insurance/lắp đặt hoặc thay đổi coupon/loyalty ngoài chính sách đã duyệt.
 - **Nghiệm thu:** test ngay dưới/bằng/trên base weight và step, nhiều SKU/quantity, số tiền lớn/overflow, cấu hình âm/bước 0, thiếu giá/cân nặng; cùng input/version luôn cùng fee.
 
-### [ ] SHIP-04 — Admin API quản trị bảng phí và publish
+### [x] SHIP-04 — Admin API quản trị bảng phí và publish
 
 - **Ưu tiên:** P0. **Phụ thuộc:** SHIP-01, SHIP-02, SHIP-03.
 - Use case draft/clone/edit/validate/publish/retire/history/preview. Chỉ draft được sửa; preview chỉ rõ draft hay giá đang áp dụng.
@@ -312,17 +312,23 @@ Browser E2E thật từ root: mở rộng và chạy `./scripts/run-prh-015-stor
 - [ ] Đơn cũ/import/backlog/protocol an toàn; migration và rollback/forward-fix được kiểm chứng.
 - [ ] Test và tài liệu/runbook được cập nhật; skipped/blocked được báo trung thực.
 
-Lượt lập kế hoạch này chỉ đọc source và tạo tài liệu; chưa thay đổi code/schema/contract, chưa chạy validation triển khai ở mục 8. Các kết quả test ở lượt review trước không được tính là validation cho tính năng chưa triển khai. Working tree đang có nhiều thay đổi ngoài phạm vi; khi bắt đầu task phải đọc lại `git status` và giữ nguyên các thay đổi đó.
+Bản kế hoạch ban đầu chưa thay đổi code; nhật ký dưới đây ghi riêng các task đã triển khai và validation mới. Working tree có nhiều thay đổi ngoài phạm vi được giữ nguyên, không đưa vào các commit shipping. Migration chỉ chạy trên database test cô lập; chưa áp dụng vào database local/production của người dùng.
 
 
 ## 10. Nhật ký triển khai SHIP-00–04
 
 - 2026-10-29 — SHIP-00: product owner xác nhận D01–D08 theo đề xuất. [ADR 007](../docs/backend/adr/007-workspace-shipping-rates.md) chốt công thức/cân thực, TTL quote dự kiến 10 phút, snapshot tiền/địa chỉ/parcel, lifecycle và compatibility. Giá thương mại/origin cụ thể do admin nhập, không seed giả.
 - Baseline trước sửa code: `dotnet test WorkspaceEcommerce.slnx --no-restore --configuration Release --verbosity minimal`: 682 pass (330 Application, 238 Infrastructure, 114 API integration). EF pending-model check Release/no-build: không có thay đổi model trước triển khai.
-- SHIP-01–04: đang triển khai; checkout/fulfillment mới chưa bật.
+- SHIP-01–04: đã hoàn tất phần backend theo phạm vi; checkout/fulfillment mới chưa bật, admin UI thuộc SHIP-05.
 - SHIP-01: đã thêm model bảng giá/vùng/audit, quote consumption và snapshot lựa chọn đơn; local shipment có ID riêng, provider ID nullable có constraint, actual cost nullable tách trường legacy. Không sửa ID/tổng tiền đơn cũ. Migration mới `20261029041328_AddWorkspaceShippingFoundation` có guard chống Down khi đã có dữ liệu mới.
 - Validation SHIP-01: 9 domain tests, 1 mapping test và 10 integration tests tập trung pass (upgrade có dữ liệu cũ, constraints/quote race, webhook regression); script `verify-prh-009-migrations.ps1 -PostgresPort 55438` pass clean + upgrade; sẽ chạy lại full regression ở cuối SHIP-04.
 - SHIP-02: danh mục canonical có version, đối chiếu mã từ hai tập Công báo QĐ 19/2025 và cập nhật Đồng Nai theo NQ 237/2026 + NQ 30/2026. Backend validate code/parent; TypeScript sinh từ cùng JSON và CI kiểm tra drift. Không sửa địa chỉ lịch sử. Coverage dùng danh mục, không hard-code số tỉnh/xã. Chi tiết nguồn tại [catalog provenance](../docs/backend/architecture/shipping-administrative-catalog.md).
 - Validation SHIP-02: 2 Application coverage tests + 1 Infrastructure catalog test pass; `node scripts/generate-shipping-catalog.mjs --check` và storefront typecheck pass. API expose catalog/coverage được nối trong SHIP-04.
 - SHIP-03: calculator thuần tính cân thực theo quantity, làm tròn tổng lên gram đúng một lần, tính bước vượt cân và trả breakdown VND. Từ chối thiếu/sai cân nặng, vượt giới hạn/cỡ số tiền; không fallback miễn phí hoặc 0,5 kg. Snapshot parcel đã có schema từ SHIP-01; nối calculator vào checkout tạo snapshot thuộc SHIP-06/07, không đổi luồng cũ ở lượt này.
 - Validation SHIP-03: 13 calculator tests pass (ngưỡng base/step, tổng gram lẻ/quantity, dữ liệu thiếu/sai, overflow/maximum và phí 0 chỉ khi cấu hình tường minh); cùng 2 coverage tests tạo thành 15 Application tests tập trung pass.
+- SHIP-04: API Admin-only tạo/sửa draft, clone, validate coverage, preview, publish/replace, retire và history; catalog/ward paging và báo cáo SKU thiếu cân nặng trước enable. Revision + compare active-plan + PostgreSQL advisory lock bảo vệ config trên nhiều replica; DB constraints là lớp bảo vệ bổ sung. Preview đọc toàn bộ revision/zones trong một SQL snapshot, không phát hành quote và không gọi đối tác. Có audit session/reason/before-after, OpenAPI và shared TypeScript contracts. Hướng dẫn: [shipping rates API](../docs/backend/api/shipping-rates.md).
+- Validation cuối SHIP-04: `dotnet test WorkspaceEcommerce.slnx --no-restore --configuration Release --verbosity minimal` pass **728/728** (354 Application, 240 Infrastructure, 134 API integration), không skip. Có 46 regression cases mới so với baseline; 16 case API admin gồm phân quyền mọi route, input null/sai, incomplete coverage, concurrent edit/publish, immutable quote/history, rollback trung gian, outage preview và báo cáo thiếu cân nặng.
+- EF pending-model check Release/no-build pass; migration clean + upgrade và upgrade với dữ liệu paid/legacy/pending outbox đã pass. Không sửa migration lịch sử.
+- Frontend: typecheck toàn workspace pass; 14 Vitest pass; lint pass với 1 warning `react-hooks/incompatible-library` tại checkout đã tồn tại trước task; build hai app pass với cảnh báo bundle >500 kB đã có trước. Catalog generator `--check` pass, đã chuẩn hóa hash CRLF/LF cho Windows/CI.
+- Kiểm tra trước commit: scoped diff không có lỗi whitespace; tài liệu UTF-8/link/code fence hợp lệ; tracked runtime secret scan pass (958 file, không in giá trị secrets).
+- Browser E2E, load/soak, triển khai production và các luồng mới SHIP-05–14 chưa chạy/triển khai trong phạm vi này. Không coi API preview là bằng chứng đã giao hàng WorkspaceEC end-to-end.

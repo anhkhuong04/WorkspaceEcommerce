@@ -29,6 +29,11 @@ tasks remain unimplemented until their work is explicitly undertaken.
 - Fee is `baseFee + ceil(max(0, grams-baseGrams)/stepGrams) * stepFee`.
   Unsupported configured weight is explicit unavailability, never a zero quote.
 
+Calculator test examples only (not production prices): base 1,000 g / 10,000 VND,
+step 500 g / 5,000 VND gives 10,000 VND at 1,000 g, 15,000 VND at 1,001 g and
+20,000 VND at 1,501 g. Aggregate fractional grams before rounding once. Real
+rates remain administrator-entered configuration.
+
 ### Publishing and quote validity (D03)
 
 - A rate plan is Draft, Published or Retired. Only drafts may change. Zone
@@ -74,6 +79,19 @@ tasks remain unimplemented until their work is explicitly undertaken.
   acceptance. Failed deliveries may retry through the existing order graph;
   cancellation uses existing stock/refund/loyalty/warranty rules. Extra delivery
   costs do not automatically become additional customer charges.
+
+The later fulfillment implementation follows this payment gate matrix:
+
+| Payment | Work acceptance | Dispatch/completion guard |
+| --- | --- | --- |
+| COD | Durable work on order acceptance | Dispatch after order confirmation; completion requires confirmed full collection. Remittance is a separate fact. |
+| VNPay | Idempotent work with verified successful payment | Dispatch only for Paid; callback amount equals the frozen order amount. |
+| Manual transfer | Pending local record is allowed | Audited exact-amount confirmation commits Paid and eligible work together; no dispatch while Pending. |
+
+Local dispatch maps to the existing order Shipping stage; failed delivery can
+retry Shipping or cancel through its existing guards. Delivery confirmation,
+payment collection and order completion must not be conflated. Implement that
+coordinator in SHIP-09/10 rather than changing existing transitions in SHIP-00–04.
 
 ## Architecture and rollout
 

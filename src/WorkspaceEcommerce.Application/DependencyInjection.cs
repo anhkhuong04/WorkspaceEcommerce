@@ -62,6 +62,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminReviewService, AdminReviewService>();
         services.AddScoped<IShipmentWebhookService, ShipmentWebhookService>();
         services.AddScoped<IOrderShipmentService, OrderShipmentService>();
+        services.AddScoped<IShippingRateAdminService, ShippingRateAdminService>();
         services.AddScoped<IOutboxOperationsService, OutboxOperationsService>();
         services.AddScoped<IAdminWarrantyService, AdminWarrantyService>();
         services.AddScoped<ICustomerWarrantyService, CustomerWarrantyService>();
