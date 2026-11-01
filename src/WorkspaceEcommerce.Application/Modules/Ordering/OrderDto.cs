@@ -26,4 +26,7 @@ public sealed record OrderDto(
     DateTimeOffset UpdatedAt,
     string? TrackingCode,
     Guid? ShipmentId,
-    IReadOnlyCollection<OrderItemDto> Items);
+    IReadOnlyCollection<OrderItemDto> Items)
+{
+    public Shipments.OrderShippingDetailsDto? Shipping { get; init; }
+}

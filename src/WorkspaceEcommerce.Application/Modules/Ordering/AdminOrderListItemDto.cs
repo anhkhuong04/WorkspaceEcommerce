@@ -16,4 +16,7 @@ public sealed record AdminOrderListItemDto(
     DateTimeOffset UpdatedAt,
     int ItemCount,
     string? TrackingCode = null,
-    string? ShipmentStatus = null);
+    string? ShipmentStatus = null)
+{
+    public Shipments.OrderShippingSummaryDto? Shipping { get; init; }
+}

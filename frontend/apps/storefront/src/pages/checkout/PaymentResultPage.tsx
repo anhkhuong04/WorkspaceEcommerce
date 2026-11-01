@@ -1,14 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import type { PaymentResultDto, PaymentStatus } from "@workspace-ecommerce/api-types";
-import { formatDate, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
+import { formatDate, formatMoney, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
 import type { ReactNode } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
+import { OrderShippingDetails } from "../../components/shipment/OrderShippingDetails";
+import { useTranslation } from "react-i18next";
 
 type PaymentResultStatus = "success" | "failed" | "cancelled";
 
 export function PaymentResultPage() {
+  const { t } = useTranslation("shipping");
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const orderCode = searchParams.get("orderCode") ?? "";
@@ -59,6 +62,8 @@ export function PaymentResultPage() {
       </section>
 
       {result ? <PaymentResultSummary result={result} /> : null}
+      <OrderShippingDetails shipping={result?.shipping} />
+      {result?.totalAmount != null && <p>{t("total")}: {formatMoney(result.totalAmount)}</p>}
 
       <section className="flex flex-wrap gap-3">
         <Link to={`/orders/lookup?orderCode=${encodeURIComponent(orderCode)}`} className="ui-control flex h-12 items-center rounded-[var(--radius-control)] border border-[var(--brand)] px-5 text-[var(--brand)] transition hover:bg-[var(--brand-soft)]">

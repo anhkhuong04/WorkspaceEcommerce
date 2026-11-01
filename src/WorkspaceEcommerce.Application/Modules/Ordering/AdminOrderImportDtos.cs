@@ -4,7 +4,10 @@ public sealed record AdminOrderImportPreviewDto(
     int TotalRows,
     int ValidRows,
     int ErrorRows,
-    IReadOnlyCollection<AdminOrderImportRowResultDto> Rows);
+    IReadOnlyCollection<AdminOrderImportRowResultDto> Rows)
+{
+    public string ShippingSemantics => "LegacyImport";
+}
 
 public sealed record AdminOrderImportCommitResultDto(
     int CreatedOrders,

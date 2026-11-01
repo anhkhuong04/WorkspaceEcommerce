@@ -53,18 +53,22 @@ internal static class OrderImportFileParser
         CancellationToken cancellationToken)
     {
         var extension = Path.GetExtension(fileName);
-        if (string.Equals(extension, ".csv", StringComparison.OrdinalIgnoreCase))
+        try
         {
-            return Result<IReadOnlyCollection<AdminOrderImportFileRow>>.Success(
-                await ParseCsvAsync(content, cancellationToken));
-        }
+            if (string.Equals(extension, ".csv", StringComparison.OrdinalIgnoreCase))
+            {
+                return Result<IReadOnlyCollection<AdminOrderImportFileRow>>.Success(
+                    await ParseCsvAsync(content, cancellationToken));
+            }
 
-        if (string.Equals(extension, ".xlsx", StringComparison.OrdinalIgnoreCase))
-        {
-            return Result<IReadOnlyCollection<AdminOrderImportFileRow>>.Success(ParseXlsx(content));
-        }
+            if (string.Equals(extension, ".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                return Result<IReadOnlyCollection<AdminOrderImportFileRow>>.Success(ParseXlsx(content));
+            }
 
-        return Result<IReadOnlyCollection<AdminOrderImportFileRow>>.Validation(["Only CSV and XLSX order import files are supported."]);
+            return Result<IReadOnlyCollection<AdminOrderImportFileRow>>.Validation(["Only CSV and XLSX order import files are supported."]);
+        }
+        catch (FormatException exception) { return Result<IReadOnlyCollection<AdminOrderImportFileRow>>.Validation([exception.Message]); }
     }
 
     private static async Task<IReadOnlyCollection<AdminOrderImportFileRow>> ParseCsvAsync(
@@ -199,6 +203,9 @@ internal static class OrderImportFileParser
             return Array.Empty<AdminOrderImportFileRow>();
         }
 
+        if (header.Any(value => value.Trim().Replace("_", "").Replace(" ", "").ToLowerInvariant()
+                is "shippingmethod" or "shippingquoteid" or "rateplanid"))
+            throw new FormatException("Order import supports legacy/import fees only. Shipping selections and quotes must use checkout; remove unsupported shipping-method/quote columns.");
         var headerIndex = header
             .Select((value, index) => new { Header = NormalizeHeader(value), Index = index })
             .Where(item => item.Header is not null)

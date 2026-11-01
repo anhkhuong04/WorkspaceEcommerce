@@ -30,6 +30,16 @@ export interface ShippingQuoteInput {
   method: ShippingMethod;
 }
 export interface ShippingCheckoutCapabilities { enabled: boolean; workspaceEnabled: boolean; externalEnabled: boolean; }
+export interface OrderShippingSummaryDto {
+  orderId: string; method: ShippingMethod; customerCharge: number; localShipmentId: string | null;
+  providerShipmentId: string | null; trackingCode: string | null; status: string | null;
+}
+export interface OrderShippingDetailsDto {
+  method: ShippingMethod; customerCharge: number; currency: string; weightGrams: number; ratePlanId: string | null;
+  rateRevision: number | null; zoneCode: string | null;
+  destination: { catalogVersion: string; provinceCode: string; provinceName: string; wardCode: string; wardName: string } | null;
+  localShipmentId: string | null; providerShipmentId: string | null; trackingCode: string | null; status: string | null;
+}
 export interface ShippingMethodOption {
   method: ShippingMethod;
   available: boolean;

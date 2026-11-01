@@ -28,4 +28,7 @@ public sealed record CustomerOrderDto(
     string? TrackingCode,
     Guid? ShipmentId,
     IReadOnlyCollection<OrderItemDto> Items,
-    IReadOnlyCollection<CustomerOrderStatusHistoryDto> StatusHistory);
+    IReadOnlyCollection<CustomerOrderStatusHistoryDto> StatusHistory)
+{
+    public Shipments.OrderShippingDetailsDto? Shipping { get; init; }
+}

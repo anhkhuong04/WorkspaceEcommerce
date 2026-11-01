@@ -28,7 +28,11 @@ public sealed record OrderReceiptSnapshot(
     DateTimeOffset? PaidAt,
     DateTimeOffset OrderedAt,
     DateTimeOffset GeneratedAt,
-    IReadOnlyCollection<OrderReceiptLineSnapshot> Items);
+    IReadOnlyCollection<OrderReceiptLineSnapshot> Items)
+{
+    public string? ShippingMethod { get; init; }
+    public string? TrackingCode { get; init; }
+}
 
 public sealed record OrderReceiptLineSnapshot(
     string ProductName,

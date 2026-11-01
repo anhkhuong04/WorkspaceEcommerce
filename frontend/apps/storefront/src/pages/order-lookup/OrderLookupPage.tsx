@@ -11,6 +11,7 @@ import { ShipmentTrackingPanel } from "../../components/shipment/ShipmentTrackin
 import { ReceiptPreviewModal } from "../../components/receipt/ReceiptPreviewModal";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
+import { OrderShippingDetails } from "../../components/shipment/OrderShippingDetails";
 
 const lookupSchema = z.object({
   orderCode: z.string().min(1, "Order code is required."),
@@ -198,7 +199,8 @@ export function OrderLookupPage() {
               <SideInfoRow label="Full name" value={result.customerName} />
               <SideInfoRow label="Phone" value={result.customerPhone} />
               {result.customerEmail && <SideInfoRow label="Email" value={result.customerEmail} />}
-              <SideInfoRow label="Shipping address" value={result.shippingAddress} />
+                <SideInfoRow label="Shipping address" value={result.shippingAddress} />
+                <OrderShippingDetails shipping={result.shipping} />
               {result.note && <SideInfoRow label="Note" value={result.note} />}
               {result.couponCodeSnapshot && <SideInfoRow label="Coupon" value={formatCouponSnapshot(result)} />}
               <div className="mt-2 grid gap-3 border-t border-slate-200 pt-3">

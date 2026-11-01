@@ -24,7 +24,7 @@ internal sealed class AdminOrderService(
     IOrderShipmentService? shipmentService = null,
     INotificationService? notificationService = null,
     ICustomerEmailOutbox? customerEmailOutbox = null,
-    IFulfillmentCoordinator? fulfillment = null) : IAdminOrderService
+    IFulfillmentCoordinator? fulfillment = null, IOrderShippingReader? shippingReader = null) : IAdminOrderService
 {
     public async Task<Result<PagedResult<AdminOrderListItemDto>>> GetOrdersAsync(
         AdminOrderListRequest request,
@@ -80,6 +80,12 @@ internal sealed class AdminOrderService(
                     .Select(shipment => shipment.ProviderStatus)
                     .FirstOrDefault()))
             .ToArrayAsyncSafe(cancellationToken);
+        if (shippingReader is not null)
+        {
+            var summaries = await shippingReader.GetManyAsync(items.Select(x => x.Id).ToArray(), cancellationToken);
+            items = items.Select(item => summaries.TryGetValue(item.Id, out var summary)
+                ? item with { Shipping = summary, TrackingCode = summary.TrackingCode ?? item.TrackingCode, ShipmentStatus = summary.Status ?? item.ShipmentStatus } : item).ToArray();
+        }
         var page = new PagedResult<AdminOrderListItemDto>(
             items,
             pageNumber,
@@ -775,7 +781,7 @@ internal sealed class AdminOrderService(
             order.TrackingCode,
             order.ShipmentId,
             items,
-            statusHistory);
+            statusHistory) { Shipping = shippingReader is null ? null : await shippingReader.GetAsync(order.Id, cancellationToken) };
     }
 
     private static AdminOrderListItemDto ToListItemDto(Order order, int itemCount, string? shipmentStatus = null)

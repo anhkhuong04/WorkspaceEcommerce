@@ -61,6 +61,7 @@ export function OrdersTable({ orders, isLoading, onView }: OrdersTableProps) {
                     <span className="text-xs text-slate-500">{formatProviderStatus(item.shipmentStatus)}</span>
                   </div>
                 ) : <span className="text-xs font-semibold text-amber-700">Pending</span>}
+                {item.shipping && <p className="mt-1 text-xs text-slate-500">{item.shipping.method === 0 ? "WorkspaceEC" : "MiniLogistics"} · {formatMoney(item.shipping.customerCharge)}</p>}
               </td>
               <td className="py-3 pr-4">{formatDate(item.createdAt)}</td>
               <td className="py-3 pr-4"><Button type="button" onClick={() => onView(item.id)}>View</Button></td>

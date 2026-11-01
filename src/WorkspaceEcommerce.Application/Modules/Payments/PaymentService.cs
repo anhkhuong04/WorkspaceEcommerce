@@ -18,7 +18,7 @@ internal sealed class PaymentService(
     IVNPayPaymentService vnPayPaymentService,
     ICurrentCustomerContext currentCustomerContext,
     IPaymentResultAccessTokenService paymentResultAccessTokenService,
-    IFulfillmentCoordinator? fulfillment = null) : IPaymentService
+    IFulfillmentCoordinator? fulfillment = null, IOrderShippingReader? shippingReader = null) : IPaymentService
 {
     public async Task<Result<PaymentResultDto>> HandleVNPayReturnAsync(
         VNPayCallbackRequest request,
@@ -121,14 +121,15 @@ internal sealed class PaymentService(
             return PaymentResultNotFound();
         }
 
+        var details = shippingReader is null ? null : await shippingReader.GetAsync(order.Id, cancellationToken);
         return Result<PublicPaymentResultDto>.Success(new PublicPaymentResultDto(
             order.OrderCode,
             order.PaymentMethod,
             order.PaymentStatus,
             order.PaidAt,
-            order.ShipmentId is not null,
-            order.TrackingCode,
-            ToPublicPaymentMessage(order.PaymentStatus)));
+            order.ShipmentId is not null || details?.LocalShipmentId is not null,
+            details?.TrackingCode ?? order.TrackingCode,
+            ToPublicPaymentMessage(order.PaymentStatus)) { Shipping = details, TotalAmount = order.TotalAmount });
     }
 
     private async Task<Result<PaymentResultDto>> ProcessVerifiedVNPayCallbackAsync(

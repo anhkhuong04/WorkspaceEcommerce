@@ -14,4 +14,7 @@ public sealed record CustomerOrderListItemDto(
     DateTimeOffset UpdatedAt,
     int ItemCount,
     string? TrackingCode,
-    string? ShipmentProvider);
+    string? ShipmentProvider)
+{
+    public Shipments.OrderShippingSummaryDto? Shipping { get; init; }
+}

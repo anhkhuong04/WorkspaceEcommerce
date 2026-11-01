@@ -99,6 +99,7 @@ export interface CustomerOrderListRequest {
 }
 
 export interface CustomerOrderListItemDto {
+  shipping?: import("./shipping").OrderShippingSummaryDto | null;
   id: string;
   orderCode: string;
   totalAmount: number;
@@ -123,6 +124,7 @@ export interface CustomerOrderStatusHistoryDto {
 }
 
 export interface CustomerOrderDto {
+  shipping?: import("./shipping").OrderShippingDetailsDto | null;
   id: string;
   orderCode: string;
   customerId: string;

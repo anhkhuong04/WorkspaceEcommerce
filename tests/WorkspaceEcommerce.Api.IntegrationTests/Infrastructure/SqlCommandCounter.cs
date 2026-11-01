@@ -1,10 +1,11 @@
 using System.Data.Common;
 using System.Threading;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace WorkspaceEcommerce.Api.IntegrationTests.Infrastructure;
 
-internal sealed class SqlCommandCounter : DbCommandInterceptor
+internal sealed class SqlCommandCounter(IHttpContextAccessor httpContext) : DbCommandInterceptor
 {
     private int _selectCount;
 
@@ -52,7 +53,8 @@ internal sealed class SqlCommandCounter : DbCommandInterceptor
 
     private void CountSelect(DbCommand command)
     {
-        if (command.CommandText.TrimStart().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
+        // Measure request work, excluding periodic/initial hosted-worker scans.
+        if (httpContext.HttpContext is not null && command.CommandText.TrimStart().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
         {
             Interlocked.Increment(ref _selectCount);
         }

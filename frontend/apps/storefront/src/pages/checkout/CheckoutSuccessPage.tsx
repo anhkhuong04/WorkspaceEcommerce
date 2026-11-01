@@ -3,6 +3,7 @@ import type { OrderDto } from "@workspace-ecommerce/api-types";
 import { formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { OrderShippingDetails } from "../../components/shipment/OrderShippingDetails";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { getManualTransferContent } from "../../features/checkout/manualTransfer";
 import { getApiErrorMessage } from "../../services/api/errors";
@@ -59,6 +60,7 @@ export function CheckoutSuccessPage() {
         <div className="ui-control mt-2 rounded-full bg-white/20 px-6 py-2 tracking-widest">{order.orderCode}</div>
       </section>
 
+      <OrderShippingDetails shipping={order.shipping} />
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <section className="ui-card border border-slate-100 p-6">
           <h2 className="ui-h2 text-slate-950">Ordered items</h2>

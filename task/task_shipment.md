@@ -221,7 +221,7 @@ Checkbox được cập nhật theo kết quả triển khai trong nhật ký m�
 - Tách form/selection/summary hook/component khi phù hợp; hỗ trợ vi/en, keyboard và lỗi field.
 - **Nghiệm thu:** Vitest logic/API liên quan và Playwright cho hai lựa chọn, địa chỉ/quantity đổi nhanh, external down, phí 0 hợp lệ, hết hạn, retry không trùng order; đúng total ở success/VNPay.
 
-### [ ] SHIP-12 — Read models, tracking, receipts và admin import
+### [x] SHIP-12 — Read models, tracking, receipts và admin import
 
 - **Ưu tiên:** P1. **Phụ thuộc:** SHIP-08, SHIP-10, SHIP-11.
 - Cập nhật DTO/mappers/admin order list/detail, customer order list/detail, guest lookup/tracking, receipt PDF và success/payment-result để đọc method/fee snapshot nhất quán.
@@ -360,3 +360,7 @@ Implemented WorkspaceEC assignment, confirmed/paid dispatch, delivery, failure/r
 ## SHIP-11 (2026-11-01)
 
 Storefront reads server capabilities and offers explicit WorkspaceEC/MiniLogistics selection without changing its existing login guard. Query identity includes address/payment/coupon/cart/customer; changes invalidate selection and late responses cannot replace another method. Explicit server zero is distinguished from unknown/failed fees. Expiry and confirmation gate submission; uncertain responses retain the exact request/quote for retry, including when the cart has disappeared. Shipping controls support vi/en. Validation: 17 Vitest and 4 storefront mock Playwright cases passed; storefront lint/typecheck passed. Real browser/API/database/provider validation follows in SHIP-13.
+
+## SHIP-12 (2026-11-01)
+
+Added snapshot-backed shipping details to checkout, admin/customer lists and details, proof-protected guest lookup/tracking, authorized payment result and PDF receipt. Local/provider IDs remain distinct; public DTOs exclude actual cost and private assignee/audit notes. Lists use one page-wide shipping projection (three request SELECTs total); quote SELECT count stays constant for 1 versus 20 cart lines. The test SQL counter now excludes background scans without disabling workers. Import is explicitly LegacyImport; unsupported new-selection columns fail validation rather than being silently ignored. Focused PostgreSQL/API suite: 36 passed; frontend workspace lint/typecheck/build and 17 Vitest passed; 5 admin and 4 storefront mock browser tests passed, plus an additional Vietnamese/keyboard scenario. Full regression, real six-case matrix and rendered PDF review are recorded under SHIP-13 when complete.

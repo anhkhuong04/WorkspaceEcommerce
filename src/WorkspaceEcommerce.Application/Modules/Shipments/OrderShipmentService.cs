@@ -21,7 +21,7 @@ internal sealed class OrderShipmentService(
     TimeProvider timeProvider,
     ILogger<OrderShipmentService> logger,
     IShippingCheckoutStore? shipping = null,
-    IFulfillmentCoordinator? fulfillment = null) : IOrderShipmentService
+    IFulfillmentCoordinator? fulfillment = null, IOrderShippingReader? shippingReader = null) : IOrderShipmentService
 {
     private const int ShipmentCommandLeaseSeconds = 120;
     private const int MaxShipmentCommandAttempts = 8;
@@ -666,7 +666,8 @@ internal sealed class OrderShipmentService(
 
     private async Task<ShipmentTrackingDto> ToDtoAsync(Order order, CancellationToken cancellationToken)
     {
-        var quoted = shipping is not null && await shipping.Selections.Where(x => x.OrderId == order.Id).AnyAsyncSafe(cancellationToken);
+        var details = shippingReader is null ? null : await shippingReader.GetAsync(order.Id, cancellationToken);
+        var quoted = shippingReader is not null ? details is not null : shipping is not null && await shipping.Selections.Where(x => x.OrderId == order.Id).AnyAsyncSafe(cancellationToken);
         var shipment = await dbContext.OrderShipments
             .AsNoTrackingIfEf()
             .Where(candidate => candidate.OrderId == order.Id)
@@ -681,7 +682,7 @@ internal sealed class OrderShipmentService(
                 .Select(entry => new ShipmentTimelineEntryDto(
                     entry.Id,
                     entry.ProviderStatus,
-                    entry.Note,
+                    shipment.Provider == nameof(ShippingMethod.WorkspaceEC) ? null : entry.Note,
                     entry.ChangedAtUtc,
                     entry.Source.ToString()))
                 .ToArrayAsyncSafe(cancellationToken);
@@ -710,7 +711,7 @@ internal sealed class OrderShipmentService(
             shipment is not null && shipment.Provider == ShipmentProviderContract.ProviderName,
             shipment is not null && shipment.Provider == ShipmentProviderContract.ProviderName && CanCancel(order, shipment),
             activeCommand?.LastError,
-            timeline);
+            timeline) { Shipping = details };
     }
 
     private async Task<bool> CanCreateAsync(Order order, CancellationToken cancellationToken)

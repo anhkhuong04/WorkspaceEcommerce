@@ -27,4 +27,7 @@ public sealed record AdminOrderDto(
     string? TrackingCode,
     Guid? ShipmentId,
     IReadOnlyCollection<OrderItemDto> Items,
-    IReadOnlyCollection<AdminOrderStatusHistoryDto> StatusHistory);
+    IReadOnlyCollection<AdminOrderStatusHistoryDto> StatusHistory)
+{
+    public Shipments.OrderShippingDetailsDto? Shipping { get; init; }
+}

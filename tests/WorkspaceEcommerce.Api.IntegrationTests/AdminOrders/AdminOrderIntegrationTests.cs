@@ -161,6 +161,18 @@ public sealed class AdminOrderIntegrationTests(ApiIntegrationTestFixture fixture
         using var response = await client.GetAsync("/api/admin/orders?pageNumber=1&pageSize=1");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.InRange(fixture.GetSqlSelectCount(), 2, 2);
+        // Count + bounded page + one batched shipping-selection projection.
+        Assert.Equal(3, fixture.GetSqlSelectCount());
+
+        await fixture.SeedAsync(dbContext =>
+        {
+            dbContext.AddRange(Enumerable.Range(0, 19).Select(index => new Order(Guid.NewGuid(), $"SYN-BATCH-{index}", null,
+                "Synthetic Buyer", "0900000000", null, "Synthetic Street", null, PaymentMethod.Cod, "VND", 1m)));
+            return Task.CompletedTask;
+        });
+        fixture.ResetSqlCommandCount();
+        using var fullPage = await client.GetAsync("/api/admin/orders?pageNumber=1&pageSize=20");
+        Assert.Equal(HttpStatusCode.OK, fullPage.StatusCode);
+        Assert.Equal(3, fixture.GetSqlSelectCount());
     }
 }

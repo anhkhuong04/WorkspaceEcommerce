@@ -70,6 +70,7 @@ export interface OrderItemDto {
 }
 
 export interface OrderDto {
+  shipping?: import("./shipping").OrderShippingDetailsDto | null;
   id: string;
   orderCode: string;
   customerId: string | null;
@@ -114,6 +115,7 @@ export interface ShipmentTimelineEntryDto {
 }
 
 export interface ShipmentTrackingDto {
+  shipping?: import("./shipping").OrderShippingDetailsDto | null;
   orderId: string;
   orderCode: string;
   orderStatus: OrderStatus;

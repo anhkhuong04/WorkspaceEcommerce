@@ -276,6 +276,7 @@ export function OrdersPage() {
               {shipmentQuery.isError ? <Notice type="error" title="Shipment could not be loaded">{getApiErrorMessage(shipmentQuery.error)}</Notice> : null}
               {shipmentQuery.data ? <AdminShipmentPanel shipment={shipmentQuery.data} /> : null}
               <OrderPaymentPanel key={order.id} orderId={order.id} />
+              {order.shipping && <p>Method: {order.shipping.method === 0 ? "WorkspaceEC" : "MiniLogistics"} · Customer charge: {formatMoney(order.shipping.customerCharge)} · {order.shipping.weightGrams} g · {order.shipping.trackingCode ?? "Awaiting creation"}</p>}
               {shipmentQuery.data?.provider === "WorkspaceEC" && <WorkspaceDeliveryPanel key={`delivery:${order.id}`} orderId={order.id} />}
             </section>
 

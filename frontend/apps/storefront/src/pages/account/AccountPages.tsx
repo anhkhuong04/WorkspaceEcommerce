@@ -24,6 +24,7 @@ import { useTranslation } from "react-i18next";
 import { Link, NavLink, useNavigate, useParams } from "react-router-dom";
 import { z } from "zod";
 import { ShipmentTrackingPanel } from "../../components/shipment/ShipmentTrackingPanel";
+import { OrderShippingDetails } from "../../components/shipment/OrderShippingDetails";
 import { ReceiptPreviewModal } from "../../components/receipt/ReceiptPreviewModal";
 import { useCustomerAuth } from "../../features/customer-auth/useCustomerAuth";
 import { getApiErrorMessage } from "../../services/api/errors";
@@ -868,6 +869,7 @@ function OrderDetail({
                 <InfoBlock label="Phone" value={order.customerPhone} />
                 {order.customerEmail ? <InfoBlock label="Email" value={order.customerEmail} /> : null}
                 <InfoBlock label="Shipping address" value={order.shippingAddress} />
+                <OrderShippingDetails shipping={order.shipping} />
                 {order.note ? <InfoBlock label="Note" value={order.note} /> : null}
                 {order.couponCodeSnapshot ? <InfoBlock label="Coupon" value={formatCouponSnapshot(order)} /> : null}
                 <InfoBlock label="Payment" value={formatPaymentMethod(order.paymentMethod)} />
@@ -1186,6 +1188,7 @@ function OrderList({ orders }: { orders: CustomerOrderListItemDto[] }) {
             ) : (
               <p className="mt-2 text-sm font-medium text-slate-500">Shipment is being prepared.</p>
             )}
+            {order.shipping && <p className="mt-1 text-sm text-slate-600">{order.shipping.method === 0 ? "WorkspaceEC" : "MiniLogistics"} · {formatMoney(order.shipping.customerCharge)}</p>}
           </div>
           <div className="text-left sm:text-right">
             <p className="ui-price text-slate-950">{formatMoney(order.totalAmount)}</p>

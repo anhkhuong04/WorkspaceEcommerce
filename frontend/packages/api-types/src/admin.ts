@@ -124,6 +124,7 @@ export interface AdminOrderListRequest extends PaginationRequest {
 }
 
 export interface AdminOrderListItemDto {
+  shipping?: import("./shipping").OrderShippingSummaryDto | null;
   id: string;
   orderCode: string;
   customerName: string;
@@ -151,7 +152,8 @@ export interface AdminOrderStatusHistoryDto {
   changedAt: string;
 }
 
-export interface AdminOrderDto extends AdminOrderListItemDto {
+export interface AdminOrderDto extends Omit<AdminOrderListItemDto, "shipping"> {
+  shipping?: import("./shipping").OrderShippingDetailsDto | null;
   customerId: string | null;
   customerEmail: string | null;
   shippingAddress: string;

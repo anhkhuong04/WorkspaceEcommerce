@@ -24,7 +24,7 @@ public interface IQuotedCheckoutService
 internal sealed class QuotedCheckoutService(ICheckoutStore checkout, IShippingCheckoutStore shipping,
     IAppDbContext db, ICurrentCustomerContext customer, ICurrentLanguageProvider language,
     IShippingAdministrativeCatalog catalog, IVNPayPaymentService vnPay, TimeProvider clock,
-    IValidator<CheckoutRequest> validator, IFulfillmentCoordinator fulfillment) : IQuotedCheckoutService
+    IValidator<CheckoutRequest> validator, IFulfillmentCoordinator fulfillment, IOrderShippingReader shippingReader) : IQuotedCheckoutService
 {
     private readonly CheckoutCartBuilder builder = new(checkout, language);
     private readonly CheckoutCouponApplier coupons = new(checkout, customer);
@@ -53,7 +53,7 @@ internal sealed class QuotedCheckoutService(ICheckoutStore checkout, IShippingCh
                     if (quote.CheckoutRequestHash != acceptance) return Result<CheckoutResponse>.Conflict("This quote was accepted with different checkout details.");
                     var accepted = await db.Orders.Include(x => x.Items).SingleAsync(x => x.Id == quote.OrderId, ct);
                     var payment = await db.PaymentTransactions.SingleOrDefaultAsync(x => x.OrderId == accepted.Id, ct);
-                    return Response(accepted, payment, request.ClientIpAddress);
+                    return await ResponseAsync(accepted, payment, request.ClientIpAddress, ct);
                 }
                 var now = clock.GetUtcNow();
                 if (quote.Method != request.ShippingMethod || quote.RevokedAtUtc.HasValue || now < quote.CreatedAtUtc || now >= quote.ExpiresAtUtc)
@@ -118,17 +118,18 @@ internal sealed class QuotedCheckoutService(ICheckoutStore checkout, IShippingCh
                 await checkout.SaveChangesAsync(ct);
                 await fulfillment.AcceptAsync(order, selection.Method, ct);
                 await checkout.SaveChangesAsync(ct);
-                return Response(order, transaction, request.ClientIpAddress);
+                return await ResponseAsync(order, transaction, request.ClientIpAddress, ct);
             }, cancellationToken);
         }
         catch (DomainException exception) { return Result<CheckoutResponse>.Conflict(exception.Message); }
         catch (PersistenceConcurrencyException) { return Result<CheckoutResponse>.Conflict("Checkout changed concurrently. Retry the same quote."); }
     }
-    private Result<CheckoutResponse> Response(Order order, PaymentTransaction? payment, string? ip)
+    private async Task<Result<CheckoutResponse>> ResponseAsync(Order order, PaymentTransaction? payment, string? ip, CancellationToken ct)
     {
         var url = order.PaymentMethod == PaymentMethod.VNPay && order.PaymentStatus != PaymentStatus.Paid && payment?.Status == PaymentTransactionStatus.Pending
             ? vnPay.CreatePaymentUrl(new VNPayCreatePaymentUrlRequest { TxnRef = payment.TxnRef, Amount = payment.Amount, OrderInfo = $"Pay order {order.OrderCode}", IpAddress = string.IsNullOrWhiteSpace(ip) ? "127.0.0.1" : ip.Trim() }) : null;
-        return Result<CheckoutResponse>.Success(new(CheckoutOrderMapper.ToDto(order), url is not null, url));
+        var dto = CheckoutOrderMapper.ToDto(order) with { Shipping = await shippingReader.GetAsync(order.Id, ct) };
+        return Result<CheckoutResponse>.Success(new(dto, url is not null, url));
     }
     private static CheckoutRequest Canonical(CheckoutRequest request, ShippingDestination destination) => new()
     {

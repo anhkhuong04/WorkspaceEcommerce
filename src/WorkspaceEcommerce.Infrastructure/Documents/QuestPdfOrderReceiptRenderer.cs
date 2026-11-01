@@ -102,6 +102,8 @@ internal sealed class QuestPdfOrderReceiptRenderer : IOrderReceiptRenderer
                 }));
             });
 
+            if (receipt.ShippingMethod is not null)
+                column.Item().Text($"{(receipt.Language == "vi" ? "Vận chuyển" : "Delivery")}: {receipt.ShippingMethod} · {receipt.TrackingCode ?? "-"}");
             column.Item().Table(table =>
             {
                 table.ColumnsDefinition(columns =>

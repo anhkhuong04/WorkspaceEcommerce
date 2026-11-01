@@ -1,6 +1,8 @@
 import type { PaymentMethod, PaymentStatus } from "./orders";
 
 export interface PaymentResultDto {
+  shipping?: import("./shipping").OrderShippingDetailsDto | null;
+  totalAmount?: number | null;
   orderCode: string;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;

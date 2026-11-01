@@ -8,7 +8,7 @@ namespace WorkspaceEcommerce.Application.Modules.Ordering;
 
 internal sealed class StorefrontOrderLookupService(
     IAppDbContext dbContext,
-    IValidator<OrderLookupRequest> validator) : IStorefrontOrderLookupService
+    IValidator<OrderLookupRequest> validator, Shipments.IOrderShippingReader? shippingReader = null) : IStorefrontOrderLookupService
 {
     public async Task<Result<OrderLookupResponse>> LookupAsync(
         OrderLookupRequest request,
@@ -41,7 +41,8 @@ internal sealed class StorefrontOrderLookupService(
             .ThenBy(item => item.Id)
             .ToArrayAsyncSafe(cancellationToken);
 
-        return Result<OrderLookupResponse>.Success(new OrderLookupResponse(ToDto(order, items)));
+        var dto = ToDto(order, items) with { Shipping = shippingReader is null ? null : await shippingReader.GetAsync(order.Id, cancellationToken) };
+        return Result<OrderLookupResponse>.Success(new OrderLookupResponse(dto));
     }
 
     private static OrderDto ToDto(Order order, IReadOnlyCollection<OrderItem> items)

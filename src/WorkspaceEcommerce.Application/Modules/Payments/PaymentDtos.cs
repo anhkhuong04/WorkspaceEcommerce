@@ -30,7 +30,11 @@ public sealed record PublicPaymentResultDto(
     DateTimeOffset? PaidAt,
     bool ShipmentCreated,
     string? TrackingCode,
-    string Message);
+    string Message)
+{
+    public Shipments.OrderShippingDetailsDto? Shipping { get; init; }
+    public decimal? TotalAmount { get; init; }
+}
 
 public sealed record PaymentTransactionDto(
     Guid Id,

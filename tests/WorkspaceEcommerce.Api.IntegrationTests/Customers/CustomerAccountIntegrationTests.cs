@@ -193,7 +193,8 @@ public sealed class CustomerAccountIntegrationTests(ApiIntegrationTestFixture fi
         using var response = await client.GetAsync("/api/customer/orders?pageNumber=1&pageSize=1");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(2, fixture.GetSqlSelectCount());
+        // Count + page + one batched shipping-selection query.
+        Assert.Equal(3, fixture.GetSqlSelectCount());
     }
 
     [Fact]

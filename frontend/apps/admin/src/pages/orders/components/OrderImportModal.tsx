@@ -81,6 +81,7 @@ export function OrderImportModal({ open, onClose, onImported }: OrderImportModal
       )}
     >
       <div className="grid gap-4">
+        <p>Legacy/import shipping fees only. This import does not select WorkspaceEC, apply a published rate plan, or dispatch delivery work. Use quoted checkout for new shipping selections.</p>
         <div>
           <label className="mb-1.5 block text-sm font-bold text-slate-700">CSV or XLSX file</label>
           <input

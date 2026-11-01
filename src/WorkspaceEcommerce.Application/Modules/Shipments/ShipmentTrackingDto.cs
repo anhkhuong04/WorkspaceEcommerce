@@ -18,7 +18,10 @@ public sealed record ShipmentTrackingDto(
     bool CanRefresh,
     bool CanCancel,
     string? LastCommandError,
-    IReadOnlyCollection<ShipmentTimelineEntryDto> Timeline);
+    IReadOnlyCollection<ShipmentTimelineEntryDto> Timeline)
+{
+    public OrderShippingDetailsDto? Shipping { get; init; }
+}
 
 public sealed record ShipmentTimelineEntryDto(
     Guid Id,

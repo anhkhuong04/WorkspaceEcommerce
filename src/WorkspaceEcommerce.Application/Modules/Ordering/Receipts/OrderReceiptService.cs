@@ -16,7 +16,7 @@ internal sealed class OrderReceiptService(
     IValidator<OrderLookupRequest> lookupValidator,
     IOrderReceiptRenderer renderer,
     TimeProvider timeProvider,
-    IOrderReceiptImageResolver? imageResolver = null) : IOrderReceiptService
+    IOrderReceiptImageResolver? imageResolver = null, Shipments.IOrderShippingReader? shippingReader = null) : IOrderReceiptService
 {
     private const string PdfContentType = "application/pdf";
 
@@ -132,6 +132,8 @@ internal sealed class OrderReceiptService(
                 item.LineTotal,
                 item.RequiresInstallation)).ToArray());
 
+        var shipping = shippingReader is null ? null : await shippingReader.GetAsync(order.Id, cancellationToken);
+        snapshot = snapshot with { ShippingMethod = shipping?.Method.ToString(), TrackingCode = shipping?.TrackingCode };
         var content = renderer.Render(snapshot);
         return Result<OrderReceiptDocument>.Success(new OrderReceiptDocument(
             content,
