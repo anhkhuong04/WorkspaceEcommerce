@@ -158,7 +158,7 @@ internal sealed class CustomerOrderService(
                 await RestoreInventoryAsync(order.Id, transactionCancellationToken);
                 CancelOrOpenRefundWorkflow(order, pendingPaymentTransactions, cancellationReason);
                 if (fulfillment is not null && await fulfillment.MethodAsync(order.Id, transactionCancellationToken) is not null)
-                    await fulfillment.CancelAsync(order, cancellationReason, transactionCancellationToken);
+                    await fulfillment.CancelAsync(order, cancellationReason, transactionCancellationToken, $"customer:{customerId.Value}");
                 await dbContext.SaveChangesAsync(transactionCancellationToken);
             }, cancellationToken);
         }

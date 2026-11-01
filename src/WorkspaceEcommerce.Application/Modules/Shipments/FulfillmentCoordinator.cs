@@ -11,6 +11,7 @@ public interface IFulfillmentCoordinator
     Task<ShippingMethod?> MethodAsync(Guid orderId, CancellationToken cancellationToken);
     Task AcceptAsync(Order order, ShippingMethod? method, CancellationToken cancellationToken);
     Task CancelAsync(Order order, string reason, CancellationToken cancellationToken);
+    Task CancelAsync(Order order, string reason, CancellationToken cancellationToken, string actor) => CancelAsync(order, reason, cancellationToken);
     Task GuardStatusAsync(Order order, OrderStatus status, CancellationToken cancellationToken);
     Task<OrderStatus?> ProviderTargetAsync(Order order, OrderStatus? target, CancellationToken cancellationToken);
 }
@@ -42,13 +43,18 @@ internal sealed class FulfillmentCoordinator(IAppDbContext db, IShippingCheckout
             await db.TryEnqueueShipmentCommandAsync(order.Id, ShipmentCommandType.Create, null, clock.GetUtcNow(), ct);
     }
 
-    public async Task CancelAsync(Order order, string reason, CancellationToken ct)
+    public Task CancelAsync(Order order, string reason, CancellationToken ct) => CancelAsync(order, reason, ct, "Order cancellation workflow");
+    public async Task CancelAsync(Order order, string reason, CancellationToken ct, string actor)
     {
         if (await MethodAsync(order.Id, ct) == ShippingMethod.WorkspaceEC)
         {
             var shipment = await db.FindOrderShipmentForUpdateAsync(order.Id, ct);
             if (shipment is null || !shipment.CancelWorkspace(clock.GetUtcNow())) return;
             var now = clock.GetUtcNow();
+            db.Add(new WorkspaceShipmentOperation(Guid.NewGuid(), shipment.Id, WorkspaceShipmentAction.Cancel,
+                Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(reason))),
+                shipment.Revision, shipment.ProviderStatus, string.IsNullOrWhiteSpace(actor) ? "Order cancellation workflow" : actor,
+                reason, shipment.AssignedTo, now));
             db.Add(new ShipmentTimelineEntry(Guid.NewGuid(), shipment.Id, shipment.ProviderStatus, reason,
                 now, ShipmentTimelineSource.Cancellation, null, now));
         }

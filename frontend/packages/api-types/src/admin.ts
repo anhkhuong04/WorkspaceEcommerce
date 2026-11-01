@@ -168,6 +168,7 @@ export interface AdminOrderDto extends AdminOrderListItemDto {
 }
 
 export interface UpdateOrderStatusRequest {
+  expectedShipmentRevision?: number | null;
   status: OrderStatus;
   internalNote?: string | null;
   cancellationReason?: string | null;

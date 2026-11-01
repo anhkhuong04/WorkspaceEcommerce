@@ -2084,6 +2084,11 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("actual_cost_amount");
 
+                    b.Property<string>("AssignedTo")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("assigned_to");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -2121,6 +2126,13 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("provider_status");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("revision");
 
                     b.Property<decimal>("ShippingFeeAmount")
                         .HasPrecision(18, 2)
@@ -2711,6 +2723,70 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                     b.HasIndex("ZoneId", "RatePlanId");
 
                     b.ToTable("zone_provinces", "shipping");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.WorkspaceShipmentOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("AssignedTo")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("assigned_to");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("payload_hash");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("ShipmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shipment_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ShipmentId", "Revision")
+                        .IsUnique();
+
+                    b.ToTable("workspace_operations", "shipping", t =>
+                        {
+                            t.HasCheckConstraint("ck_workspace_operation_revision", "revision > 0");
+                        });
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Warranties.ProductVariantWarrantyPlan", b =>
@@ -3523,6 +3599,15 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ZoneId", "RatePlanId")
                         .HasPrincipalKey("Id", "RatePlanId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Shipments.WorkspaceShipmentOperation", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Shipments.OrderShipment", null)
+                        .WithMany()
+                        .HasForeignKey("ShipmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

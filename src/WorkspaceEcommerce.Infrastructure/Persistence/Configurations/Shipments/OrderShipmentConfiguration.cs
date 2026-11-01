@@ -23,6 +23,8 @@ internal sealed class OrderShipmentConfiguration : IEntityTypeConfiguration<Orde
         builder.Property(shipment => shipment.ProviderShipmentId).HasColumnName("provider_shipment_id");
         builder.Property(shipment => shipment.TrackingCode).HasColumnName("tracking_code").HasMaxLength(100).IsRequired();
         builder.Property(shipment => shipment.ProviderStatus).HasColumnName("provider_status").HasMaxLength(50).IsRequired();
+        builder.Property(shipment => shipment.Revision).HasColumnName("revision").HasDefaultValue(1L).IsConcurrencyToken();
+        builder.Property(shipment => shipment.AssignedTo).HasColumnName("assigned_to").HasMaxLength(120);
         builder.Property(shipment => shipment.ShippingFeeAmount).HasColumnName("shipping_fee_amount").HasPrecision(18, 2).IsRequired();
         builder.Property(shipment => shipment.ActualCostAmount).HasColumnName("actual_cost_amount").HasPrecision(18, 2);
         builder.Property(shipment => shipment.Currency).HasColumnName("currency").HasMaxLength(10).IsRequired();

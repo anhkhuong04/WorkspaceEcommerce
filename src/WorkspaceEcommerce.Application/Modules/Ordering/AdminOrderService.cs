@@ -133,6 +133,12 @@ internal sealed class AdminOrderService(
                     return;
                 }
 
+                if (request.ExpectedShipmentRevision.HasValue)
+                {
+                    var local = await dbContext.FindOrderShipmentForUpdateAsync(order.Id, transactionCancellationToken);
+                    if (request.Status != OrderStatus.Cancelled || local?.Provider != "WorkspaceEC" || local.Revision != request.ExpectedShipmentRevision)
+                        throw new DomainException("Shipment revision changed or this command is not a local cancellation. Reload before retrying.");
+                }
                 if (fulfillment is not null) await fulfillment.GuardStatusAsync(order, request.Status, transactionCancellationToken);
                 var history = order.ChangeStatus(
                     Guid.NewGuid(),
@@ -149,7 +155,7 @@ internal sealed class AdminOrderService(
                     CancelOrOpenRefundWorkflow(order, pendingPaymentTransactions, request.CancellationReason!);
                     EnqueueCancellationEmail(order, request.CancellationReason!, request.CustomerMessage);
                     if (fulfillment is not null && await fulfillment.MethodAsync(order.Id, transactionCancellationToken) is not null)
-                        await fulfillment.CancelAsync(order, request.CancellationReason!, transactionCancellationToken);
+                        await fulfillment.CancelAsync(order, request.CancellationReason!, transactionCancellationToken, changedBy ?? "Admin order cancellation");
                 }
 
                 await dbContext.SaveChangesAsync(transactionCancellationToken);

@@ -11,6 +11,13 @@ internal sealed class EfShippingCheckoutStore(AppDbContext context) : IShippingC
 {
     public IQueryable<ShippingQuote> Quotes => context.Set<ShippingQuote>();
     public IQueryable<OrderShippingSelection> Selections => context.Set<OrderShippingSelection>();
+    public IQueryable<WorkspaceShipmentOperation> WorkspaceOperations => context.Set<WorkspaceShipmentOperation>();
+    public async Task SaveWorkspaceOperationAsync(CancellationToken cancellationToken)
+    {
+        try { await context.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        { throw new PersistenceConcurrencyException("This delivery operation or revision has already been recorded.", exception); }
+    }
     public IQueryable<OrderPaymentReceipt> PaymentReceipts => context.Set<OrderPaymentReceipt>();
     public async Task SavePaymentReceiptAsync(CancellationToken cancellationToken)
     {

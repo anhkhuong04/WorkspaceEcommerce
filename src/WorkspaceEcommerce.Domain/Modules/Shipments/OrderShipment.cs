@@ -58,6 +58,8 @@ public sealed class OrderShipment : Entity
     public string TrackingCode { get; private set; } = string.Empty;
 
     public string ProviderStatus { get; private set; } = string.Empty;
+    public long Revision { get; private set; } = 1;
+    public string? AssignedTo { get; private set; }
 
     // Legacy provider field retained for existing contracts. New money views use
     // order selection for the customer charge and ActualCostAmount for cost.
@@ -128,9 +130,29 @@ public sealed class OrderShipment : Entity
     {
         if (Provider != nameof(ShippingMethod.WorkspaceEC)) throw new DomainException("This is not a WorkspaceEC shipment.");
         if (ProviderStatus == "Cancelled") return false;
-        if (ProviderStatus != "AwaitingRelease") throw new DomainException("WorkspaceEC shipment cannot be cancelled at this stage.");
+        if (ProviderStatus is not ("AwaitingRelease" or "Assigned" or "FailedDelivery")) throw new DomainException("WorkspaceEC shipment cannot be cancelled at this stage.");
         ProviderStatus = "Cancelled";
+        Revision++;
         UpdatedAtUtc = LastEventAtUtc = LastSyncedAtUtc = now;
         return true;
+    }
+
+    public void ApplyWorkspaceAction(WorkspaceShipmentAction action, string? assignedTo, DateTimeOffset now)
+    {
+        if (Provider != nameof(ShippingMethod.WorkspaceEC) || now == default || now < UpdatedAtUtc)
+            throw new DomainException("WorkspaceEC shipment and a valid operation time are required.");
+        var assignee = action == WorkspaceShipmentAction.Assign ? ShippingRatePlan.Required(assignedTo!, 120, nameof(AssignedTo)) : AssignedTo;
+        ProviderStatus = action switch
+        {
+            WorkspaceShipmentAction.Assign when ProviderStatus is "AwaitingRelease" or "Assigned" => "Assigned",
+            WorkspaceShipmentAction.Dispatch when ProviderStatus == "Assigned" => "OutForDelivery",
+            WorkspaceShipmentAction.Deliver when ProviderStatus == "OutForDelivery" => "Delivered",
+            WorkspaceShipmentAction.FailDelivery when ProviderStatus == "OutForDelivery" => "FailedDelivery",
+            WorkspaceShipmentAction.RetryDelivery when ProviderStatus == "FailedDelivery" => "OutForDelivery",
+            _ => throw new DomainException("WorkspaceEC action is not allowed at the current shipment stage.")
+        };
+        AssignedTo = assignee;
+        Revision++;
+        UpdatedAtUtc = LastEventAtUtc = LastSyncedAtUtc = now;
     }
 }

@@ -144,9 +144,9 @@ test("edit, preview saved price, confirm publication and retain history", async 
   ).toBeDisabled();
   await page.getByLabel("Name", { exact: true }).fill("Reviewed rates");
   await page.getByRole("button", { name: "Publish plan", exact: true }).click();
-  await expect(page.getByRole("alertdialog").or(page.getByRole("dialog"))).toContainText(
-    "Valid existing quotes",
-  );
+  await expect(
+    page.getByRole("alertdialog").or(page.getByRole("dialog")),
+  ).toContainText("Valid existing quotes");
   await page.getByRole("button", { name: "Confirm publish" }).click();
   await expect(
     page.getByRole("heading", { name: /Reviewed rates · Published/ }),
@@ -220,12 +220,61 @@ test("order detail reviews and records an exact audited transfer", async ({
     statusHistory: [],
   };
   let recorded = false;
+  let assigned = false;
   await page.route("**/api/admin/orders**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (!path.startsWith("/api/")) return route.continue();
     const ok = (data: unknown) =>
       route.fulfill({
         json: { success: true, data, errors: [], traceId: "synthetic" },
+      });
+    if (path.endsWith("/workspace-shipment/history"))
+      return ok(
+        paged(
+          assigned
+            ? [
+                {
+                  id: "assignment",
+                  action: 0,
+                  revision: 2,
+                  status: "Assigned",
+                  actor: "admin-session:synthetic",
+                  reason: "Assignment reviewed",
+                  assignedTo: "OPS-UI-001",
+                  occurredAtUtc: now,
+                },
+              ]
+            : [],
+        ),
+      );
+    if (path.endsWith("/workspace-shipment/actions")) {
+      expect(route.request().postDataJSON()).toMatchObject({
+        expectedRevision: 1,
+        action: 0,
+        reason: "Assignment reviewed",
+        assignedTo: "OPS-UI-001",
+      });
+      assigned = true;
+    }
+    if (
+      path.endsWith("/workspace-shipment") ||
+      path.endsWith("/workspace-shipment/actions")
+    )
+      return ok({
+        id: "local-shipment",
+        orderId: id,
+        trackingCode: "WEC-SYNTHETIC",
+        status: assigned ? "Assigned" : "AwaitingRelease",
+        revision: assigned ? 2 : 1,
+        assignedTo: assigned ? "OPS-UI-001" : null,
+        orderStatus: 0,
+        paymentStatus: order.paymentStatus,
+        canAssign: true,
+        canDispatch: false,
+        canDeliver: false,
+        canFailDelivery: false,
+        canRetryDelivery: false,
+        canCancel: true,
       });
     if (path.endsWith("/confirm-transfer")) {
       expect(route.request().postDataJSON()).toEqual({
@@ -287,7 +336,10 @@ test("order detail reviews and records an exact audited transfer", async ({
   });
   await page.goto("/orders");
   await page
-    .getByRole("row").filter({ hasText: "ORD-PAYMENT-UI" }).getByRole("button").last()
+    .getByRole("row")
+    .filter({ hasText: "ORD-PAYMENT-UI" })
+    .getByRole("button")
+    .last()
     .click();
   await expect(
     page.getByRole("heading", { name: "Order ORD-PAYMENT-UI" }),
@@ -304,7 +356,11 @@ test("order detail reviews and records an exact audited transfer", async ({
     .getByLabel("Confirmation reason", { exact: true })
     .fill("Verified statement");
   await page.getByRole("button", { name: "Review confirmation" }).click();
-  await expect(page.getByRole("alertdialog", { name: "Confirm bank transfer" }).or(page.getByRole("dialog", { name: "Confirm bank transfer" }))).toContainText("105.000 VND");
+  await expect(
+    page
+      .getByRole("alertdialog", { name: "Confirm bank transfer" })
+      .or(page.getByRole("dialog", { name: "Confirm bank transfer" })),
+  ).toContainText("105.000 VND");
   await page.getByRole("button", { name: "Record payment fact" }).click();
   await expect(page.getByText("Payment confirmation recorded.")).toBeVisible();
   await expect(page.getByText(/BANK-UI-001 · Verified statement/)).toBeHidden();
@@ -312,6 +368,20 @@ test("order detail reviews and records an exact audited transfer", async ({
   await expect(
     page.getByText("BANK-UI-001 · Verified statement"),
   ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Assign delivery", exact: true })
+    .click();
+  await page
+    .getByLabel("Assignee reference", { exact: true })
+    .fill("OPS-UI-001");
+  await page
+    .getByLabel("Operation reason", { exact: true })
+    .fill("Assignment reviewed");
+  await page.getByRole("button", { name: "Review delivery operation" }).click();
+  await page
+    .getByRole("button", { name: "Confirm delivery operation" })
+    .click();
+  await expect(page.getByText("Assigned reference: OPS-UI-001")).toBeVisible();
 });
 
 test("loading and failed plan queries expose a recovery action", async ({

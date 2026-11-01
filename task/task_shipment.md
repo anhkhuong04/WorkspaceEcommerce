@@ -201,7 +201,7 @@ Checkbox được cập nhật theo kết quả triển khai trong nhật ký m�
 - Nếu hoãn chuyển khoản hoặc COD collection, ghi phạm vi rõ và chặn các kết hợp payment mới chưa được hỗ trợ; không đánh dấu bộ tính năng toàn bộ payment đã hoàn tất.
 - **Nghiệm thu:** duplicate/partial/overpayment/cancel race, 401/403, không giao prepaid chưa Paid, không tạo hai shipment, không thay đổi semantics thanh toán đơn lịch sử ngoài D07.
 
-### [ ] SHIP-10 — Lifecycle giao nội bộ và thao tác admin
+### [x] SHIP-10 — Lifecycle giao nội bộ và thao tác admin
 
 - **Ưu tiên:** P0. **Phụ thuộc:** SHIP-08, SHIP-09 theo payment được bật.
 - Tạo local shipment idempotent với mã nội bộ unique và trạng thái chờ phù hợp; gán người phụ trách bằng tham chiếu vận hành tối thiểu được duyệt, không tạo identity/shipper platform mới.
@@ -352,3 +352,7 @@ Admin-only exact-amount manual-transfer, COD collection and separate COD-remitta
 Validation: full backend 752/752 passed (354 Application, 241 Infrastructure, 157 API integration), no skips; frontend 14 Vitest and 5 Playwright shipping/admin scenarios passed, workspace lint/typecheck/build passed. Existing storefront React Hook Form watch warning and >500 kB bundle warnings remain. PostgreSQL clean/upgrade migrations and EF pending-model check passed; catalog drift check passed. No provider-real calls, user/production database migration, production enablement, load/soak or complete storefront shipping E2E were performed. SHIP-10-14 remain release gates.
 
 Commit-isolation check: copied the staged frontend into an ignored isolated directory, installed its own frozen lockfile, and passed admin lint/build plus all 5 Playwright scenarios without the user's unrelated UI/package changes. Shipping route has a hydration loading state. No changes to the original user files were detected outside the three intentional route/menu/order-panel integration files.
+
+## SHIP-10 (2026-11-01)
+
+Implemented WorkspaceEC assignment, confirmed/paid dispatch, delivery, failure/retry and order-workflow cancellation. Row locks/revisions and immutable operation IDs/hashes protect retries and races; private assignment/reason/actor/time audit is separate from customer timeline. COD delivery waits for full collection; prepaid delivery requires Paid. Existing stock/refund/loyalty/history paths remain in use. Focused shipping API suite: 29 cases passed (including 6 new lifecycle/auth/race cases); 5 admin Playwright cases passed including reviewed assignment and existing payment controls. Migration is additive; production intake remains disabled.

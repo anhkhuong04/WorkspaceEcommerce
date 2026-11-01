@@ -9,6 +9,17 @@ export enum ShippingMethod {
   WorkspaceEC = 0,
   MiniLogistics = 1,
 }
+export enum WorkspaceShipmentAction { Assign = 0, Dispatch = 1, Deliver = 2, FailDelivery = 3, RetryDelivery = 4, Cancel = 5 }
+export interface WorkspaceShipmentRequest { requestId: string; expectedRevision: number; action: WorkspaceShipmentAction; reason: string; assignedTo?: string | null; }
+export interface WorkspaceShipmentDto {
+  id: string; orderId: string; trackingCode: string; status: string; revision: number; assignedTo: string | null;
+  orderStatus: number; paymentStatus: number; canAssign: boolean; canDispatch: boolean; canDeliver: boolean;
+  canFailDelivery: boolean; canRetryDelivery: boolean; canCancel: boolean;
+}
+export interface WorkspaceShipmentAuditDto {
+  id: string; action: WorkspaceShipmentAction; revision: number; status: string; actor: string; reason: string;
+  assignedTo: string | null; occurredAtUtc: string;
+}
 export interface ShippingQuoteInput {
   sessionId: string;
   shippingStreet: string;

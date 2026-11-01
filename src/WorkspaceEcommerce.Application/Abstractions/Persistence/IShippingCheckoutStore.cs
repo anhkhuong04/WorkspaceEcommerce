@@ -7,6 +7,8 @@ public interface IShippingCheckoutStore
 {
     IQueryable<ShippingQuote> Quotes { get; }
     IQueryable<OrderShippingSelection> Selections { get; }
+    IQueryable<WorkspaceShipmentOperation> WorkspaceOperations { get; }
+    Task SaveWorkspaceOperationAsync(CancellationToken cancellationToken);
     IQueryable<Domain.Modules.Payments.OrderPaymentReceipt> PaymentReceipts { get; }
     Task SavePaymentReceiptAsync(CancellationToken cancellationToken);
     Task<ShippingQuote?> LockQuoteAsync(Guid id, CancellationToken cancellationToken);

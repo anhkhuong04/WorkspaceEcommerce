@@ -58,5 +58,6 @@ public enum ShipmentTimelineSource
     ShipmentCreated = 0,
     Webhook = 1,
     LiveRefresh = 2,
-    Cancellation = 3
+    Cancellation = 3,
+    LocalOperation = 4
 }

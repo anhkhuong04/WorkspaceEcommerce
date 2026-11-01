@@ -4,6 +4,7 @@ namespace WorkspaceEcommerce.Application.Modules.Ordering;
 
 public sealed class UpdateOrderStatusRequest
 {
+    public long? ExpectedShipmentRevision { get; init; }
     public OrderStatus Status { get; init; }
 
     public string? InternalNote { get; init; }

@@ -102,6 +102,7 @@ public sealed class ApiIntegrationTestFixture : IAsyncLifetime
         await dbContext.Database.ExecuteSqlRawAsync(
             """
             TRUNCATE TABLE
+                shipping.workspace_operations,
                 shipping.order_selections,
                 shipping.quotes,
                 shipping.rate_audits,
