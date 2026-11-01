@@ -261,15 +261,18 @@ internal sealed class QuestPdfOrderReceiptRenderer : IOrderReceiptRenderer
         });
     }
 
+    // The Alpine runtime uses invariant globalization. Explicit VND formatting
+    // keeps the same separators without requiring an installed culture database.
+    private static readonly NumberFormatInfo VndNumbers = new() { NumberGroupSeparator = ".", NumberDecimalSeparator = "," };
     private static string FormatMoney(decimal amount, string currencyCode) =>
-        $"{amount.ToString("N0", CultureInfo.GetCultureInfo("vi-VN"))} {currencyCode}";
+        $"{amount.ToString("N0", VndNumbers)} {currencyCode}";
 
     private static string FormatDate(DateTimeOffset value, string language)
     {
         var vietnamTime = value.ToOffset(VietnamOffset);
         return language == "vi"
             ? vietnamTime.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture) + " (UTC+7)"
-            : vietnamTime.ToString("dd MMM yyyy HH:mm", CultureInfo.GetCultureInfo("en-US")) + " (UTC+7)";
+            : vietnamTime.ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture) + " (UTC+7)";
     }
 
     private static LicenseType ParseLicense(string? value)

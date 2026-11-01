@@ -28,7 +28,7 @@ public sealed class QuestPdfOrderReceiptRendererTests
             QuestPdfLicense = "Community"
         });
 
-        var content = renderer.Render(CreateSnapshot(language));
+        var content = renderer.Render(CreateSnapshot(language) with { ShippingMethod = "WorkspaceEC", TrackingCode = "WEC-SYNTHETIC" });
 
         Assert.True(content.Length > 1_000);
         Assert.Equal("%PDF", Encoding.ASCII.GetString(content, 0, 4));
