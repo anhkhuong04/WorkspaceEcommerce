@@ -70,4 +70,6 @@ SignalR là endpoint nội bộ `/hubs/notifications`, không phải provider b�
 
 ## Kiểm tra và triển khai
 
+WorkspaceEC giao nội bộ và MiniLogistics dùng chung [runbook vận chuyển](runbooks/workspace-shipping.md): bảng phí, payment guards, cấu hình theo method, giám sát và rollout. Luồng nội bộ không tạo HTTP/outbox đối tác. [Contract hiện hành](../backend/architecture/shipping.md) phân biệt đơn quoted và legacy/import.
+
 Provider tests dùng synthetic callbacks, fake HTTP hoặc fixtures; PostgreSQL integration tests chứng minh enqueue/locks/deduplication. Lệnh tại [Testing](../backend/development/testing.md). Compose cần VNPay/MiniLogistics sandbox credentials ngay cả khi không thực hiện flow đó; hướng dẫn local tại [Development guide](../backend/development/guide.md). Domain/ingress, CORS/cookies, callback và key-ring checks khi triển khai nằm tại [Production release](../backend/runbooks/production-release.md).

@@ -62,3 +62,7 @@ Lệnh install/dev/lint/test/typecheck/build nằm tại [Development guide](../
 `VITE_*` của client được đưa vào bundle lúc build; không chứa secrets. Vite proxy hiện chỉ cấu hình `/api`, admin target cố định `http://localhost:5080`; nếu dùng same-origin cho SignalR, reverse proxy cần định tuyến `/hubs` riêng. API origin trực tiếp cần CORS/cookie topology phù hợp.
 
 Khi đổi contract, cập nhật `api-types`, API facade, query consumers và các trạng thái loading/empty/error/auth expiry. Storefront có Vitest và Playwright smoke; admin hiện có lint/typecheck/build, chưa có unit-test script. Dùng các checks tương ứng trong [Testing](../backend/development/testing.md).
+
+## Shipping checkout and operations
+
+Storefront capabilities select the additive shipping flow. Customers explicitly select a method and confirm an unexpired server price; changed address/cart/payment invalidates it. Unknown price is distinct from zero. An uncertain order response retains its exact request for retry. Existing login and guest-proof boundaries remain. vi/en shipping strings use their own namespace. Admin `/shipping` manages versioned fees; order detail handles reviewed payments/local delivery with revisions. Lists, detail, lookup, payment result and PDF read accepted shipping snapshots. See [shipping contracts](../backend/architecture/shipping.md), [validation](../backend/development/shipping-validation.md) and [runbook](../services/runbooks/workspace-shipping.md).

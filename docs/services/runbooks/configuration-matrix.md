@@ -52,3 +52,7 @@ For every staging/production candidate, the Platform/SRE owner records externall
 3. Data Protection shared-key-ring persistence/encryption/access evidence.
 4. Exact public host/origin/proxy topology and cookie/CORS/HTTPS behavior.
 5. Any accepted forced-session-expiry window for JWT/key rotation.
+
+## Quoted shipping
+
+`ShippingCheckout` is default-off. Its method intake flags, quote lifetime/retention/deadline and the distinction between legacy fallback versus suspending new method quotes are defined in the [shipping configuration and rollout runbook](workspace-shipping.md). No production rate plan is seeded automatically.

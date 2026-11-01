@@ -12,4 +12,4 @@ new record or an explicit note instead of silently rewriting the original contex
 | [004](004-durable-media-storage.md) | Durable object storage and media lifecycle | Accepted |
 | [005](005-warranty-activation-and-identifier-protection.md) | Warranty ownership, eligibility, snapshots, and HMAC identifiers | Accepted |
 | [006](006-durable-external-side-effects.md) | Transactional outbox/inbox and at-least-once provider work | Accepted |
-| [007](007-workspace-shipping-rates.md) | WorkspaceEC delivery, versioned rates and frozen customer charges | Accepted; SHIP-00–04 implementation scope |
+| [007](007-workspace-shipping-rates.md) | WorkspaceEC delivery, versioned rates and frozen customer charges | Accepted; implementation and rollout in [shipping architecture](../architecture/shipping.md) |

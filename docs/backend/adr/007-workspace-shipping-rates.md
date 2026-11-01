@@ -119,3 +119,7 @@ query-budget tests characterize legacy behavior. Record current commands/results
 in the task ledger; new schema and admin operations additionally require clean
 and upgrade PostgreSQL migration tests, revision/publish races, authorization,
 coverage validation and calculator boundary tests.
+
+## Implementation note (2026-11-01)
+
+The decision above remains accepted. SHIP-05 through SHIP-12 implement rate administration, bound quotes/atomic checkout, payment guards, local audited delivery and safe shipping read models. Current contracts are in [shipping architecture](../architecture/shipping.md); test evidence and deployment-specific gates are in the [validation matrix](../development/shipping-validation.md) and [runbook](../../services/runbooks/workspace-shipping.md). The historical staged-scope statements above describe the original decision date. Real tariffs and QA/operator production approval are separate release gates.

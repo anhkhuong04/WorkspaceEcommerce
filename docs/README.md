@@ -76,3 +76,5 @@ docs/
 - ADR giữ nguyên bối cảnh quyết định; dùng ADR mới hoặc ghi chú supersession khi quyết định thay đổi. Runbook giữ các bước thao tác và kiểm tra vận hành.
 - Tính năng dự kiến thuộc issue/proposal có nhãn rõ ràng. Credentials, dữ liệu khách hàng và evidence của từng lần chạy không đưa vào tài liệu Git.
 - [README gốc](../README.md) chỉ dẫn đường; `.agents/` chỉ chứa hướng dẫn cho agent. Không dùng hai nơi này làm bản sao của tài liệu sản phẩm.
+
+- [WorkspaceEC shipping: rules and contracts](backend/architecture/shipping.md), [validation](backend/development/shipping-validation.md), [operations and rollout](services/runbooks/workspace-shipping.md).

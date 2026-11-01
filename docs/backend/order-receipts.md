@@ -34,3 +34,11 @@ QuestPDF requires an explicit license declaration. Before production deployment,
 - No tax/VAT fields, tax authority code, legal invoice number, or digital signature.
 - No internal order notes or administrator-only status-history notes.
 - No editing or reissuing workflow: regenerating a receipt simply renders the current order snapshot and status.
+
+## Accepted shipping selection
+
+New quoted orders show the selected delivery method and tracking code, with the
+same frozen customer shipping fee and total as order/payment. Legacy orders have
+no fabricated method. Internal assignee/audit notes and provider actual cost are
+excluded. Receipt ownership and guest order-code/phone proof are unchanged. See
+[shipping contracts](architecture/shipping.md).

@@ -77,3 +77,7 @@ persisted shipment state. See [ADR 006](../adr/006-durable-external-side-effects
 
 Commands and verification are in the [development guide](../development/guide.md)
 and [production release runbook](../runbooks/production-release.md).
+
+## Quoted shipping and local delivery
+
+The shipping selection/quote transaction, immutable rate revisions, payment/fulfillment lock order, local operation idempotency and explicit legacy/import semantics are documented in [shipping consistency](shipping.md). List projections add one bounded batch query rather than one query per order. Deploy via additive migrations and compatible workers before enabling intake.

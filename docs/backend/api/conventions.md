@@ -86,3 +86,7 @@ These Admin-only endpoints provide versioned configuration and simulation;
 customer offers/acceptance are documented in [Shipping checkout](shipping-checkout.md)
 and audited transfer/COD facts in [Payment confirmations](order-payment-confirmations.md).
 New issuance is disabled by default until delivery/storefront rollout gates are complete.
+
+## Shipping contracts
+
+[Shipping route families and read contracts](../architecture/shipping.md) add server-owned quotes, admin rate/payment/local-operation commands and optional shipping details. Existing authorization, ownership/proof, error envelope and historical provider IDs remain in force. Local tracking text grants no access by itself.

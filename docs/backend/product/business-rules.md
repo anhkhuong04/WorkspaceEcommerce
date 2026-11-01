@@ -123,3 +123,7 @@ Related decisions: [ADR 002](../adr/002-customer-totp-authentication.md),
 [ADR 003](../adr/003-customer-account-lifecycle.md),
 [ADR 004](../adr/004-durable-media-storage.md), and
 [ADR 005](../adr/005-warranty-activation-and-identifier-protection.md).
+
+## WorkspaceEC quoted delivery
+
+New shipping selections freeze the customer charge and parcel/rate snapshot. Local delivery requires confirmed order and Paid for prepaid methods; new COD completes only after full audited collection. Legacy/import orders retain their existing fees and workflow. See [shipping rules and consistency](../architecture/shipping.md) and [operations](../../services/runbooks/workspace-shipping.md).
