@@ -2,6 +2,8 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import en from "./locales/en.json";
 import vi from "./locales/vi.json";
+import shippingEn from "./locales/shipping.en.json";
+import shippingVi from "./locales/shipping.vi.json";
 
 export const supportedLanguages = ["en", "vi"] as const;
 export type SupportedLanguage = (typeof supportedLanguages)[number];
@@ -32,8 +34,8 @@ function syncDocumentLanguage(language?: string | null) {
 
 void i18n.use(initReactI18next).init({
   resources: {
-    en: { translation: en },
-    vi: { translation: vi },
+    en: { translation: en, shipping: shippingEn },
+    vi: { translation: vi, shipping: shippingVi },
   },
   lng: getInitialLanguage(),
   fallbackLng: "en",

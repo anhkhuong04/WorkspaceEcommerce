@@ -16,6 +16,7 @@ public sealed class ShippingCheckoutOptions
     public int UnusedQuoteRetentionDays { get; set; } = 30;
     public int ExternalQuoteTimeoutSeconds { get; set; } = 12;
 }
+public sealed record ShippingCheckoutCapabilities(bool Enabled, bool WorkspaceEnabled, bool ExternalEnabled);
 public sealed record ShippingQuoteInput
 {
     public string SessionId { get; init; } = string.Empty;

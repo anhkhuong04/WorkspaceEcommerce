@@ -1,4 +1,5 @@
 import type {
+  ShippingCheckoutCapabilities, ShippingQuoteDto, ShippingQuoteInput, ShippingMethodOption,
   AddCartItemRequest,
   AdminBannerDto,
   AdminBannerUpsertRequest,
@@ -138,6 +139,9 @@ export function createStorefrontApi(client: ApiClient) {
       client.post<CheckoutCouponValidationResponse, ValidateCheckoutCouponRequest>("/api/checkout/coupons/validate", request),
     getShippingQuote: (request: GetShippingQuoteRequest) =>
       client.post<GetShippingQuoteResponse, GetShippingQuoteRequest>("/api/checkout/shipping-quote", request),
+    getShippingCapabilities: () => client.get<ShippingCheckoutCapabilities>("/api/checkout/shipping/capabilities"),
+    getShippingOptions: (request: ShippingQuoteInput) => client.post<ShippingMethodOption[], ShippingQuoteInput>("/api/checkout/shipping/options", request),
+    issueShippingQuote: (request: ShippingQuoteInput) => client.post<ShippingQuoteDto, ShippingQuoteInput>("/api/checkout/shipping/quotes", request),
     lookupOrder: (request: OrderLookupRequest) => client.get<OrderLookupResponse>(`/api/orders/lookup${buildQuery(request)}`),
     lookupOrderReceipt: (request: OrderLookupRequest) => client.getBlob(`/api/orders/lookup/receipt${buildQuery(request)}`),
     lookupOrderTracking: (request: OrderLookupRequest) =>

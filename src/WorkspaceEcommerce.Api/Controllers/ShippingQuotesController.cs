@@ -12,8 +12,13 @@ namespace WorkspaceEcommerce.Api.Controllers;
 [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
 [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
 [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-public sealed class ShippingQuotesController(IShippingQuoteService service) : ControllerBase
+public sealed class ShippingQuotesController(IShippingQuoteService service,
+    Microsoft.Extensions.Options.IOptions<ShippingCheckoutOptions> options) : ControllerBase
 {
+    [HttpGet("api/checkout/shipping/capabilities")]
+    [ProducesResponseType(typeof(ApiResponse<ShippingCheckoutCapabilities>), StatusCodes.Status200OK)]
+    public IActionResult Capabilities() => this.ToApiResponse(WorkspaceEcommerce.Application.Common.Models.Result<ShippingCheckoutCapabilities>.Success(
+        new(options.Value.Enabled, options.Value.WorkspaceEnabled, options.Value.ExternalEnabled)));
     [HttpPost("api/checkout/shipping/options")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyCollection<ShippingMethodOption>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Options(ShippingQuoteInput request, CancellationToken cancellationToken) =>

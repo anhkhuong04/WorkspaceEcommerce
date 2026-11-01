@@ -29,6 +29,7 @@ export interface ShippingQuoteInput {
   couponCode?: string | null;
   method: ShippingMethod;
 }
+export interface ShippingCheckoutCapabilities { enabled: boolean; workspaceEnabled: boolean; externalEnabled: boolean; }
 export interface ShippingMethodOption {
   method: ShippingMethod;
   available: boolean;

@@ -211,7 +211,7 @@ Checkbox được cập nhật theo kết quả triển khai trong nhật ký m�
 - Không dùng `Returned` của đối tác như business return/refund. Hủy/giao thất bại không tự tạo refund đã chi tiền; giữ RefundPending theo chính sách hiện tại.
 - **Nghiệm thu:** lặp thao tác không lặp history/points/stock; không giao đơn hủy/chưa đủ payment; failed-delivery retry đúng graph; concurrent cancel/deliver deterministic; local cancel không enqueue MiniLogistics.
 
-### [ ] SHIP-11 — Storefront lựa chọn phương thức và quản lý quote
+### [x] SHIP-11 — Storefront lựa chọn phương thức và quản lý quote
 
 - **Ưu tiên:** P1. **Phụ thuộc:** SHIP-06, SHIP-07, SHIP-08.
 - Thêm lựa chọn WorkspaceEC/đối tác với fee, trạng thái khả dụng và thông tin thời gian giao nếu có cấu hình thật; không tự hứa ETA.
@@ -356,3 +356,7 @@ Commit-isolation check: copied the staged frontend into an ignored isolated dire
 ## SHIP-10 (2026-11-01)
 
 Implemented WorkspaceEC assignment, confirmed/paid dispatch, delivery, failure/retry and order-workflow cancellation. Row locks/revisions and immutable operation IDs/hashes protect retries and races; private assignment/reason/actor/time audit is separate from customer timeline. COD delivery waits for full collection; prepaid delivery requires Paid. Existing stock/refund/loyalty/history paths remain in use. Focused shipping API suite: 29 cases passed (including 6 new lifecycle/auth/race cases); 5 admin Playwright cases passed including reviewed assignment and existing payment controls. Migration is additive; production intake remains disabled.
+
+## SHIP-11 (2026-11-01)
+
+Storefront reads server capabilities and offers explicit WorkspaceEC/MiniLogistics selection without changing its existing login guard. Query identity includes address/payment/coupon/cart/customer; changes invalidate selection and late responses cannot replace another method. Explicit server zero is distinguished from unknown/failed fees. Expiry and confirmation gate submission; uncertain responses retain the exact request/quote for retry, including when the cart has disappeared. Shipping controls support vi/en. Validation: 17 Vitest and 4 storefront mock Playwright cases passed; storefront lint/typecheck passed. Real browser/API/database/provider validation follows in SHIP-13.
