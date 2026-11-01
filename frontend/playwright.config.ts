@@ -21,7 +21,7 @@ const artifactsDirectory = resolve(process.env.E2E_ARTIFACTS_DIR ?? "test-result
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "**/*.spec.ts",
+  testMatch: process.env.E2E_SHIPPING_SCENARIO === "true" ? "shipping-flow.spec.ts" : ["storefront-smoke.spec.ts", "storefront-ui.spec.ts"],
   timeout: 45_000,
   expect: {
     timeout: 12_000

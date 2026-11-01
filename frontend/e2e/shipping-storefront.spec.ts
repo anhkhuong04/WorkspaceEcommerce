@@ -193,6 +193,19 @@ test("explicit zero offer, external outage and changed address never silently ch
     page.getByRole("radio", { name: "WorkspaceEC", exact: true }),
   ).not.toBeChecked();
 });
+
+test("shipping confirmation supports Vietnamese and keyboard selection", async ({ page }) => {
+  await setup(page);
+  await page.getByRole("button", { name: "Select language", exact: true }).first().click();
+  await page.getByRole("menuitemradio", { name: "Vietnamese", exact: true }).click();
+  await expect(page.getByText("Phương thức vận chuyển", { exact: true })).toBeVisible();
+  const method = page.getByRole("radio", { name: "WorkspaceEC", exact: true });
+  await method.focus(); await page.keyboard.press("Space");
+  const confirmation = page.getByRole("checkbox", { name: "Tôi đồng ý với phí vận chuyển này" });
+  await expect(confirmation).toBeVisible();
+  await confirmation.focus(); await page.keyboard.press("Space");
+  await expect(confirmation).toBeChecked();
+});
 test("a late external response cannot replace the selected local quote", async ({
   page,
 }) => {

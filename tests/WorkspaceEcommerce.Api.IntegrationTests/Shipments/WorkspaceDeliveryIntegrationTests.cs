@@ -79,6 +79,39 @@ public sealed partial class ShippingCheckoutIntegrationTests
         foreach (var response in responses) response.Dispose();
     }
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WorkspaceDeliveryAndCodCollectionRace_CompletesOnce(bool reverseStartOrder)
+    {
+        await SeedAsync(); var carrier = new CountingCarrier(); await using var factory = Factory(carrier);
+        using var first = factory.CreateClient(); using var second = factory.CreateClient();
+        var quote = await QuoteAsync(first); using var placed = await first.PostAsJsonAsync("/api/checkout", Accept(quote));
+        var order = (await DataAsync<CheckoutResponse>(placed)).Order;
+        var token = await first.LoginAsAdminAsync(); first.UseBearerToken(token); second.UseBearerToken(token);
+        var state = await LocalAsync(first, order.Id);
+        state = await ActAsync(first, order.Id, new(Guid.NewGuid(), state.Revision, WorkspaceShipmentAction.Assign, "Assign", "SYNTHETIC-TEAM"));
+        using var confirmed = await first.PutAsJsonAsync($"/api/admin/orders/{order.Id}/status", new { status = 1 }); Assert.True(confirmed.IsSuccessStatusCode);
+        state = await ActAsync(first, order.Id, new(Guid.NewGuid(), state.Revision, WorkspaceShipmentAction.Dispatch, "Dispatch"));
+        var delivery = new WorkspaceShipmentRequest(Guid.NewGuid(), state.Revision, WorkspaceShipmentAction.Deliver, "Observed delivery");
+        var collection = new ConfirmOrderPaymentRequest(order.TotalAmount, "VND", "SYNTHETIC-COD-RACE", "Full collection");
+        Task<HttpResponseMessage> Deliver() => first.PostAsJsonAsync($"/api/admin/orders/{order.Id}/workspace-shipment/actions", delivery);
+        Task<HttpResponseMessage> Collect() => second.PostAsJsonAsync($"/api/admin/orders/{order.Id}/payment/collect-cod", collection);
+        // Each HTTP request has an independent scope/DbContext against PostgreSQL.
+        var earlier = reverseStartOrder ? Collect() : Deliver();
+        var later = reverseStartOrder ? Deliver() : Collect();
+        var responses = await Task.WhenAll(earlier, later);
+        Assert.All(responses, response => Assert.True(response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.Conflict));
+        using var retryCollection = await Collect(); Assert.True(retryCollection.IsSuccessStatusCode);
+        var replay = await ActAsync(first, order.Id, delivery); Assert.Equal(OrderStatus.Completed, replay.OrderStatus);
+        Assert.Equal(1, await fixture.ExecuteDbAsync(db => db.OrderStatusHistories.CountAsync(x => x.OrderId == order.Id && x.ToStatus == OrderStatus.Completed)));
+        Assert.Equal(1, await fixture.ExecuteDbAsync(db => db.Set<WorkspaceEcommerce.Domain.Modules.Payments.OrderPaymentReceipt>().CountAsync()));
+        Assert.Equal(1, await fixture.ExecuteDbAsync(db => db.Set<WorkspaceShipmentOperation>().CountAsync(x => x.Action == WorkspaceShipmentAction.Deliver)));
+        Assert.Equal(9, await fixture.ExecuteDbAsync(db => db.ProductVariants.Select(x => x.StockQuantity).SingleAsync()));
+        Assert.Equal(0, carrier.Calls);
+        foreach (var response in responses) response.Dispose();
+    }
+
+    [Theory]
     [InlineData("GET", "")]
     [InlineData("POST", "/actions")]
     [InlineData("GET", "/history")]

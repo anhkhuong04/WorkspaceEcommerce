@@ -65,6 +65,14 @@ jobs:
           --configuration Release
           --no-build
 
+      - name: Verify receipt rendering without installed cultures
+        env:
+          DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 'true'
+        run: >-
+          dotnet test tests/WorkspaceEcommerce.Infrastructure.Tests/WorkspaceEcommerce.Infrastructure.Tests.csproj
+          --no-build --no-restore --configuration Release
+          --filter FullyQualifiedName~QuestPdfOrderReceiptRendererTests
+
       - name: Verify clean and upgrade migrations
         shell: pwsh
         run: ./scripts/verify-prh-009-migrations.ps1
@@ -198,12 +206,20 @@ jobs:
         working-directory: frontend
         run: corepack pnpm exec playwright test --config playwright.shipping.config.ts
 
+      - name: Run shipping storefront UI regression
+        working-directory: frontend
+        run: corepack pnpm exec playwright test --config playwright.shipping-storefront.config.ts
+
+      - name: Run isolated shipping browser API database and provider matrix
+        shell: pwsh
+        run: ./scripts/run-prh-015-storefront-e2e.ps1 -ShippingScenario -SkipImageBuild -ArtifactsDirectory artifacts/frontend/shipping-e2e
+
       - name: Upload browser smoke evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: browser-e2e-evidence-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/frontend/e2e
+          path: artifacts/frontend
           if-no-files-found: warn
           retention-days: 90
 

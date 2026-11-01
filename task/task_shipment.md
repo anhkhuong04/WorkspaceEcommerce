@@ -230,7 +230,7 @@ Checkbox được cập nhật theo kết quả triển khai trong nhật ký m�
 - Preserve ownership/customer filters và guest proof order-code + phone; không biến mã local tracking thành đường truy cập bỏ qua authorization.
 - **Nghiệm thu:** contract/auth tests cho admin/customer/guest; PDF tổng tiền khớp order; đơn cũ vẫn đọc được; import preview/commit không gây shipment ngoài ý muốn.
 
-### [ ] SHIP-13 — Kiểm thử xuyên luồng, concurrency và hiệu năng
+### [x] SHIP-13 — Kiểm thử xuyên luồng, concurrency và hiệu năng
 
 - **Ưu tiên:** P0 release gate. **Phụ thuộc:** SHIP-04–12; test từng task thực hiện ngay, không đợi task này.
 - Hoàn tất ma trận mục 7, PostgreSQL independent scopes cho race; kiểm tra command counts và bounded paging của list/quote, tránh N+1 theo item/vùng.
@@ -240,6 +240,8 @@ Checkbox được cập nhật theo kết quả triển khai trong nhật ký m�
 - **Nghiệm thu:** toàn bộ matrix có test hoặc ngoại lệ được giải thích; build/test/lint/typecheck pass theo phạm vi; không tăng query theo số item không cần thiết; không tuyên bố capacity chưa load-test.
 
 ### [ ] SHIP-14 — Tài liệu, seed/enable và rollout vận hành
+
+**Trạng thái 2026-11-01:** phần tài liệu/cấu hình/runbook và kiểm tra synthetic đã triển khai. Giữ task mở cho duyệt bảng phí thật, smoke trên môi trường triển khai và chữ ký QA/business/operator; chưa bật production.
 
 - **Ưu tiên:** P0 release gate. **Phụ thuộc:** SHIP-13.
 - Cập nhật tài liệu sở hữu: business rules, backend consistency/API, frontend, services runbooks và ADR index; phân biệt thật đã làm với proposal. Sửa link liên quan trong phạm vi shipping, không dọn docs toàn repo.
@@ -364,3 +366,13 @@ Storefront reads server capabilities and offers explicit WorkspaceEC/MiniLogisti
 ## SHIP-12 (2026-11-01)
 
 Added snapshot-backed shipping details to checkout, admin/customer lists and details, proof-protected guest lookup/tracking, authorized payment result and PDF receipt. Local/provider IDs remain distinct; public DTOs exclude actual cost and private assignee/audit notes. Lists use one page-wide shipping projection (three request SELECTs total); quote SELECT count stays constant for 1 versus 20 cart lines. The test SQL counter now excludes background scans without disabling workers. Import is explicitly LegacyImport; unsupported new-selection columns fail validation rather than being silently ignored. Focused PostgreSQL/API suite: 36 passed; frontend workspace lint/typecheck/build and 17 Vitest passed; 5 admin and 4 storefront mock browser tests passed, plus an additional Vietnamese/keyboard scenario. Full regression, real six-case matrix and rendered PDF review are recorded under SHIP-13 when complete.
+
+## SHIP-13 validation (2026-11-01)
+
+- Full backend regression: **764 passed, zero skips** (354 Application, 241 Infrastructure, 169 PostgreSQL/API). Two additional independent-request delivery/COD-collection race cases ensure one completion/receipt and unchanged stock on replay.
+- Frontend: workspace lint/typecheck/build and 17 Vitest passed; 5 admin mock scenarios plus 5 storefront scenarios (including Vietnamese/keyboard) passed. The staged frontend was independently installed from its frozen lockfile and passed lint/typecheck/build without unrelated user UI/package edits.
+- Real browser → API → PostgreSQL → synthetic HTTP provider matrix: **6/6 passed**, both methods × COD/transfer/signed VNPay. No commerce API responses are mocked. Only the synthetic gateway page is fulfilled by Playwright; persisted order reads verify accepted quote/fee/total. Local cases assert zero carrier calls during simulated outage; partner quote 33,000 versus creation cost 43,000 never changes customer totals.
+- All six generated PDFs passed method/fee/total/privacy/text-bound checks; local and partner renderings were visually reviewed. E2E exposed an existing Alpine invariant-culture PDF failure; formatter now preserves VND separators/English dates without installed cultures. Four renderer tests passed normally and again in invariant mode; CI includes this regression gate.
+- Clean/upgrade PostgreSQL migration to `20261101113222_AddWorkspaceDeliveryOperations`, EF pending-model, generated catalog drift and tracked runtime-secret scan passed. Test runners use isolated loopback endpoints, named temporary containers, compiled Release migrations and reliable native exit-code checks on Windows PowerShell.
+- Added shipping UI and real matrix jobs to CI. Acceptance-to-test mapping: [shipping validation](../docs/backend/development/shipping-validation.md). Operational method/outcome latency/counters and expiry/revocation/input-mismatch counters have bounded labels; no customer payloads/IDs are metric tags.
+- Limits: no production enablement/migration, real provider certification, hosted CI run, dependency vulnerability scan or load/soak. Image restore reports existing NuGet NU1902/NU1903 advisories for `System.Security.Cryptography.Pkcs` 9.0.0; this is a separate release gate, not addressed by a shipping dependency upgrade. The existing Vite E2E SignalR negotiation 404 remains outside the asserted HTTP shipping flow. Bundle-size warnings remain.

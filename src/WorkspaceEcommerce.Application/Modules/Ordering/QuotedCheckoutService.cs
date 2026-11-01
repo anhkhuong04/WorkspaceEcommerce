@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using WorkspaceEcommerce.Application.Abstractions.Authentication;
@@ -32,6 +33,18 @@ internal sealed class QuotedCheckoutService(ICheckoutStore checkout, IShippingCh
 
     public async Task<Result<CheckoutResponse>> CheckoutAsync(CheckoutRequest request, CancellationToken cancellationToken)
     {
+        var started = Stopwatch.GetTimestamp();
+        var outcome = "Error";
+        try
+        {
+            var result = await CheckoutCoreAsync(request, cancellationToken);
+            outcome = result.Status.ToString();
+            return result;
+        }
+        finally { ShipmentIntegrationMetrics.RecordShippingRequest("accept", request.ShippingMethod, outcome, Stopwatch.GetElapsedTime(started).TotalSeconds); }
+    }
+    private async Task<Result<CheckoutResponse>> CheckoutCoreAsync(CheckoutRequest request, CancellationToken cancellationToken)
+    {
         if (!request.ShippingQuoteId.HasValue || request.ShippingQuoteId == Guid.Empty)
             return Result<CheckoutResponse>.Validation(["A shipping quote is required."]);
         if (!request.ShippingMethod.HasValue || !Enum.IsDefined(request.ShippingMethod.Value)
@@ -57,7 +70,10 @@ internal sealed class QuotedCheckoutService(ICheckoutStore checkout, IShippingCh
                 }
                 var now = clock.GetUtcNow();
                 if (quote.Method != request.ShippingMethod || quote.RevokedAtUtc.HasValue || now < quote.CreatedAtUtc || now >= quote.ExpiresAtUtc)
+                {
+                    ShipmentIntegrationMetrics.RecordCheckoutRejection(quote.Method, quote.RevokedAtUtc.HasValue ? "revoked" : now >= quote.ExpiresAtUtc ? "expired" : "method_or_time");
                     return Result<CheckoutResponse>.Conflict("Shipping quote is unavailable or expired. Request and confirm a new quote.");
+                }
                 var snapshot = JsonSerializer.Deserialize<ShippingInputSnapshot>(quote.SnapshotJson);
                 if (snapshot is null || snapshot.Version != 1 || snapshot.Destination.ProvinceCode != request.ShippingProvinceCode
                     || snapshot.Destination.WardCode != request.ShippingWardCode)
@@ -92,7 +108,10 @@ internal sealed class QuotedCheckoutService(ICheckoutStore checkout, IShippingCh
                     CouponCode = request.CouponCode
                 };
                 if (quote.InputFingerprint != ShippingQuoteFingerprint.Inputs(input, destination.CatalogVersion, coupon?.DiscountAmount ?? 0, items.Value!))
+                {
+                    ShipmentIntegrationMetrics.RecordCheckoutRejection(quote.Method, "input_mismatch");
                     return Result<CheckoutResponse>.Conflict("Cart, address or payment inputs changed. Request and confirm a new quote.");
+                }
                 var order = await factory.CreateAsync(canonical, customer.CustomerId, items.Value!, ct);
                 order.SetShippingFee(quote.CustomerCharge);
                 if (coupon is not null)

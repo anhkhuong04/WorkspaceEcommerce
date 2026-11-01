@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -31,6 +32,18 @@ internal sealed class ShippingQuoteService(ICheckoutStore checkout, IShippingChe
             new(ShippingMethod.MiniLogistics, options.Value.ExternalEnabled, options.Value.ExternalEnabled ? "QuoteRequired" : "MethodDisabled")]);
     }
     public async Task<Result<ShippingQuoteDto>> IssueAsync(ShippingQuoteInput input, CancellationToken cancellationToken)
+    {
+        var started = Stopwatch.GetTimestamp();
+        var outcome = "Error";
+        try
+        {
+            var result = await IssueCoreAsync(input, cancellationToken);
+            outcome = result.Status.ToString();
+            return result;
+        }
+        finally { ShipmentIntegrationMetrics.RecordShippingRequest("quote", input.Method, outcome, Stopwatch.GetElapsedTime(started).TotalSeconds); }
+    }
+    private async Task<Result<ShippingQuoteDto>> IssueCoreAsync(ShippingQuoteInput input, CancellationToken cancellationToken)
     {
         var context = await ContextAsync(input, cancellationToken);
         if (context.IsFailure) return Result<ShippingQuoteDto>.Validation(context.Errors);

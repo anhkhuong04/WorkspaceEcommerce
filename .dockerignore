@@ -17,3 +17,9 @@
 *.suo
 *.nupkg
 packages/
+.tmp/
+artifacts/
+tmp/
+output/
+frontend/test-results/
+frontend/playwright-report/

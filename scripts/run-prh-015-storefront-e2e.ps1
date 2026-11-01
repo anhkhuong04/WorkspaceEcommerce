@@ -3,7 +3,8 @@ param(
     [string]$ImageTag = 'workspace-ecommerce-api:prh015-e2e',
     [string]$MigrationImageTag = 'workspace-ecommerce-api-migrate:prh015-e2e',
     [string]$ArtifactsDirectory = (Join-Path $PSScriptRoot '..\artifacts\frontend\e2e'),
-    [switch]$SkipImageBuild
+    [switch]$SkipImageBuild,
+    [switch]$ShippingScenario
 )
 
 Set-StrictMode -Version Latest
@@ -21,6 +22,10 @@ $suffix = [Guid]::NewGuid().ToString('N').Substring(0, 12)
 $networkName = "prh015-e2e-network-$suffix"
 $postgresContainer = "prh015-e2e-postgres-$suffix"
 $apiContainer = "prh015-e2e-api-$suffix"
+$migrationContainer = "prh015-e2e-migrate-$suffix"
+$seedContainer = "prh015-e2e-seed-$suffix"
+$providerContainer = "prh015-e2e-provider-$suffix"
+$providerPort = $null
 $database = 'workspace_ecommerce_e2e'
 $username = 'workspace_ecommerce'
 $apiPort = $null
@@ -70,8 +75,16 @@ $connectionString = "Host=$postgresContainer;Port=5432;Database=$database;Userna
 function Invoke-Docker {
     param([Parameter(Mandatory)][string[]]$Arguments)
 
-    & docker @Arguments
-    if ($LASTEXITCODE -ne 0) {
+    # Windows PowerShell can turn redirected native stderr into terminating errors
+    # (including benign NuGet warnings). The native exit code is authoritative.
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & docker @Arguments
+        $dockerExitCode = $LASTEXITCODE
+    }
+    finally { $ErrorActionPreference = $previousErrorActionPreference }
+    if ($dockerExitCode -ne 0) {
         # Do not echo the Docker argument list: it contains isolated test credentials.
         throw "Docker operation '$($Arguments[0])' failed. Inspect the isolated-run artifacts for details."
     }
@@ -220,6 +233,22 @@ try {
     )
 
     Invoke-Docker -Arguments @('network', 'create', $networkName)
+    if ($ShippingScenario) {
+        $providerPort = Get-AvailableLoopbackPort
+        $providerScript = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'e2e-shipping-provider.mjs'))
+        Invoke-Docker -Arguments @('run', '--rm', '-d', '--name', $providerContainer, '--network', $networkName,
+            '--publish', "127.0.0.1:$providerPort`:8081", '--mount', "type=bind,source=$providerScript,target=/provider.mjs,readonly",
+            '-e', "SYNTHETIC_PROVIDER_KEY=$miniLogisticsApiKey", 'node:22.18.0-alpine', 'node', '/provider.mjs')
+        $shippingEnvironment = @()
+        for ($index = 0; $index -lt $commonEnvironment.Count; $index += 2) {
+            if ($commonEnvironment[$index + 1] -notmatch '^(MiniLogistics__BaseUrl|MiniLogistics__CommandWorkerIntervalSeconds|Payment__VNPay__PaymentUrl)=') {
+                $shippingEnvironment += @($commonEnvironment[$index], $commonEnvironment[$index + 1])
+            }
+        }
+        $commonEnvironment = $shippingEnvironment + @('-e', 'ShippingCheckout__Enabled=true', '-e', 'ShippingCheckout__WorkspaceEnabled=true', '-e', 'ShippingCheckout__ExternalEnabled=true',
+            '-e', "MiniLogistics__BaseUrl=http://$providerContainer`:8081/api/v1/partner", '-e', 'MiniLogistics__CommandWorkerIntervalSeconds=5',
+            '-e', "Payment__VNPay__PaymentUrl=$apiBaseUrl/__test/vnpay")
+    }
     Invoke-Docker -Arguments @(
         'run', '--rm', '-d', '--name', $postgresContainer, '--network', $networkName,
         '-e', "POSTGRES_DB=$database",
@@ -229,8 +258,8 @@ try {
     Wait-ForPostgres
 
     # Schema and deterministic demo data are initialized once before the API starts.
-    Invoke-Docker -Arguments (@('run', '--rm', '--network', $networkName) + $commonEnvironment + @($MigrationImageTag))
-    Invoke-Docker -Arguments (@('run', '--rm', '--network', $networkName) + $commonEnvironment + @($ImageTag, '--seed-demo'))
+    Invoke-Docker -Arguments (@('run', '--rm', '--name', $migrationContainer, '--network', $networkName) + $commonEnvironment + @($MigrationImageTag, '--configuration', 'Release', '--no-build'))
+    Invoke-Docker -Arguments (@('run', '--rm', '--name', $seedContainer, '--network', $networkName) + $commonEnvironment + @($ImageTag, '--seed-demo'))
     Invoke-Docker -Arguments (@(
             'run', '-d', '--name', $apiContainer, '--network', $networkName,
             '--publish', "127.0.0.1:$apiPort`:8080") + $commonEnvironment + @($ImageTag))
@@ -245,6 +274,15 @@ try {
         VITE_API_BASE_URL = ''
         VITE_API_PROXY_TARGET = $apiBaseUrl
         VITE_CART_SESSION_ID = 'prh015-e2e-cart'
+        E2E_SHIPPING_SCENARIO = $ShippingScenario.IsPresent.ToString().ToLowerInvariant()
+    }
+    if ($ShippingScenario) {
+        $e2eEnvironment['E2E_ADMIN_EMAIL'] = $adminEmail
+        $e2eEnvironment['E2E_ADMIN_PASSWORD'] = $adminPassword
+        $e2eEnvironment['E2E_PROVIDER_URL'] = "http://127.0.0.1:$providerPort"
+        $e2eEnvironment['E2E_PROVIDER_KEY'] = $miniLogisticsApiKey
+        $e2eEnvironment['E2E_VNPAY_CODE'] = $vnPayTmnCode
+        $e2eEnvironment['E2E_VNPAY_SECRET'] = $vnPayHashSecret
     }
     $previousEnvironment = @{}
     foreach ($entry in $e2eEnvironment.GetEnumerator()) {
@@ -254,6 +292,8 @@ try {
 
     Push-Location (Join-Path $repositoryRoot 'frontend')
     try {
+        $frontendErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
         # This is idempotent and non-interactive. CI installs system browser dependencies
         # separately; local Windows/macOS runs only need the Chromium binary.
         & corepack pnpm exec playwright install chromium
@@ -267,6 +307,7 @@ try {
         }
     }
     finally {
+        if (Test-Path variable:frontendErrorActionPreference) { $ErrorActionPreference = $frontendErrorActionPreference }
         Pop-Location
         foreach ($entry in $previousEnvironment.GetEnumerator()) {
             [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, 'Process')
@@ -299,7 +340,7 @@ finally {
         Failure = $failure
     } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $resultPath -Encoding utf8
 
-    foreach ($containerName in @($apiContainer, $postgresContainer)) {
+    foreach ($containerName in @($apiContainer, $migrationContainer, $seedContainer, $postgresContainer, $providerContainer)) {
         $containerIds = @(& docker ps --all --quiet --filter "name=^/$containerName`$")
         if ($containerIds.Count -gt 0) {
             & docker rm -f $containerName *> $null

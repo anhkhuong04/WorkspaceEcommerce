@@ -187,6 +187,7 @@ export interface AdminOrderImportRowResultDto {
 }
 
 export interface AdminOrderImportPreviewDto {
+  shippingSemantics?: "LegacyImport";
   totalRows: number;
   validRows: number;
   errorRows: number;
