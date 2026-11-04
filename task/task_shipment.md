@@ -239,9 +239,9 @@ Checkbox được cập nhật theo kết quả triển khai trong nhật ký m�
 - Đưa test mới vào CI đúng job. Chạy full regression sau checks tập trung; ghi rõ skipped/block vì Docker/tooling và mọi regression do working tree chưa liên quan.
 - **Nghiệm thu:** toàn bộ matrix có test hoặc ngoại lệ được giải thích; build/test/lint/typecheck pass theo phạm vi; không tăng query theo số item không cần thiết; không tuyên bố capacity chưa load-test.
 
-### [ ] SHIP-14 — Tài liệu, seed/enable và rollout vận hành
+### [x] SHIP-14 — Tài liệu, seed/enable và rollout vận hành
 
-**Trạng thái 2026-11-01:** phần tài liệu/cấu hình/runbook và kiểm tra synthetic đã triển khai. Giữ task mở cho duyệt bảng phí thật, smoke trên môi trường triển khai và chữ ký QA/business/operator; chưa bật production.
+**Phạm vi nghiệm thu được chủ dự án cập nhật ngày 2026-11-04:** project học tập, tự động duyệt bằng dữ liệu/bảng phí synthetic và môi trường Docker riêng; không cần staging thực tế hay chữ ký QA/business. Các gate production giữ lại làm tham khảo nếu triển khai thật. Báo cáo kiểm chứng: [nghiệm thu học tập](../docs/backend/runbooks/shipping-educational-acceptance.md). Mặc định source vẫn tắt intake mới.
 
 - **Ưu tiên:** P0 release gate. **Phụ thuộc:** SHIP-13.
 - Cập nhật tài liệu sở hữu: business rules, backend consistency/API, frontend, services runbooks và ADR index; phân biệt thật đã làm với proposal. Sửa link liên quan trong phạm vi shipping, không dọn docs toàn repo.
@@ -249,7 +249,7 @@ Checkbox được cập nhật theo kết quả triển khai trong nhật ký m�
 - Deploy schema → code hiểu cả legacy/new (mọi worker replica) → cấu hình → admin nhập bảng phí thật → validate/publish → smoke → enable nhận đơn. Không tự publish seed demo trên production.
 - Theo dõi theo method: quote failure/latency, mismatch/expiry, rate-plan version, publish audit, local backlog/failed delivery, external queue age/cost discrepancy; không log payload/địa chỉ/số điện thoại.
 - Rollback bằng disable nhận đơn mới và forward fix; tiếp tục xử lý đơn/quote/work đã cam kết. Không xóa tariff/order/shipment/audit hoặc chạy destructive Down sau phát sinh đơn mới.
-- **Nghiệm thu:** chạy local-only với đối tác unavailable, chạy hai method với provider giả, kiểm chứng backlog đơn cũ; business duyệt giá/coverage và QA ký checklist trên candidate cụ thể.
+- **Nghiệm thu học tập đã được duyệt:** chạy local-only với đối tác unavailable, chạy hai method với provider giả, kiểm chứng backlog đơn cũ bằng regression. Nếu triển khai thực tế sau này, business duyệt giá/coverage và QA ký checklist trên candidate cụ thể.
 
 ## 6. Thứ tự thực hiện và mốc bàn giao
 
@@ -384,3 +384,12 @@ Owner documentation now links the implemented business rules, transactions/locks
 The default isolated storefront runner also passed **11/11** tests on the current working tree, alongside the six-case shipping run. Synthetic local-only outage, both methods and legacy/backlog compatibility have automated coverage. Test containers were removed; no user/production database was migrated.
 
 Still open for the deployment owner: approve real fees/coverage/weights, record candidate image/config/rate revision, complete deployed sandbox/legacy-backlog smoke and QA/business/operator signatures, and clear the existing dependency-audit release gate. See the unchecked candidate checklist in the runbook. SHIP-14 remains unchecked intentionally; source implementation does not constitute production approval.
+
+## SHIP-14 hoàn tất trong phạm vi học tập (2026-11-04)
+
+- Chủ dự án xác nhận tự động nghiệm thu vì đây là project học tập, chưa triển khai thực tế. Phạm vi này cập nhật trạng thái còn mở ngày 2026-11-01; không thay thế các gate nếu đưa lên production sau này. [Báo cáo nghiệm thu](../docs/backend/runbooks/shipping-educational-acceptance.md) ghi rõ candidate, kết quả và giới hạn.
+- Bổ sung mapping sáu cấu hình `ShippingCheckout` vào Compose và `.env.example`, giữ mặc định checkout mới tắt. Script kiểm chứng render ba cấu hình × sáu giá trị, cô lập biến môi trường và không đọc `.env`; đã xác nhận fail trước sửa, pass sau sửa. CI chạy cùng regression này.
+- Ghim bản vá PKCS `9.0.21` cho dependency tooling với `PrivateAssets=all`; NuGet audit không còn mục vulnerable. Thêm marker web root để API integration khởi động được từ clean checkout, không phụ thuộc thư mục local.
+- Kiểm chứng clean worktree: locked restore/Release build **0 warning/error**; **754 backend tests pass, 0 skip** (346 Application, 241 Infrastructure, 167 API), frontend lint/typecheck/build và **17 Vitest** pass; **5 admin + 5 storefront** mock browser cases pass. Con số backend khác lần trước vì không bao gồm 10 test đang sửa ngoài phạm vi của người dùng; không xóa test shipping đã track.
+- Browser → API → PostgreSQL → provider giả: **6/6 pass** trên image vừa build, cả hai method × COD/transfer/VNPay giả có chữ ký; runner xác nhận `Succeeded=true` và dọn container test. Clean/upgrade migrations, EF pending-model, catalog drift, bốn PDF tests trong invariant mode và scan secret **1.009 tracked files** pass. Reviewer độc lập không phát hiện Critical/Important/Minor trong diff cấu hình/build/tài liệu.
+- Giới hạn: frontend audit vẫn có **3 High, 4 Moderate, 1 Low advisory entries**, không tắt gate hay tuyên bố production-ready; bundle-size warning và SignalR 404 của E2E đã ghi trong báo cáo. Không gọi provider thật, không migrate database người dùng, không deploy, không chạy hosted CI/Trivy hoặc load/soak. Giữ nguyên các thay đổi chưa commit ngoài shipping của người dùng.

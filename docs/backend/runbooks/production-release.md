@@ -4,6 +4,12 @@
 
 This is the operational release gate. A release manager owns the final decision; the application team supplies the local evidence and the platform/SRE owner supplies deployed-topology evidence. A missing evidence item is a **no-go**, not an implicit pass.
 
+Shipping-specific deployment order, intake suspension and forward-fix behavior are
+in the [shipping runbook](../../services/runbooks/workspace-shipping.md); use its
+[candidate report template](shipping-release-report.example.md) for a deployed
+shipping release. The learning project's [synthetic acceptance](shipping-educational-acceptance.md)
+does not satisfy or override this production gate.
+
 Never put passwords, JWTs, refresh cookies, TOTP recovery codes, OAuth ID tokens, webhook bodies, or object-store credentials in tickets, logs, dashboards, or this document. Rotate an exposed value through the [credential rotation runbook](../../services/runbooks/credential-rotation.md).
 
 ## Pre-deploy local evidence

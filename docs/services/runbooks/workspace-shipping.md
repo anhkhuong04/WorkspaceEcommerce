@@ -4,6 +4,17 @@ Current implementation: [shipping architecture/API](../../backend/architecture/s
 Validation: [shipping matrix](../../backend/development/shipping-validation.md).
 This runbook does not approve real rates or enable a deployed environment.
 
+## Educational acceptance
+
+For this learning project, the owner approved automatic synthetic acceptance on
+2026-11-04. [The acceptance report](../../backend/runbooks/shipping-educational-acceptance.md)
+records the checks and known limitations. Synthetic prices/coverage in an isolated
+test database can satisfy SHIP-14 for this educational scope; real tariffs, a staging
+deployment and human business/QA signatures are not required for that scope.
+The production checklist below remains applicable only if the project is later
+deployed. Educational acceptance neither enables production intake nor marks the
+general production-release gates as passed.
+
 ## Configure and review rates
 
 1. In admin `/shipping`, inspect catalog version and paged weight-readiness report.
@@ -33,6 +44,18 @@ are test-only. Business must approve real fees, coverage and weight limits.
 | `ShippingCheckout__QuoteLifetimeMinutes` | 10 | New quote lifetime |
 | `ShippingCheckout__UnusedQuoteRetentionDays` | 30 | Retention of expired, unused quotes only |
 | `ShippingCheckout__ExternalQuoteTimeoutSeconds` | 12 | Bounded carrier quote deadline |
+
+The development Compose API forwards all six settings from `.env`; omitted values
+use the defaults above. `.env.example` documents them without enabling intake.
+After editing flags, recreate the API container (`docker compose --env-file .env up
+-d --no-deps api`) and check `GET /api/checkout/shipping/capabilities`; restart/recreate
+each replica through its deployment platform. Configuration is loaded at startup,
+not a live admin toggle. Compose is development-only and still requires its existing
+provider/payment placeholders to be replaced even for local-only experiments.
+
+`./scripts/verify-shipping-compose.ps1` renders defaults, local-only intake and
+paused-method configurations using synthetic `.env.example` values. It neither
+starts containers nor reads your local `.env`, and never prints resolved secrets.
 
 1. Back up and run the one-shot migration job (including
    `20261101113222_AddWorkspaceDeliveryOperations`). API replicas never migrate.
@@ -150,6 +173,10 @@ Production release remains gated on approved real tariff/coverage, configured
 shipping teams and QA/operator sign-off. Automated test success is not that approval.
 
 Release evidence checklist (environment owner completes on the candidate):
+
+Use the [candidate report template](../../backend/runbooks/shipping-release-report.example.md)
+to record identities, evidence and signatures in the deployment team's restricted
+store. The general production-release gates remain required.
 
 - [ ] Candidate commit/image digest, migration version and all replica versions recorded.
 - [ ] Business-approved real tariff revision, nationwide coverage and SKU weights reviewed.
