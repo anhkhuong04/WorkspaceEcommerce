@@ -57,6 +57,13 @@ services:
       MediaStorage__NoOpMalwareScannerRiskOwner: ${MediaStorage__NoOpMalwareScannerRiskOwner:-}
       MediaStorage__NoOpMalwareScannerRiskExpiresAtUtc: ${MediaStorage__NoOpMalwareScannerRiskExpiresAtUtc:-}
       MediaStorage__NoOpMalwareScannerRiskReference: ${MediaStorage__NoOpMalwareScannerRiskReference:-}
+      # Default-off quoted checkout; method flags pause new quotes only.
+      ShippingCheckout__Enabled: ${ShippingCheckout__Enabled:-false}
+      ShippingCheckout__WorkspaceEnabled: ${ShippingCheckout__WorkspaceEnabled:-true}
+      ShippingCheckout__ExternalEnabled: ${ShippingCheckout__ExternalEnabled:-true}
+      ShippingCheckout__QuoteLifetimeMinutes: ${ShippingCheckout__QuoteLifetimeMinutes:-10}
+      ShippingCheckout__UnusedQuoteRetentionDays: ${ShippingCheckout__UnusedQuoteRetentionDays:-30}
+      ShippingCheckout__ExternalQuoteTimeoutSeconds: ${ShippingCheckout__ExternalQuoteTimeoutSeconds:-12}
       MiniLogistics__BaseUrl: ${MiniLogistics__BaseUrl:-http://host.docker.internal:5221/api/v1/partner}
       MiniLogistics__ApiKey: ${MiniLogistics__ApiKey:?Set MiniLogistics__ApiKey in .env}
       MiniLogistics__WebhookSecret: ${MiniLogistics__WebhookSecret:?Set MiniLogistics__WebhookSecret in .env}

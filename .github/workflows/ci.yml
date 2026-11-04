@@ -50,6 +50,10 @@ jobs:
       - name: Build backend
         run: dotnet build WorkspaceEcommerce.slnx --no-restore --configuration Release
 
+      - name: Verify shipping Compose defaults and intake suspension
+        shell: pwsh
+        run: ./scripts/verify-shipping-compose.ps1
+
       - name: Run backend tests
         run: >-
           dotnet test WorkspaceEcommerce.slnx --no-build --no-restore --configuration Release
