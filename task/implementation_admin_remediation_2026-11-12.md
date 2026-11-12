@@ -1,6 +1,6 @@
 # Hoàn thiện Admin Ecommerce — 12/11/2026
 
-Phạm vi: xử lý báo cáo `report_admin_uiux_backend_2026-11-12.md`, đồng thời bổ sung tìm kiếm tổng quát và tìm kiếm/bộ lọc Products. Thực hiện trên working tree hiện tại, giữ các thay đổi có sẵn; không commit/push.
+Phạm vi: xử lý báo cáo `report_admin_uiux_backend_2026-11-12.md`, đồng thời bổ sung tìm kiếm tổng quát và tìm kiếm/bộ lọc Products. Thực hiện trên working tree hiện tại, giữ các thay đổi có sẵn. Sau nghiệm thu, người dùng yêu cầu commit/push và khởi động chương trình; code đã được push lên `origin/main` tại commit `8a6bbc7`.
 
 Skill áp dụng: [ui-ux-pro-max](C:/Users/Admin/.agents/skills/ui-ux-pro-max/SKILL.md) cho layout, accessibility và tương tác; [React best practices](C:/Users/Admin/.codex/plugins/cache/openai-curated-remote/vercel/0.54.1/skills/react-best-practices/SKILL.md) cho query/cache, vòng đời component và phân trang. Giữ modular monolith/direct EF và UI primitives hiện có.
 
@@ -101,7 +101,7 @@ Ba migration mới:
 2. `20261112015210_PaymentDifferenceReconciliation`
 3. `20261112015609_AuditManualStockAdjustments`
 
-Đã kiểm tra trên database tách biệt; **chưa apply vào database shop, chưa rebuild/restart Docker API của shop**. Migration là additive; Down từ chối xóa reconciliation/audit khi đã có dữ liệu. Sau backup và khi đưa code này vào runtime, dùng migration job trước khi chạy bản API mới:
+Đã kiểm tra trên database tách biệt, sau đó áp dụng thành công cả ba migration vào database shop local theo yêu cầu khởi động chương trình. Trước khi áp dụng đã tạo backup `.tmp/backups/before-admin-start-20261112-093446.dump` (255.234 bytes). Docker API và migration image được build lại từ source đã commit. Migration là additive; Down từ chối xóa reconciliation/audit khi đã có dữ liệu. Các lệnh dùng để cập nhật runtime:
 
 ```powershell
 docker compose --env-file .env --profile tools run --rm --build migrate
@@ -109,6 +109,8 @@ docker compose --env-file .env up -d --build api
 ```
 
 Admin Vite cần dependencies hiện tại (`corepack pnpm install --frozen-lockfile` trong `frontend/`); bản build cần được cập nhật cùng backend. Giữ nguyên feature flags và thông tin ngân hàng/email/điện thoại shop đang để trống theo yêu cầu.
+
+Xác nhận sau khởi động: API/PostgreSQL đều `healthy`; `/health/ready` trả 200. Đăng nhập Admin thành công và đọc dashboard, global search, Products filter, articles page, operations outbox đều trả HTTP 200. Storefront `http://localhost:5173` và Admin `http://localhost:5174` đều trả 200. Không seed lại dữ liệu shop. Thay đổi xóa `review-code.md` đã có sẵn được giữ ngoài commit vì không thuộc mã ứng dụng của đợt này.
 
 Không backfill audit tồn, import identity, PaidAt hoặc các đơn hoàn lịch sử. Không mở lại đơn/request đã reject, không tự đưa unit quarantine lên bán. Chưa bổ sung MFA/nhân viên/RBAC chi tiết, rich-text editor, phản hồi review, KPI theo kỳ hay một hệ kế toán/đối soát provider. Đây là các hướng mở rộng; không được suy từ số test pass thành đã chứng nhận toàn bộ vận hành production.
 
