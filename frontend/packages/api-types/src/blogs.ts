@@ -14,6 +14,13 @@ export interface BlogCommentDto {
 
 export type BlogCommentModerationStatus = 0 | 1 | 2;
 
+export interface PublicBlogCommentDto {
+  id: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+}
+
 export interface CommentSubmissionAcknowledgement {
   message: string;
 }
@@ -41,7 +48,7 @@ export interface StorefrontBlogPostDto {
   imageUrl?: string;
   publishedAt?: string;
   relatedProducts: StorefrontProductListItemDto[];
-  comments: BlogCommentDto[];
+  comments: PublicBlogCommentDto[];
 }
 
 export interface CreateBlogPostRequest {

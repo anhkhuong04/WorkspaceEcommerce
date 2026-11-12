@@ -8,6 +8,88 @@ namespace WorkspaceEcommerce.Application.Tests.Modules.Content.Banners;
 public sealed class AdminBannerServiceTests
 {
     [Fact]
+    public async Task BannersWithEqualOrderAndEmptyTitles_ReturnStableIdOrder()
+    {
+        var firstId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var secondId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(
+            new Banner(secondId, null, "https://example.test/second.jpg", null, 0),
+            new Banner(firstId, null, "https://example.test/first.jpg", null, 0));
+
+        var admin = await CreateService(dbContext).GetBannersAsync();
+        var storefront = await new StorefrontBannerService(dbContext).GetActiveBannersAsync();
+
+        Assert.Equal(new[] { firstId, secondId }, admin.Value!.Select(banner => banner.Id));
+        Assert.Equal(new[] { firstId, secondId }, storefront.Value!.Select(banner => banner.Id));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task CreateBannerAsync_WithoutTitle_CreatesImageOnlyBanner(string? title)
+    {
+        var dbContext = new FakeAppDbContext();
+        var service = CreateService(dbContext);
+
+        var result = await service.CreateBannerAsync(new CreateBannerRequest
+        {
+            Title = title,
+            ImageUrl = "https://example.test/banner.jpg"
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(string.Empty, result.Value!.Title);
+        Assert.Equal(string.Empty, Assert.Single(dbContext.Banners).Title);
+        Assert.Equal(1, dbContext.SaveChangesCallCount);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task UpdateBannerAsync_ClearTitle_PreservesImageAndVisibility(string? title)
+    {
+        var banner = CreateBanner();
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(banner);
+        var service = CreateService(dbContext);
+
+        var result = await service.UpdateBannerAsync(banner.Id, new UpdateBannerRequest
+        {
+            Title = title,
+            ImageUrl = banner.ImageUrl,
+            LinkUrl = banner.LinkUrl,
+            SortOrder = banner.SortOrder,
+            IsActive = true
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(string.Empty, banner.Title);
+        Assert.Equal("https://example.test/banner.jpg", banner.ImageUrl);
+        Assert.True(banner.IsActive);
+    }
+
+    [Fact]
+    public async Task BannerRequests_TitleTooLong_RejectWithoutSaving()
+    {
+        var banner = CreateBanner();
+        var dbContext = new FakeAppDbContext();
+        dbContext.Seed(banner);
+        var service = CreateService(dbContext);
+        var title = new string('x', 251);
+
+        var created = await service.CreateBannerAsync(new CreateBannerRequest { Title = title, ImageUrl = banner.ImageUrl });
+        var updated = await service.UpdateBannerAsync(banner.Id, new UpdateBannerRequest { Title = title, ImageUrl = banner.ImageUrl });
+
+        Assert.Equal(ResultStatus.Validation, created.Status);
+        Assert.Equal(ResultStatus.Validation, updated.Status);
+        Assert.Equal("Banner", banner.Title);
+        Assert.Equal(0, dbContext.SaveChangesCallCount);
+    }
+
+    [Fact]
     public async Task DeleteBannerAsync_ExistingBanner_RemovesBanner()
     {
         var banner = CreateBanner();

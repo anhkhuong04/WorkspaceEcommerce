@@ -36,19 +36,25 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
         var normalizedCategorySlug = NormalizeOptional(request.CategorySlug);
         var normalizedSearch = NormalizeOptional(request.Search);
         var query =
-            from product in catalogStore.Products.AsNoTrackingIfEf()
+            from product in (normalizedSearch is null ? catalogStore.Products : catalogStore.SearchProducts(normalizedSearch)).AsNoTrackingIfEf()
             join category in catalogStore.Categories.AsNoTrackingIfEf() on product.CategoryId equals category.Id
             where product.IsActive && category.IsActive
             select new ProductCatalogRow { Product = product, Category = category };
 
         if (normalizedCategorySlug is not null)
         {
-            query = query.Where(row => row.Category.Slug == normalizedCategorySlug);
-        }
-
-        if (normalizedSearch is not null)
-        {
-            query = query.Where(row => row.Product.Slug.Contains(normalizedSearch));
+            var categories = await catalogStore.Categories.AsNoTrackingIfEf()
+                .Where(category => category.IsActive).ToArrayAsyncSafe(cancellationToken);
+            var categoryIds = categories.Where(category => category.Slug == normalizedCategorySlug).Select(category => category.Id).ToHashSet();
+            // Expand only active descendants, with a visited set to bound malformed cycles.
+            while (true)
+            {
+                var children = categories.Where(category => category.ParentId.HasValue && categoryIds.Contains(category.ParentId.Value))
+                    .Select(category => category.Id).Where(id => !categoryIds.Contains(id)).ToArray();
+                if (children.Length == 0) break;
+                categoryIds.UnionWith(children);
+            }
+            query = query.Where(row => categoryIds.Contains(row.Category.Id));
         }
 
         if (request.MinPrice is not null || request.MaxPrice is not null)
@@ -181,6 +187,9 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
             "updated-desc" => products
                 .OrderByDescending(row => row.Product.UpdatedAt)
                 .ThenBy(row => row.Product.Slug),
+            "created-desc" => products
+                .OrderByDescending(row => row.Product.CreatedAt)
+                .ThenBy(row => row.Product.Slug),
             _ => products
                 .OrderBy(row => row.Product.Slug)
         };
@@ -232,13 +241,7 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
         decimal? minPrice = variants.Length == 0
             ? null
             : variants.Min(variant => variant.Price);
-        var compareAtPrices = variants
-            .Where(variant => variant.CompareAtPrice is not null)
-            .Select(variant => variant.CompareAtPrice)
-            .ToArray();
-        decimal? compareAtPrice = compareAtPrices.Length == 0
-            ? null
-            : compareAtPrices.Max();
+        var compareAtPrice = variants.OrderBy(variant => variant.Price).ThenBy(variant => variant.Sku).FirstOrDefault()?.CompareAtPrice;
 
         return new StorefrontProductListItemDto(
             product.Id,
@@ -251,7 +254,7 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
             minPrice,
             compareAtPrice,
             variants.Any(variant => variant.StockQuantity > 0),
-            primaryImage?.ImageUrl);
+            primaryImage?.ImageUrl) { VariantCount = variants.Length };
     }
 
     private static StorefrontProductDetailDto ToDetailDto(
@@ -343,9 +346,9 @@ internal sealed class StorefrontCatalogService(ICatalogReadStore catalogStore, I
         }
 
         var sortBy = NormalizeOptional(request.SortBy);
-        if (sortBy is not null && sortBy is not ("name-asc" or "price-asc" or "price-desc" or "updated-desc"))
+        if (sortBy is not null && sortBy is not ("name-asc" or "price-asc" or "price-desc" or "updated-desc" or "created-desc"))
         {
-            errors.Add("Sort must be one of name-asc, price-asc, price-desc, or updated-desc.");
+            errors.Add("Sort must be one of name-asc, price-asc, price-desc, updated-desc, or created-desc.");
         }
 
         return [.. errors];

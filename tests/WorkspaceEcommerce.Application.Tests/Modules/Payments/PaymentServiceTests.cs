@@ -12,6 +12,26 @@ namespace WorkspaceEcommerce.Application.Tests.Modules.Payments;
 public sealed class PaymentServiceTests
 {
     [Fact]
+    public async Task LateCaptureAfterLocalCancellation_RecordsRefundPendingOnceWithoutShipment()
+    {
+        var setup = CreatePendingPayment();
+        setup.Order.ChangeStatus(Guid.NewGuid(), OrderStatus.Cancelled, "Cancelled", "test");
+        setup.Order.MarkPaymentCancelled();
+        setup.Transaction.MarkCancelled(null, "ORDER_CANCELLED", "Cancelled", null, null, DateTimeOffset.UtcNow);
+        var service = CreateService(setup.DbContext);
+        var request = CreateCallback(setup.Transaction.TxnRef, "00", "00", setup.Transaction.Amount);
+        var first = await service.HandleVNPayReturnAsync(request);
+        var repeated = await service.HandleVNPayReturnAsync(request);
+        Assert.True(first.IsSuccess);
+        Assert.True(repeated.IsSuccess);
+        Assert.Equal(OrderStatus.Cancelled, setup.Order.Status);
+        Assert.Equal(PaymentStatus.RefundPending, setup.Order.PaymentStatus);
+        Assert.Equal(PaymentTransactionStatus.Success, setup.Transaction.Status);
+        Assert.NotNull(setup.Transaction.RawResponse);
+        Assert.Empty(setup.DbContext.ShipmentCommandOutbox);
+    }
+
+    [Fact]
     public async Task HandleVNPayReturnAsync_Success_MarksPaidAndQueuesDurableShipmentCommand()
     {
         var setup = CreatePendingPayment();

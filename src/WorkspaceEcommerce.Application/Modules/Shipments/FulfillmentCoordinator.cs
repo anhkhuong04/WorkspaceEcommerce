@@ -25,6 +25,7 @@ internal sealed class FulfillmentCoordinator(IAppDbContext db, IShippingCheckout
     public async Task AcceptAsync(Order order, ShippingMethod? method, CancellationToken ct)
     {
         method ??= await MethodAsync(order.Id, ct);
+        if (!method.HasValue && order.ImportSource is not null) return;
         if (order.Status is OrderStatus.Cancelled or OrderStatus.Returned or OrderStatus.Completed) return;
         if (method == ShippingMethod.WorkspaceEC)
         {
@@ -65,7 +66,7 @@ internal sealed class FulfillmentCoordinator(IAppDbContext db, IShippingCheckout
     public async Task GuardStatusAsync(Order order, OrderStatus status, CancellationToken ct)
     {
         var method = await MethodAsync(order.Id, ct);
-        if (!method.HasValue) return;
+        if (!method.HasValue && order.ImportSource is null) return;
         if (status == OrderStatus.Shipping && order.PaymentMethod != PaymentMethod.Cod && order.PaymentStatus != PaymentStatus.Paid)
             throw new DomainException("Prepaid delivery requires verified payment.");
         if (status == OrderStatus.Completed && order.PaymentMethod == PaymentMethod.Cod && order.PaymentStatus != PaymentStatus.Paid)

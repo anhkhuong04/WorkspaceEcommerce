@@ -12,17 +12,21 @@ internal sealed class AdminProductService(
     IOrderReadStore orderStore,
     IAppWriteStore writeStore,
     IValidator<CreateProductRequest> createProductValidator,
-    IValidator<UpdateProductRequest> updateProductValidator) : IAdminProductService
+    IValidator<UpdateProductRequest> updateProductValidator,
+    IValidator<AdminProductListRequest>? listValidator = null) : IAdminProductService
 {
+    public Task<Result<PagedResult<AdminProductDto>>> GetProductsAsync(PaginationRequest request, CancellationToken cancellationToken = default) =>
+        GetProductsAsync(new AdminProductListRequest { PageNumber = request.NormalizedPageNumber, PageSize = request.NormalizedPageSize }, cancellationToken);
+
     public async Task<Result<PagedResult<AdminProductDto>>> GetProductsAsync(
-        PaginationRequest request,
+        AdminProductListRequest request,
         CancellationToken cancellationToken = default)
     {
+        var validation = await (listValidator ?? new AdminProductListRequestValidator()).ValidateAsync(request, cancellationToken);
+        if (!validation.IsValid) return Result<PagedResult<AdminProductDto>>.Validation(validation.Errors.Select(error => error.ErrorMessage));
         var pageNumber = request.NormalizedPageNumber;
         var pageSize = request.NormalizedPageSize;
-        var productsQuery = catalogStore.Products
-            .AsNoTrackingIfEf()
-            .OrderBy(product => product.Slug);
+        var productsQuery = AdminProductQuery.Sort(catalogStore, AdminProductQuery.Filter(catalogStore, request).AsNoTrackingIfEf(), request.SortBy);
 
         var totalCount = await productsQuery.CountAsyncSafe(cancellationToken);
         var products = await productsQuery
@@ -139,7 +143,6 @@ internal sealed class AdminProductService(
         SetFeatured(product, request.IsFeatured);
         SetActive(product, request.IsActive);
 
-        writeStore.Update(product);
         await writeStore.SaveChangesAsync(cancellationToken);
 
         var variants = await catalogStore.ProductVariants
@@ -176,6 +179,8 @@ internal sealed class AdminProductService(
             .Where(variant => variant.ProductId == id)
             .ToArrayAsyncSafe(cancellationToken);
         var variantIds = variants.Select(variant => variant.Id).ToArray();
+        if (await catalogStore.StockAdjustments.Where(a => variantIds.Contains(a.ProductVariantId)).AnyAsyncSafe(cancellationToken))
+            return Result<AdminProductDto>.Conflict("Product has stock adjustment history and cannot be deleted. Deactivate it instead.");
         if (await orderStore.OrderItems
             .Where(item => variantIds.Contains(item.ProductVariantId))
             .AnyAsyncSafe(cancellationToken))
@@ -211,7 +216,14 @@ internal sealed class AdminProductService(
         }
 
         writeStore.Remove(product);
-        await writeStore.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await writeStore.SaveChangesAsync(cancellationToken);
+        }
+        catch (PersistenceReferenceConflictException exception)
+        {
+            return Result<AdminProductDto>.Conflict(exception.Message);
+        }
 
         return Result<AdminProductDto>.Success(dto);
     }
@@ -278,7 +290,7 @@ internal sealed class AdminProductService(
             variant.CompareAtPrice,
             variant.StockQuantity,
             variant.RequiresInstallation,
-            variant.IsActive);
+            variant.IsActive) { WeightKg = variant.WeightKg, LengthCm = variant.LengthCm, WidthCm = variant.WidthCm, HeightCm = variant.HeightCm };
     }
 
     private static AdminProductImageDto ToDto(ProductImage image)

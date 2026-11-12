@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
 using WorkspaceEcommerce.Api.IntegrationTests.Infrastructure;
 using WorkspaceEcommerce.Domain.Common;
 using WorkspaceEcommerce.Domain.Modules.Catalog;
@@ -9,6 +10,58 @@ namespace WorkspaceEcommerce.Api.IntegrationTests.AdminProducts;
 [Collection(ApiIntegrationTestCollection.Name)]
 public sealed class AdminProductAssetIntegrationTests(ApiIntegrationTestFixture fixture)
 {
+    [Fact]
+    public async Task DeleteProduct_InShoppingCart_ReturnsConflictAndPreservesProductAndCart()
+    {
+        await fixture.ResetDatabaseAsync();
+        var catalog = TestData.CreateVisibleCatalog();
+        var cart = new WorkspaceEcommerce.Domain.Modules.Cart.Cart(Guid.NewGuid(), null, "product-delete-test");
+        cart.AddItem(Guid.NewGuid(), catalog.Variant.Id, 2, catalog.Variant.Price);
+        await fixture.SeedAsync(dbContext =>
+        {
+            dbContext.AddRange(catalog.Category, catalog.Product, catalog.Variant, cart);
+            return Task.CompletedTask;
+        });
+        using var client = fixture.CreateClient();
+        client.UseBearerToken(await client.LoginAsAdminAsync());
+
+        using var response = await client.DeleteAsync($"/api/admin/products/{catalog.Product.Id}");
+        var json = await response.ReadJsonAsync();
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.False(json["success"]!.GetValue<bool>());
+        Assert.Contains("shopping cart", json["errors"]!.ToJsonString());
+        Assert.Contains("Deactivate", json["errors"]!.ToJsonString());
+        var state = await fixture.ExecuteDbAsync(async dbContext => new
+        {
+            ProductExists = await dbContext.Products.AnyAsync(product => product.Id == catalog.Product.Id),
+            VariantExists = await dbContext.ProductVariants.AnyAsync(variant => variant.Id == catalog.Variant.Id),
+            CartQuantity = await dbContext.CartItems.Where(item => item.CartId == cart.Id).Select(item => item.Quantity).SingleAsync()
+        });
+        Assert.True(state.ProductExists);
+        Assert.True(state.VariantExists);
+        Assert.Equal(2, state.CartQuantity);
+
+        await fixture.SeedAsync(dbContext =>
+        {
+            dbContext.Carts.Remove(cart);
+            return Task.CompletedTask;
+        });
+        using var retryResponse = await client.DeleteAsync($"/api/admin/products/{catalog.Product.Id}");
+        Assert.Equal(HttpStatusCode.OK, retryResponse.StatusCode);
+        var deleted = await fixture.ExecuteDbAsync(async dbContext => new
+        {
+            ProductExists = await dbContext.Products.AnyAsync(product => product.Id == catalog.Product.Id),
+            VariantExists = await dbContext.ProductVariants.AnyAsync(variant => variant.Id == catalog.Variant.Id),
+            ImageExists = await dbContext.ProductImages.AnyAsync(image => image.ProductId == catalog.Product.Id),
+            SpecificationExists = await dbContext.ProductSpecifications.AnyAsync(specification => specification.ProductId == catalog.Product.Id)
+        });
+        Assert.False(deleted.ProductExists);
+        Assert.False(deleted.VariantExists);
+        Assert.False(deleted.ImageExists);
+        Assert.False(deleted.SpecificationExists);
+    }
+
     [Fact]
     public async Task DeleteProduct_WithoutOrderHistory_RemovesProduct()
     {

@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 
 namespace WorkspaceEcommerce.Application.Modules.Catalog.Products;
 
@@ -32,6 +32,18 @@ public sealed class UpdateProductVariantRequestValidator : AbstractValidator<Upd
             .Must(price => price == decimal.Truncate(price!.Value))
             .When(request => request.CompareAtPrice is not null)
             .WithMessage("Compare-at price must be a whole VND amount and cannot be lower than price.");
+
+        RuleFor(request => request.WeightKg).GreaterThan(0m).LessThanOrEqualTo(20000m)
+            .When(request => request.WeightKg.HasValue);
+
+        RuleFor(request => request.LengthCm).GreaterThan(0m).LessThanOrEqualTo(20000m)
+            .When(request => request.LengthCm.HasValue);
+
+        RuleFor(request => request.WidthCm).GreaterThan(0m).LessThanOrEqualTo(20000m)
+            .When(request => request.WidthCm.HasValue);
+
+        RuleFor(request => request.HeightCm).GreaterThan(0m).LessThanOrEqualTo(20000m)
+            .When(request => request.HeightCm.HasValue);
 
         RuleFor(request => request.StockQuantity)
             .GreaterThanOrEqualTo(0);

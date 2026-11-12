@@ -18,6 +18,7 @@ internal sealed class AdminBannerService(
             .AsNoTrackingIfEf()
             .OrderBy(banner => banner.SortOrder)
             .ThenBy(banner => banner.Title)
+            .ThenBy(banner => banner.Id)
             .Select(banner => new AdminBannerDto(
                 banner.Id,
                 banner.Title,

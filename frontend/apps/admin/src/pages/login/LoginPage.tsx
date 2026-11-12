@@ -3,13 +3,19 @@ import { Controller, useForm } from "react-hook-form";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { Button, Field, Notice, TextInput } from "../../components/ui/AdminUi";
+import { AdminBrand } from "../../components/ui/AdminBrand";
 import { useAdminAuth } from "../../features/auth/useAdminAuth";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
 
 const loginSchema = z.object({
-  email: z.email("Enter a valid admin email.").max(256, "Email must be 256 characters or less."),
-  password: z.string().min(1, "Password is required.").max(200, "Password must be 200 characters or less.")
+  email: z
+    .email("Enter a valid admin email.")
+    .max(256, "Email must be 256 characters or less."),
+  password: z
+    .string()
+    .min(1, "Password is required.")
+    .max(200, "Password must be 200 characters or less."),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -29,13 +35,13 @@ export function LoginPage() {
     handleSubmit,
     formState: { errors, isSubmitting },
     setError,
-    clearErrors
+    clearErrors,
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "admin@example.com",
-      password: ""
-    }
+      password: "",
+    },
   });
 
   if (isAuthenticated) {
@@ -55,12 +61,15 @@ export function LoginPage() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[var(--surface-soft)] p-4">
-      <section className="w-full max-w-md rounded-[var(--radius-shell)] border border-white/70 bg-[var(--surface)] p-8 shadow-[var(--shadow-panel)]">
-        <img src="/demo/logo.svg" alt="WorkspaceEcom" className="h-auto w-[190px]" />
-        <p className="mt-5 text-xs font-black uppercase tracking-[0.18em] text-[var(--muted)]">Admin console</p>
-        <h1 className="mt-3 text-3xl font-black text-[var(--ink)]">Sign in</h1>
-        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Use your admin credentials to access operations screens.</p>
+    <main className="grid min-h-dvh place-items-center bg-[var(--surface-soft)] p-4">
+      <section className="admin-panel w-full max-w-[420px] !p-6 sm:!p-8">
+        <AdminBrand />
+        <h1 className="mt-8 text-2xl font-semibold text-[var(--ink)]">
+          Sign in
+        </h1>
+        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+          Sign in to manage your store.
+        </p>
 
         {errors.root?.message ? (
           <div className="mt-5">
@@ -68,13 +77,22 @@ export function LoginPage() {
           </div>
         ) : null}
 
-        <form className="mt-6 grid gap-4" onSubmit={handleSubmit(handleLogin)} noValidate>
+        <form
+          className="mt-6 grid gap-4"
+          onSubmit={handleSubmit(handleLogin)}
+          noValidate
+        >
           <Controller
             name="email"
             control={control}
             render={({ field }) => (
               <Field label="Email" error={errors.email?.message}>
-                <TextInput {...field} autoComplete="email" inputMode="email" disabled={isSubmitting} />
+                <TextInput
+                  {...field}
+                  autoComplete="email"
+                  inputMode="email"
+                  disabled={isSubmitting}
+                />
               </Field>
             )}
           />
@@ -84,12 +102,22 @@ export function LoginPage() {
             control={control}
             render={({ field }) => (
               <Field label="Password" error={errors.password?.message}>
-                <TextInput {...field} type="password" autoComplete="current-password" disabled={isSubmitting} />
+                <TextInput
+                  {...field}
+                  type="password"
+                  autoComplete="current-password"
+                  disabled={isSubmitting}
+                />
               </Field>
             )}
           />
 
-          <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
+          <Button
+            type="submit"
+            variant="primary"
+            fullWidth
+            disabled={isSubmitting}
+          >
             {isSubmitting ? "Signing in..." : "Login"}
           </Button>
         </form>

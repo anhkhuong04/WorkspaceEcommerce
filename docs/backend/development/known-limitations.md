@@ -5,19 +5,23 @@ Re-verify source and tests before changing them.
 
 ## Product and workflow gaps
 
-- Return handling is only a direct `Completed -> Returned` transition. There is
-  no return request/review aggregate, item-level disposition, refund execution,
-  inventory movement, loyalty reversal, or automatic warranty reconciliation.
-- Paid cancellation ends at `PaymentStatus.RefundPending`; no VNPay refund worker
-  or reconciliation process exists.
-- Manual bank transfer checkout remains pending; there is no settlement endpoint
-  or automatic shipment trigger for it.
+- [Item returns](../api/order-returns.md) support approval, physical inspection,
+  partial verified refunds, loyalty reversal/debt and warranty reconciliation.
+  Serialized returned goods stay quarantined; resale needs a separate
+  reprovisioning workflow. Refund execution and carrier reverse logistics are
+  operational actions; no bank/VNPay refund worker initiates transfers.
+- Paid cancellation enters RefundPending until verified outgoing proof is
+  recorded. [Payment confirmations](../api/order-payment-confirmations.md)
+  reconcile new manual transfers/COD and short/excess receipts. Old unmarked
+  legacy orders keep their prior workflow and need reviewed migration rather
+  than automatic reclassification.
 - COD/manual-transfer shipping fee refresh happens after the order transaction.
   A quote failure can leave an accepted order at its initial zero shipping fee;
   COD shipment work may already be queued. Treat any redesign as a money and
   fulfillment consistency change.
 - Loyalty tier discount/free-shipping fields are displayed but checkout does not
-  apply them. Earned points are not reversed on cancellation/return.
+  apply them. Verified item-return refunds reverse earned points proportionally;
+  already spent points become debt repaid from future earning.
 - PDF receipts are not legal tax/VAT invoices.
 - Admin authentication is one configured credential and `Admin` role; there is
   no operator directory or fine-grained RBAC.

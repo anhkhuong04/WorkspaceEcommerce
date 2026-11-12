@@ -2,7 +2,7 @@
 
 public sealed class UpdateBannerRequest
 {
-    public string Title { get; init; } = string.Empty;
+    public string? Title { get; init; }
 
     public string ImageUrl { get; init; } = string.Empty;
 

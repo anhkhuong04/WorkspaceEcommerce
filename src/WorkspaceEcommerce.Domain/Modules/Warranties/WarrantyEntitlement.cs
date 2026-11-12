@@ -75,7 +75,8 @@ public sealed class WarrantyEntitlement : Entity
         DateTimeOffset activatedAt,
         WarrantyActivationSource source,
         string acceptedTermsVersion,
-        IEnumerable<WarrantyCoverageSnapshot> coverageSnapshots)
+        IEnumerable<WarrantyCoverageSnapshot> coverageSnapshots,
+        DateTimeOffset? recordedAt = null)
     {
         if (Status == WarrantyEntitlementStatus.Active)
         {
@@ -107,7 +108,7 @@ public sealed class WarrantyEntitlement : Entity
         AcceptedTermsVersion = Guard.Required(acceptedTermsVersion, nameof(acceptedTermsVersion));
         _coverageSnapshots.AddRange(snapshots);
         Status = WarrantyEntitlementStatus.Active;
-        UpdatedAt = activatedAt;
+        UpdatedAt = recordedAt ?? activatedAt;
     }
 
     public void Void(DateTimeOffset at)

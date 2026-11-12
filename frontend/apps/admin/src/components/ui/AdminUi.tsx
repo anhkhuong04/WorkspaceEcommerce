@@ -1,176 +1,191 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
-import { useEffect, useId, useRef } from "react";
+import * as AlertDialog from "@radix-ui/react-alert-dialog";
+import * as Dialog from "@radix-ui/react-dialog";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import * as Switch from "@radix-ui/react-switch";
+import * as Tabs from "@radix-ui/react-tabs";
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowLeftRight,
+  CheckCircle2,
+  Ellipsis,
+  Inbox,
+  Info,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import {
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type Ref,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from "react";
 import { cx } from "./cx";
-
-const focusableSelector = [
-  "a[href]",
-  "button:not([disabled])",
-  "textarea:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  "[tabindex]:not([tabindex='-1'])"
-].join(",");
-
-function getFocusableElements(container: HTMLElement) {
-  return Array.from(container.querySelectorAll<HTMLElement>(focusableSelector)).filter((element) => !element.hasAttribute("aria-hidden"));
-}
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "ghost" | "danger";
   fullWidth?: boolean;
+  ref?: Ref<HTMLButtonElement>;
 }
-
-export function Button({ className, variant = "secondary", fullWidth = false, disabled, ...props }: ButtonProps) {
-  const variants = {
-    primary: "border-[var(--brand)] bg-[var(--brand)] text-[var(--brand-contrast)] hover:border-black hover:bg-black",
-    secondary: "border-[var(--border)] bg-[var(--surface)] text-[var(--muted-strong)] hover:border-[var(--muted)] hover:text-[var(--ink)]",
-    ghost: "border-transparent bg-transparent text-[var(--muted-strong)] hover:bg-[var(--brand-soft)] hover:text-[var(--brand)]",
-    danger: "border-red-200 bg-[var(--danger-soft)] text-[var(--danger)] hover:bg-red-100"
-  };
-
+export function Button({
+  className,
+  variant = "secondary",
+  fullWidth,
+  type = "button",
+  ...props
+}: ButtonProps) {
   return (
     <button
       {...props}
-      disabled={disabled}
+      type={type}
       className={cx(
-        "inline-flex items-center justify-center rounded-[var(--radius-control)] border px-4 py-2 text-sm font-bold shadow-[var(--shadow-card)] transition disabled:cursor-not-allowed disabled:opacity-60",
-        variants[variant],
+        "admin-button",
+        `admin-button-${variant}`,
         fullWidth && "w-full",
-        className
+        className,
       )}
     />
   );
 }
-
+export function IconButton({
+  label,
+  children,
+  className,
+  ...props
+}: ButtonProps & { label: string }) {
+  return (
+    <Button
+      {...props}
+      variant={props.variant ?? "ghost"}
+      aria-label={label}
+      title={props.title ?? label}
+      className={cx("admin-icon-button", className)}
+    >
+      {children}
+    </Button>
+  );
+}
 interface NoticeProps {
   type?: "error" | "warning" | "success" | "info";
   title: string;
   children?: ReactNode;
 }
-
 export function Notice({ type = "info", title, children }: NoticeProps) {
-  const styles = {
-    error: "border-red-200 bg-[var(--danger-soft)] text-red-900",
-    warning: "border-amber-200 bg-[var(--warning-soft)] text-amber-900",
-    success: "border-emerald-200 bg-[var(--success-soft)] text-emerald-900",
-    info: "border-sky-200 bg-[var(--info-soft)] text-sky-900"
-  };
-
+  const Icon = {
+    error: AlertCircle,
+    warning: AlertTriangle,
+    success: CheckCircle2,
+    info: Info,
+  }[type];
   return (
-    <div className={cx("rounded-[var(--radius-panel)] border p-4", styles[type])}>
-      <p className="font-bold">{title}</p>
-      {children ? <div className="mt-1 text-sm opacity-85">{children}</div> : null}
+    <div
+      className={cx("admin-notice", `admin-notice-${type}`)}
+      role={type === "error" ? "alert" : "status"}
+    >
+      <Icon size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+      <div className="min-w-0">
+        <p className="font-medium">{title}</p>
+        {children ? <div className="mt-1 text-sm">{children}</div> : null}
+      </div>
     </div>
   );
 }
 
+// These controlled shells do not own a Trigger. Remember the page's button so
+// closing a dialog returns focus to the action which opened it.
+function useDialogFocus() {
+  const returnFocus = useRef<HTMLElement | null>(null);
+  return {
+    onOpenAutoFocus: () => {
+      returnFocus.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+    },
+    onCloseAutoFocus: (event: Event) => {
+      if (returnFocus.current?.isConnected) {
+        event.preventDefault();
+        returnFocus.current.focus({ preventScroll: true });
+      }
+    },
+  };
+}
 interface ModalProps {
   title: string;
   open: boolean;
   children: ReactNode;
   footer?: ReactNode;
   widthClass?: string;
+  busy?: boolean;
+  error?: string;
   onClose: () => void;
 }
-
-export function Modal({ title, open, children, footer, widthClass = "max-w-xl", onClose }: ModalProps) {
-  const titleId = useId();
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    previouslyFocusedElementRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-
-    window.setTimeout(() => {
-      const dialog = dialogRef.current;
-      if (!dialog) {
-        return;
-      }
-
-      const [firstFocusableElement] = getFocusableElements(dialog);
-      (firstFocusableElement ?? dialog).focus();
-    }, 0);
-
-    return () => {
-      previouslyFocusedElementRef.current?.focus();
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-
-      if (event.key !== "Tab") {
-        return;
-      }
-
-      const dialog = dialogRef.current;
-      if (!dialog) {
-        return;
-      }
-
-      const focusableElements = getFocusableElements(dialog);
-      if (focusableElements.length === 0) {
-        event.preventDefault();
-        dialog.focus();
-        return;
-      }
-
-      const firstElement = focusableElements[0];
-      const lastElement = focusableElements[focusableElements.length - 1];
-
-      if (event.shiftKey && document.activeElement === firstElement) {
-        event.preventDefault();
-        lastElement.focus();
-      } else if (!event.shiftKey && document.activeElement === lastElement) {
-        event.preventDefault();
-        firstElement.focus();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, open]);
-
-  if (!open) {
-    return null;
-  }
-
+export function Modal({
+  title,
+  open,
+  children,
+  footer,
+  widthClass = "max-w-xl",
+  busy = false,
+  error,
+  onClose,
+}: ModalProps) {
+  const focus = useDialogFocus();
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4 backdrop-blur-sm" role="presentation">
-      <div
-        ref={dialogRef}
-        className={cx("max-h-[90vh] w-full overflow-hidden rounded-[var(--radius-shell)] bg-[var(--surface)] shadow-[var(--shadow-panel)] outline-none", widthClass)}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-      >
-        <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-6 py-4">
-          <h2 id={titleId} className="text-xl font-black text-[var(--ink)]">{title}</h2>
-          <button className="rounded-full px-3 py-1 text-2xl leading-none text-[var(--muted)] hover:bg-[var(--brand-soft)]" onClick={onClose} aria-label="Close">
-            x
-          </button>
-        </div>
-        <div className="max-h-[calc(90vh-140px)] overflow-y-auto px-6 py-5">{children}</div>
-        {footer ? <div className="flex justify-end gap-3 border-t border-[var(--border-soft)] px-6 py-4">{footer}</div> : null}
-      </div>
-    </div>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !busy) onClose();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="admin-overlay" />
+        <Dialog.Content
+          {...focus}
+          aria-describedby={undefined}
+          aria-busy={busy}
+          className={cx("admin-modal", widthClass)}
+          onEscapeKeyDown={(e) => {
+            if (busy) e.preventDefault();
+          }}
+          onPointerDownOutside={(e) => {
+            if (busy) e.preventDefault();
+          }}
+        >
+          <div className="admin-dialog-heading">
+            <Dialog.Title className="text-lg font-semibold">
+              {title}
+            </Dialog.Title>
+            <Dialog.Close asChild>
+              <IconButton label="Close dialog" disabled={busy}>
+                <X size={20} aria-hidden="true" />
+              </IconButton>
+            </Dialog.Close>
+          </div>
+          <div className="admin-dialog-body">
+            {error ? (
+              <div className="mb-4">
+                <Notice type="error" title={error} />
+              </div>
+            ) : null}
+            <fieldset disabled={busy} className="m-0 min-w-0 border-0 p-0">
+              {children}
+            </fieldset>
+          </div>
+          {footer ? <div className="admin-dialog-footer">{footer}</div> : null}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
-
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
@@ -178,10 +193,11 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   busy?: boolean;
+  error?: string;
+  confirmVariant?: "primary" | "danger";
   onCancel: () => void;
   onConfirm: () => void;
 }
-
 export function ConfirmDialog({
   open,
   title,
@@ -189,27 +205,66 @@ export function ConfirmDialog({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   busy = false,
+  error,
+  confirmVariant = "danger",
   onCancel,
-  onConfirm
+  onConfirm,
 }: ConfirmDialogProps) {
+  const focus = useDialogFocus();
   return (
-    <Modal
-      title={title}
+    <AlertDialog.Root
       open={open}
-      onClose={onCancel}
-      widthClass="max-w-md"
-      footer={(
-        <>
-          <Button type="button" disabled={busy} onClick={onCancel}>{cancelLabel}</Button>
-          <Button type="button" variant="danger" disabled={busy} onClick={onConfirm}>{busy ? "Working..." : confirmLabel}</Button>
-        </>
-      )}
+      onOpenChange={(next) => {
+        if (!next && !busy) onCancel();
+      }}
     >
-      <div className="text-sm font-semibold leading-6 text-slate-600">{message}</div>
-    </Modal>
+      <AlertDialog.Portal>
+        <AlertDialog.Overlay className="admin-overlay" />
+        <AlertDialog.Content
+          {...focus}
+          aria-busy={busy}
+          onEscapeKeyDown={(e) => {
+            if (busy) e.preventDefault();
+          }}
+          className="admin-modal max-w-md"
+        >
+          <div className="admin-dialog-heading">
+            <AlertDialog.Title className="text-lg font-semibold">
+              {title}
+            </AlertDialog.Title>
+          </div>
+          <AlertDialog.Description asChild>
+            <div className="admin-dialog-body text-sm leading-6 text-[var(--muted-strong)]">
+              {message}
+              {error ? (
+                <div className="mt-4">
+                  <Notice type="error" title={error} />
+                </div>
+              ) : null}
+            </div>
+          </AlertDialog.Description>
+          <div className="admin-dialog-footer">
+            <AlertDialog.Cancel asChild>
+              <Button disabled={busy}>{cancelLabel}</Button>
+            </AlertDialog.Cancel>
+            <AlertDialog.Action asChild>
+              <Button
+                variant={confirmVariant}
+                disabled={busy}
+                onClick={(event) => {
+                  event.preventDefault();
+                  onConfirm();
+                }}
+              >
+                {busy ? "Working..." : confirmLabel}
+              </Button>
+            </AlertDialog.Action>
+          </div>
+        </AlertDialog.Content>
+      </AlertDialog.Portal>
+    </AlertDialog.Root>
   );
 }
-
 interface DrawerProps {
   title: string;
   open: boolean;
@@ -217,172 +272,294 @@ interface DrawerProps {
   widthClass?: string;
   onClose: () => void;
 }
-
-export function Drawer({ title, open, children, widthClass = "max-w-3xl", onClose }: DrawerProps) {
-  const titleId = useId();
-  const drawerRef = useRef<HTMLElement>(null);
-  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    previouslyFocusedElementRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-
-    window.setTimeout(() => {
-      const drawer = drawerRef.current;
-      if (!drawer) {
-        return;
-      }
-
-      const [firstFocusableElement] = getFocusableElements(drawer);
-      (firstFocusableElement ?? drawer).focus();
-    }, 0);
-
-    return () => {
-      previouslyFocusedElementRef.current?.focus();
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-
-      if (event.key !== "Tab") {
-        return;
-      }
-
-      const drawer = drawerRef.current;
-      if (!drawer) {
-        return;
-      }
-
-      const focusableElements = getFocusableElements(drawer);
-      if (focusableElements.length === 0) {
-        event.preventDefault();
-        drawer.focus();
-        return;
-      }
-
-      const firstElement = focusableElements[0];
-      const lastElement = focusableElements[focusableElements.length - 1];
-
-      if (event.shiftKey && document.activeElement === firstElement) {
-        event.preventDefault();
-        lastElement.focus();
-      } else if (!event.shiftKey && document.activeElement === lastElement) {
-        event.preventDefault();
-        firstElement.focus();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, open]);
-
-  if (!open) {
-    return null;
-  }
-
+export function Drawer({
+  title,
+  open,
+  children,
+  widthClass = "max-w-3xl",
+  onClose,
+}: DrawerProps) {
+  const focus = useDialogFocus();
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/45 backdrop-blur-sm" role="presentation">
-      <aside
-        ref={drawerRef}
-        className={cx("h-full w-full overflow-y-auto bg-[var(--surface)] p-6 shadow-[var(--shadow-panel)] outline-none", widthClass)}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-      >
-        <div className="mb-5 flex items-center justify-between gap-4">
-          <h2 id={titleId} className="text-2xl font-black text-[var(--ink)]">{title}</h2>
-          <Button type="button" onClick={onClose}>Close</Button>
-        </div>
-        {children}
-      </aside>
-    </div>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="admin-overlay" />
+        <Dialog.Content
+          {...focus}
+          aria-describedby={undefined}
+          className={cx("admin-drawer", widthClass)}
+        >
+          <div className="admin-dialog-heading">
+            <Dialog.Title className="text-lg font-semibold">
+              {title}
+            </Dialog.Title>
+            <Dialog.Close asChild>
+              <IconButton label="Close drawer">
+                <X size={20} aria-hidden="true" />
+              </IconButton>
+            </Dialog.Close>
+          </div>
+          <div className="admin-dialog-body">{children}</div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
-
 interface FieldProps {
   label: string;
   error?: string;
   children: ReactNode;
 }
-
 export function Field({ label, error, children }: FieldProps) {
+  const generatedId = useId();
+  const child = isValidElement<Record<string, unknown>>(children)
+    ? children
+    : null;
+  const id = (child?.props.id as string | undefined) ?? generatedId;
+  const isGroup = child?.type === "div";
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm font-bold text-[var(--muted-strong)]">{label}</span>
-      {children}
-      {error ? <span className="mt-1 block text-sm font-semibold text-red-600" role="alert">{error}</span> : null}
-    </label>
+    <div className="min-w-0">
+      {isGroup ? (
+        <span
+          id={`${id}-label`}
+          className="mb-1.5 block text-sm font-medium text-[var(--muted-strong)]"
+        >
+          {label}
+        </span>
+      ) : (
+        <label
+          htmlFor={id}
+          className="mb-1.5 block text-sm font-medium text-[var(--muted-strong)]"
+        >
+          {label}
+        </label>
+      )}
+      {child
+        ? cloneElement(child, {
+            id,
+            ...(isGroup
+              ? { role: "group", "aria-labelledby": `${id}-label` }
+              : {}),
+            "aria-invalid": error ? true : child.props["aria-invalid"],
+            "aria-describedby":
+              [child.props["aria-describedby"], error ? `${id}-error` : null]
+                .filter(Boolean)
+                .join(" ") || undefined,
+          })
+        : children}
+      {error ? (
+        <p
+          id={`${id}-error`}
+          className="mt-1.5 text-sm text-red-700"
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
-
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cx("w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--muted)] focus:ring-4 focus:ring-[var(--brand-soft)] disabled:bg-[var(--brand-soft)]", props.className)} />;
+  return <input {...props} className={cx("admin-input", props.className)} />;
 }
-
 export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={cx("w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--muted)] focus:ring-4 focus:ring-[var(--brand-soft)] disabled:bg-[var(--brand-soft)]", props.className)} />;
+  return (
+    <textarea
+      {...props}
+      className={cx("admin-input min-h-24", props.className)}
+    />
+  );
 }
-
 export function SelectInput(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={cx("w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--muted)] focus:ring-4 focus:ring-[var(--brand-soft)] disabled:bg-[var(--brand-soft)]", props.className)} />;
+  return <select {...props} className={cx("admin-input", props.className)} />;
 }
-
 interface ToggleProps {
   checked: boolean;
   disabled?: boolean;
   label?: string;
+  id?: string;
+  "aria-invalid"?: boolean;
+  "aria-describedby"?: string;
   onChange: (checked: boolean) => void;
 }
-
-export function Toggle({ checked, disabled, label = "Toggle setting", onChange }: ToggleProps) {
+export function Toggle({ checked, onChange, label, ...props }: ToggleProps) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={cx(
-        "relative h-6 w-11 rounded-full transition disabled:opacity-60",
-        checked ? "bg-[var(--brand)]" : "bg-slate-300"
-      )}
-      aria-pressed={checked}
-      aria-label={label}
+    <Switch.Root
+      {...props}
+      checked={checked}
+      onCheckedChange={onChange}
+      aria-label={label ?? (props.id ? undefined : "Active")}
+      className="admin-switch"
     >
-      <span className={cx("absolute top-1 h-4 w-4 rounded-full bg-white shadow transition", checked ? "left-6" : "left-1")} />
-    </button>
+      <Switch.Thumb className="admin-switch-thumb" />
+    </Switch.Root>
   );
 }
-
-interface PillProps {
+export function Pill({
+  children,
+  tone = "slate",
+}: {
   children: ReactNode;
   tone?: "green" | "red" | "blue" | "orange" | "slate";
+}) {
+  return (
+    <span className={cx("admin-pill", `admin-pill-${tone}`)}>
+      <span
+        className="h-1.5 w-1.5 shrink-0 rounded-full bg-current"
+        aria-hidden="true"
+      />
+      {children}
+    </span>
+  );
 }
-
-export function Pill({ children, tone = "slate" }: PillProps) {
-  const tones = {
-    green: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    red: "bg-red-50 text-red-700 ring-red-200",
-    blue: "bg-blue-50 text-blue-700 ring-blue-200",
-    orange: "bg-orange-50 text-orange-700 ring-orange-200",
-    slate: "bg-slate-100 text-slate-700 ring-slate-200"
-  };
-
-  return <span className={cx("inline-flex rounded-full px-2.5 py-1 text-xs font-black ring-1", tones[tone])}>{children}</span>;
-}
-
 export function EmptyState({ children }: { children: ReactNode }) {
-  return <div className="rounded-[var(--radius-panel)] border border-dashed border-[var(--border)] bg-[var(--brand-soft)] p-8 text-center text-sm font-semibold text-[var(--muted)]">{children}</div>;
+  return (
+    <div className="admin-empty">
+      <Inbox size={28} className="mb-3 text-slate-500" aria-hidden="true" />
+      <div className="max-w-md text-sm leading-6 text-[var(--muted-strong)]">
+        {children}
+      </div>
+    </div>
+  );
+}
+export function TableViewport({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [overflow, setOverflow] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() =>
+      setOverflow(el.scrollWidth > el.clientWidth + 1),
+    );
+    observer.observe(el);
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
+    return () => observer.disconnect();
+  }, [children]);
+  return (
+    <div className="min-w-0">
+      <div
+        ref={ref}
+        role="region"
+        aria-label={label}
+        tabIndex={0}
+        className={cx("admin-table-scroll overflow-auto", className)}
+      >
+        {children}
+      </div>
+      {overflow ? (
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-[var(--muted)]">
+          <ArrowLeftRight size={14} aria-hidden="true" />
+          Scroll to view more columns
+        </p>
+      ) : null}
+    </div>
+  );
+}
+export function AdminTabs({
+  tabs,
+  label,
+  defaultValue,
+  value,
+  onValueChange,
+}: {
+  tabs: { value: string; label: string; content: ReactNode }[];
+  label: string;
+  defaultValue?: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
+}) {
+  return (
+    <Tabs.Root
+      defaultValue={defaultValue ?? tabs[0]?.value}
+      value={value}
+      onValueChange={onValueChange}
+      className="min-w-0"
+    >
+      <Tabs.List aria-label={label} className="admin-tabs">
+        {tabs.map((tab) => (
+          <Tabs.Trigger key={tab.value} value={tab.value} className="admin-tab">
+            {tab.label}
+          </Tabs.Trigger>
+        ))}
+      </Tabs.List>
+      {tabs.map((tab) => (
+        <Tabs.Content
+          key={tab.value}
+          value={tab.value}
+          className="min-w-0 pt-4 outline-none"
+        >
+          {tab.content}
+        </Tabs.Content>
+      ))}
+    </Tabs.Root>
+  );
+}
+export interface RowAction {
+  label: string;
+  icon?: LucideIcon;
+  onSelect: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}
+export function RowActions({
+  label,
+  actions,
+}: {
+  label: string;
+  actions: RowAction[];
+}) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const pendingAction = useRef<(() => void) | null>(null);
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <IconButton label={label} ref={triggerRef}>
+          <Ellipsis size={18} aria-hidden="true" />
+        </IconButton>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={6}
+          collisionPadding={12}
+          className="admin-menu"
+          onCloseAutoFocus={(event) => {
+            if (!pendingAction.current) return;
+            event.preventDefault();
+            triggerRef.current?.focus();
+            const action = pendingAction.current;
+            pendingAction.current = null;
+            requestAnimationFrame(action);
+          }}
+        >
+          {actions.map(({ icon: Icon, ...action }) => (
+            <DropdownMenu.Item
+              key={action.label}
+              onSelect={() => {
+                pendingAction.current = action.onSelect;
+              }}
+              disabled={action.disabled}
+              className={cx("admin-menu-item", action.danger && "text-red-700")}
+            >
+              {Icon ? <Icon size={16} aria-hidden="true" /> : null}
+              {action.label}
+            </DropdownMenu.Item>
+          ))}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
 }

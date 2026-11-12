@@ -1,16 +1,21 @@
 import type { AdminBlogPostDto } from "@workspace-ecommerce/api-types";
-import { Button, EmptyState, Pill, Toggle } from "../../../components/ui/AdminUi";
-
-type BlogPostsTableProps = {
+import { FileText, Pencil, Trash2 } from "lucide-react";
+import {
+  EmptyState,
+  IconButton,
+  Pill,
+  TableViewport,
+  Toggle,
+} from "../../../components/ui/AdminUi";
+type Props = {
   posts: AdminBlogPostDto[];
   isLoading: boolean;
   togglePublishPending: boolean;
   deletePending: boolean;
-  onEdit: (post: AdminBlogPostDto) => void;
-  onDelete: (post: AdminBlogPostDto) => void;
-  onTogglePublish: (post: AdminBlogPostDto) => void;
+  onEdit: (p: AdminBlogPostDto) => void;
+  onDelete: (p: AdminBlogPostDto) => void;
+  onTogglePublish: (p: AdminBlogPostDto) => void;
 };
-
 export function BlogPostsTable({
   posts,
   isLoading,
@@ -18,64 +23,97 @@ export function BlogPostsTable({
   deletePending,
   onEdit,
   onDelete,
-  onTogglePublish
-}: BlogPostsTableProps) {
-  if (isLoading) {
+  onTogglePublish,
+}: Props) {
+  if (isLoading)
     return (
-      <div className="grid gap-3">
-        {[0, 1, 2].map((item) => <div key={item} className="h-14 animate-pulse rounded-2xl bg-slate-100" />)}
+      <div className="grid gap-3" role="status" aria-label="Loading articles">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="h-16 animate-pulse rounded-lg bg-slate-100" />
+        ))}
       </div>
     );
-  }
-
-  if (posts.length === 0) {
-    return <EmptyState>No blog posts created yet. Get started by clicking New Article.</EmptyState>;
-  }
-
+  if (!posts.length)
+    return (
+      <EmptyState>
+        No articles yet. Create an article to share news with your customers.
+      </EmptyState>
+    );
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[900px] text-left text-sm">
-        <thead className="text-xs uppercase tracking-wide text-slate-500">
-          <tr className="border-b border-slate-100">
-            <th className="py-3 pr-4">Cover Image</th>
-            <th className="py-3 pr-4">Title</th>
-            <th className="py-3 pr-4">Slug</th>
-            <th className="py-3 pr-4">Date</th>
-            <th className="py-3 pr-4">Status</th>
-            <th className="py-3 pr-4">Actions</th>
+    <TableViewport label="Articles">
+      <table className="w-full min-w-[650px]">
+        <thead>
+          <tr>
+            <th>Article</th>
+            <th>Date</th>
+            <th>Publication</th>
+            <th>
+              <span className="sr-only">Actions</span>
+            </th>
           </tr>
         </thead>
         <tbody>
-          {posts.map((post) => (
-            <tr key={post.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
-              <td className="py-3 pr-4">
-                {post.imageUrl ? (
-                  <img className="h-12 w-20 rounded-lg object-cover ring-1 ring-slate-100" src={post.imageUrl} alt={post.title} />
-                ) : (
-                  <div className="grid h-12 w-20 place-items-center rounded-lg bg-slate-100 text-xs font-bold text-slate-400">No Image</div>
-                )}
-              </td>
-              <td className="py-3 pr-4 font-bold text-slate-900">{post.title}</td>
-              <td className="py-3 pr-4 font-mono text-xs text-slate-500">/news/{post.slug}</td>
-              <td className="py-3 pr-4 text-xs text-slate-500">
-                {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString() : `Drafted ${new Date(post.createdAt).toLocaleDateString()}`}
-              </td>
-              <td className="py-3 pr-4">
+          {posts.map((p) => (
+            <tr key={p.id} className="border-b border-slate-100 last:border-0">
+              <td>
                 <div className="flex items-center gap-3">
-                  <Toggle checked={post.isPublished} disabled={togglePublishPending} onChange={() => onTogglePublish(post)} />
-                  <Pill tone={post.isPublished ? "green" : "slate"}>{post.isPublished ? "Published" : "Draft"}</Pill>
+                  {p.imageUrl ? (
+                    <img
+                      src={p.imageUrl}
+                      alt=""
+                      loading="lazy"
+                      width={80}
+                      height={48}
+                      className="h-12 w-20 shrink-0 rounded-lg bg-slate-50 object-cover"
+                    />
+                  ) : (
+                    <span className="grid h-12 w-20 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-400">
+                      <FileText size={20} aria-hidden="true" />
+                    </span>
+                  )}
+                  <p className="max-w-md font-medium">{p.title}</p>
                 </div>
               </td>
-              <td className="py-3 pr-4">
-                <div className="flex gap-2">
-                  <Button type="button" onClick={() => onEdit(post)}>Edit</Button>
-                  <Button type="button" variant="danger" disabled={deletePending} onClick={() => onDelete(post)}>Delete</Button>
+              <td className="whitespace-nowrap text-xs text-[var(--muted)]">
+                {p.publishedAt
+                  ? new Date(p.publishedAt).toLocaleDateString()
+                  : `Drafted ${new Date(p.createdAt).toLocaleDateString()}`}
+              </td>
+              <td>
+                <div className="flex items-center gap-2">
+                  <Toggle
+                    label={`Publication of ${p.title}`}
+                    checked={p.isPublished}
+                    disabled={togglePublishPending}
+                    onChange={() => onTogglePublish(p)}
+                  />
+                  <Pill tone={p.isPublished ? "green" : "slate"}>
+                    {p.isPublished ? "Published" : "Draft"}
+                  </Pill>
+                </div>
+              </td>
+              <td>
+                <div className="flex gap-1">
+                  <IconButton
+                    label={`Edit ${p.title}`}
+                    onClick={() => onEdit(p)}
+                  >
+                    <Pencil size={17} aria-hidden="true" />
+                  </IconButton>
+                  <IconButton
+                    label={`Delete ${p.title}`}
+                    variant="danger"
+                    disabled={deletePending}
+                    onClick={() => onDelete(p)}
+                  >
+                    <Trash2 size={17} aria-hidden="true" />
+                  </IconButton>
                 </div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-    </div>
+    </TableViewport>
   );
 }

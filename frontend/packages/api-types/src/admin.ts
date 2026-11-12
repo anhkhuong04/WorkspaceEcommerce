@@ -24,7 +24,7 @@ export interface MediaUploadResult {
 export interface AdminCategoryDto {
   id: string;
   parentId: string | null;
-  name: string;
+  name: Record<string, string>;
   slug: string;
   isActive: boolean;
   sortOrder: number;
@@ -33,13 +33,17 @@ export interface AdminCategoryDto {
 
 export interface AdminCategoryUpsertRequest {
   parentId?: string | null;
-  name: string;
+  name: Record<string, string>;
   slug: string;
   sortOrder: number;
   isActive: boolean;
 }
 
 export interface AdminProductVariantDto {
+  weightKg?: number | null;
+  lengthCm?: number | null;
+  widthCm?: number | null;
+  heightCm?: number | null;
   id: string;
   productId: string;
   sku: string;
@@ -54,6 +58,13 @@ export interface AdminProductVariantDto {
 }
 
 export interface AdminProductVariantUpsertRequest {
+  stockChangeReason?: string;
+  updateDimensions?: boolean;
+  weightKg?: number | null;
+  lengthCm?: number | null;
+  widthCm?: number | null;
+  heightCm?: number | null;
+  expectedStockQuantity?: number;
   sku: string;
   name: string;
   color?: string | null;
@@ -97,9 +108,9 @@ export interface AdminProductDto {
   id: string;
   categoryId: string;
   categoryName: string | null;
-  name: string;
+  name: Record<string, string>;
   slug: string;
-  description: string | null;
+  description: Record<string, string> | null;
   isFeatured: boolean;
   isActive: boolean;
   createdAt: string;
@@ -111,14 +122,33 @@ export interface AdminProductDto {
 
 export interface AdminProductUpsertRequest {
   categoryId: string;
-  name: string;
+  name: Record<string, string>;
   slug: string;
-  description?: string | null;
+  description?: Record<string, string> | null;
   isFeatured: boolean;
   isActive: boolean;
 }
 
+export interface AdminProductListRequest extends PaginationRequest {
+  ids?: string;
+  search?: string;
+  productId?: string;
+  categoryId?: string;
+  isActive?: boolean;
+  isFeatured?: boolean;
+  stock?: "in" | "out" | "low";
+  minPrice?: number;
+  maxPrice?: number;
+  sortBy?: "slug" | "created-desc" | "price-asc" | "price-desc" | "stock-asc";
+}
+export interface AdminSearchItemDto { kind: string; id: string; title: string; detail: string | null; url: string; }
+export interface AdminSearchDto { items: AdminSearchItemDto[]; }
+export interface AdminBlogListRequest extends PaginationRequest { search?: string; isPublished?: boolean; postId?: string; }
+export interface AdminCommentListRequest extends PaginationRequest { postId?: string; status?: import("./blogs").BlogCommentModerationStatus; }
+
 export interface AdminOrderListRequest extends PaginationRequest {
+  paymentStatus?: PaymentStatus;
+  queue?: string;
   status?: OrderStatus;
   search?: string;
 }
@@ -153,6 +183,11 @@ export interface AdminOrderStatusHistoryDto {
 }
 
 export interface AdminOrderDto extends Omit<AdminOrderListItemDto, "shipping"> {
+  importSource?: string | null;
+  refundedAmount?: number;
+  paymentDueAt?: string | null;
+  returnRequestedAt?: string | null;
+  returnReason?: string | null;
   shipping?: import("./shipping").OrderShippingDetailsDto | null;
   customerId: string | null;
   customerEmail: string | null;
@@ -178,6 +213,7 @@ export interface UpdateOrderStatusRequest {
 }
 
 export interface AdminOrderImportRowResultDto {
+  alreadyImported?: boolean;
   rowNumber: number;
   externalOrderCode: string;
   sku: string;
@@ -187,7 +223,7 @@ export interface AdminOrderImportRowResultDto {
 }
 
 export interface AdminOrderImportPreviewDto {
-  shippingSemantics?: "LegacyImport";
+  shippingSemantics?: "LegacyImport" | "ManualFulfillment";
   totalRows: number;
   validRows: number;
   errorRows: number;
@@ -201,6 +237,7 @@ export interface AdminOrderImportCreatedOrderDto {
 }
 
 export interface AdminOrderImportCommitResultDto {
+  skippedOrders?: number;
   createdOrders: number;
   orders: AdminOrderImportCreatedOrderDto[];
   preview: AdminOrderImportPreviewDto;
@@ -265,7 +302,7 @@ export interface AdminBannerDto {
 }
 
 export interface AdminBannerUpsertRequest {
-  title: string;
+  title?: string | null;
   imageUrl: string;
   linkUrl?: string | null;
   sortOrder: number;
@@ -297,6 +334,8 @@ export interface RecentAdminOrderDto {
 }
 
 export interface AdminDashboardDto {
+  netCollectedRevenue?: number;
+  operations?: { key: string; label: string; count: number; url: string }[];
   totalOrders: number;
   totalRevenue: number;
   newOrders: number;

@@ -8,7 +8,7 @@ export function ShipmentTrackingPanel({ tracking }: { tracking: ShipmentTracking
     return (
       <div className="rounded-[var(--radius-card)] border border-dashed border-slate-200 bg-slate-50 p-5">
         <p className="text-sm font-bold text-slate-800">{t("shipment.preparing")}</p>
-        <p className="ui-body mt-1 text-slate-500">{t("shipment.preparingHint")}</p>
+        <p className="ui-body mt-1 text-slate-600">{t("shipment.preparingHint")}</p>
         {tracking.lastCommandError ? <p className="mt-2 text-sm font-semibold text-amber-700">{t("shipment.retryQueued")}</p> : null}
       </div>
     );
@@ -33,14 +33,14 @@ export function ShipmentTrackingPanel({ tracking }: { tracking: ShipmentTracking
               <span className="mt-1.5 h-3.5 w-3.5 rounded-full bg-emerald-600 ring-4 ring-emerald-50" aria-hidden="true" />
               <span className="min-w-0">
                 <span className="block text-sm font-bold text-slate-950">{formatProviderStatus(entry.providerStatus, t("shipment.pending"))}</span>
-                <span className="mt-0.5 block text-xs font-medium text-slate-500">{formatDate(entry.changedAtUtc)}</span>
+                <span className="mt-0.5 block text-xs font-medium text-slate-600">{formatDate(entry.changedAtUtc)}</span>
                 {entry.note ? <span className="mt-1 block text-sm text-slate-600">{entry.note}</span> : null}
               </span>
             </li>
           ))}
         </ol>
       ) : (
-        <p className="border-t border-slate-100 pt-4 text-sm font-semibold text-slate-500">{t("shipment.waiting")}</p>
+        <p className="border-t border-slate-100 pt-4 text-sm font-semibold text-slate-600">{t("shipment.waiting")}</p>
       )}
     </div>
   );
@@ -49,7 +49,7 @@ export function ShipmentTrackingPanel({ tracking }: { tracking: ShipmentTracking
 function ShipmentField({ label, mono = false, value }: { label: string; mono?: boolean; value: string }) {
   return (
     <div className="min-w-0">
-      <p className="ui-caption uppercase tracking-[0.14em] text-slate-400">{label}</p>
+      <p className="ui-caption uppercase tracking-[0.14em] text-slate-600">{label}</p>
       <p className={`mt-1 break-words text-sm font-bold text-slate-800 ${mono ? "font-mono" : ""}`}>{value}</p>
     </div>
   );

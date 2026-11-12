@@ -26,8 +26,15 @@
   "revision": "Rate revision",
   "total": "Total",
   "statuses": {
-    "AwaitingRelease": "Awaiting release", "Ready": "Ready", "Assigned": "Assigned",
-    "OutForDelivery": "Out for delivery", "Delivered": "Delivered", "FailedDelivery": "Delivery failed",
-    "Cancelled": "Cancelled", "Draft": "Preparing shipment"
-  }
+    "AwaitingRelease": "Awaiting release",
+    "Ready": "Ready",
+    "Assigned": "Assigned",
+    "OutForDelivery": "Out for delivery",
+    "Delivered": "Delivered",
+    "FailedDelivery": "Delivery failed",
+    "Cancelled": "Cancelled",
+    "Draft": "Preparing shipment"
+  },
+  "capabilitiesError": "Delivery configuration could not be loaded. Please try again.",
+  "couponCode": "Discount code"
 }

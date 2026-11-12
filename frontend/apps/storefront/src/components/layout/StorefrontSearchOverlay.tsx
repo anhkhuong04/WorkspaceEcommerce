@@ -83,7 +83,7 @@ function StorefrontSearchOverlayContent({ onClose }: Pick<StorefrontSearchOverla
               ref={inputRef}
               value={query}
               onChange={handleQueryChange}
-              className="min-w-0 flex-1 border-0 border-b-2 border-slate-900 bg-transparent px-0 pb-3 text-slate-900 placeholder:text-slate-500"
+              className="min-w-0 flex-1 border-0 border-b-2 border-slate-900 bg-transparent px-0 pb-3 text-slate-900 placeholder:text-slate-600"
               placeholder={t("search.placeholder")}
               aria-label={t("search.placeholder")}
             />
@@ -155,7 +155,7 @@ function SearchTabButton({ active, children, onClick }: { active: boolean; child
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`min-h-11 border-b-2 text-lg font-semibold transition ${active ? "border-slate-950 text-slate-950" : "border-transparent text-slate-500 hover:text-slate-950"}`}
+      className={`min-h-11 border-b-2 text-lg font-semibold transition ${active ? "border-slate-950 text-slate-950" : "border-transparent text-slate-600 hover:text-slate-950"}`}
     >
       {children}
     </button>
@@ -194,11 +194,11 @@ function ProductSearchResults({
             {product.imageUrl ? (
               <img src={product.imageUrl} alt={product.name} className="h-full w-full object-contain p-3" />
             ) : (
-              <span className="text-xs font-bold text-slate-400">WorkspaceEcom</span>
+              <span className="text-xs font-bold text-slate-600">WorkspaceEcom</span>
             )}
           </div>
           <div className="min-w-0 self-center pr-2">
-            <p className="truncate text-sm font-semibold text-slate-500 sm:text-base">{product.categoryName}</p>
+            <p className="truncate text-sm font-semibold text-slate-600 sm:text-base">{product.categoryName}</p>
             <h3 className="mt-1 line-clamp-2 text-base font-semibold text-slate-950 sm:text-lg">{product.name}</h3>
             <p className="mt-2 text-lg font-semibold text-slate-950">{product.minPrice === null ? t("common.contactUs") : formatMoney(product.minPrice)}</p>
           </div>
@@ -240,13 +240,13 @@ function BlogSearchResults({
             {post.imageUrl ? (
               <img src={post.imageUrl} alt={post.title} className="h-full w-full object-cover" />
             ) : (
-              <span className="text-xs font-bold text-slate-400">{t("search.article")}</span>
+              <span className="text-xs font-bold text-slate-600">{t("search.article")}</span>
             )}
           </div>
           <div className="min-w-0 self-center pr-2">
-            <p className="text-sm font-semibold text-slate-500">{t("search.blogPost")}</p>
+            <p className="text-sm font-semibold text-slate-600">{t("search.blogPost")}</p>
             <h3 className="mt-1 line-clamp-1 text-lg font-black text-slate-800 sm:text-2xl">{post.title}</h3>
-            <p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-slate-500">{post.summary}</p>
+            <p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-slate-600">{post.summary}</p>
           </div>
         </Link>
       ))}
@@ -256,7 +256,7 @@ function BlogSearchResults({
 
 function SearchStateMessage({ children, tone = "info" }: { children: string; tone?: "info" | "error" }) {
   return (
-    <div className={`rounded-xl px-5 py-4 text-sm font-semibold ${tone === "error" ? "bg-red-50 text-red-700" : "bg-slate-50 text-slate-500"}`}>
+    <div className={`rounded-xl px-5 py-4 text-sm font-semibold ${tone === "error" ? "bg-red-50 text-red-700" : "bg-slate-50 text-slate-600"}`}>
       {children}
     </div>
   );

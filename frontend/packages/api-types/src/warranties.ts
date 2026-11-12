@@ -100,6 +100,7 @@ export interface AssignWarrantyPlanRequest {
 }
 
 export interface AdminWarrantyUnitListRequest extends PaginationRequest {
+  productVariantId?: string;
   search?: string;
   status?: SerializedProductUnitStatus;
 }

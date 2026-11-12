@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import storefrontI18n from "../../i18n";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
@@ -10,7 +12,7 @@ import { ProductCard } from "../../components/ui/ProductCard";
 
 const commentSchema = z.object({
   authorName: z.string().trim().min(1, "Name is required.").max(100, "Name is too long."),
-  authorEmail: z.string().trim().min(1, "Email is required.").email("Invalid email address.").max(150, "Email is too long."),
+  authorEmail: z.string().trim().min(1, "Email is required.").email("Invalid email address.").max(150, storefrontI18n.t("uiCopy.email_is_too_long")),
   content: z.string().trim().min(1, "Comment content is required.").max(2000, "Comment is too long.")
 });
 
@@ -23,6 +25,7 @@ const defaultValues: CommentFormValues = {
 };
 
 export function BlogDetailPage() {
+  useTranslation();
   const { slug } = useParams<{ slug: string }>();
   const queryClient = useQueryClient();
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -59,7 +62,7 @@ export function BlogDetailPage() {
     return (
       <div className="mx-auto max-w-[900px] px-5 py-20 text-center">
         <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-teal-700 border-t-transparent" />
-        <p className="mt-4 text-sm font-semibold text-slate-400">Loading article...</p>
+        <p className="mt-4 text-sm font-semibold text-slate-600">{storefrontI18n.t("uiCopy.loading_article")}</p>
       </div>
     );
   }
@@ -67,11 +70,9 @@ export function BlogDetailPage() {
   if (blogPostQuery.isError || !blogPostQuery.data) {
     return (
       <div className="mx-auto max-w-[900px] px-5 py-20 text-center">
-        <h1 className="text-2xl font-black text-slate-900">Article not found</h1>
-        <p className="mt-2 text-slate-500 font-semibold">The article you are looking for does not exist or has been unpublished.</p>
-        <Link to="/news" className="mt-6 inline-flex h-11 items-center justify-center rounded-full bg-teal-700 px-6 text-sm font-bold text-white hover:bg-teal-800 transition">
-          Back to News
-        </Link>
+        <h1 className="text-2xl font-black text-slate-900">{storefrontI18n.t("uiCopy.article_not_found")}</h1>
+        <p className="mt-2 text-slate-600 font-semibold">{storefrontI18n.t("uiCopy.the_article_you_are_looking_for_does_not_exist_or_has_been_unpublished")}</p>
+        <Link to="/news" className="mt-6 inline-flex h-11 items-center justify-center rounded-full bg-teal-700 px-6 text-sm font-bold text-white hover:bg-teal-800 transition">{storefrontI18n.t("uiCopy.back_to_news")}</Link>
       </div>
     );
   }
@@ -88,13 +89,13 @@ export function BlogDetailPage() {
         >
           ← Back to News
         </Link>
-        <time className="block mt-4 text-xs font-bold text-slate-400">
+        <time className="block mt-4 text-xs font-bold text-slate-600">
           {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString() : ""}
         </time>
         <h1 className="mt-4 text-3xl font-black leading-tight text-slate-900 sm:text-4xl md:text-5xl tracking-tight max-w-3xl mx-auto">
           {post.title}
         </h1>
-        <p className="mt-6 text-base sm:text-lg font-medium text-slate-500 max-w-2xl mx-auto leading-relaxed border-l-4 border-teal-700 pl-4 text-left">
+        <p className="mt-6 text-base sm:text-lg font-medium text-slate-600 max-w-2xl mx-auto leading-relaxed border-l-4 border-teal-700 pl-4 text-left">
           {post.summary}
         </p>
       </header>
@@ -132,12 +133,8 @@ export function BlogDetailPage() {
         <section className="border-t border-slate-100 bg-slate-50/50 py-16 lg:py-24">
           <div className="mx-auto max-w-[1400px] px-5 sm:px-8 lg:px-10">
             <div className="mb-10 text-left">
-              <h2 className="text-2xl font-black text-slate-950 sm:text-3xl tracking-tight">
-                Featured Products in this Article
-              </h2>
-              <p className="mt-2 text-sm font-semibold text-slate-500">
-                Explore the workspace furniture and configurations mentioned above.
-              </p>
+              <h2 className="text-2xl font-black text-slate-950 sm:text-3xl tracking-tight">{storefrontI18n.t("uiCopy.featured_products_in_this_article")}</h2>
+              <p className="mt-2 text-sm font-semibold text-slate-600">{storefrontI18n.t("uiCopy.explore_the_workspace_furniture_and_configurations_mentioned_above")}</p>
             </div>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {post.relatedProducts.map((product) => (
@@ -160,7 +157,7 @@ export function BlogDetailPage() {
           className="mb-12 rounded-3xl border border-slate-100 bg-slate-50/50 p-6 sm:p-8"
           noValidate
         >
-          <h3 className="text-sm font-bold text-slate-900 mb-6">Leave a comment</h3>
+          <h3 className="text-sm font-bold text-slate-900 mb-6">{storefrontI18n.t("uiCopy.leave_a_comment")}</h3>
 
           {successMessage && (
             <div className="mb-6 rounded-2xl bg-green-50 border border-green-100 p-4 text-xs font-bold text-green-800">
@@ -180,7 +177,7 @@ export function BlogDetailPage() {
               name="authorName"
               render={({ field, fieldState }) => (
                 <div>
-                  <label htmlFor="authorName" className="block text-xs font-bold text-slate-500 mb-2">Name</label>
+                  <label htmlFor="authorName" className="block text-xs font-bold text-slate-600 mb-2">{storefrontI18n.t("uiCopy.name")}</label>
                   <input
                     {...field}
                     id="authorName"
@@ -200,7 +197,7 @@ export function BlogDetailPage() {
               name="authorEmail"
               render={({ field, fieldState }) => (
                 <div>
-                  <label htmlFor="authorEmail" className="block text-xs font-bold text-slate-500 mb-2">Email (will not be published)</label>
+                  <label htmlFor="authorEmail" className="block text-xs font-bold text-slate-600 mb-2">{storefrontI18n.t("uiCopy.email_will_not_be_published")}</label>
                   <input
                     {...field}
                     id="authorEmail"
@@ -222,7 +219,7 @@ export function BlogDetailPage() {
               name="content"
               render={({ field, fieldState }) => (
                 <div>
-                  <label htmlFor="content" className="block text-xs font-bold text-slate-500 mb-2">Comment</label>
+                  <label htmlFor="content" className="block text-xs font-bold text-slate-600 mb-2">{storefrontI18n.t("uiCopy.comment")}</label>
                   <textarea
                     {...field}
                     id="content"
@@ -230,7 +227,7 @@ export function BlogDetailPage() {
                     className={`w-full rounded-2xl border bg-white px-4 py-3 text-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 ${
                       fieldState.error ? "border-red-300 focus:border-red-500 focus:ring-red-500" : "border-slate-200"
                     }`}
-                    placeholder="What are your thoughts on this article?"
+                    placeholder={storefrontI18n.t("uiCopy.what_are_your_thoughts_on_this_article")}
                   />
                   {fieldState.error && <p className="mt-1 text-[11px] font-bold text-red-600">{fieldState.error.message}</p>}
                 </div>
@@ -260,7 +257,7 @@ export function BlogDetailPage() {
                 <div className="min-w-0">
                   <div className="flex items-baseline gap-2">
                     <span className="text-sm font-bold text-slate-900">{comment.authorName}</span>
-                    <span className="text-[10px] text-slate-400">• {new Date(comment.createdAt).toLocaleDateString()}</span>
+                    <span className="text-[10px] text-slate-600">• {new Date(comment.createdAt).toLocaleDateString()}</span>
                   </div>
                   <p className="mt-1.5 text-sm leading-relaxed text-slate-600 whitespace-pre-wrap font-medium break-words">
                     {comment.content}
@@ -270,9 +267,7 @@ export function BlogDetailPage() {
             ))}
           </div>
         ) : (
-          <div className="py-8 text-center text-slate-400 text-sm font-semibold">
-            No comments yet. Start the conversation!
-          </div>
+          <div className="py-8 text-center text-slate-600 text-sm font-semibold">{storefrontI18n.t("uiCopy.no_comments_yet_start_the_conversation")}</div>
         )}
       </section>
     </div>

@@ -13,4 +13,6 @@ public sealed record StorefrontBlogPostDto(
     string? ImageUrl,
     DateTimeOffset? PublishedAt,
     IReadOnlyCollection<StorefrontProductListItemDto> RelatedProducts,
-    IReadOnlyCollection<BlogCommentDto> Comments);
+    IReadOnlyCollection<PublicBlogCommentDto> Comments);
+
+public sealed record PublicBlogCommentDto(Guid Id, string AuthorName, string Content, DateTimeOffset CreatedAt);

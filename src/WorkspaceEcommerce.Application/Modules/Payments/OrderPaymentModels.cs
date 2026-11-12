@@ -21,7 +21,11 @@ public sealed record OrderPaymentReceiptDto(Guid Id, OrderPaymentReceiptKind Kin
     string Reference, string Reason, string Actor, DateTimeOffset OccurredAtUtc);
 public sealed record OrderPaymentSummaryDto(Guid OrderId, PaymentMethod PaymentMethod, PaymentStatus PaymentStatus,
     decimal TotalAmount, string Currency, ShippingMethod? ShippingMethod, bool CanConfirmTransfer, bool CanCollectCod,
-    bool CanRemitCod, IReadOnlyCollection<OrderPaymentReceiptDto> Receipts);
+    bool CanRemitCod, IReadOnlyCollection<OrderPaymentReceiptDto> Receipts)
+{
+    public bool CanConfirmFullRefund { get; init; }
+    public string? ImportSource { get; init; }
+}
 public interface IOrderPaymentService
 {
     Task<Result<OrderPaymentSummaryDto>> GetAsync(Guid id, CancellationToken cancellationToken);

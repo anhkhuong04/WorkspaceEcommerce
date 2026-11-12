@@ -45,7 +45,7 @@ export class ApiClient {
       }
 
       if (response.status === 401) {
-        this.options.onUnauthorized?.();
+        this.handleUnauthorized(headers);
       }
 
       const errors = envelope?.errors?.length ? envelope.errors : ["File download failed."];
@@ -107,7 +107,7 @@ export class ApiClient {
     const envelope = (await response.json()) as ApiResponse<T>;
     if (!response.ok || !envelope.success) {
       if (response.status === 401) {
-        this.options.onUnauthorized?.();
+        this.handleUnauthorized(headers);
       }
 
       const errors = envelope.errors.length > 0 ? envelope.errors : ["API request failed."];
@@ -115,6 +115,13 @@ export class ApiClient {
     }
 
     return envelope.data as T;
+  }
+
+  private handleUnauthorized(requestHeaders: Headers): void {
+    const currentToken = this.options.getAccessToken?.();
+    const currentAuthorization = currentToken ? `Bearer ${currentToken}` : null;
+    // A response belonging to a previous identity cannot sign out the new one.
+    if (requestHeaders.get("Authorization") === currentAuthorization) this.options.onUnauthorized?.();
   }
 
   private createHeaders(initialHeaders?: HeadersInit): Headers {

@@ -21,7 +21,6 @@ const navItems: ReadonlyArray<{
   { to: "/products", labelKey: "header.products", menu: "products" },
   { to: "/warranty", labelKey: "header.warranty", menu: "warranty" },
   { to: "/news", labelKey: "header.news" },
-  { labelKey: "header.showroom" },
   { to: "/about-us", labelKey: "header.about" }
 ];
 
@@ -83,7 +82,7 @@ function StorefrontLayoutContent() {
                 {expandedMenu === item.menu && item.menu === "products" && <ProductMegaMenu categories={categoriesQuery.data ?? []} isLoading={categoriesQuery.isLoading} />}
                 {expandedMenu === item.menu && item.menu === "warranty" && <WarrantyMenu />}
               </div>
-            ) : <span key={item.labelKey} className="cursor-default text-slate-500">{t(item.labelKey)}</span>)}
+            ) : <span key={item.labelKey} className="cursor-default text-slate-600">{t(item.labelKey)}</span>)}
           </nav>
           <div className="flex shrink-0 items-center sm:gap-1 lg:col-start-3 lg:justify-self-end">
             <button type="button" aria-label={t("header.openNavigation")} aria-haspopup="dialog" onClick={() => setIsMobileMenuOpen(true)} className="grid h-11 w-11 place-items-center rounded-full hover:bg-slate-100 lg:hidden">
@@ -106,7 +105,7 @@ function StorefrontLayoutContent() {
       <main id="storefront-content" tabIndex={-1} className={hideHeader ? "w-full flex-1" : isHome ? "w-full flex-1 pb-16" : "storefront-container flex-1 py-8 sm:py-12"}>
         <Outlet />
       </main>
-      {!hideHeader && <StorefrontFooter />}
+      {!hideHeader && <StorefrontFooter compact={location.pathname.startsWith("/checkout")} />}
       <StorefrontSearchOverlay isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <CustomerOrderNotifications />
       {isMobileMenuOpen && <dialog {...mobileMenu} className="storefront-modal storefront-drawer flex flex-col" aria-label={t("header.navigation")}>
@@ -117,7 +116,7 @@ function StorefrontLayoutContent() {
         <nav className="min-h-0 flex-1 overflow-y-auto px-6 py-6" aria-label={t("header.navigation")}
           onClickCapture={(event) => { if (event.target instanceof Element && event.target.closest("a")) setIsMobileMenuOpen(false); }}>
           <div className="grid gap-1 border-b border-slate-100 pb-6">
-            {navItems.map((item) => item.to ? <NavLink key={item.labelKey} to={item.to} className="flex min-h-12 items-center justify-between text-lg font-medium">{t(item.labelKey)}<span aria-hidden="true">↗</span></NavLink> : <span key={item.labelKey} className="py-3 text-slate-500">{t(item.labelKey)}</span>)}
+            {navItems.map((item) => item.to ? <NavLink key={item.labelKey} to={item.to} className="flex min-h-12 items-center justify-between text-lg font-medium">{t(item.labelKey)}<span aria-hidden="true">↗</span></NavLink> : <span key={item.labelKey} className="py-3 text-slate-600">{t(item.labelKey)}</span>)}
             <NavLink to="/warranty-policy" className="flex min-h-12 items-center text-sm text-slate-600">{t("header.warrantyPolicy")}</NavLink>
           </div>
           <div className="grid gap-8 pt-6">
@@ -158,9 +157,9 @@ function ProductMegaMenu({
       <div id="header-products" className="max-h-[min(560px,calc(100vh-7rem))] overflow-y-auto rounded-2xl border border-slate-100 bg-white p-5 text-slate-950 shadow-[0_18px_45px_rgba(15,23,42,0.16)]">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {isLoading ? (
-            <div className="text-sm font-semibold text-slate-500">{t("header.loadingCategories")}</div>
+            <div className="text-sm font-semibold text-slate-600">{t("header.loadingCategories")}</div>
           ) : categories.length === 0 ? (
-            <div className="text-sm font-semibold text-slate-500">{t("header.noCategories")}</div>
+            <div className="text-sm font-semibold text-slate-600">{t("header.noCategories")}</div>
           ) : (
             categories.map((category) => <CategoryColumn key={category.id} category={category} />)
           )}
@@ -186,7 +185,7 @@ function CategoryColumn({ category }: { category: StorefrontCategoryDto }) {
         ) : (
           <NavLink
             to={`/products?categorySlug=${encodeURIComponent(category.slug)}`}
-            className="block text-base font-bold text-slate-500 transition hover:text-slate-950"
+            className="block text-base font-bold text-slate-600 transition hover:text-slate-950"
           >
             {t("header.viewProducts")}
           </NavLink>
@@ -207,7 +206,7 @@ function CategoryMenuItem({
     <div className={level > 0 ? "pl-4" : ""}>
       <NavLink
         to={`/products?categorySlug=${encodeURIComponent(category.slug)}`}
-        className="block text-base font-bold text-slate-500 transition hover:text-slate-950"
+        className="block text-base font-bold text-slate-600 transition hover:text-slate-950"
       >
         {category.name}
       </NavLink>

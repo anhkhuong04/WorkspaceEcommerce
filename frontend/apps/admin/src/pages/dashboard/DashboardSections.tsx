@@ -3,203 +3,284 @@ import type {
   AdminOrderStatusSummaryDto,
   LowStockProductVariantDto,
   OrderStatus,
-  RecentAdminOrderDto
+  RecentAdminOrderDto,
 } from "@workspace-ecommerce/api-types";
-import { formatDate, formatMoney, formatOrderStatus } from "@workspace-ecommerce/shared-utils";
+import {
+  formatDate,
+  formatMoney,
+  formatOrderStatus,
+} from "@workspace-ecommerce/shared-utils";
+import {
+  ArrowUpRight,
+  CircleDollarSign,
+  ClipboardList,
+  PackageSearch,
+  RefreshCw,
+  ShoppingBag,
+} from "lucide-react";
 import type { ReactNode } from "react";
-import { Button, EmptyState, Pill } from "../../components/ui/AdminUi";
+import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
+import {
+  Button,
+  EmptyState,
+  IconButton,
+  Pill,
+  TableViewport,
+} from "../../components/ui/AdminUi";
 import { formatLocalizedText } from "../../utils/localizedText";
 
 type PillTone = "green" | "red" | "blue" | "orange" | "slate";
-
-const statusPresentation: Record<OrderStatus, { tone: PillTone; barClass: string }> = {
+const statusPresentation: Record<
+  OrderStatus,
+  { tone: PillTone; barClass: string }
+> = {
   0: { tone: "orange", barClass: "bg-amber-500" },
-  1: { tone: "slate", barClass: "bg-slate-600" },
+  1: { tone: "slate", barClass: "bg-slate-500" },
   2: { tone: "blue", barClass: "bg-sky-600" },
   3: { tone: "blue", barClass: "bg-indigo-500" },
   4: { tone: "green", barClass: "bg-emerald-600" },
-  5: { tone: "orange", barClass: "bg-orange-500" },
-  6: { tone: "red", barClass: "bg-red-500" },
-  7: { tone: "slate", barClass: "bg-slate-500" }
+  5: { tone: "orange", barClass: "bg-orange-600" },
+  6: { tone: "red", barClass: "bg-red-600" },
+  7: { tone: "slate", barClass: "bg-slate-700" },
 };
 
-interface DashboardHeroProps {
+export function DashboardHero({
+  lastUpdated,
+  refreshing,
+  onRefresh,
+}: {
   lastUpdated: string;
   refreshing: boolean;
   onRefresh: () => void;
-}
-
-export function DashboardHero({ lastUpdated, refreshing, onRefresh }: DashboardHeroProps) {
+}) {
   return (
-    <section className="relative overflow-hidden rounded-[1.75rem] border border-slate-900/10 bg-gradient-to-br from-slate-950 via-slate-900 to-black px-5 py-4 text-white shadow-lg shadow-slate-900/10 sm:px-6">
-      <div className="absolute -right-16 -top-24 h-56 w-56 rounded-full bg-slate-400/10 blur-3xl" aria-hidden="true" />
-      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-300">Operations overview</p>
-          <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Admin dashboard</h1>
-          <p className="mt-1.5 max-w-2xl text-sm leading-5 text-slate-300">
-            Track order throughput, completed revenue, recent activity, and inventory requiring attention.
-          </p>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 backdrop-blur">
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Last updated</p>
-            <p className="mt-0.5 text-sm font-bold text-white" aria-live="polite">{lastUpdated}</p>
-          </div>
-          <Button
-            type="button"
-            variant="primary"
-            className="border-slate-600 bg-white text-slate-950 hover:bg-slate-200"
-            disabled={refreshing}
-            onClick={onRefresh}
-          >
-            {refreshing ? "Refreshing..." : "Refresh data"}
+    <AdminPageHeader
+      title="Dashboard"
+      description="A clear view of orders, revenue and inventory."
+      actions={
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs text-[var(--muted)]">
+            Updated {lastUpdated}
+          </span>
+          <Button disabled={refreshing} onClick={onRefresh}>
+            <RefreshCw
+              size={16}
+              className={refreshing ? "animate-spin" : ""}
+              aria-hidden="true"
+            />
+            {refreshing ? "Refreshing..." : "Refresh"}
           </Button>
         </div>
-      </div>
-    </section>
+      }
+    />
   );
 }
 
-export function DashboardMetrics({ dashboard }: { dashboard: AdminDashboardDto }) {
+export function DashboardMetrics({
+  dashboard,
+}: {
+  dashboard: AdminDashboardDto;
+}) {
   const metrics = [
     {
       label: "Total orders",
       value: dashboard.totalOrders,
-      detail: "All order statuses",
-      accentClass: "bg-slate-900"
+      detail: "Across all statuses",
+      icon: ShoppingBag,
     },
     {
-      label: "Completed revenue",
-      value: formatMoney(dashboard.totalRevenue),
-      detail: "Completed orders only",
-      accentClass: "bg-emerald-600"
+      label: "Net collected on fulfilled orders",
+      value: dashboard.netCollectedRevenue === undefined ? "Unavailable" : formatMoney(dashboard.netCollectedRevenue),
+      detail: "All time · verified paid less recorded refunds · VND at order rate",
+      icon: CircleDollarSign,
     },
     {
-      label: "New orders",
+      label: "Awaiting confirmation",
       value: dashboard.newOrders,
-      detail: "Pending confirmation",
-      accentClass: "bg-amber-500"
+      detail: "Pending orders",
+      icon: ClipboardList,
     },
     {
-      label: "Low-stock variants",
+      label: "Stock alerts shown",
       value: dashboard.lowStockVariants.length,
-      detail: `At or below ${dashboard.lowStockThreshold} units`,
-      accentClass: "bg-red-500"
-    }
+      detail: `Up to 10 variants · ≤ ${dashboard.lowStockThreshold} units`,
+      icon: PackageSearch,
+    },
   ];
-
   return (
-    <section className="grid grid-cols-2 gap-3 xl:grid-cols-4 xl:gap-4" aria-label="Dashboard metrics">
-      {metrics.map((metric) => (
-        <article key={metric.label} className="relative min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm xl:rounded-3xl">
-          <span className={`absolute inset-x-0 top-0 h-1 ${metric.accentClass}`} aria-hidden="true" />
-          <p className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-500 sm:text-xs">{metric.label}</p>
-          <p className="mt-2 truncate text-2xl font-black tracking-tight text-slate-950 xl:text-3xl" title={String(metric.value)}>{metric.value}</p>
-          <p className="mt-1 text-xs font-semibold leading-4 text-slate-500 sm:text-sm">{metric.detail}</p>
+    <section
+      className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 xl:grid-cols-4"
+      aria-label="Dashboard metrics"
+    >
+      {metrics.map(({ icon: Icon, ...m }) => (
+        <article key={m.label} className="admin-panel !p-4">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm text-[var(--muted-strong)]">{m.label}</p>
+            <Icon
+              size={18}
+              className="shrink-0 text-[var(--brand)]"
+              aria-hidden="true"
+            />
+          </div>
+          <p className="mt-3 break-words text-[clamp(20px,2vw,28px)] font-semibold leading-tight tracking-tight tabular-nums">
+            {m.value}
+          </p>
+          <p className="mt-2 text-xs text-[var(--muted)]">{m.detail}</p>
         </article>
       ))}
     </section>
   );
 }
 
-interface OrderStatusOverviewProps {
+export function OrderStatusOverview({
+  summary,
+  totalOrders,
+  onViewOrders,
+  onViewStatus,
+}: {
   summary: AdminOrderStatusSummaryDto[];
   totalOrders: number;
   onViewOrders: () => void;
   onViewStatus: (status: OrderStatus) => void;
-}
-
-export function OrderStatusOverview({ summary, totalOrders, onViewOrders, onViewStatus }: OrderStatusOverviewProps) {
+}) {
   return (
     <DashboardCard
-      title="Order status"
-      description="Current distribution across the MVP workflow."
-      action={<Button type="button" onClick={onViewOrders}>View orders</Button>}
+      title="Order activity"
+      description="Distribution by current order status."
+      action={
+        <Button variant="ghost" onClick={onViewOrders}>
+          View orders
+          <ArrowUpRight size={16} aria-hidden="true" />
+        </Button>
+      }
     >
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
-        {summary.map((item) => {
-          const presentation = statusPresentation[item.status];
-          const percentage = totalOrders === 0 ? 0 : Math.round((item.count / totalOrders) * 100);
-
-          return (
-            <div key={item.status} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
-              <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
-                <button
-                  type="button"
-                  className="rounded-md font-bold text-slate-700 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-600 focus-visible:ring-offset-2"
-                  onClick={() => onViewStatus(item.status)}
-                >
-                  {formatOrderStatus(item.status)}
-                </button>
-                <button
-                  type="button"
-                  className="rounded-md font-black text-slate-950 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-600 focus-visible:ring-offset-2"
-                  onClick={() => onViewStatus(item.status)}
-                  aria-label={`View ${formatOrderStatus(item.status)} orders`}
-                >
-                  {item.count} <span className="font-semibold text-slate-400">({percentage}%)</span>
-                </button>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+      {totalOrders === 0 ? (
+        <div className="flex flex-col gap-1 rounded-lg bg-slate-50 px-4 py-5 text-sm">
+          <p className="font-medium">No orders yet</p>
+          <p className="text-[var(--muted)]">
+            Order activity will appear here when customers place an order.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div
+            className="mb-5 flex h-3 overflow-hidden rounded-full bg-slate-100"
+            aria-hidden="true"
+          >
+            {summary
+              .filter((s) => s.count > 0)
+              .map((s) => (
                 <div
-                  className={`h-full rounded-full transition-[width] ${presentation.barClass}`}
-                  style={{ width: `${percentage}%` }}
-                  role="progressbar"
-                  aria-label={`${formatOrderStatus(item.status)} orders`}
-                  aria-valuemin={0}
-                  aria-valuemax={Math.max(totalOrders, 1)}
-                  aria-valuenow={item.count}
+                  key={s.status}
+                  className={statusPresentation[s.status].barClass}
+                  style={{ width: `${(s.count / totalOrders) * 100}%` }}
                 />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              ))}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {summary.map((s) => (
+              <button
+                key={s.status}
+                type="button"
+                onClick={() => onViewStatus(s.status)}
+                className="flex min-h-11 items-center justify-between gap-3 rounded-lg px-3 py-2 text-left hover:bg-slate-50"
+                aria-label={`View ${formatOrderStatus(s.status)} orders`}
+              >
+                <span className="flex items-center gap-2 text-sm text-[var(--muted-strong)]">
+                  <span
+                    className={`h-2 w-2 shrink-0 rounded-full ${statusPresentation[s.status].barClass}`}
+                    aria-hidden="true"
+                  />
+                  {formatOrderStatus(s.status)}
+                </span>
+                <span className="whitespace-nowrap font-semibold tabular-nums">
+                  {s.count}
+                  <span className="ml-2 text-xs font-normal text-[var(--muted)]">
+                    {Math.round((s.count / totalOrders) * 100)}%
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </DashboardCard>
   );
 }
 
-interface RecentOrdersSectionProps {
+export function RecentOrdersSection({
+  orders,
+  onViewOrders,
+  onViewOrder,
+}: {
   orders: RecentAdminOrderDto[];
   onViewOrders: () => void;
   onViewOrder: (order: RecentAdminOrderDto) => void;
-}
-
-export function RecentOrdersSection({ orders, onViewOrders, onViewOrder }: RecentOrdersSectionProps) {
+}) {
   return (
     <DashboardCard
       title="Recent orders"
-      description="The five most recently created orders."
-      action={<Button type="button" onClick={onViewOrders}>Open all orders</Button>}
+      description="The five latest orders."
+      action={
+        <Button variant="ghost" onClick={onViewOrders}>
+          All orders
+          <ArrowUpRight size={16} aria-hidden="true" />
+        </Button>
+      }
     >
       {orders.length ? (
-        <DashboardTableViewport label="Recent orders table">
-          <table className="w-full min-w-[680px] text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-white text-xs uppercase tracking-wide text-slate-500 shadow-[0_1px_0_0_#e2e8f0]">
-              <tr className="border-b border-slate-100">
-                <th className="px-3 py-2.5">Order</th>
-                <th className="px-3 py-2.5">Customer</th>
-                <th className="px-3 py-2.5">Total</th>
-                <th className="px-3 py-2.5">Status</th>
-                <th className="px-3 py-2.5">Created</th>
-                <th className="px-3 py-2.5 text-right">Action</th>
+        <TableViewport label="Recent orders">
+          <table className="w-full min-w-[600px]">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {orders.map((order) => (
-                <tr key={order.id} className="border-b border-slate-100 last:border-0">
-                  <td className="px-3 py-2.5 font-black text-slate-900">{order.orderCode}</td>
-                  <td className="px-3 py-2.5 font-semibold text-slate-700">{formatLocalizedText(order.customerName)}</td>
-                  <td className="px-3 py-2.5 font-bold text-slate-900">{formatMoney(order.totalAmount)}</td>
-                  <td className="px-3 py-2.5"><OrderStatusPill status={order.status} /></td>
-                  <td className="px-3 py-2.5 text-slate-500">{formatDate(order.createdAt)}</td>
-                  <td className="px-3 py-2.5 text-right"><Button type="button" variant="ghost" onClick={() => onViewOrder(order)}>Open</Button></td>
+              {orders.map((o) => (
+                <tr
+                  key={o.id}
+                  className="border-b border-slate-100 last:border-0"
+                >
+                  <td>
+                    <button
+                      className="text-left font-medium text-[var(--brand)] hover:underline"
+                      onClick={() => onViewOrder(o)}
+                    >
+                      {o.orderCode}
+                    </button>
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      {formatDate(o.createdAt)}
+                    </p>
+                  </td>
+                  <td>{formatLocalizedText(o.customerName)}</td>
+                  <td className="whitespace-nowrap font-medium tabular-nums">
+                    {formatMoney(o.totalAmount)}
+                  </td>
+                  <td>
+                    <Pill tone={statusPresentation[o.status].tone}>
+                      {formatOrderStatus(o.status)}
+                    </Pill>
+                  </td>
+                  <td>
+                    <IconButton
+                      label={`Open order ${o.orderCode}`}
+                      onClick={() => onViewOrder(o)}
+                    >
+                      <ArrowUpRight size={17} aria-hidden="true" />
+                    </IconButton>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </DashboardTableViewport>
+        </TableViewport>
       ) : (
         <EmptyState>No recent orders</EmptyState>
       )}
@@ -207,121 +288,128 @@ export function RecentOrdersSection({ orders, onViewOrders, onViewOrder }: Recen
   );
 }
 
-interface LowStockSectionProps {
+export function LowStockSection({
+  threshold,
+  variants,
+  onViewProducts,
+  onViewVariant,
+}: {
   threshold: number;
   variants: LowStockProductVariantDto[];
   onViewProducts: () => void;
   onViewVariant: (variant: LowStockProductVariantDto) => void;
-}
-
-export function LowStockSection({ threshold, variants, onViewProducts, onViewVariant }: LowStockSectionProps) {
+}) {
   return (
     <DashboardCard
-      title="Inventory attention"
-      description={`Variants at or below the ${threshold}-unit low-stock threshold.`}
-      action={<Button type="button" onClick={onViewProducts}>Open products</Button>}
+      title="Inventory to review"
+      description={`First ${variants.length} alerts at or below ${threshold} units.`}
+      action={
+        <Button variant="ghost" onClick={onViewProducts}>
+          Products
+          <ArrowUpRight size={16} aria-hidden="true" />
+        </Button>
+      }
     >
       {variants.length ? (
-        <DashboardTableViewport label="Low-stock variants table">
-          <table className="w-full min-w-[680px] text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-white text-xs uppercase tracking-wide text-slate-500 shadow-[0_1px_0_0_#e2e8f0]">
-              <tr className="border-b border-slate-100">
-                <th className="px-3 py-2.5">Product</th>
-                <th className="px-3 py-2.5">SKU</th>
-                <th className="px-3 py-2.5">Variant</th>
-                <th className="px-3 py-2.5">Inventory</th>
-                <th className="px-3 py-2.5">Availability</th>
-                <th className="px-3 py-2.5 text-right">Action</th>
+        <TableViewport label="Inventory alerts" className="max-h-[420px]">
+          <table className="w-full min-w-[520px]">
+            <thead className="sticky top-0 z-10">
+              <tr>
+                <th>Product / variant</th>
+                <th>Stock</th>
+                <th>Visibility</th>
+                <th>
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {variants.map((variant) => {
-                const stockState = getStockState(variant.stockQuantity, threshold);
-
-                return (
-                  <tr key={variant.variantId} className="border-b border-slate-100 last:border-0">
-                    <td className="px-3 py-2.5 font-black text-slate-900">{formatLocalizedText(variant.productName)}</td>
-                    <td className="px-3 py-2.5 font-semibold text-slate-600">{variant.sku}</td>
-                    <td className="px-3 py-2.5 text-slate-600">{variant.variantName}</td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg font-black text-slate-950">{variant.stockQuantity}</span>
-                        <Pill tone={stockState.tone}>{stockState.label}</Pill>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5"><Pill tone={variant.isActive ? "green" : "slate"}>{variant.isActive ? "Active" : "Inactive"}</Pill></td>
-                    <td className="px-3 py-2.5 text-right"><Button type="button" variant="ghost" onClick={() => onViewVariant(variant)}>Manage</Button></td>
-                  </tr>
-                );
-              })}
+              {variants.map((v) => (
+                <tr
+                  key={v.variantId}
+                  className="border-b border-slate-100 last:border-0"
+                >
+                  <td className="max-w-[400px]">
+                    <p className="line-clamp-2 font-medium">
+                      {formatLocalizedText(v.productName)}
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-xs text-[var(--muted)]">
+                      {v.variantName}
+                    </p>
+                    <p className="mt-1 font-mono text-xs text-[var(--muted)]">
+                      {v.sku}
+                    </p>
+                  </td>
+                  <td>
+                    <Pill tone={v.stockQuantity === 0 ? "red" : "orange"}>
+                      {v.stockQuantity === 0
+                        ? "Out of stock"
+                        : `${v.stockQuantity} left`}
+                    </Pill>
+                  </td>
+                  <td>
+                    <span className="text-xs text-[var(--muted-strong)]">
+                      {v.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td>
+                    <IconButton
+                      label={`Manage ${v.sku}`}
+                      onClick={() => onViewVariant(v)}
+                    >
+                      <ArrowUpRight size={17} aria-hidden="true" />
+                    </IconButton>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
-        </DashboardTableViewport>
+        </TableViewport>
       ) : (
-        <EmptyState>No variants are at or below the current threshold</EmptyState>
+        <EmptyState>
+          No variants to review at the {threshold}-unit alert threshold.
+        </EmptyState>
       )}
     </DashboardCard>
   );
 }
-
 export function DashboardSkeleton() {
   return (
-    <div className="grid gap-4" aria-label="Loading dashboard">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[0, 1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-3xl bg-slate-200/70" />)}
+    <div className="grid gap-4" role="status" aria-label="Loading dashboard">
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="h-32 animate-pulse rounded-xl bg-slate-200/70"
+          />
+        ))}
       </div>
-      <div className="h-44 animate-pulse rounded-3xl bg-slate-200/70" />
-      <div className="grid gap-4 2xl:grid-cols-2">
-        <div className="h-96 animate-pulse rounded-3xl bg-slate-200/70" />
-        <div className="h-96 animate-pulse rounded-3xl bg-slate-200/70" />
-      </div>
+      <div className="h-44 animate-pulse rounded-xl bg-slate-200/70" />
+      <div className="h-80 animate-pulse rounded-xl bg-slate-200/70" />
     </div>
   );
 }
-
-function DashboardCard({ title, description, action, children }: { title: string; description: string; action?: ReactNode; children: ReactNode }) {
+function DashboardCard({
+  title,
+  description,
+  action,
+  children,
+}: {
+  title: string;
+  description: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <section className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-xl font-black tracking-tight text-slate-950">{title}</h2>
-          <p className="mt-1 text-sm font-semibold text-slate-500">{description}</p>
+    <section className="admin-panel">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold">{title}</h2>
+          <p className="mt-1 text-xs text-[var(--muted)]">{description}</p>
         </div>
         {action}
       </div>
       {children}
     </section>
   );
-}
-
-function DashboardTableViewport({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div>
-      <p className="mb-2 text-xs font-semibold text-slate-400 sm:hidden">Swipe horizontally to view all columns.</p>
-      <div
-        className="admin-table-scroll max-h-[22rem] overflow-auto rounded-2xl border border-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-600 focus-visible:ring-offset-2"
-        role="region"
-        aria-label={label}
-        tabIndex={0}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function OrderStatusPill({ status }: { status: OrderStatus }) {
-  return <Pill tone={statusPresentation[status].tone}>{formatOrderStatus(status)}</Pill>;
-}
-
-function getStockState(stockQuantity: number, threshold: number): { label: string; tone: PillTone } {
-  if (stockQuantity === 0) {
-    return { label: "Out of stock", tone: "red" };
-  }
-
-  if (stockQuantity <= Math.max(1, Math.floor(threshold / 2))) {
-    return { label: "Critical", tone: "red" };
-  }
-
-  return { label: "Low", tone: "orange" };
 }

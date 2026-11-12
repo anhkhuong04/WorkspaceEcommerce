@@ -56,7 +56,14 @@ internal sealed class AdminReviewService(IAppDbContext db) : IAdminReviewService
             new PagedResult<AdminReviewListItemDto>(items, page, pageSize, totalCount));
     }
 
-    public async Task<Result> DeleteReviewAsync(
+    public async Task<Result> DeleteReviewAsync(Guid reviewId, CancellationToken cancellationToken = default)
+    {
+        Result? result = null;
+        await db.ExecuteInTransactionAsync(async ct => { result = await DeleteReviewAsyncCore(reviewId, ct); }, cancellationToken);
+        return result!;
+    }
+
+    private async Task<Result> DeleteReviewAsyncCore(
         Guid reviewId,
         CancellationToken cancellationToken = default)
     {
@@ -71,9 +78,8 @@ internal sealed class AdminReviewService(IAppDbContext db) : IAdminReviewService
             return Result.NotFound("Review was not found.");
         }
 
-        var product = await db.Products
-            .Where(p => p.Id == review.ProductId)
-            .FirstOrDefaultAsyncSafe(cancellationToken);
+        var product = await db.FindProductForUpdateAsync(review.ProductId, cancellationToken);
+        if (!await db.Reviews.Where(r => r.Id == reviewId).AnyAsyncSafe(cancellationToken)) return Result.NotFound("Review was not found.");
 
         db.Remove(review);
 
@@ -87,8 +93,7 @@ internal sealed class AdminReviewService(IAppDbContext db) : IAdminReviewService
                 .FirstOrDefaultAsyncSafe(cancellationToken);
             var count = ratingSummary?.Count ?? 0;
             product.UpdateRatingStats(count == 0 ? 0 : ratingSummary!.Total / (double)count, count);
-            db.Update(product);
-        }
+            }
 
         await db.SaveChangesAsync(cancellationToken);
 

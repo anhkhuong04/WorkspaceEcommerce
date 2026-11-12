@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "paths": { "@workspace-ecommerce/api-types": ["./packages/api-types/src/index.ts"] }
+  },
+  "include": [
+    "e2e/admin-ui.fixtures.ts",
+    "e2e/admin-ui.spec.ts",
+    "e2e/shipping-admin.spec.ts",
+    "playwright.admin-ui.config.ts"
+  ]
+}

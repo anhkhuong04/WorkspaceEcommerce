@@ -1,26 +1,30 @@
 import type { AdminCouponDto } from "@workspace-ecommerce/api-types";
 import { formatMoney } from "@workspace-ecommerce/shared-utils";
-import { Button, EmptyState, Pill, Toggle } from "../../../components/ui/AdminUi";
+import { Pencil, Trash2 } from "lucide-react";
+import {
+  EmptyState,
+  IconButton,
+  Pill,
+  TableViewport,
+  Toggle,
+} from "../../../components/ui/AdminUi";
 import {
   couponStatusTone,
   formatCouponStatus,
   formatDiscount,
-  formatDiscountType,
   formatUsage,
-  formatWindow
+  formatWindow,
 } from "../couponTypes";
-
-type CouponsTableProps = {
+type Props = {
   coupons: AdminCouponDto[];
   isLoading: boolean;
   statusPending: boolean;
   deletePending: boolean;
-  getTargetSummary: (coupon: AdminCouponDto) => string;
-  onEdit: (coupon: AdminCouponDto) => void;
-  onDelete: (coupon: AdminCouponDto) => void;
-  onToggleStatus: (coupon: AdminCouponDto) => void;
+  getTargetSummary: (c: AdminCouponDto) => string;
+  onEdit: (c: AdminCouponDto) => void;
+  onDelete: (c: AdminCouponDto) => void;
+  onToggleStatus: (c: AdminCouponDto) => void;
 };
-
 export function CouponsTable({
   coupons,
   isLoading,
@@ -29,81 +33,109 @@ export function CouponsTable({
   getTargetSummary,
   onEdit,
   onDelete,
-  onToggleStatus
-}: CouponsTableProps) {
-  if (isLoading) {
+  onToggleStatus,
+}: Props) {
+  if (isLoading)
     return (
-      <div className="grid gap-3">
-        {[0, 1, 2].map((item) => <div key={item} className="h-16 animate-pulse rounded-2xl bg-slate-100" />)}
+      <div className="grid gap-3" role="status" aria-label="Loading coupons">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="h-16 animate-pulse rounded-lg bg-slate-100" />
+        ))}
       </div>
     );
-  }
-
-  if (coupons.length === 0) {
-    return <EmptyState>No coupons found</EmptyState>;
-  }
-
+  if (!coupons.length)
+    return (
+      <EmptyState>
+        No coupons found. Try clearing the filters or create a coupon.
+      </EmptyState>
+    );
   return (
-    <div className="admin-table-scroll overflow-x-auto">
-      <table className="w-full min-w-[1180px] text-left text-sm">
-        <thead className="text-xs uppercase tracking-wide text-slate-500">
-          <tr className="border-b border-slate-100">
-            <th className="py-3 pr-4">Code</th>
-            <th className="py-3 pr-4">Name</th>
-            <th className="py-3 pr-4">Type</th>
-            <th className="py-3 pr-4">Value</th>
-            <th className="py-3 pr-4">Dates</th>
-            <th className="py-3 pr-4">Usage</th>
-            <th className="py-3 pr-4">Targets</th>
-            <th className="py-3 pr-4">Status</th>
-            <th className="py-3 pr-4">Actions</th>
+    <TableViewport label="Coupons">
+      <table className="w-full min-w-[980px]">
+        <thead>
+          <tr>
+            <th>Coupon</th>
+            <th>Discount</th>
+            <th>Validity</th>
+            <th>Usage</th>
+            <th>Eligibility</th>
+            <th>Status</th>
+            <th>
+              <span className="sr-only">Actions</span>
+            </th>
           </tr>
         </thead>
         <tbody>
-          {coupons.map((coupon) => (
-            <tr key={coupon.id} className="border-b border-slate-100 last:border-0">
-              <td className="py-3 pr-4">
-                <p className="font-black text-slate-950">{coupon.code}</p>
-                {coupon.minimumSubtotal !== null ? <p className="mt-0.5 text-xs font-semibold text-slate-500">Min {formatMoney(coupon.minimumSubtotal)}</p> : null}
+          {coupons.map((c) => (
+            <tr key={c.id} className="border-b border-slate-100 last:border-0">
+              <td>
+                <p className="font-mono text-sm font-semibold">{c.code}</p>
+                <p className="mt-1 max-w-[200px] text-xs text-[var(--muted)]">
+                  {c.name}
+                </p>
               </td>
-              <td className="py-3 pr-4">
-                <p className="font-bold text-slate-900">{coupon.name}</p>
-                {coupon.description ? <p className="mt-0.5 max-w-[260px] truncate text-xs text-slate-500">{coupon.description}</p> : null}
+              <td className="whitespace-nowrap font-medium tabular-nums">
+                {formatDiscount(c)}
               </td>
-              <td className="py-3 pr-4">{formatDiscountType(coupon.discountType)}</td>
-              <td className="py-3 pr-4 font-bold text-slate-900">{formatDiscount(coupon)}</td>
-              <td className="py-3 pr-4 text-slate-600">{formatWindow(coupon)}</td>
-              <td className="py-3 pr-4">
-                <div className="grid gap-1">
-                  <span className="font-bold text-slate-800">{formatUsage(coupon)}</span>
-                  <span className="text-xs text-slate-500">{coupon.redemptionCount} redemptions</span>
+              <td className="text-xs text-[var(--muted-strong)]">
+                {formatWindow(c)}
+              </td>
+              <td>
+                <p className="font-medium tabular-nums">{formatUsage(c)}</p>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  {c.redemptionCount} redemptions
+                </p>
+              </td>
+              <td>
+                <p className="max-w-[180px] text-xs text-[var(--muted-strong)]">
+                  {getTargetSummary(c)}
+                </p>
+                {c.minimumSubtotal !== null ? (
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    Min {formatMoney(c.minimumSubtotal)}
+                  </p>
+                ) : null}
+              </td>
+              <td>
+                <div className="flex items-center gap-2">
+                  <Toggle
+                    label={`Status of coupon ${c.code}`}
+                    checked={c.isActive}
+                    disabled={statusPending}
+                    onChange={() => onToggleStatus(c)}
+                  />
+                  <Pill tone={couponStatusTone(c)}>
+                    {formatCouponStatus(c)}
+                  </Pill>
                 </div>
               </td>
-              <td className="py-3 pr-4 text-slate-600">{getTargetSummary(coupon)}</td>
-              <td className="py-3 pr-4">
-                <div className="flex items-center gap-3">
-                  <Toggle checked={coupon.isActive} disabled={statusPending} onChange={() => onToggleStatus(coupon)} />
-                  <Pill tone={couponStatusTone(coupon)}>{formatCouponStatus(coupon)}</Pill>
-                </div>
-              </td>
-              <td className="py-3 pr-4">
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" onClick={() => onEdit(coupon)}>Edit</Button>
-                  <Button
-                    type="button"
-                    variant="danger"
-                    disabled={coupon.redemptionCount > 0 || deletePending}
-                    title={coupon.redemptionCount > 0 ? "Coupons with redemptions cannot be deleted. Deactivate instead." : undefined}
-                    onClick={() => onDelete(coupon)}
+              <td>
+                <div className="flex gap-1">
+                  <IconButton
+                    label={`Edit coupon ${c.code}`}
+                    onClick={() => onEdit(c)}
                   >
-                    Delete
-                  </Button>
+                    <Pencil size={17} aria-hidden="true" />
+                  </IconButton>
+                  <IconButton
+                    label={`Delete coupon ${c.code}`}
+                    variant="danger"
+                    disabled={c.redemptionCount > 0 || deletePending}
+                    title={
+                      c.redemptionCount > 0
+                        ? "This coupon has redemptions. Deactivate it instead."
+                        : undefined
+                    }
+                    onClick={() => onDelete(c)}
+                  >
+                    <Trash2 size={17} aria-hidden="true" />
+                  </IconButton>
                 </div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-    </div>
+    </TableViewport>
   );
 }

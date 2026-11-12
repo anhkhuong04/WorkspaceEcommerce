@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import storefrontI18n from "../../i18n";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { getApiErrorMessage } from "../../services/api/errors";
@@ -8,7 +10,7 @@ function LifecycleShell({ children, title, subtitle }: { children: ReactNode; ti
     <section className="mx-auto flex min-h-[60vh] max-w-lg items-center px-5 py-12">
       <div className="w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <h1 className="text-2xl font-bold text-slate-950">{title}</h1>
-        <p className="mt-2 text-sm text-slate-500">{subtitle}</p>
+        <p className="mt-2 text-sm text-slate-600">{subtitle}</p>
         {children}
       </div>
     </section>
@@ -19,6 +21,7 @@ const inputClassName = "mt-1.5 h-11 w-full rounded-md border border-slate-300 px
 const buttonClassName = "mt-5 h-11 w-full rounded-md bg-slate-950 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
 
 export function EmailVerificationPage() {
+  useTranslation();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
   const [email, setEmail] = useState("");
@@ -61,22 +64,21 @@ export function EmailVerificationPage() {
   }
 
   return (
-    <LifecycleShell title="Verify your email" subtitle="Open the verification link from your email, or request a new link below.">
+    <LifecycleShell title={storefrontI18n.t("uiCopy.verify_your_email")} subtitle={storefrontI18n.t("uiCopy.open_the_verification_link_from_your_email_or_request_a_new_link_below")}>
       {message ? <p className="mt-5 rounded-md bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{message}</p> : null}
       {error ? <p className="mt-5 rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</p> : null}
       <form className="mt-5" onSubmit={requestVerification}>
-        <label className="block text-sm font-semibold text-slate-800">
-          Email address
-          <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" required className={inputClassName} />
+        <label className="block text-sm font-semibold text-slate-800">{storefrontI18n.t("uiCopy.email_address")}<input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" required className={inputClassName} />
         </label>
         <button className={buttonClassName} disabled={isSubmitting} type="submit">{isSubmitting ? "Requesting…" : "Send verification link"}</button>
       </form>
-      <Link className="mt-5 block text-center text-sm font-semibold text-slate-700 underline underline-offset-4" to="/login">Back to sign in</Link>
+      <Link className="mt-5 block text-center text-sm font-semibold text-slate-700 underline underline-offset-4" to="/login">{storefrontI18n.t("uiCopy.back_to_sign_in")}</Link>
     </LifecycleShell>
   );
 }
 
 export function PasswordResetPage() {
+  useTranslation();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
   const navigate = useNavigate();
@@ -105,7 +107,7 @@ export function PasswordResetPage() {
     event.preventDefault();
     if (!token) return;
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError(storefrontI18n.t("uiCopy.passwords_do_not_match"));
       return;
     }
 
@@ -131,26 +133,20 @@ export function PasswordResetPage() {
       {error ? <p className="mt-5 rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</p> : null}
       {isReset ? (
         <form className="mt-5" onSubmit={submitPasswordReset}>
-          <label className="block text-sm font-semibold text-slate-800">
-            New password
-            <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="new-password" minLength={8} maxLength={128} required className={inputClassName} />
+          <label className="block text-sm font-semibold text-slate-800">{storefrontI18n.t("uiCopy.new_password")}<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="new-password" minLength={8} maxLength={128} required className={inputClassName} />
           </label>
-          <label className="mt-4 block text-sm font-semibold text-slate-800">
-            Confirm new password
-            <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type="password" autoComplete="new-password" minLength={8} maxLength={128} required className={inputClassName} />
+          <label className="mt-4 block text-sm font-semibold text-slate-800">{storefrontI18n.t("uiCopy.confirm_new_password")}<input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type="password" autoComplete="new-password" minLength={8} maxLength={128} required className={inputClassName} />
           </label>
           <button className={buttonClassName} disabled={isSubmitting} type="submit">{isSubmitting ? "Resetting…" : "Reset password"}</button>
         </form>
       ) : (
         <form className="mt-5" onSubmit={submitForgotPassword}>
-          <label className="block text-sm font-semibold text-slate-800">
-            Email address
-            <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" required className={inputClassName} />
+          <label className="block text-sm font-semibold text-slate-800">{storefrontI18n.t("uiCopy.email_address")}<input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" required className={inputClassName} />
           </label>
           <button className={buttonClassName} disabled={isSubmitting} type="submit">{isSubmitting ? "Requesting…" : "Send reset link"}</button>
         </form>
       )}
-      <Link className="mt-5 block text-center text-sm font-semibold text-slate-700 underline underline-offset-4" to="/login">Back to sign in</Link>
+      <Link className="mt-5 block text-center text-sm font-semibold text-slate-700 underline underline-offset-4" to="/login">{storefrontI18n.t("uiCopy.back_to_sign_in")}</Link>
     </LifecycleShell>
   );
 }

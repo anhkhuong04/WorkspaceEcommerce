@@ -38,6 +38,11 @@ public sealed class BlogCommentModerationIntegrationTests(ApiIntegrationTestFixt
         var afterApprovalJson = await afterApproval.ReadJsonAsync();
         var comment = Assert.Single(afterApprovalJson["data"]!["comments"]!.AsArray());
         Assert.Equal("<script>alert(1)</script>", comment!["content"]!.GetValue<string>());
+        Assert.Null(comment["authorEmail"]);
+        Assert.Null(comment["moderatedAt"]);
+        Assert.Null(comment["moderatedBy"]);
+        Assert.Null(comment["moderationStatus"]);
+        Assert.DoesNotContain("commenter@example.test", afterApprovalJson.ToJsonString());
     }
 
     [Fact]

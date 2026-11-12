@@ -1,15 +1,46 @@
+import { Pagination } from "../../components/ui/Pagination";
+import { RotateCcw, Search, Upload } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { AdminOrderDto, AdminOrderListRequest, OrderStatus, PaymentStatus, ShipmentTrackingDto } from "@workspace-ecommerce/api-types";
-import { downloadBlob, formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
+import type {
+  AdminOrderDto,
+  AdminOrderListRequest,
+  OrderStatus,
+  PaymentStatus,
+  ShipmentTrackingDto,
+} from "@workspace-ecommerce/api-types";
+import {
+  downloadBlob,
+  formatDate,
+  formatMoney,
+  formatOrderStatus,
+  formatPaymentMethod,
+  formatPaymentStatus,
+} from "@workspace-ecommerce/shared-utils";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { AdminPageHeader } from "../../components/ui/AdminPageHeader";
-import { Button, Drawer, EmptyState, Field, Notice, Pill, SelectInput, TextArea, TextInput } from "../../components/ui/AdminUi";
-import { useAdminOrder, useAdminOrders, useAdminOrderShipment } from "../../hooks/queries/useAdminOrders";
+import {
+  AdminTabs,
+  Button,
+  ConfirmDialog,
+  Drawer,
+  EmptyState,
+  Field,
+  Notice,
+  Pill,
+  SelectInput,
+  TextArea,
+  TextInput,
+} from "../../components/ui/AdminUi";
+import {
+  useAdminOrder,
+  useAdminOrders,
+  useAdminOrderShipment,
+} from "../../hooks/queries/useAdminOrders";
 import { adminApi } from "../../services/api/adminApi";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { formatLocalizedText } from "../../utils/localizedText";
@@ -17,47 +48,105 @@ import { OrderImportModal } from "./components/OrderImportModal";
 import { AdminReceiptPreviewModal } from "./components/AdminReceiptPreviewModal";
 import { OrdersTable } from "./components/OrdersTable";
 import { OrderPaymentPanel } from "./components/OrderPaymentPanel";
+import { PaymentExceptionsPanel } from "./components/PaymentExceptionsPanel";
+import { OrderReturnsPanel } from "./components/OrderReturnsPanel";
 import { WorkspaceDeliveryPanel } from "./components/WorkspaceDeliveryPanel";
 
 const orderStatuses: OrderStatus[] = [0, 1, 2, 3, 4, 5, 6, 7];
-const nextStatusesByStatus: Record<OrderStatus, OrderStatus[]> = { 0: [1, 6], 1: [2, 6], 2: [3], 3: [4, 5], 4: [7], 5: [3, 6], 6: [], 7: [] };
-const statusSchema = z.object({
-  status: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7)]),
-  internalNote: z.string().trim().max(1000, "Internal note is too long.").optional(),
-  cancellationReason: z.string().trim().max(500, "Cancellation reason is too long.").optional(),
-  customerMessage: z.string().trim().max(1000, "Customer message is too long.").optional()
-}).superRefine((values, context) => {
-  if (values.status === 6 && !values.cancellationReason) {
-    context.addIssue({ code: "custom", path: ["cancellationReason"], message: "Cancellation reason is required." });
-  }
-});
+const nextStatusesByStatus: Record<OrderStatus, OrderStatus[]> = {
+  0: [1, 6],
+  1: [2, 6],
+  2: [3],
+  3: [4, 5],
+  4: [],
+  5: [3, 6],
+  6: [],
+  7: [],
+};
+const statusSchema = z
+  .object({
+    status: z.union([
+      z.literal(0),
+      z.literal(1),
+      z.literal(2),
+      z.literal(3),
+      z.literal(4),
+      z.literal(5),
+      z.literal(6),
+      z.literal(7),
+    ]),
+    internalNote: z
+      .string()
+      .trim()
+      .max(1000, "Internal note is too long.")
+      .optional(),
+    cancellationReason: z
+      .string()
+      .trim()
+      .max(500, "Cancellation reason is too long.")
+      .optional(),
+    customerMessage: z
+      .string()
+      .trim()
+      .max(1000, "Customer message is too long.")
+      .optional(),
+  })
+  .superRefine((values, context) => {
+    if (values.status === 6 && !values.cancellationReason) {
+      context.addIssue({
+        code: "custom",
+        path: ["cancellationReason"],
+        message: "Cancellation reason is required.",
+      });
+    }
+  });
 
 type StatusFormValues = z.infer<typeof statusSchema>;
 
-const statusTones: Record<OrderStatus, "green" | "red" | "blue" | "orange" | "slate"> = { 0: "orange", 1: "slate", 2: "blue", 3: "blue", 4: "green", 5: "orange", 6: "red", 7: "slate" };
-const paymentStatusTones: Record<PaymentStatus, "green" | "red" | "blue" | "orange" | "slate"> = { 0: "slate", 1: "blue", 2: "green", 3: "red", 4: "slate", 5: "orange" };
+const statusTones: Record<
+  OrderStatus,
+  "green" | "red" | "blue" | "orange" | "slate"
+> = {
+  0: "orange",
+  1: "slate",
+  2: "blue",
+  3: "blue",
+  4: "green",
+  5: "orange",
+  6: "red",
+  7: "slate",
+};
+const paymentStatusTones: Record<
+  PaymentStatus,
+  "green" | "red" | "blue" | "orange" | "slate"
+> = { 0: "slate", 1: "blue", 2: "green", 3: "red", 4: "slate", 5: "orange", 6: "green", 7: "orange" };
 
 function orderStatusPill(status: OrderStatus) {
   return <Pill tone={statusTones[status]}>{formatOrderStatus(status)}</Pill>;
 }
 
 function paymentStatusPill(status: PaymentStatus) {
-  return <Pill tone={paymentStatusTones[status]}>{formatPaymentStatus(status)}</Pill>;
+  return (
+    <Pill tone={paymentStatusTones[status]}>{formatPaymentStatus(status)}</Pill>
+  );
 }
 
 function toStatusRequest(values: StatusFormValues) {
   return {
     status: values.status,
     internalNote: values.internalNote?.trim() || null,
-    cancellationReason: values.status === 6 ? values.cancellationReason?.trim() || null : null,
-    customerMessage: values.customerMessage?.trim() || null
+    cancellationReason:
+      values.status === 6 ? values.cancellationReason?.trim() || null : null,
+    customerMessage: values.customerMessage?.trim() || null,
   };
 }
 
 function parseOrderStatus(value: string | null): OrderStatus | undefined {
   if (value === null) return undefined;
   const status = Number(value);
-  return orderStatuses.includes(status as OrderStatus) ? status as OrderStatus : undefined;
+  return orderStatuses.includes(status as OrderStatus)
+    ? (status as OrderStatus)
+    : undefined;
 }
 
 function parsePageNumber(value: string | null): number {
@@ -67,45 +156,92 @@ function parsePageNumber(value: string | null): number {
 
 export function OrdersPage() {
   const queryClient = useQueryClient();
+  const [confirmShipmentCancel, setConfirmShipmentCancel] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [notice, setNotice] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isReceiptPreviewOpen, setIsReceiptPreviewOpen] = useState(false);
   const [isDownloadingReceipt, setIsDownloadingReceipt] = useState(false);
   const pageNumber = parsePageNumber(searchParams.get("page"));
   const statusFilter = parseOrderStatus(searchParams.get("status"));
   const searchFilter = searchParams.get("search")?.trim() || undefined;
-  const request = useMemo<AdminOrderListRequest>(() => ({ pageNumber, pageSize: 8, status: statusFilter, search: searchFilter }), [pageNumber, searchFilter, statusFilter]);
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const paymentFilter = searchParams.has("paymentStatus") ? Number(searchParams.get("paymentStatus")) as PaymentStatus : undefined;
+  const queue = searchParams.get("queue") || undefined;
+  const request = useMemo<AdminOrderListRequest>(
+    () => ({
+      pageNumber,
+      pageSize: 8,
+      status: statusFilter,
+      search: searchFilter,
+      paymentStatus: paymentFilter,
+      queue,
+    }),
+    [pageNumber, searchFilter, statusFilter, paymentFilter, queue],
+  );
+  const selectedOrderId = searchParams.get("orderId");
+  function setSelectedOrderId(id: string | null) {
+    const params = new URLSearchParams(searchParams);
+    if (id) params.set("orderId", id); else params.delete("orderId");
+    setSearchParams(params);
+  }
   const ordersQuery = useAdminOrders(request);
   const orderQuery = useAdminOrder(selectedOrderId);
   const shipmentQuery = useAdminOrderShipment(selectedOrderId);
   const order = orderQuery.data;
-  const nextStatuses = useMemo(() => order ? nextStatusesByStatus[order.status] : [], [order]);
+  const nextStatuses = useMemo(
+    () => (order ? nextStatusesByStatus[order.status] : []),
+    [order],
+  );
 
   const statusForm = useForm<StatusFormValues>({
     resolver: zodResolver(statusSchema),
-    defaultValues: { status: 1, internalNote: "", cancellationReason: "", customerMessage: "" }
+    defaultValues: {
+      status: 1,
+      internalNote: "",
+      cancellationReason: "",
+      customerMessage: "",
+    },
   });
-  const selectedNextStatus = useWatch({ control: statusForm.control, name: "status" });
+  const selectedNextStatus = useWatch({
+    control: statusForm.control,
+    name: "status",
+  });
 
   useEffect(() => {
     if (nextStatuses.length > 0) {
-      statusForm.reset({ status: nextStatuses[0], internalNote: "", cancellationReason: "", customerMessage: "" });
+      statusForm.reset({
+        status: nextStatuses[0],
+        internalNote: "",
+        cancellationReason: "",
+        customerMessage: "",
+      });
     }
   }, [nextStatuses, statusForm]);
 
   const updateStatusMutation = useMutation({
     mutationFn: (values: StatusFormValues) => {
       if (!selectedOrderId) throw new Error("Order is required.");
-      return adminApi.updateOrderStatus(selectedOrderId, toStatusRequest(values));
+      return adminApi.updateOrderStatus(
+        selectedOrderId,
+        toStatusRequest(values),
+      );
     },
     onSuccess: async (updatedOrder) => {
-      queryClient.setQueryData(["admin-order", selectedOrderId], updatedOrder);
-      await Promise.all([queryClient.invalidateQueries({ queryKey: ["admin-orders"] }), queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] })]);
+      queryClient.setQueryData(["admin-order", updatedOrder.id], updatedOrder);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-order-payment", updatedOrder.id] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-order-shipment", updatedOrder.id] }),
+        queryClient.invalidateQueries({ queryKey: ["workspace-shipment", updatedOrder.id] }),
+      ]);
       setNotice({ type: "success", message: "Order status updated." });
     },
-    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
+    onError: (error) =>
+      setNotice({ type: "error", message: getApiErrorMessage(error) }),
   });
 
   const refreshShipmentMutation = useMutation({
@@ -114,10 +250,14 @@ export function OrdersPage() {
       return adminApi.refreshOrderShipment(selectedOrderId);
     },
     onSuccess: (shipment) => {
-      queryClient.setQueryData(["admin-order-shipment", selectedOrderId], shipment);
+      queryClient.setQueryData(
+        ["admin-order-shipment", shipment.orderId],
+        shipment,
+      );
       setNotice({ type: "success", message: "Shipment tracking refreshed." });
     },
-    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
+    onError: (error) =>
+      setNotice({ type: "error", message: getApiErrorMessage(error) }),
   });
 
   const retryShipmentMutation = useMutation({
@@ -126,29 +266,50 @@ export function OrdersPage() {
       return adminApi.retryOrderShipment(selectedOrderId);
     },
     onSuccess: async (shipment) => {
-      queryClient.setQueryData(["admin-order-shipment", selectedOrderId], shipment);
+      queryClient.setQueryData(
+        ["admin-order-shipment", shipment.orderId],
+        shipment,
+      );
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["admin-order", selectedOrderId] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-orders"] })
+        queryClient.invalidateQueries({
+          queryKey: ["admin-order", shipment.orderId],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
       ]);
       setNotice({ type: "success", message: "Shipment created." });
     },
-    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
+    onError: (error) =>
+      setNotice({ type: "error", message: getApiErrorMessage(error) }),
   });
 
   const cancelShipmentMutation = useMutation({
     mutationFn: () => {
       if (!selectedOrderId) throw new Error("Order is required.");
-      return adminApi.cancelOrderShipment(selectedOrderId, "Order cancelled by admin.");
+      return adminApi.cancelOrderShipment(
+        selectedOrderId,
+        "Order cancelled by admin.",
+      );
     },
     onSuccess: (shipment) => {
-      queryClient.setQueryData(["admin-order-shipment", selectedOrderId], shipment);
-      setNotice({ type: "success", message: shipment.providerStatus === "Cancelled" ? "Shipment cancelled." : "Shipment cancellation queued." });
+      queryClient.setQueryData(
+        ["admin-order-shipment", shipment.orderId],
+        shipment,
+      );
+      setNotice({
+        type: "success",
+        message:
+          shipment.providerStatus === "Cancelled"
+            ? "Shipment cancelled."
+            : "Shipment cancellation queued.",
+      });
     },
-    onError: (error) => setNotice({ type: "error", message: getApiErrorMessage(error) })
+    onError: (error) =>
+      setNotice({ type: "error", message: getApiErrorMessage(error) }),
   });
 
-  function updateFilters(values: Pick<AdminOrderListRequest, "status" | "search">) {
+  function updateFilters(
+    values: Pick<AdminOrderListRequest, "status" | "search">,
+  ) {
     const nextParams = new URLSearchParams(searchParams);
     if (values.status === undefined) nextParams.delete("status");
     else nextParams.set("status", String(values.status));
@@ -183,20 +344,106 @@ export function OrdersPage() {
     <div className="admin-page-grid">
       <AdminPageHeader
         title="Orders"
-        description="Review orders, inspect order snapshots, render status history, and move orders through MVP transitions."
-        actions={<Button type="button" variant="primary" onClick={() => setIsImportModalOpen(true)}>Import orders</Button>}
+        description="Review orders, payments and delivery."
+        actions={
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => setIsImportModalOpen(true)}
+          >
+            <Upload size={17} aria-hidden="true" />
+            Import orders
+          </Button>
+        }
       />
       {notice ? <Notice type={notice.type} title={notice.message} /> : null}
-      {ordersQuery.isError ? <Notice type="error" title="Orders could not be loaded">{getApiErrorMessage(ordersQuery.error)}</Notice> : null}
+      {ordersQuery.isError ? (
+        <Notice type="error" title="Orders could not be loaded">
+          {getApiErrorMessage(ordersQuery.error)}
+          <div className="mt-3">
+            <Button
+              disabled={ordersQuery.isFetching}
+              onClick={() => void ordersQuery.refetch()}
+            >
+              Try again
+            </Button>
+          </div>
+        </Notice>
+      ) : null}
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="mb-4 flex flex-col gap-3 lg:flex-row">
-          <TextInput key={searchFilter ?? ""} defaultValue={searchFilter ?? ""} placeholder="Search code, customer, phone" onKeyDown={(event) => { if (event.key === "Enter") updateFilters({ status: statusFilter, search: event.currentTarget.value.trim() || undefined }); }} />
-          <SelectInput value={statusFilter ?? ""} onChange={(event) => updateFilters({ status: event.target.value === "" ? undefined : Number(event.target.value) as OrderStatus, search: searchFilter })} className="lg:max-w-xs">
-            <option value="">All statuses</option>
-            {orderStatuses.map((status) => <option key={status} value={status}>{formatOrderStatus(status)}</option>)}
-          </SelectInput>
-        </div>
+      <section className="admin-panel">
+        <form
+          className="mb-5 grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_180px_180px_auto]"
+          onSubmit={(e) => {
+            e.preventDefault();
+            updateFilters({
+              status: statusFilter,
+              search:
+                String(
+                  new FormData(e.currentTarget).get("search") ?? "",
+                ).trim() || undefined,
+            });
+          }}
+        >
+          <div>
+            <label
+              htmlFor="order-search"
+              className="mb-1.5 block text-sm font-medium text-[var(--muted-strong)]"
+            >
+              Search orders
+            </label>
+            <div className="flex gap-2">
+              <TextInput
+                id="order-search"
+                name="search"
+                type="search"
+                key={searchFilter ?? ""}
+                defaultValue={searchFilter ?? ""}
+                placeholder="Code, customer or phone"
+              />
+              <Button type="submit">
+                <Search size={16} aria-hidden="true" />
+                <span className="sr-only">Search</span>
+              </Button>
+            </div>
+          </div>
+          <Field label="Order status">
+            <SelectInput
+              value={statusFilter ?? ""}
+              onChange={(event) =>
+                updateFilters({
+                  status:
+                    event.target.value === ""
+                      ? undefined
+                      : (Number(event.target.value) as OrderStatus),
+                  search: searchFilter,
+                })
+              }
+            >
+              <option value="">All statuses</option>
+              {orderStatuses.map((status) => (
+                <option key={status} value={status}>
+                  {formatOrderStatus(status)}
+                </option>
+              ))}
+            </SelectInput>
+          </Field>
+          <Field label="Payment status"><SelectInput value={paymentFilter ?? ""} onChange={event => {
+            const params = new URLSearchParams(searchParams); params.delete("page");
+            if (event.target.value) params.set("paymentStatus", event.target.value); else params.delete("paymentStatus"); setSearchParams(params);
+          }}><option value="">All payments</option>{([0,1,2,3,4,5,6,7] as PaymentStatus[]).map(value => <option key={value} value={value}>{formatPaymentStatus(value)}</option>)}</SelectInput></Field>
+          <Button
+            variant="ghost"
+            onClick={(e) => {
+              e.currentTarget.form?.reset();
+              setSearchParams({});
+            }}
+          >
+            <RotateCcw size={16} aria-hidden="true" />
+            Reset
+          </Button>
+        </form>
+        {queue && <Notice type="info" title={`Operational queue: ${queue.replaceAll("-", " ")}`}><Button onClick={() => { const params = new URLSearchParams(searchParams); params.delete("queue"); params.delete("page"); setSearchParams(params); }}>Clear queue</Button></Notice>}
 
         <OrdersTable
           orders={ordersQuery.data?.items ?? []}
@@ -205,13 +452,12 @@ export function OrdersPage() {
         />
 
         {ordersQuery.data ? (
-          <div className="mt-4 flex items-center justify-between text-sm font-semibold text-slate-500">
-            <span>Page {ordersQuery.data.pageNumber} of {ordersQuery.data.totalPages || 1}</span>
-            <div className="flex gap-2">
-              <Button type="button" disabled={!ordersQuery.data.hasPreviousPage} onClick={() => updatePage(Math.max(1, pageNumber - 1))}>Previous</Button>
-              <Button type="button" disabled={!ordersQuery.data.hasNextPage} onClick={() => updatePage(pageNumber + 1)}>Next</Button>
-            </div>
-          </div>
+          <Pagination
+            data={ordersQuery.data}
+            label="orders"
+            busy={ordersQuery.isFetching}
+            onPageChange={updatePage}
+          />
         ) : null}
       </section>
 
@@ -227,93 +473,429 @@ export function OrdersPage() {
           setSelectedOrderId(null);
         }}
       >
-        {orderQuery.isError ? <Notice type="error" title="Order could not be loaded">{getApiErrorMessage(orderQuery.error)}</Notice> : null}
+        {orderQuery.isError ? (
+          <Notice type="error" title="Order could not be loaded">
+            {getApiErrorMessage(orderQuery.error)}
+            <div className="mt-3">
+              <Button
+                disabled={orderQuery.isFetching}
+                onClick={() => void orderQuery.refetch()}
+              >
+                Try again
+              </Button>
+            </div>
+          </Notice>
+        ) : null}
         {orderQuery.isLoading ? (
-          <div className="grid gap-3">{[0, 1, 2].map((item) => <div key={item} className="h-20 animate-pulse rounded-2xl bg-slate-100" />)}</div>
-        ) : order ? (
-          <div className="grid gap-4">
-            <section className="rounded-3xl border border-slate-200 p-5">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-black">Order confirmation</h3>
-                  <p className="mt-1 text-sm text-slate-500">Receipt only; this document is not a VAT invoice.</p>
-                </div>
-                <Button type="button" onClick={() => setIsReceiptPreviewOpen(true)}>
-                  View receipt
-                </Button>
-              </div>
-              <div className="grid gap-3 text-sm sm:grid-cols-2">
-                <Info label="Status" value={orderStatusPill(order.status)} />
-                <Info label="Payment" value={formatPaymentMethod(order.paymentMethod)} />
-                <Info label="Payment status" value={paymentStatusPill(order.paymentStatus)} />
-                <Info label="Paid at" value={order.paidAt ? formatDate(order.paidAt) : "-"} />
-                <Info label="Customer" value={formatLocalizedText(order.customerName)} />
-                <Info label="Phone" value={order.customerPhone} />
-                <Info label="Email" value={order.customerEmail ?? "-"} />
-                <Info label="Created" value={formatDate(order.createdAt)} />
-                <Info wide label="Shipping address" value={order.shippingAddress} />
-                <Info wide label="Customer note" value={order.note ?? "-"} />
-                {order.couponCodeSnapshot ? <Info wide label="Coupon" value={formatCouponSnapshot(order)} /> : null}
-                <Info label="Subtotal" value={formatMoney(order.subtotal)} />
-                <Info label="Shipping fee" value={formatMoney(order.shippingFee)} />
-                <Info label={formatDiscountLabel(order)} value={formatMoney(order.discountAmount)} />
-                <Info label="Total" value={formatMoney(order.totalAmount)} />
-              </div>
-            </section>
-
-            <section className="rounded-3xl border border-slate-200 p-5">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <h3 className="text-lg font-black">Shipment</h3>
-                {shipmentQuery.data ? (
-                  <div className="flex flex-wrap gap-2">
-                    {shipmentQuery.data.canRefresh ? <Button type="button" disabled={refreshShipmentMutation.isPending} onClick={() => refreshShipmentMutation.mutate()}>{refreshShipmentMutation.isPending ? "Refreshing..." : "Refresh"}</Button> : null}
-                    {shipmentQuery.data.canRetry ? <Button type="button" variant="primary" disabled={retryShipmentMutation.isPending} onClick={() => retryShipmentMutation.mutate()}>{retryShipmentMutation.isPending ? "Retrying..." : "Retry creation"}</Button> : null}
-                    {shipmentQuery.data.canCancel ? <Button type="button" variant="danger" disabled={cancelShipmentMutation.isPending} onClick={() => { if (window.confirm("Cancel this carrier shipment?")) cancelShipmentMutation.mutate(); }}>{cancelShipmentMutation.isPending ? "Cancelling..." : "Cancel shipment"}</Button> : null}
-                  </div>
-                ) : null}
-              </div>
-              {shipmentQuery.isLoading ? <div className="h-24 animate-pulse rounded-2xl bg-slate-100" /> : null}
-              {shipmentQuery.isError ? <Notice type="error" title="Shipment could not be loaded">{getApiErrorMessage(shipmentQuery.error)}</Notice> : null}
-              {shipmentQuery.data ? <AdminShipmentPanel shipment={shipmentQuery.data} /> : null}
-              <OrderPaymentPanel key={order.id} orderId={order.id} />
-              {order.shipping && <p>Method: {order.shipping.method === 0 ? "WorkspaceEC" : "MiniLogistics"} · Customer charge: {formatMoney(order.shipping.customerCharge)} · {order.shipping.weightGrams} g · {order.shipping.trackingCode ?? "Awaiting creation"}</p>}
-              {shipmentQuery.data?.provider === "WorkspaceEC" && <WorkspaceDeliveryPanel key={`delivery:${order.id}`} orderId={order.id} />}
-            </section>
-
-            <section className="rounded-3xl border border-slate-200 p-5">
-              <h3 className="mb-3 text-lg font-black">Items</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[680px] text-left text-sm">
-                  <thead className="text-xs uppercase tracking-wide text-slate-500"><tr><th className="py-2 pr-3">Product</th><th className="py-2 pr-3">SKU</th><th className="py-2 pr-3">Price</th><th className="py-2 pr-3">Qty</th><th className="py-2 pr-3">Line</th><th className="py-2 pr-3">Install</th></tr></thead>
-                  <tbody>{order.items.map((item) => <tr key={item.id} className="border-t border-slate-100"><td className="py-2 pr-3">{formatLocalizedText(item.productNameSnapshot)}</td><td className="py-2 pr-3">{item.skuSnapshot}</td><td className="py-2 pr-3">{formatMoney(item.unitPrice)}</td><td className="py-2 pr-3">{item.quantity}</td><td className="py-2 pr-3">{formatMoney(item.lineTotal)}</td><td className="py-2 pr-3"><Pill tone={item.requiresInstallation ? "blue" : "slate"}>{item.requiresInstallation ? "Required" : "None"}</Pill></td></tr>)}</tbody>
-                </table>
-              </div>
-            </section>
-
-            <section className="rounded-3xl border border-slate-200 p-5">
-              <h3 className="mb-3 text-lg font-black">Status transition</h3>
-              {nextStatuses.length === 0 ? <EmptyState>This order is in a terminal status</EmptyState> : (
-                <form className="grid gap-4">
-                  <Controller control={statusForm.control} name="status" render={({ field, fieldState }) => <Field label="Next status" error={fieldState.error?.message}><SelectInput value={field.value} onChange={(event) => field.onChange(Number(event.target.value) as OrderStatus)}>{nextStatuses.map((status) => <option key={status} value={status}>{formatOrderStatus(status)}</option>)}</SelectInput></Field>} />
-                  {selectedNextStatus === 6 ? (
-                    <Controller control={statusForm.control} name="cancellationReason" render={({ field, fieldState }) => <Field label="Cancellation reason" error={fieldState.error?.message}><TextArea {...field} rows={2} placeholder="Required reason shown to the customer" /></Field>} />
-                  ) : null}
-                  <Controller control={statusForm.control} name="customerMessage" render={({ field, fieldState }) => <Field label="Customer message" error={fieldState.error?.message}><TextArea {...field} rows={3} placeholder="Optional message visible in the customer's order timeline" /></Field>} />
-                  <Controller control={statusForm.control} name="internalNote" render={({ field, fieldState }) => <Field label="Internal note" error={fieldState.error?.message}><TextArea {...field} rows={3} placeholder="Optional; only administrators can see this note" /></Field>} />
-                  <Button type="button" variant="primary" disabled={updateStatusMutation.isPending} onClick={statusForm.handleSubmit((values) => updateStatusMutation.mutate(values))}>{updateStatusMutation.isPending ? "Updating..." : "Update status"}</Button>
-                </form>
-              )}
-            </section>
-
-            <section className="rounded-3xl border border-slate-200 p-5">
-              <h3 className="mb-3 text-lg font-black">Status history</h3>
-              {order.statusHistory.length ? (
-                <div className="grid gap-3">{order.statusHistory.map((history) => <div key={history.id} className="border-l-4 border-slate-600 pl-4"><p className="font-bold">{history.fromStatus === null ? "Created" : formatOrderStatus(history.fromStatus)} to {formatOrderStatus(history.toStatus)}</p><p className="text-sm text-slate-500">{formatDate(history.changedAt)} by {history.changedBy ?? "system"}</p>{history.cancellationReason ? <p className="mt-1 text-sm text-red-700"><strong>Cancellation reason:</strong> {history.cancellationReason}</p> : null}{history.customerMessage ? <p className="mt-1 text-sm text-blue-700"><strong>Customer message:</strong> {history.customerMessage}</p> : null}{history.internalNote ? <p className="mt-1 text-sm text-slate-700"><strong>Internal:</strong> {history.internalNote}</p> : null}</div>)}</div>
-              ) : <EmptyState>No status history</EmptyState>}
-            </section>
+          <div className="grid gap-3">
+            {[0, 1, 2].map((item) => (
+              <div
+                key={item}
+                className="h-20 animate-pulse rounded-2xl bg-slate-100"
+              />
+            ))}
           </div>
+        ) : order ? (
+          <AdminTabs
+            key={order.id}
+            label="Order details"
+            defaultValue="summary"
+            tabs={[
+              { value: "returns", label: "Returns", content: <OrderReturnsPanel key={order.id} order={order} /> },
+              {
+                value: "summary",
+                label: "Overview",
+                content: (
+                  <section className="admin-panel !shadow-none">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-lg font-semibold">
+                          Order confirmation
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Receipt only; this document is not a VAT invoice.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={() => setIsReceiptPreviewOpen(true)}
+                      >
+                        View receipt
+                      </Button>
+                    </div>
+                    <div className="grid gap-3 text-sm sm:grid-cols-2">
+                      <Info
+                        label="Status"
+                        value={orderStatusPill(order.status)}
+                      />
+                      <Info
+                        label="Payment"
+                        value={formatPaymentMethod(order.paymentMethod)}
+                      />
+                      <Info
+                        label="Payment status"
+                        value={paymentStatusPill(order.paymentStatus)}
+                      />
+                      <Info
+                        label="Paid at"
+                        value={order.paidAt ? formatDate(order.paidAt) : "-"}
+                      />
+                      <Info
+                        label="Customer"
+                        value={formatLocalizedText(order.customerName)}
+                      />
+                      <Info label="Phone" value={order.customerPhone} />
+                      <Info label="Email" value={order.customerEmail ?? "-"} />
+                      <Info
+                        label="Created"
+                        value={formatDate(order.createdAt)}
+                      />
+                      <Info
+                        wide
+                        label="Shipping address"
+                        value={order.shippingAddress}
+                      />
+                      <Info
+                        wide
+                        label="Customer note"
+                        value={order.note ?? "-"}
+                      />
+                      {order.couponCodeSnapshot ? (
+                        <Info
+                          wide
+                          label="Coupon"
+                          value={formatCouponSnapshot(order)}
+                        />
+                      ) : null}
+                      {order.returnRequestedAt && <Info label="Return request awaiting review" value={`${formatDate(order.returnRequestedAt)}: ${order.returnReason ?? ""}`} />}
+                      {order.paymentDueAt && <Info label="Payment deadline" value={formatDate(order.paymentDueAt)} />}
+                      <Info
+                        label="Subtotal"
+                        value={formatMoney(order.subtotal)}
+                      />
+                      <Info
+                        label="Shipping fee"
+                        value={formatMoney(order.shippingFee)}
+                      />
+                      <Info
+                        label={formatDiscountLabel(order)}
+                        value={formatMoney(order.discountAmount)}
+                      />
+                      <Info
+                        label="Total"
+                        value={formatMoney(order.totalAmount)}
+                      />
+                    </div>
+                  </section>
+                ),
+              },
+              {
+                value: "shipment",
+                label: "Delivery",
+                content: (
+                  <section className="admin-panel !shadow-none">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <h3 className="text-lg font-semibold">Shipment</h3>
+                      {shipmentQuery.data ? (
+                        <div className="flex flex-wrap gap-2">
+                          {shipmentQuery.data.canRefresh ? (
+                            <Button
+                              type="button"
+                              disabled={refreshShipmentMutation.isPending}
+                              onClick={() => refreshShipmentMutation.mutate()}
+                            >
+                              {refreshShipmentMutation.isPending
+                                ? "Refreshing..."
+                                : "Refresh"}
+                            </Button>
+                          ) : null}
+                          {shipmentQuery.data.canRetry ? (
+                            <Button
+                              type="button"
+                              variant="primary"
+                              disabled={retryShipmentMutation.isPending}
+                              onClick={() => retryShipmentMutation.mutate()}
+                            >
+                              {retryShipmentMutation.isPending
+                                ? "Retrying..."
+                                : "Retry creation"}
+                            </Button>
+                          ) : null}
+                          {shipmentQuery.data.canCancel ? (
+                            <Button
+                              type="button"
+                              variant="danger"
+                              disabled={cancelShipmentMutation.isPending}
+                              onClick={() => {
+                                cancelShipmentMutation.reset();
+                                setConfirmShipmentCancel(true);
+                              }}
+                            >
+                              {cancelShipmentMutation.isPending
+                                ? "Cancelling..."
+                                : "Cancel shipment"}
+                            </Button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                    {shipmentQuery.isLoading ? (
+                      <div className="h-24 animate-pulse rounded-2xl bg-slate-100" />
+                    ) : null}
+                    {shipmentQuery.isError ? (
+                      <Notice type="error" title="Shipment could not be loaded">
+                        {getApiErrorMessage(shipmentQuery.error)}
+                        <div className="mt-3">
+                          <Button
+                            disabled={shipmentQuery.isFetching}
+                            onClick={() => void shipmentQuery.refetch()}
+                          >
+                            Try again
+                          </Button>
+                        </div>
+                      </Notice>
+                    ) : null}
+                    {shipmentQuery.data ? (
+                      <AdminShipmentPanel shipment={shipmentQuery.data} />
+                    ) : null}
+                    <OrderPaymentPanel key={order.id} orderId={order.id} />
+                    <PaymentExceptionsPanel key={`payment-exceptions:${order.id}`} orderId={order.id} />
+                    {order.shipping && <p>Method: {order.shipping.method === 0 ? "WorkspaceEC" : "MiniLogistics"} · Customer charge: {formatMoney(order.shipping.customerCharge)} · {order.shipping.weightGrams} g · {order.shipping.trackingCode ?? "Awaiting creation"}</p>}
+                    {shipmentQuery.data?.provider === "WorkspaceEC" && <WorkspaceDeliveryPanel key={`delivery:${order.id}`} orderId={order.id} />}
+                  </section>
+                ),
+              },
+              {
+                value: "items",
+                label: `Items (${order.items.length})`,
+                content: (
+                  <section className="admin-panel !shadow-none">
+                    <h3 className="mb-3 text-lg font-semibold">Items</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[680px] text-left text-sm">
+                        <thead className="text-xs uppercase tracking-wide text-slate-500">
+                          <tr>
+                            <th className="py-2 pr-3">Product</th>
+                            <th className="py-2 pr-3">SKU</th>
+                            <th className="py-2 pr-3">Price</th>
+                            <th className="py-2 pr-3">Qty</th>
+                            <th className="py-2 pr-3">Line</th>
+                            <th className="py-2 pr-3">Install</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {order.items.map((item) => (
+                            <tr
+                              key={item.id}
+                              className="border-t border-slate-100"
+                            >
+                              <td className="py-2 pr-3">
+                                {formatLocalizedText(item.productNameSnapshot)}
+                              </td>
+                              <td className="py-2 pr-3">{item.skuSnapshot}</td>
+                              <td className="py-2 pr-3">
+                                {formatMoney(item.unitPrice)}
+                              </td>
+                              <td className="py-2 pr-3">{item.quantity}</td>
+                              <td className="py-2 pr-3">
+                                {formatMoney(item.lineTotal)}
+                              </td>
+                              <td className="py-2 pr-3">
+                                <Pill
+                                  tone={
+                                    item.requiresInstallation ? "blue" : "slate"
+                                  }
+                                >
+                                  {item.requiresInstallation
+                                    ? "Required"
+                                    : "None"}
+                                </Pill>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                ),
+              },
+              {
+                value: "activity",
+                label: "Activity",
+                content: (
+                  <div className="grid gap-5">
+                    <section className="admin-panel !shadow-none">
+                      <h3 className="mb-3 text-lg font-semibold">
+                        Status transition
+                      </h3>
+                      {nextStatuses.length === 0 ? (
+                        <EmptyState>
+                          This order is in a terminal status
+                        </EmptyState>
+                      ) : (
+                        <form className="grid gap-4">
+                          <Controller
+                            control={statusForm.control}
+                            name="status"
+                            render={({ field, fieldState }) => (
+                              <Field
+                                label="Next status"
+                                error={fieldState.error?.message}
+                              >
+                                <SelectInput
+                                  value={field.value}
+                                  onChange={(event) =>
+                                    field.onChange(
+                                      Number(event.target.value) as OrderStatus,
+                                    )
+                                  }
+                                >
+                                  {nextStatuses.map((status) => (
+                                    <option key={status} value={status}>
+                                      {formatOrderStatus(status)}
+                                    </option>
+                                  ))}
+                                </SelectInput>
+                              </Field>
+                            )}
+                          />
+                          {selectedNextStatus === 6 ? (
+                            <Controller
+                              control={statusForm.control}
+                              name="cancellationReason"
+                              render={({ field, fieldState }) => (
+                                <Field
+                                  label="Cancellation reason"
+                                  error={fieldState.error?.message}
+                                >
+                                  <TextArea
+                                    {...field}
+                                    rows={2}
+                                    placeholder="Required reason shown to the customer"
+                                  />
+                                </Field>
+                              )}
+                            />
+                          ) : null}
+                          <Controller
+                            control={statusForm.control}
+                            name="customerMessage"
+                            render={({ field, fieldState }) => (
+                              <Field
+                                label="Customer message"
+                                error={fieldState.error?.message}
+                              >
+                                <TextArea
+                                  {...field}
+                                  rows={3}
+                                  placeholder="Optional message visible in the customer's order timeline"
+                                />
+                              </Field>
+                            )}
+                          />
+                          <Controller
+                            control={statusForm.control}
+                            name="internalNote"
+                            render={({ field, fieldState }) => (
+                              <Field
+                                label="Internal note"
+                                error={fieldState.error?.message}
+                              >
+                                <TextArea
+                                  {...field}
+                                  rows={3}
+                                  placeholder="Optional; only administrators can see this note"
+                                />
+                              </Field>
+                            )}
+                          />
+                          <Button
+                            type="button"
+                            variant="primary"
+                            disabled={updateStatusMutation.isPending}
+                            onClick={statusForm.handleSubmit((values) =>
+                              updateStatusMutation.mutate(values),
+                            )}
+                          >
+                            {updateStatusMutation.isPending
+                              ? "Updating..."
+                              : "Update status"}
+                          </Button>
+                        </form>
+                      )}
+                    </section>
+                    <section className="admin-panel !shadow-none">
+                      <h3 className="mb-3 text-lg font-semibold">
+                        Status history
+                      </h3>
+                      {order.statusHistory.length ? (
+                        <div className="grid gap-3">
+                          {order.statusHistory.map((history) => (
+                            <div
+                              key={history.id}
+                              className="border-l-4 border-slate-600 pl-4"
+                            >
+                              <p className="font-medium">
+                                {history.fromStatus === null
+                                  ? "Created"
+                                  : formatOrderStatus(history.fromStatus)}{" "}
+                                to {formatOrderStatus(history.toStatus)}
+                              </p>
+                              <p className="text-sm text-slate-500">
+                                {formatDate(history.changedAt)} by{" "}
+                                {history.changedBy ?? "system"}
+                              </p>
+                              {history.cancellationReason ? (
+                                <p className="mt-1 text-sm text-red-700">
+                                  <strong>Cancellation reason:</strong>{" "}
+                                  {history.cancellationReason}
+                                </p>
+                              ) : null}
+                              {history.customerMessage ? (
+                                <p className="mt-1 text-sm text-blue-700">
+                                  <strong>Customer message:</strong>{" "}
+                                  {history.customerMessage}
+                                </p>
+                              ) : null}
+                              {history.internalNote ? (
+                                <p className="mt-1 text-sm text-slate-700">
+                                  <strong>Internal:</strong>{" "}
+                                  {history.internalNote}
+                                </p>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <EmptyState>No status history</EmptyState>
+                      )}
+                    </section>
+                  </div>
+                ),
+              },
+            ]}
+          />
         ) : null}
       </Drawer>
+
+      <ConfirmDialog
+        open={confirmShipmentCancel}
+        title="Cancel carrier shipment"
+        message="Send a cancellation request to the carrier for this shipment?"
+        busy={cancelShipmentMutation.isPending}
+        error={
+          cancelShipmentMutation.isError
+            ? getApiErrorMessage(cancelShipmentMutation.error)
+            : undefined
+        }
+        confirmLabel="Cancel shipment"
+        onCancel={() => setConfirmShipmentCancel(false)}
+        onConfirm={() =>
+          cancelShipmentMutation.mutate(undefined, {
+            onSuccess: () => setConfirmShipmentCancel(false),
+          })
+        }
+      />
 
       {order ? (
         <AdminReceiptPreviewModal
@@ -331,52 +913,101 @@ export function OrdersPage() {
         onImported={async (result) => {
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
-            queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] })
+            queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }),
           ]);
           setIsImportModalOpen(false);
-          setNotice({ type: "success", message: `${result.createdOrders} order(s) imported.` });
+          setNotice({
+            type: "success",
+            message: `${result.createdOrders} order(s) imported; ${result.skippedOrders ?? 0} already imported order(s) skipped.`,
+          });
         }}
       />
     </div>
   );
 }
 
-function Info({ label, value, wide = false }: { label: string; value: ReactNode; wide?: boolean }) {
-  return <div className={wide ? "sm:col-span-2" : undefined}><p className="text-xs font-black uppercase tracking-wide text-slate-400">{label}</p><div className="mt-1 font-semibold text-slate-800">{value}</div></div>;
+function Info({
+  label,
+  value,
+  wide = false,
+}: {
+  label: string;
+  value: ReactNode;
+  wide?: boolean;
+}) {
+  return (
+    <div className={wide ? "sm:col-span-2" : undefined}>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <div className="mt-1 font-semibold text-slate-800">{value}</div>
+    </div>
+  );
 }
 
 function formatDiscountLabel(order: AdminOrderDto): string {
-  return order.couponCodeSnapshot ? `Discount (${order.couponCodeSnapshot})` : "Discount";
+  return order.couponCodeSnapshot
+    ? `Discount (${order.couponCodeSnapshot})`
+    : "Discount";
 }
 
 function formatCouponSnapshot(order: AdminOrderDto): string {
-  return order.couponNameSnapshot ? `${order.couponCodeSnapshot} - ${formatLocalizedText(order.couponNameSnapshot)}` : order.couponCodeSnapshot ?? "";
+  return order.couponNameSnapshot
+    ? `${order.couponCodeSnapshot} - ${formatLocalizedText(order.couponNameSnapshot)}`
+    : (order.couponCodeSnapshot ?? "");
 }
 
 function AdminShipmentPanel({ shipment }: { shipment: ShipmentTrackingDto }) {
   if (!shipment.trackingCode) {
-    return <EmptyState>{shipment.lastCommandError ? "Carrier is unavailable. Shipment creation is queued for retry." : "Shipment has not been created."}</EmptyState>;
+    return (
+      <EmptyState>
+        {shipment.lastCommandError
+          ? "Carrier is unavailable. Shipment creation is queued for retry."
+          : "Shipment has not been created."}
+      </EmptyState>
+    );
   }
 
   return (
     <div className="grid gap-5">
       <div className="grid gap-3 text-sm sm:grid-cols-2">
-        <Info label="Tracking code" value={<span className="font-mono">{shipment.trackingCode}</span>} />
-        <Info label="Provider status" value={formatProviderStatus(shipment.providerStatus)} />
+        <Info
+          label="Tracking code"
+          value={<span className="font-mono">{shipment.trackingCode}</span>}
+        />
+        <Info
+          label="Provider status"
+          value={formatProviderStatus(shipment.providerStatus)}
+        />
         <Info label="Provider" value={shipment.provider ?? "MiniLogistics"} />
-        <Info label="Last sync" value={shipment.lastSyncedAtUtc ? formatDate(shipment.lastSyncedAtUtc) : "-"} />
+        <Info
+          label="Last sync"
+          value={
+            shipment.lastSyncedAtUtc
+              ? formatDate(shipment.lastSyncedAtUtc)
+              : "-"
+          }
+        />
       </div>
       {shipment.timeline.length ? (
         <div className="grid gap-3 border-t border-slate-100 pt-4">
           {shipment.timeline.map((entry) => (
             <div key={entry.id} className="border-l-4 border-emerald-600 pl-4">
-              <p className="font-bold">{formatProviderStatus(entry.providerStatus)}</p>
-              <p className="text-sm text-slate-500">{formatDate(entry.changedAtUtc)}</p>
-              {entry.note ? <p className="mt-1 text-sm text-slate-700">{entry.note}</p> : null}
+              <p className="font-medium">
+                {formatProviderStatus(entry.providerStatus)}
+              </p>
+              <p className="text-sm text-slate-500">
+                {formatDate(entry.changedAtUtc)}
+              </p>
+              {entry.note ? (
+                <p className="mt-1 text-sm text-slate-700">{entry.note}</p>
+              ) : null}
             </div>
           ))}
         </div>
-      ) : <EmptyState>No carrier timeline events yet</EmptyState>}
+      ) : (
+        <EmptyState>No carrier timeline events yet</EmptyState>
+      )}
     </div>
   );
 }

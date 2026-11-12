@@ -280,6 +280,13 @@ public sealed class Coupon : Entity
         Touch();
     }
 
+    public void ReleaseUsage()
+    {
+        if (UsedCount <= 0) throw new DomainException("Coupon usage cannot be released below zero.");
+        UsedCount--;
+        Touch();
+    }
+
     private void Touch()
     {
         UpdatedAt = DateTimeOffset.UtcNow;

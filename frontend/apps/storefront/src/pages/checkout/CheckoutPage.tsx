@@ -1,3 +1,5 @@
+import { bankTransferConfigured } from "../../services/storefrontInfo";
+import storefrontI18n from "../../i18n";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
@@ -27,22 +29,22 @@ import { useShippingSelection } from "../../features/checkout/useShippingSelecti
 import { ShippingSelection } from "../../features/checkout/ShippingSelection";
 import { isShippingQuoteCurrent } from "../../features/checkout/shippingQuoteState";
 
-const checkoutSchema = z.object({
-  customerName: z.string().min(2, "Please enter your full name."),
-  customerPhone: z.string().min(8, "Invalid phone number."),
+const checkoutSchema = () => z.object({
+  customerName: z.string().min(2, storefrontI18n.t("uiCopy.please_enter_your_full_name")),
+  customerPhone: z.string().min(8, storefrontI18n.t("uiCopy.invalid_phone_number")),
   customerEmail: z
     .string()
-    .email("Invalid email.")
+    .email(storefrontI18n.t("uiCopy.invalid_email"))
     .optional()
     .or(z.literal("")),
-  addressLine: z.string().min(5, "Please enter your shipping address."),
-  ward: z.string().min(1, "Please select a ward/commune."),
-  city: z.string().min(1, "Please select a province/city."),
+  addressLine: z.string().min(5, storefrontI18n.t("uiCopy.please_enter_your_shipping_address")),
+  ward: z.string().min(1, storefrontI18n.t("uiCopy.please_select_a_ward_commune")),
+  city: z.string().min(1, storefrontI18n.t("uiCopy.please_select_a_province_city")),
   note: z.string().optional(),
   paymentMethod: z.enum(["0", "1", "2"]),
 });
 
-type CheckoutFormValues = z.infer<typeof checkoutSchema>;
+type CheckoutFormValues = z.infer<ReturnType<typeof checkoutSchema>>;
 type CheckoutTextField = "customerName" | "customerPhone" | "customerEmail";
 type CouponValidationMode = "apply" | "revalidate";
 
@@ -67,6 +69,7 @@ interface TextAreaProps
     TextareaHTMLAttributes<HTMLTextAreaElement> {}
 
 export function CheckoutPage() {
+  useTranslation();
   const { t } = useTranslation("shipping");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -105,7 +108,7 @@ export function CheckoutPage() {
     control,
     formState: { errors },
   } = useForm<CheckoutFormValues>({
-    resolver: zodResolver(checkoutSchema),
+    resolver: zodResolver(checkoutSchema()),
     defaultValues: {
       customerName: "",
       customerPhone: "",
@@ -324,7 +327,7 @@ export function CheckoutPage() {
     setLastValidatedCartSignature(null);
     setCouponNotice({
       type: "info",
-      message: "The discount code has been removed because the cart is empty.",
+      message: storefrontI18n.t("uiCopy.the_discount_code_has_been_removed_because_the_cart_is_empty"),
     });
   }
 
@@ -362,7 +365,7 @@ export function CheckoutPage() {
       setLastValidatedCartSignature(null);
       setCouponNotice({
         type: "info",
-        message: "Discount code removed. Click Apply to check the new code.",
+        message: storefrontI18n.t("uiCopy.discount_code_removed_click_apply_to_check_the_new_code"),
       });
     }
   }
@@ -372,7 +375,7 @@ export function CheckoutPage() {
     if (!code) {
       setCouponNotice({
         type: "error",
-        message: "Please enter a discount code.",
+        message: storefrontI18n.t("uiCopy.please_enter_a_discount_code"),
       });
       return;
     }
@@ -386,31 +389,30 @@ export function CheckoutPage() {
     setLastValidatedCartSignature(null);
     setCouponNotice({
       type: "info",
-      message: "Discount code has been removed from the order.",
+      message: storefrontI18n.t("uiCopy.discount_code_has_been_removed_from_the_order"),
     });
   }
 
   return (
     <section className="-mt-8 ml-[calc(50%-50vw)] min-h-[calc(100vh-5rem)] w-screen bg-[#f6f6f6] px-5 py-10 sm:px-8 lg:py-14">
       <div className="mx-auto grid max-w-[1440px] gap-8">
+        {shipping.capabilities.isError && <div role="alert" className="rounded-xl bg-red-50 p-5 text-red-800">
+          {t("capabilitiesError")}
+          <button type="button" onClick={() => void shipping.capabilities.refetch()} className="ml-3 min-h-11 underline">{t("retry")}</button>
+        </div>}
         <div className="max-w-3xl">
-          <h1 className="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">
-            Checkout
-          </h1>
-          <p className="mt-6 max-w-2xl text-base leading-7 text-slate-800">
-            Enter your shipping information and select a payment method.
-          </p>
+          <h1 className="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">{storefrontI18n.t("uiCopy.checkout")}</h1>
+          <p className="mt-6 max-w-2xl text-base leading-7 text-slate-800">{storefrontI18n.t("uiCopy.enter_your_shipping_information_and_select_a_payment_method")}</p>
         </div>
 
         {customer ? (
-          <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800">
-            Signed in as <span className="font-black">{customer.email}</span>.
+          <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800">{storefrontI18n.t("uiCopy.signed_in_as")}<span className="font-black">{customer.email}</span>.
             Contact fields have been prefilled for you.
           </div>
         ) : null}
 
         {cartQuery.isLoading ? (
-          <StateMessage>Loading cart...</StateMessage>
+          <StateMessage>{storefrontI18n.t("uiCopy.loading_cart")}</StateMessage>
         ) : null}
 
         {cartQuery.isError ? (
@@ -420,9 +422,7 @@ export function CheckoutPage() {
               type="button"
               onClick={() => openCartDrawer()}
               className="underline"
-            >
-              Open cart
-            </button>
+            >{storefrontI18n.t("uiCopy.open_cart")}</button>
           </StateMessage>
         ) : null}
 
@@ -458,49 +458,47 @@ export function CheckoutPage() {
               className="grid min-w-0 gap-5"
             >
               <section>
-                <h2 className="mb-4 text-lg font-black text-slate-950">
-                  Shipping Information
-                </h2>
+                <h2 className="mb-4 text-lg font-black text-slate-950">{storefrontI18n.t("uiCopy.shipping_information")}</h2>
                 <div className="rounded-lg bg-white p-5 shadow-sm sm:p-7">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <FormInput
-                      placeholder="Full name *"
+                      placeholder={storefrontI18n.t("uiCopy.full_name")}
                       autoComplete="name"
                       {...register("customerName")}
                       error={errors.customerName?.message}
-                      label="Full name"
+                      label={storefrontI18n.t("uiCopy.full_name")}
                     />
                     <FormInput
-                      placeholder="Phone number *"
+                      placeholder={storefrontI18n.t("uiCopy.phone_number")}
                       type="tel"
                       autoComplete="tel"
                       {...register("customerPhone")}
                       error={errors.customerPhone?.message}
-                      label="Phone number"
+                      label={storefrontI18n.t("uiCopy.phone_number")}
                     />
                     <FormInput
-                      placeholder="Email"
+                      placeholder={storefrontI18n.t("uiCopy.email")}
                       type="email"
                       autoComplete="email"
                       {...register("customerEmail")}
                       error={errors.customerEmail?.message}
-                      label="Email"
+                      label={storefrontI18n.t("uiCopy.email")}
                     />
                     <div className="sm:col-span-2">
                       <FormInput
-                        placeholder="Address *"
+                        placeholder={storefrontI18n.t("uiCopy.address")}
                         autoComplete="street-address"
                         {...register("addressLine")}
                         error={errors.addressLine?.message}
-                        label="Address"
+                        label={storefrontI18n.t("uiCopy.address")}
                       />
                     </div>
                     <FormSelect
                       {...register("city")}
                       error={errors.city?.message}
-                      label="Province/City"
+                      label={storefrontI18n.t("uiCopy.province_city")}
                     >
-                      <option value="">Select province/city *</option>
+                      <option value="">{storefrontI18n.t("uiCopy.select_province_city")}</option>
                       {VIETNAM_ADMINISTRATIVE_UNITS.map((province) => (
                         <option key={province.code} value={province.code}>
                           {province.name}
@@ -511,12 +509,12 @@ export function CheckoutPage() {
                       {...register("ward")}
                       disabled={!selectedProvince}
                       error={errors.ward?.message}
-                      label="Ward/Commune"
+                      label={storefrontI18n.t("uiCopy.ward_commune")}
                     >
                       <option value="">
                         {selectedProvince
-                          ? "Select ward/commune *"
-                          : "Select province/city first"}
+                          ? storefrontI18n.t("uiCopy.select_ward_commune")
+                          : storefrontI18n.t("uiCopy.select_province_city_first")}
                       </option>
                       {wardOptions.map((ward) => (
                         <option key={ward.code} value={ward.code}>
@@ -529,39 +527,36 @@ export function CheckoutPage() {
               </section>
 
               <section>
-                <h2 className="mb-4 text-lg font-black text-slate-950">
-                  Order Notes
-                </h2>
+                <h2 className="mb-4 text-lg font-black text-slate-950">{storefrontI18n.t("uiCopy.order_notes")}</h2>
                 <FormTextArea
                   rows={4}
-                  placeholder="e.g., deliver during business hours, call 30 minutes before arrival..."
+                  placeholder={storefrontI18n.t("uiCopy.e_g_deliver_during_business_hours_call_30_minutes_before_arrival")}
                   {...register("note")}
                   error={errors.note?.message}
-                  label="Order Notes"
+                  label={storefrontI18n.t("uiCopy.order_notes")}
                 />
               </section>
 
               <section className="rounded-lg bg-white p-5 shadow-sm sm:p-6">
-                <h2 className="mb-4 text-lg font-black text-slate-950">
-                  Payment Method
-                </h2>
+                <h2 className="mb-4 text-lg font-black text-slate-950">{storefrontI18n.t("uiCopy.payment_method")}</h2>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <PaymentOption
                     value="0"
-                    label="COD"
-                    description="Pay on delivery"
+                    label={storefrontI18n.t("uiCopy.cod")}
+                    description={storefrontI18n.t("uiCopy.pay_on_delivery")}
                     register={register("paymentMethod")}
                   />
                   <PaymentOption
                     value="1"
-                    label="Bank Transfer"
-                    description="Verify manually after placement"
+                    disabled={!bankTransferConfigured}
+                    label={storefrontI18n.t("uiCopy.bank_transfer")}
+                    description={bankTransferConfigured ? storefrontI18n.t("bank.title") : storefrontI18n.t("bank.missing")}
                     register={register("paymentMethod")}
                   />
                   <PaymentOption
                     value="2"
                     label="VNPay"
-                    description="Pay online via sandbox gateway"
+                    description={storefrontI18n.t("uiCopy.pay_online_via_sandbox_gateway")}
                     register={register("paymentMethod")}
                   />
                 </div>
@@ -623,13 +618,15 @@ export function CheckoutPage() {
 function FormInput({ label, error, className = "", ...props }: InputProps) {
   return (
     <label className="block">
-      <span className="sr-only">{label}</span>
+      <span className="mb-2 block text-sm font-semibold text-slate-700">{label}</span>
       <input
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `checkout-${props.name}-error` : undefined}
         aria-label={label}
-        className={`h-14 w-full rounded-lg border border-slate-200 bg-white px-5 text-base font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500 ${className}`}
+        className={`h-14 w-full rounded-lg border border-slate-200 bg-white px-5 text-base font-medium text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-slate-500 ${className}`}
         {...props}
       />
-      <FieldError message={error} />
+      <FieldError id={`checkout-${props.name}-error`} message={error} />
     </label>
   );
 }
@@ -643,15 +640,17 @@ function FormSelect({
 }: SelectProps) {
   return (
     <label className="block">
-      <span className="sr-only">{label}</span>
+      <span className="mb-2 block text-sm font-semibold text-slate-700">{label}</span>
       <select
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `checkout-${props.name}-error` : undefined}
         aria-label={label}
-        className={`h-14 w-full rounded-lg border border-slate-200 bg-white px-5 text-base font-medium text-slate-500 outline-none transition focus:border-slate-500 ${className}`}
+        className={`h-14 w-full rounded-lg border border-slate-200 bg-white px-5 text-base font-medium text-slate-600 outline-none transition focus:border-slate-500 ${className}`}
         {...props}
       >
         {children}
       </select>
-      <FieldError message={error} />
+      <FieldError id={`checkout-${props.name}-error`} message={error} />
     </label>
   );
 }
@@ -664,32 +663,36 @@ function FormTextArea({
 }: TextAreaProps) {
   return (
     <label className="block rounded-lg bg-white shadow-sm">
-      <span className="sr-only">{label}</span>
+      <span className="mb-2 block text-sm font-semibold text-slate-700">{label}</span>
       <textarea
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `checkout-${props.name}-error` : undefined}
         aria-label={label}
-        className={`w-full resize-none rounded-lg border border-white bg-white px-5 py-4 text-base font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-300 ${className}`}
+        className={`w-full resize-none rounded-lg border border-white bg-white px-5 py-4 text-base font-medium text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-slate-300 ${className}`}
         {...props}
       />
-      <FieldError message={error} />
+      <FieldError id={`checkout-${props.name}-error`} message={error} />
     </label>
   );
 }
 
-function FieldError({ message }: { message?: string }) {
+function FieldError({ message, id }: { message?: string; id?: string }) {
   if (!message) {
     return null;
   }
 
-  return <p className="mt-1 text-sm font-semibold text-red-600">{message}</p>;
+  return <p id={id} role="alert" className="mt-1 text-sm font-semibold text-red-700">{message}</p>;
 }
 
 function PaymentOption({
   description,
+  disabled = false,
   label,
   register,
   value,
 }: {
   description: string;
+  disabled?: boolean;
   label: string;
   register: ReturnType<typeof useForm<CheckoutFormValues>>["register"] extends (
     name: "paymentMethod",
@@ -699,16 +702,17 @@ function PaymentOption({
   value: "0" | "1" | "2";
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4 transition has-[:checked]:border-slate-950 has-[:checked]:bg-slate-50">
+    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4 transition has-[:disabled]:cursor-not-allowed has-[:disabled]:bg-slate-100 has-[:checked]:border-slate-950 has-[:checked]:bg-slate-50">
       <input
         type="radio"
+        disabled={disabled}
         value={value}
         className="mt-1 accent-slate-950"
         {...register}
       />
       <span>
         <span className="block font-bold text-slate-950">{label}</span>
-        <span className="mt-1 block text-sm text-slate-500">{description}</span>
+        <span className="mt-1 block text-sm text-slate-600">{description}</span>
       </span>
     </label>
   );
@@ -717,13 +721,13 @@ function PaymentOption({
 function ManualTransferNotice() {
   return (
     <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-      <p className="font-bold text-slate-950">Manual Bank Transfer</p>
+      <p className="font-bold text-slate-950">{storefrontI18n.t("uiCopy.manual_bank_transfer")}</p>
       <p className="mt-1 leading-6">
         After placing the order, the system will generate an order code and
         transfer details for copying. Our staff will confirm your order once the
         payment is received.
       </p>
-      <p className="mt-3 font-mono text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+      <p className="mt-3 font-mono text-xs font-bold uppercase tracking-[0.14em] text-slate-600">
         Sample reference: {buildManualTransferContent("ORDER-CODE")}
       </p>
     </div>
@@ -772,14 +776,14 @@ function OrderSummary({
   const { t } = useTranslation("shipping");
   const submitLabel =
     paymentMethod === "1"
-      ? "Place order and get transfer info"
+      ? storefrontI18n.t("uiCopy.place_order_and_get_transfer_info")
       : paymentMethod === "2"
-        ? "Continue to VNPay"
-        : "Place order (COD)";
+        ? storefrontI18n.t("uiCopy.continue_to_vnpay")
+        : storefrontI18n.t("uiCopy.place_order_cod");
 
   return (
     <aside className="lg:sticky lg:top-28">
-      <h2 className="mb-4 text-lg font-black text-slate-950">Order Summary</h2>
+      <h2 className="mb-4 text-lg font-black text-slate-950">{storefrontI18n.t("uiCopy.order_summary")}</h2>
       <div className="rounded-lg bg-white p-5 shadow-sm sm:p-7">
         <div className="grid gap-5">
           {cartItems.map((item) => (
@@ -796,6 +800,7 @@ function OrderSummary({
           <div className="flex min-h-12 items-center rounded-full border border-slate-200 bg-white pl-5 pr-1.5 text-slate-700 focus-within:border-slate-500">
             <input
               value={couponCodeInput}
+              aria-label={t("couponCode")}
               onChange={(event) =>
                 onCouponCodeChange(event.currentTarget.value)
               }
@@ -805,24 +810,22 @@ function OrderSummary({
                   onApplyCoupon();
                 }
               }}
-              placeholder="Enter discount code"
+              placeholder={storefrontI18n.t("uiCopy.enter_discount_code")}
               disabled={isPending}
-              className="min-w-0 flex-1 bg-transparent text-sm font-bold uppercase outline-none placeholder:normal-case placeholder:font-medium placeholder:text-slate-400 disabled:cursor-not-allowed"
+              className="min-w-0 flex-1 bg-transparent text-sm font-bold uppercase outline-none placeholder:normal-case placeholder:font-medium placeholder:text-slate-600 disabled:cursor-not-allowed"
             />
             {appliedCoupon ? (
               <button
                 type="button"
                 disabled={isPending}
                 onClick={onRemoveCoupon}
-                className="mr-1 rounded-full px-3 py-2 text-xs font-black text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Remove
-              </button>
+                className="mr-1 rounded-full px-3 py-2 text-xs font-black text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+              >{storefrontI18n.t("uiCopy.remove")}</button>
             ) : null}
             <button
               type="button"
               className="grid h-9 w-9 place-items-center rounded-full bg-slate-950 text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200"
-              aria-label="Apply discount code"
+              aria-label={storefrontI18n.t("uiCopy.apply_discount_code")}
               disabled={isPending || couponCodeInput.trim().length === 0}
               onClick={onApplyCoupon}
             >
@@ -860,18 +863,18 @@ function OrderSummary({
             </div>
           ) : null}
           {isCouponPending ? (
-            <CouponMessage type="info">Checking discount code...</CouponMessage>
+            <CouponMessage type="info">{storefrontI18n.t("uiCopy.checking_discount_code")}</CouponMessage>
           ) : null}
         </div>
 
-        <div className="mt-5 grid gap-4 text-sm text-slate-500">
+        <div className="mt-5 grid gap-4 text-sm text-slate-600">
           <SummaryLine
-            label="Subtotal"
+            label={storefrontI18n.t("uiCopy.subtotal")}
             value={formatCartMoney(subtotal, false)}
             strong
           />
           <SummaryLine
-            label="Shipping fee"
+            label={storefrontI18n.t("uiCopy.shipping_fee")}
             value={
               isShippingQuoteLoading
                 ? "Calculating..."
@@ -891,7 +894,7 @@ function OrderSummary({
           ) : null}
           <div className="border-t border-slate-200 pt-5">
             <SummaryLine
-              label="Total (VND)"
+              label={storefrontI18n.t("uiCopy.total_vnd")}
               value={
                 totalAmount === null
                   ? t("unknown")
@@ -911,7 +914,7 @@ function OrderSummary({
         <button
           type="submit"
           disabled={isPending || isShippingQuoteLoading || shippingUnavailable}
-          className="mt-8 min-h-14 w-full rounded-full bg-[#9d9d9d] px-6 py-3 text-base font-black text-white transition hover:bg-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-8 min-h-14 w-full rounded-full bg-slate-950 px-6 py-3 text-base font-black text-white transition hover:bg-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isPending ? "Processing..." : submitLabel}
         </button>
@@ -952,7 +955,7 @@ function CheckoutCartItem({
           />
         ) : (
           <svg
-            className="h-10 w-10 text-slate-400"
+            className="h-10 w-10 text-slate-600"
             viewBox="0 0 24 24"
             fill="none"
             aria-hidden="true"
@@ -968,7 +971,7 @@ function CheckoutCartItem({
         )}
       </div>
       <div className="min-w-0 py-1">
-        <p className="truncate text-sm text-slate-500">{item.productName}</p>
+        <p className="truncate text-sm text-slate-600">{item.productName}</p>
         <h3 className="mt-1 line-clamp-2 text-sm font-black leading-5 text-slate-800">
           {item.variantName}
         </h3>
@@ -976,7 +979,7 @@ function CheckoutCartItem({
           {formatCartMoney(item.unitPriceSnapshot, false)}
         </p>
         {formatVariantOptions(item) ? (
-          <p className="mt-2 truncate text-sm text-slate-500">
+          <p className="mt-2 truncate text-sm text-slate-600">
             {formatVariantOptions(item)}
           </p>
         ) : null}
@@ -986,8 +989,8 @@ function CheckoutCartItem({
               type="button"
               disabled={isPending || item.quantity <= 1}
               onClick={() => updateQuantity(item.quantity - 1)}
-              className="grid h-10 w-9 place-items-center text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Decrease quantity"
+              className="grid h-10 w-9 place-items-center text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label={storefrontI18n.t("uiCopy.decrease_quantity")}
             >
               -
             </button>
@@ -999,14 +1002,14 @@ function CheckoutCartItem({
               disabled={isPending}
               onChange={(event) => updateQuantity(Number(event.target.value))}
               className="h-10 w-12 border-x border-slate-200 text-center text-sm font-bold text-slate-700 outline-none disabled:bg-slate-50"
-              aria-label="Quantity"
+              aria-label={storefrontI18n.t("uiCopy.quantity")}
             />
             <button
               type="button"
               disabled={isPending}
               onClick={() => updateQuantity(item.quantity + 1)}
-              className="grid h-10 w-9 place-items-center text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Increase quantity"
+              className="grid h-10 w-9 place-items-center text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label={storefrontI18n.t("uiCopy.increase_quantity")}
             >
               +
             </button>
@@ -1023,7 +1026,7 @@ function CheckoutCartItem({
 function EmptyCheckoutState({ onOpenCart }: { onOpenCart: () => void }) {
   return (
     <section className="rounded-lg border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
-      <h2 className="text-2xl font-black text-slate-950">Your cart is empty</h2>
+      <h2 className="text-2xl font-black text-slate-950">{storefrontI18n.t("uiCopy.your_cart_is_empty")}</h2>
       <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">
         Your cart session might have expired or has already been paid for. Check
         your active cart or go back to the product catalog to continue shopping.
@@ -1033,15 +1036,11 @@ function EmptyCheckoutState({ onOpenCart }: { onOpenCart: () => void }) {
           type="button"
           onClick={onOpenCart}
           className="ui-control rounded-[var(--radius-control)] border border-slate-200 px-5 py-3 text-slate-700 transition hover:border-slate-950 hover:text-slate-950"
-        >
-          Open cart
-        </button>
+        >{storefrontI18n.t("uiCopy.open_cart")}</button>
         <Link
           to="/products"
           className="ui-control rounded-[var(--radius-control)] bg-slate-950 px-5 py-3 text-white transition hover:bg-slate-800"
-        >
-          Continue shopping
-        </Link>
+        >{storefrontI18n.t("uiCopy.continue_shopping")}</Link>
       </div>
     </section>
   );
@@ -1084,7 +1083,7 @@ function SummaryLine({
   return (
     <div className="flex items-center justify-between gap-4">
       <span
-        className={tone === "success" ? "text-emerald-600" : "text-slate-500"}
+        className={tone === "success" ? "text-emerald-600" : "text-slate-600"}
       >
         {label}
       </span>
@@ -1094,7 +1093,7 @@ function SummaryLine({
             ? "font-black text-emerald-600"
             : strong
               ? "font-black text-slate-800"
-              : "font-medium text-slate-500"
+              : "font-medium text-slate-600"
         }
       >
         {value}
@@ -1112,7 +1111,7 @@ function StateMessage({
 }) {
   return (
     <div
-      className={`rounded-lg px-5 py-4 text-sm font-semibold ${tone === "error" ? "bg-red-50 text-red-700" : "bg-white text-slate-500"}`}
+      className={`rounded-lg px-5 py-4 text-sm font-semibold ${tone === "error" ? "bg-red-50 text-red-700" : "bg-white text-slate-600"}`}
     >
       {children}
     </div>

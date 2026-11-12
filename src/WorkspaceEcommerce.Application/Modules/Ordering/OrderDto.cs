@@ -28,5 +28,6 @@ public sealed record OrderDto(
     Guid? ShipmentId,
     IReadOnlyCollection<OrderItemDto> Items)
 {
+    public DateTimeOffset? PaymentDueAt { get; init; }
     public Shipments.OrderShippingDetailsDto? Shipping { get; init; }
 }

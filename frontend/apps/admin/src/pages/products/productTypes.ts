@@ -10,18 +10,25 @@ import type {
   AdminProductVariantUpsertRequest
 } from "@workspace-ecommerce/api-types";
 import { z } from "zod";
-import { formatLocalizedText } from "../../utils/localizedText";
+import { formatLocalizedText, localizedValue, updateTranslations } from "../../utils/localizedText";
 
 export const productSchema = z.object({
   categoryId: z.string().min(1, "Category is required."),
   name: z.string().trim().min(1, "Name is required.").max(250, "Name is too long."),
+  nameEn: z.string().trim().max(250, "English name is too long."),
   slug: z.string().trim().min(1, "Slug is required.").max(250, "Slug is too long.").regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must use lowercase letters, numbers, and hyphens."),
   description: z.string().trim().optional(),
+  descriptionEn: z.string().trim(),
   isFeatured: z.boolean(),
   isActive: z.boolean()
 });
 
 export const variantSchema = z.object({
+  stockChangeReason: z.string().trim().max(500, "Stock adjustment reason is too long."),
+  weightKg: z.number().positive().max(20000).nullable(),
+  lengthCm: z.number().positive().max(20000).nullable(),
+  widthCm: z.number().positive().max(20000).nullable(),
+  heightCm: z.number().positive().max(20000).nullable(),
   sku: z.string().trim().min(1, "SKU is required.").max(100, "SKU is too long.").regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, "SKU must use letters, numbers, dots, underscores, or hyphens."),
   name: z.string().trim().min(1, "Variant name is required.").max(250, "Variant name is too long."),
   color: z.string().trim().max(100, "Color is too long.").optional(),
@@ -56,8 +63,8 @@ export type DeleteTarget =
   | { type: "image"; item: AdminProductImageDto }
   | { type: "specification"; item: AdminProductSpecificationDto };
 
-export const productDefaultValues: ProductFormValues = { categoryId: "", name: "", slug: "", description: "", isFeatured: false, isActive: true };
-export const variantDefaultValues: VariantFormValues = { sku: "", name: "", color: "", size: "", price: 0, compareAtPrice: null, stockQuantity: 0, requiresInstallation: false, isActive: true };
+export const productDefaultValues: ProductFormValues = { categoryId: "", name: "", nameEn: "", slug: "", description: "", descriptionEn: "", isFeatured: false, isActive: true };
+export const variantDefaultValues: VariantFormValues = { stockChangeReason: "", sku: "", name: "", color: "", size: "", price: 0, compareAtPrice: null, stockQuantity: 0, weightKg: null, lengthCm: null, widthCm: null, heightCm: null, requiresInstallation: false, isActive: true };
 export const imageDefaultValues: ImageFormValues = { imageUrl: "", altText: "", sortOrder: 1 };
 export const specificationDefaultValues: SpecificationFormValues = { name: "", value: "", sortOrder: 1 };
 
@@ -66,19 +73,20 @@ export function flattenCategories(categories: AdminCategoryDto[], level = 0): Ca
 }
 
 export function toProductFormValues(product: AdminProductDto): ProductFormValues {
-  return { categoryId: product.categoryId, name: formatLocalizedText(product.name, ""), slug: product.slug, description: formatLocalizedText(product.description, ""), isFeatured: product.isFeatured, isActive: product.isActive };
+  return { categoryId: product.categoryId, name: localizedValue(product.name, "vi") || formatLocalizedText(product.name, ""), nameEn: localizedValue(product.name, "en"), slug: product.slug, description: localizedValue(product.description, "vi"), descriptionEn: localizedValue(product.description, "en"), isFeatured: product.isFeatured, isActive: product.isActive };
 }
 
-export function toProductRequest(values: ProductFormValues): AdminProductUpsertRequest {
-  return { categoryId: values.categoryId, name: values.name.trim(), slug: values.slug.trim(), description: values.description?.trim() ? values.description.trim() : null, isFeatured: values.isFeatured, isActive: values.isActive };
+export function toProductRequest(values: ProductFormValues, original?: AdminProductDto | null): AdminProductUpsertRequest {
+  const description = updateTranslations(original?.description, values.description ?? "", values.descriptionEn);
+  return { categoryId: values.categoryId, name: updateTranslations(original?.name, values.name, values.nameEn), slug: values.slug.trim(), description: Object.values(description).some(value => value.trim()) ? description : null, isFeatured: values.isFeatured, isActive: values.isActive };
 }
 
 export function toVariantFormValues(variant: AdminProductVariantDto): VariantFormValues {
-  return { sku: variant.sku, name: variant.name, color: variant.color ?? "", size: variant.size ?? "", price: variant.price, compareAtPrice: variant.compareAtPrice, stockQuantity: variant.stockQuantity, requiresInstallation: variant.requiresInstallation, isActive: variant.isActive };
+  return { stockChangeReason: "", sku: variant.sku, name: variant.name, color: variant.color ?? "", size: variant.size ?? "", price: variant.price, compareAtPrice: variant.compareAtPrice, stockQuantity: variant.stockQuantity, weightKg: variant.weightKg ?? null, lengthCm: variant.lengthCm ?? null, widthCm: variant.widthCm ?? null, heightCm: variant.heightCm ?? null, requiresInstallation: variant.requiresInstallation, isActive: variant.isActive };
 }
 
 export function toVariantRequest(values: VariantFormValues): AdminProductVariantUpsertRequest {
-  return { sku: values.sku.trim(), name: values.name.trim(), color: values.color?.trim() ? values.color.trim() : null, size: values.size?.trim() ? values.size.trim() : null, price: values.price, compareAtPrice: values.compareAtPrice, stockQuantity: values.stockQuantity, requiresInstallation: values.requiresInstallation, isActive: values.isActive };
+  return { ...values, updateDimensions: true, sku: values.sku.trim(), name: values.name.trim(), color: values.color?.trim() ? values.color.trim() : null, size: values.size?.trim() ? values.size.trim() : null };
 }
 
 export function toImageFormValues(image: AdminProductImageDto): ImageFormValues {

@@ -1,4 +1,4 @@
-﻿namespace WorkspaceEcommerce.Application.Modules.Catalog.Products;
+namespace WorkspaceEcommerce.Application.Modules.Catalog.Products;
 
 public sealed record AdminProductVariantDto(
     Guid Id,
@@ -11,4 +11,10 @@ public sealed record AdminProductVariantDto(
     decimal? CompareAtPrice,
     int StockQuantity,
     bool RequiresInstallation,
-    bool IsActive);
+    bool IsActive)
+{
+    public decimal? WeightKg { get; init; }
+    public decimal? LengthCm { get; init; }
+    public decimal? WidthCm { get; init; }
+    public decimal? HeightCm { get; init; }
+}

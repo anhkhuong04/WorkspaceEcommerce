@@ -1,11 +1,30 @@
 using Microsoft.EntityFrameworkCore;
 using WorkspaceEcommerce.Application.Modules.Admin.Dashboard;
 using WorkspaceEcommerce.Domain.Modules.Ordering;
+using WorkspaceEcommerce.Application.Modules.Ordering;
+using WorkspaceEcommerce.Domain.Modules.Blogs;
+using WorkspaceEcommerce.Application.Abstractions.Persistence;
 
 namespace WorkspaceEcommerce.Infrastructure.Persistence.Queries;
 
-internal sealed class EfAdminDashboardQuery(AppDbContext dbContext) : IAdminDashboardQuery
+internal sealed class EfAdminDashboardQuery(AppDbContext dbContext, IShippingCheckoutStore shipping) : IAdminDashboardQuery
 {
+    public async Task<decimal> GetNetCollectedRevenueAsync(CancellationToken cancellationToken = default) =>
+        await dbContext.Orders.AsNoTracking().Where(o => o.PaidAt != null && (o.Status == OrderStatus.Completed || o.Status == OrderStatus.Returned))
+            .Select(o => (decimal?)((o.TotalAmount - o.RefundedAmount) * o.ExchangeRate)).SumAsync(cancellationToken) ?? 0m;
+
+    public async Task<IReadOnlyCollection<AdminOperationalQueueDto>> GetOperationsAsync(CancellationToken cancellationToken = default)
+    {
+        var result = new List<AdminOperationalQueueDto>();
+        foreach (var (key, label) in new[] { ("transfers", "Verify bank transfers"), ("cod-remittance", "Reconcile collected COD"), ("delivery-failed", "Failed deliveries"), ("returns", "Review / receive returns"), ("refunds", "Refunds awaiting evidence") })
+            result.Add(new(key, label, await AdminOrderQueues.Filter(dbContext, dbContext.Orders.AsNoTracking(), key, shipping).CountAsync(cancellationToken), $"/orders?queue={key}"));
+        result.Add(new("payment-exceptions", "Reconcile payment differences", await dbContext.OrderPaymentExceptions.CountAsync(e => e.SettledAt == null, cancellationToken), "/orders?queue=payment-exceptions"));
+        result.Add(new("comments", "Comments awaiting moderation", await dbContext.BlogComments.CountAsync(c => c.ModerationStatus == BlogCommentModerationStatus.Pending, cancellationToken), "/blogs?moderation=pending"));
+        var failedWork = await dbContext.CustomerEmailOutboxMessages.CountAsync(e => e.DeadLetteredAt != null, cancellationToken)
+            + await dbContext.ShipmentCommandOutbox.CountAsync(c => c.DeadLetteredAtUtc != null, cancellationToken);
+        result.Add(new("operations", "Background failure records", failedWork, "/operations"));
+        return result;
+    }
     public async Task<IReadOnlyCollection<AdminOrderStatusSummaryDto>> GetOrderStatusSummaryAsync(
         CancellationToken cancellationToken = default)
     {

@@ -235,6 +235,8 @@ public sealed class AdminProductServiceTests
             Price = 1300000m,
             CompareAtPrice = 1500000m,
             StockQuantity = 4,
+            ExpectedStockQuantity = variant.StockQuantity,
+            StockChangeReason = "Verified warehouse count correction",
             RequiresInstallation = false,
             IsActive = false
         });

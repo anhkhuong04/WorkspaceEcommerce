@@ -15,14 +15,15 @@ Admin-only endpoints under `/api/admin/orders/{id}/payment`:
 Each POST body is `{ amount, currency, reference, reason }`. All fields are
 required. Reference is at most 120 characters, reason 500. Actor comes from the
 authenticated admin session and time from the server. The receipt is immutable.
-Only new orders with a persisted shipping selection use these commands. Legacy
-orders return 409 and keep their previous payment/import workflow.
+New orders with a persisted shipping selection and new manual imports carrying
+`ImportSource` use these commands. Old unmarked legacy orders return 409 and keep
+their previous workflow; historical records are not automatically reclassified.
 
 Missing authentication gives 401, Customer role 403. Invalid fields/currency give
 400; wrong method/stage, cancelled/returned order, partial or excessive amounts
-give 409. The minimal workflow does not book partial collections, edit totals,
-automatically reconcile banks or pay refunds. Such cases need operational
-exception handling. Repeating the same order/kind/reference and exact amount
+give 409. Short/excess receipts use the audited exceptions workflow below. These
+commands do not edit totals, connect to banks or initiate outgoing payments.
+Repeating the same order/kind/reference and exact amount
 returns the existing fact; a different reference conflicts. PostgreSQL enforces
 one fact per order/kind and unique reference per kind across orders. All mutations
 lock pending payment transactions before order, then shipment, matching callback
@@ -40,3 +41,26 @@ remaining delivery/storefront/release gates are satisfied.
 The `AddAuditedOrderPaymentReceipts` migration is additive in `payments`. Its Down
 refuses to delete recorded evidence. Deploy via the migration job; replicas never
 migrate at boot. Use disable-new-intake and forward fixes once data exists.
+
+## Payment differences
+
+`GET /exceptions?pageNumber=1` returns ten evidence records per page and the
+permitted next settlement. `POST /exceptions` takes
+`{ requestId, actualAmount, reference, reason }`. Record a positive, whole VND
+receipt that differs from the frozen total before full payment confirmation.
+Manual transfer must be Pending; COD must be Unpaid and Shipping. Only one open
+difference per order is permitted. Request ID and original reference are durable
+retry identities; conflicting reuse is rejected.
+
+`POST /exceptions/{exceptionId}/resolve` takes `{ amount, reference, reason }`.
+Verify the distinct settlement evidence first: collect the exact shortfall or
+return the exact excess. For an open order, settlement and the existing full
+collection command commit together, including eligible fulfillment/loyalty. An
+open difference blocks direct full confirmation. If cancellation/expiry won the
+order lock first, resolution instead requires returning the actual funds
+received and never marks the cancelled order Paid. Retrying the same resolution
+does not add a receipt. VNPay remains on its verified gateway callback path.
+
+`POST /confirm-full-refund` remains for audited full refunds on eligible closed
+orders. Once an RMA exists, record each refund through its
+[return case](order-returns.md) so quantities, warranty and loyalty reconcile.

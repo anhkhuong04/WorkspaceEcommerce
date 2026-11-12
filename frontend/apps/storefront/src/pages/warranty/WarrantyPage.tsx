@@ -84,14 +84,14 @@ export function WarrantyPage() {
             autoComplete="off"
             maxLength={64}
             placeholder={t("warranty.placeholder")}
-            className="min-h-14 min-w-0 flex-1 rounded-xl px-4 text-base text-slate-950 outline-none ring-offset-2 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-600"
+            className="min-h-14 min-w-0 flex-1 rounded-xl px-4 text-base text-slate-950 outline-none ring-offset-2 placeholder:text-slate-600 focus:ring-2 focus:ring-blue-600"
           />
           <button type="submit" disabled={lookupMutation.isPending} className="min-h-14 rounded-xl bg-[var(--brand)] px-7 font-bold text-white transition hover:bg-slate-950 disabled:cursor-not-allowed disabled:opacity-60">
             {lookupMutation.isPending ? t("warranty.checking") : t("warranty.check")}
           </button>
         </form>
 
-        <p className="mt-3 text-xs font-medium text-slate-500">{t("warranty.privacyHint")}</p>
+        <p className="mt-3 text-xs font-medium text-slate-600">{t("warranty.privacyHint")}</p>
 
         {message ? <div className="mx-auto mt-6 max-w-4xl rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-900" role="status">{message}</div> : null}
 
@@ -135,7 +135,7 @@ function WarrantyResult({ result, activating, onActivate }: { result: PublicWarr
         <div>
           <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">{t("warranty.record")}</p>
           <h2 className="mt-1 text-xl font-black text-slate-950">{result.productName}</h2>
-          <p className="mt-1 text-sm font-semibold text-slate-500">{result.maskedIdentifier}</p>
+          <p className="mt-1 text-sm font-semibold text-slate-600">{result.maskedIdentifier}</p>
         </div>
         <span className={`rounded-full px-3 py-1.5 text-sm font-black ${result.status === 1 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{result.status === null ? t("warranty.status.unknown") : t(statusLabelKey[result.status])}</span>
       </div>

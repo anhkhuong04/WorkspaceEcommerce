@@ -7,6 +7,7 @@ export interface LoyaltyAccountDto {
   accountId: string | null;
   customerId: string;
   currentPoints: number;
+  pointsDebt?: number;
   totalPointsEarned: number;
   currentTier: LoyaltyTierType;
   discountPercent: number;

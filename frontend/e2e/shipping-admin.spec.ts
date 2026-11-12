@@ -155,6 +155,36 @@ test("edit, preview saved price, confirm publication and retain history", async 
     page.getByRole("heading", { name: "Change history" }),
   ).toBeVisible();
 });
+test("dirty shipping drafts require an explicit discard when switching plans", async ({ page }) => {
+  await setup(page); await page.getByRole("button", { name: /Approved rates · Draft/ }).click();
+  await page.getByLabel("Name", { exact: true }).fill("Unsaved draft");
+  await page.getByRole("button", { name: "New rate plan", exact: true }).click();
+  const confirm = page.getByRole("alertdialog"); await expect(confirm).toContainText("Discard unsaved changes?");
+  await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Unsaved draft");
+  await page.getByRole("button", { name: "New rate plan", exact: true }).click();
+  await confirm.getByRole("button", { name: "Discard and continue" }).click();
+  await expect(page.getByLabel("Name", { exact: true })).not.toHaveValue("Unsaved draft");
+});
+
+test("shipping preview is invalidated when its input changes and saving locks inputs", async ({ page }) => {
+  await setup(page); await page.getByRole("button", { name: /Approved rates · Draft/ }).click();
+  await page.getByLabel("Destination province").selectOption("01"); await page.getByLabel("Destination ward").selectOption("00001");
+  await page.getByRole("button", { name: "Preview price" }).click(); await expect(page.getByText(/Preview: 20/)).toBeVisible();
+  await page.getByLabel("Lifecycle reason").fill("Validated"); await expect(page.getByRole("button", { name: "Publish plan", exact: true })).toBeEnabled();
+  await page.getByLabel("Parcel weight (kg)").fill("2"); await expect(page.getByText(/Preview: 20/)).not.toBeVisible();
+  await expect(page.getByRole("button", { name: "Publish plan", exact: true })).toBeDisabled();
+  let release = () => {}; const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route(`**/api/admin/shipping/rate-plans/${id}`, async route => {
+    if (route.request().method() !== "PUT") return route.fallback();
+    await gate; return route.fulfill({ status: 409, json: { success: false, data: null, errors: ["Revision changed"], traceId: "synthetic" } });
+  });
+  await page.getByLabel("Name", { exact: true }).fill("Pending save"); await page.getByLabel("Reason", { exact: true }).fill("Revised rates");
+  try { await page.getByRole("button", { name: "Save draft" }).click(); await expect(page.getByLabel("Name", { exact: true })).toBeDisabled(); await expect(page.getByRole("button", { name: "New rate plan", exact: true })).toBeDisabled(); }
+  finally { release(); }
+  await expect(page.getByLabel("Name", { exact: true })).toBeEnabled();
+});
+
 test("version conflict retains edits and offers reload", async ({ page }) => {
   await setup(page, true);
   await page.getByRole("button", { name: /Approved rates · Draft/ }).click();
@@ -228,6 +258,7 @@ test("order detail reviews and records an exact audited transfer", async ({
       route.fulfill({
         json: { success: true, data, errors: [], traceId: "synthetic" },
       });
+    if (path.endsWith("/payment/exceptions")) return ok({ canRecord: false, currency: "VND", exceptions: paged([]) });
     if (path.endsWith("/workspace-shipment/history"))
       return ok(
         paged(

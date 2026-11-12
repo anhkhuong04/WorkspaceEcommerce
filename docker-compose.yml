@@ -58,6 +58,8 @@ services:
       MediaStorage__NoOpMalwareScannerRiskExpiresAtUtc: ${MediaStorage__NoOpMalwareScannerRiskExpiresAtUtc:-}
       MediaStorage__NoOpMalwareScannerRiskReference: ${MediaStorage__NoOpMalwareScannerRiskReference:-}
       # Default-off quoted checkout; method flags pause new quotes only.
+      OrderExpiry__VNPayMinutes: ${OrderExpiry__VNPayMinutes:-30}
+      OrderExpiry__ManualTransferMinutes: ${OrderExpiry__ManualTransferMinutes:-1440}
       ShippingCheckout__Enabled: ${ShippingCheckout__Enabled:-false}
       ShippingCheckout__WorkspaceEnabled: ${ShippingCheckout__WorkspaceEnabled:-true}
       ShippingCheckout__ExternalEnabled: ${ShippingCheckout__ExternalEnabled:-true}

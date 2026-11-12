@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Application.Common.Models;
+using WorkspaceEcommerce.Application.Common.Persistence;
 using WorkspaceEcommerce.Application.Modules.Loyalty;
 using WorkspaceEcommerce.Application.Modules.Shipments;
 using WorkspaceEcommerce.Domain.Common;
@@ -36,7 +37,9 @@ internal sealed class OrderPaymentService(IAppDbContext db, IShippingCheckoutSto
                 await db.FindPendingPaymentTransactionsForOrderForUpdateAsync(id, token);
                 var order = await db.FindOrderForUpdateAsync(id, token);
                 if (order is null) return Result<OrderPaymentSummaryDto>.NotFound("Order was not found.");
-                if (await fulfillment.MethodAsync(id, token) is null)
+                if (await db.OrderPaymentExceptions.Where(e => e.OrderId == id && e.SettledAt == null).AnyAsyncSafe(token))
+                    return Result<OrderPaymentSummaryDto>.Conflict("Reconcile the open payment difference using verified settlement evidence first.");
+                if (kind != OrderPaymentReceiptKind.FullRefund && order.ImportSource is null && await fulfillment.MethodAsync(id, token) is null)
                     return Result<OrderPaymentSummaryDto>.Conflict("Legacy orders retain their existing payment workflow.");
                 if (request.Amount != order.TotalAmount || request.Currency != order.CurrencyCode)
                     return Result<OrderPaymentSummaryDto>.Conflict("Confirm the exact frozen order amount and currency. Partial/excess amounts require exception handling.");
@@ -45,10 +48,16 @@ internal sealed class OrderPaymentService(IAppDbContext db, IShippingCheckoutSto
                     return existing.Reference == request.Reference.Trim()
                         ? Result<OrderPaymentSummaryDto>.Success(await SummaryAsync(order, token))
                         : Result<OrderPaymentSummaryDto>.Conflict("This payment fact was already recorded with another reference.");
-                if (order.Status is OrderStatus.Cancelled or OrderStatus.Returned)
+                if (kind is not (OrderPaymentReceiptKind.CodRemitted or OrderPaymentReceiptKind.FullRefund) && order.Status is OrderStatus.Cancelled or OrderStatus.Returned)
                     return Result<OrderPaymentSummaryDto>.Conflict("Cancelled or returned orders cannot accept payment confirmations.");
                 var now = clock.GetUtcNow();
-                if (kind == OrderPaymentReceiptKind.ManualTransfer)
+                if (kind == OrderPaymentReceiptKind.FullRefund)
+                {
+                    if (await db.OrderReturns.Where(r => r.OrderId == id).AnyAsyncSafe(token))
+                        return Result<OrderPaymentSummaryDto>.Conflict("Record received-goods refunds through the return case so inventory, points and refund allocations remain consistent.");
+                    order.MarkPaymentRefunded();
+                }
+                else if (kind == OrderPaymentReceiptKind.ManualTransfer)
                 {
                     if (order.PaymentMethod != PaymentMethod.ManualBankTransfer || order.PaymentStatus != PaymentStatus.Pending)
                         return Result<OrderPaymentSummaryDto>.Conflict("This order cannot accept a manual transfer confirmation.");
@@ -89,10 +98,13 @@ internal sealed class OrderPaymentService(IAppDbContext db, IShippingCheckoutSto
         var method = await fulfillment.MethodAsync(order.Id, ct);
         var receipts = await shipping.PaymentReceipts.AsNoTracking().Where(x => x.OrderId == order.Id).OrderBy(x => x.OccurredAtUtc).ThenBy(x => x.Id)
             .Select(x => new OrderPaymentReceiptDto(x.Id, x.Kind, x.Amount, x.Currency, x.Reference, x.Reason, x.Actor, x.OccurredAtUtc)).ToArrayAsync(ct);
-        var open = method.HasValue && order.Status is not (OrderStatus.Cancelled or OrderStatus.Returned);
+        var operational = method.HasValue || order.ImportSource is not null;
+        var open = operational && order.Status is not (OrderStatus.Cancelled or OrderStatus.Returned) &&
+            !await db.OrderPaymentExceptions.Where(e => e.OrderId == order.Id && e.SettledAt == null).AnyAsyncSafe(ct);
         return new(order.Id, order.PaymentMethod, order.PaymentStatus, order.TotalAmount, order.CurrencyCode, method,
             open && order.PaymentMethod == PaymentMethod.ManualBankTransfer && order.PaymentStatus == PaymentStatus.Pending,
             open && order.PaymentMethod == PaymentMethod.Cod && order.Status == OrderStatus.Shipping && order.PaymentStatus == PaymentStatus.Unpaid,
-            open && receipts.Any(x => x.Kind == OrderPaymentReceiptKind.CodCollected) && receipts.All(x => x.Kind != OrderPaymentReceiptKind.CodRemitted), receipts);
+            operational && order.PaymentMethod == PaymentMethod.Cod && receipts.Any(x => x.Kind == OrderPaymentReceiptKind.CodCollected) && receipts.All(x => x.Kind != OrderPaymentReceiptKind.CodRemitted), receipts)
+        { ImportSource = order.ImportSource, CanConfirmFullRefund = order.PaymentStatus == PaymentStatus.RefundPending && (order.Status is OrderStatus.Cancelled or OrderStatus.Returned) && !await db.OrderReturns.Where(r => r.OrderId == order.Id).AnyAsyncSafe(ct) };
     }
 }

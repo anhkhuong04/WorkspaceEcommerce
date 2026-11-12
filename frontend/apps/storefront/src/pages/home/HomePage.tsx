@@ -5,7 +5,7 @@ import type {
 } from "@workspace-ecommerce/api-types";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { BannerCarousel } from "../../components/ui/BannerCarousel";
+import { HomeBanners } from "../../components/ui/HomeBanners";
 import { ProductCard } from "../../components/ui/ProductCard";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
@@ -106,7 +106,7 @@ function BlogPostCard({ post }: { post: StorefrontBlogPostDto }) {
             loading="lazy"
           />
         ) : (
-          <div className="grid h-full w-full place-items-center bg-gradient-to-br from-slate-100 to-slate-200 text-lg font-black text-slate-400">
+          <div className="grid h-full w-full place-items-center bg-gradient-to-br from-slate-100 to-slate-200 text-lg font-black text-slate-600">
             Workspace Ecom
           </div>
         )}
@@ -123,10 +123,10 @@ function BlogPostCard({ post }: { post: StorefrontBlogPostDto }) {
       {post.publishedAt ? (
         <time
           dateTime={post.publishedAt}
-          className="mt-6 flex items-center gap-3 text-sm font-semibold text-slate-500"
+          className="mt-6 flex items-center gap-3 text-sm font-semibold text-slate-600"
         >
           <svg
-            className="h-5 w-5 text-slate-400"
+            className="h-5 w-5 text-slate-600"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -163,7 +163,7 @@ export function HomePage() {
   });
   const newProductsQuery = useQuery({
     queryKey: ["storefront", "products", "new-arrivals"],
-    queryFn: () => storefrontApi.getProducts({ pageNumber: 1, pageSize: 10 }),
+    queryFn: () => storefrontApi.getProducts({ pageNumber: 1, pageSize: 10, sortBy: "created-desc" }),
   });
   const blogPostsQuery = useQuery({
     queryKey: ["storefront", "blog-posts", "home"],
@@ -171,7 +171,7 @@ export function HomePage() {
   });
 
   const categories = categoriesQuery.data?.slice(0, 4) ?? [];
-  const newProducts = newProductsQuery.data?.items ?? [];
+  const newProducts = newProductsQuery.data?.items.slice(0, 10) ?? [];
   const latestBlogPosts = [...(blogPostsQuery.data ?? [])]
     .sort((a: StorefrontBlogPostDto, b: StorefrontBlogPostDto) => {
       const firstDate = a.publishedAt ? Date.parse(a.publishedAt) : 0;
@@ -183,8 +183,9 @@ export function HomePage() {
 
   return (
     <div className="flex flex-col pb-10">
+      <h1 className="sr-only">{t("home.heading")}</h1>
       <section>
-        <BannerCarousel
+        <HomeBanners
           banners={bannersQuery.data ?? []}
           isLoading={bannersQuery.isLoading}
         />
@@ -220,7 +221,7 @@ export function HomePage() {
             {!categoriesQuery.isLoading &&
               !categoriesQuery.isError &&
               categories.length === 0 && (
-                <div className="ui-body col-span-full rounded-xl bg-slate-50 px-5 py-8 text-center text-slate-500">
+                <div className="ui-body col-span-full rounded-xl bg-slate-50 px-5 py-8 text-center text-slate-600">
                   {t("home.noCategories")}
                 </div>
               )}
@@ -262,7 +263,7 @@ export function HomePage() {
             </div>
           )}
 
-          <div className="mt-7 grid grid-cols-2 gap-x-3 gap-y-9 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 lg:gap-x-6">
+          <div className="mt-7 grid grid-cols-2 gap-x-3 gap-y-9 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-5 lg:gap-x-6" data-testid="new-arrivals-grid">
             {newProductsQuery.isLoading &&
               Array.from({ length: 10 }).map((_, index) => (
                 <ProductSkeleton key={index} />
@@ -270,7 +271,7 @@ export function HomePage() {
             {!newProductsQuery.isLoading &&
               !newProductsQuery.isError &&
               newProducts.length === 0 && (
-                <div className="ui-body col-span-full rounded-xl bg-slate-50 px-5 py-8 text-center text-slate-500">
+                <div className="ui-body col-span-full rounded-xl bg-slate-50 px-5 py-8 text-center text-slate-600">
                   <p className="font-semibold">{t("home.noProducts")}</p>
                   <p className="mt-1">
                     {t("home.addProductsHint")}
@@ -319,7 +320,7 @@ export function HomePage() {
             {!blogPostsQuery.isLoading &&
               !blogPostsQuery.isError &&
               latestBlogPosts.length === 0 && (
-                <div className="ui-body col-span-full rounded-xl bg-slate-50 px-5 py-8 text-center text-slate-500">
+                <div className="ui-body col-span-full rounded-xl bg-slate-50 px-5 py-8 text-center text-slate-600">
                   {t("home.noBlogs")}
                 </div>
               )}

@@ -56,6 +56,13 @@ public sealed class CouponRedemption : Entity
     public decimal DiscountAmount { get; private set; }
 
     public DateTimeOffset RedeemedAt { get; private set; }
+    public DateTimeOffset? ReleasedAt { get; private set; }
+
+    public void Release(DateTimeOffset now)
+    {
+        if (now == default) throw new DomainException("Coupon release timestamp is required.");
+        ReleasedAt ??= now;
+    }
 
     private static string NormalizeCode(string code)
     {

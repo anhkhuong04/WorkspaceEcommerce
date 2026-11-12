@@ -35,14 +35,15 @@ export function useVariantMutations({
   const variantSaveMutation = useMutation({
     mutationFn: (values: VariantFormValues) => {
       const request = toVariantRequest(values);
-      if (editingVariant) return adminApi.updateProductVariant(editingVariant.id, request);
+      if (editingVariant) return adminApi.updateProductVariant(editingVariant.id, { ...request, expectedStockQuantity: editingVariant.stockQuantity });
       if (!variantProduct) throw new Error("Product is required for a new variant.");
       return adminApi.createProductVariant(variantProduct.id, request);
     },
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-products"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] })
+        queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-stock-history"] })
       ]);
       setIsVariantModalOpen(false);
       setVariantProduct(null);
@@ -54,7 +55,7 @@ export function useVariantMutations({
   });
 
   const variantToggleMutation = useMutation({
-    mutationFn: (variant: AdminProductVariantDto) => adminApi.updateProductVariant(variant.id, { ...toVariantRequest(toVariantFormValues(variant)), isActive: !variant.isActive }),
+    mutationFn: (variant: AdminProductVariantDto) => adminApi.updateProductVariant(variant.id, { ...toVariantRequest(toVariantFormValues(variant)), expectedStockQuantity: variant.stockQuantity, isActive: !variant.isActive }),
     onSuccess: async () => {
       await refreshProducts();
       setNotice({ type: "success", message: "Variant status updated." });

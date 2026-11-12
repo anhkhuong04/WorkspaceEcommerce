@@ -24,6 +24,19 @@ public sealed class CustomerLoyaltyAccount : Entity
     public Guid CustomerId { get; private set; }
 
     public int CurrentPoints { get; private set; }
+    public int PointsDebt { get; private set; }
+
+    public LoyaltyTransaction ReverseEarnedPoints(int points, Guid orderId, string description, IEnumerable<LoyaltyTier> tiers, DateTimeOffset now)
+    {
+        if (points <= 0 || orderId == Guid.Empty) throw new DomainException("Positive reversal points and order are required.");
+        var fromBalance = Math.Min(points, CurrentPoints);
+        CurrentPoints -= fromBalance; PointsDebt = checked(PointsDebt + points - fromBalance);
+        TotalPointsEarned = Math.Max(0, TotalPointsEarned - points);
+        var tier = tiers.Where(t => t.MinTotalPointsEarned <= TotalPointsEarned).OrderByDescending(t => t.MinTotalPointsEarned).ThenByDescending(t => t.Type).FirstOrDefault();
+        if (tier is not null) { CurrentTier = tier.Type; TierUpdatedAt = now; }
+        var transaction = new LoyaltyTransaction(Guid.NewGuid(), Id, orderId, null, LoyaltyTransactionType.Adjust, -points, CurrentPoints, description);
+        _transactions.Add(transaction); return transaction;
+    }
 
     public int TotalPointsEarned { get; private set; }
 
@@ -52,7 +65,9 @@ public sealed class CustomerLoyaltyAccount : Entity
             throw new DomainException("Loyalty points have already been earned for this order.");
         }
 
-        CurrentPoints += points;
+        var debtPayment = Math.Min(points, PointsDebt);
+        PointsDebt -= debtPayment;
+        CurrentPoints += points - debtPayment;
         TotalPointsEarned += points;
 
         var transaction = new LoyaltyTransaction(

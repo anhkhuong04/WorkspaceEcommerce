@@ -52,6 +52,19 @@ function getRequestPath(path: string): string {
 }
 
 describe("customer session storage", () => {
+  it("ignores a late unauthorized response from the previous account", async () => {
+    saveCustomerSession(completedAuthentication({ customerId: "A", accessToken: "token-A" }));
+    const unauthorized = vi.fn();
+    setCustomerUnauthorizedHandler(unauthorized);
+    let finish: (response: Response) => void = () => undefined;
+    vi.stubGlobal("fetch", () => new Promise<Response>(resolve => { finish = resolve; }));
+    const oldRequest = storefrontApi.getCustomerMe().catch(() => undefined);
+    saveCustomerSession(completedAuthentication({ customerId: "B", accessToken: "token-B" }));
+    finish(failedEnvelope(401, ["Old token revoked"]));
+    await oldRequest;
+    expect(unauthorized).not.toHaveBeenCalled();
+    expect(getCustomerSession()?.customerId).toBe("B");
+  });
   it("persists only the completed, short-lived customer session", () => {
     const session = saveCustomerSession(completedAuthentication());
 

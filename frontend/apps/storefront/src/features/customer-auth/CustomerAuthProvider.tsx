@@ -1,6 +1,7 @@
 import type { CustomerProfileDto } from "@workspace-ecommerce/api-types";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   clearCustomerSession,
   getCustomerSession,
@@ -29,6 +30,8 @@ function profileFromSession(session: CustomerSession): CustomerProfileDto {
 }
 
 export function CustomerAuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
+  const identityGeneration = useRef(0);
   const [session, setSession] = useState<CustomerSession | null>(() => getCustomerSession());
   const [isReady, setIsReady] = useState(false);
   const [customer, setCustomer] = useState<CustomerProfileDto | null>(() => {
@@ -36,13 +39,23 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     return initialSession ? profileFromSession(initialSession) : null;
   });
 
+  const clearPrivateCache = useCallback(() => {
+    const filters = { predicate: (query: { queryKey: readonly unknown[] }) =>
+      ["customer", "payment-result", "checkout"].includes(String(query.queryKey[0])) };
+    void queryClient.cancelQueries(filters);
+    queryClient.removeQueries(filters);
+  }, [queryClient]);
+
   const clearSession = useCallback(() => {
+    identityGeneration.current += 1;
+    clearPrivateCache();
     clearCustomerSession();
     setSession(null);
     setCustomer(null);
-  }, []);
+  }, [clearPrivateCache]);
 
   const updateCustomer = useCallback((profile: CustomerProfileDto) => {
+    if (getCustomerSession()?.customerId !== profile.id) return;
     const nextSession = updateCustomerSessionProfile(profile);
     if (nextSession) {
       setSession(nextSession);
@@ -51,18 +64,27 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshCustomer = useCallback(async () => {
+    const generation = identityGeneration.current;
     if (!getCustomerSession()) {
       clearSession();
       return null;
     }
 
     const profile = await storefrontApi.getCustomerMe();
-    updateCustomer(profile);
+    if (generation === identityGeneration.current) updateCustomer(profile);
     return profile;
   }, [clearSession, updateCustomer]);
 
   const renewSession = useCallback(async () => {
-    const response = await storefrontApi.refreshCustomerSession();
+    const generation = identityGeneration.current;
+    let response;
+    try {
+      response = await storefrontApi.refreshCustomerSession();
+    } catch (error) {
+      if (generation !== identityGeneration.current) return null;
+      throw error;
+    }
+    if (generation !== identityGeneration.current) return null;
     const nextSession = saveCustomerSession(response);
     setSession(nextSession);
     setCustomer(profileFromSession(nextSession));
@@ -78,23 +100,24 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     let active = true;
 
     async function restoreSession() {
+      const generation = identityGeneration.current;
       try {
         let current = getCustomerSession();
         if (!current) {
           current = await renewSession();
         }
 
-        if (!active) {
+        if (!active || generation !== identityGeneration.current || !current) {
           return;
         }
 
         setSession(current);
         const profile = await storefrontApi.getCustomerMe();
-        if (active) {
+        if (active && generation === identityGeneration.current) {
           updateCustomer(profile);
         }
       } catch {
-        if (active) {
+        if (active && generation === identityGeneration.current) {
           clearSession();
         }
       } finally {
@@ -147,6 +170,8 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: session !== null,
       isReady,
       signIn: (response) => {
+        identityGeneration.current += 1;
+        clearPrivateCache();
         const nextSession = saveCustomerSession(response);
         setSession(nextSession);
         setCustomer(profileFromSession(nextSession));
@@ -160,7 +185,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
         clearSession();
       }
     }),
-    [clearSession, customer, isReady, refreshCustomer, session, updateCustomer]
+    [clearPrivateCache, clearSession, customer, isReady, refreshCustomer, session, updateCustomer]
   );
 
   return <CustomerAuthContext.Provider value={value}>{children}</CustomerAuthContext.Provider>;

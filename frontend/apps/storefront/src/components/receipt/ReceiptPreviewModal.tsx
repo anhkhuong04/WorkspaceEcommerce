@@ -128,7 +128,7 @@ export function ReceiptPreviewModal({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
           <div>
             <h2 id="receipt-preview-title" className="text-base font-black text-slate-950 sm:text-lg">{t("receipt.preview")}</h2>
-            <p className="text-xs font-medium text-slate-500">{t("receipt.previewHint")}</p>
+            <p className="text-xs font-medium text-slate-600">{t("receipt.previewHint")}</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -158,12 +158,12 @@ export function ReceiptPreviewModal({
             <header className="flex flex-col justify-between gap-8 border-b border-slate-200 pb-8 sm:flex-row sm:items-start">
               <div>
                 <img src="/demo/logo.svg" alt="Workspace Ecommerce" className="h-auto w-[190px]" />
-                <p className="mt-2 text-sm font-medium text-slate-500">workspaceecom.com</p>
+                <p className="mt-2 text-sm font-medium text-slate-600">workspaceecom.com</p>
               </div>
               <div className="sm:text-right">
                 <p className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{t("receipt.documentTitle")}</p>
                 <p className="mt-2 font-mono text-sm font-bold text-slate-600">#{order.orderCode}</p>
-                <p className="mt-1 text-sm text-slate-500">{t("receipt.date")}: {formatReceiptDate(order.createdAt, language)}</p>
+                <p className="mt-1 text-sm text-slate-600">{t("receipt.date")}: {formatReceiptDate(order.createdAt, language)}</p>
               </div>
             </header>
 
@@ -216,13 +216,13 @@ export function ReceiptPreviewModal({
                               className="h-14 w-14 shrink-0 rounded-lg object-cover ring-1 ring-slate-200"
                             />
                           ) : (
-                            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-slate-50 to-slate-200 text-lg font-black text-slate-500 ring-1 ring-slate-200" aria-hidden="true">
+                            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-slate-50 to-slate-200 text-lg font-black text-slate-600 ring-1 ring-slate-200" aria-hidden="true">
                               {item.productNameSnapshot.trim().charAt(0).toUpperCase() || "P"}
                             </div>
                           )}
                           <div>
                             <p className="font-bold text-slate-950">{item.productNameSnapshot}</p>
-                            <p className="mt-1 font-mono text-xs text-slate-500">{item.skuSnapshot}</p>
+                            <p className="mt-1 font-mono text-xs text-slate-600">{item.skuSnapshot}</p>
                             {item.requiresInstallation ? <p className="mt-1 text-xs font-semibold text-amber-700">{t("receipt.installationRequired")}</p> : null}
                           </div>
                         </div>
@@ -258,7 +258,7 @@ export function ReceiptPreviewModal({
               </ReceiptSection>
             </div>
 
-            <footer className="flex flex-wrap justify-center gap-x-5 gap-y-2 pt-8 text-center text-xs font-medium text-slate-500">
+            <footer className="flex flex-wrap justify-center gap-x-5 gap-y-2 pt-8 text-center text-xs font-medium text-slate-600">
               <span>support@workspaceecom.com</span><span aria-hidden="true">|</span><span>1900 636 660</span><span aria-hidden="true">|</span><span>workspaceecom.com</span>
             </footer>
           </article>
@@ -273,7 +273,7 @@ function ReceiptSection({ title, children }: { title: string; children: ReactNod
 }
 
 function ReceiptMeta({ label, value }: { label: string; value: ReactNode }) {
-  return <div className="flex min-w-0 items-center gap-2"><span className="font-semibold text-slate-500">{label}:</span><span className="min-w-0 font-bold text-slate-800">{value}</span></div>;
+  return <div className="flex min-w-0 items-center gap-2"><span className="font-semibold text-slate-600">{label}:</span><span className="min-w-0 font-bold text-slate-800">{value}</span></div>;
 }
 
 function ReceiptTotal({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {

@@ -8,6 +8,29 @@ namespace WorkspaceEcommerce.Api.IntegrationTests.Catalog;
 public sealed class CatalogIntegrationTests(ApiIntegrationTestFixture fixture)
 {
     [Fact]
+    public async Task Catalog_SearchesLocalizedNamesAndParentDescendants_AndPairsComparePrice()
+    {
+        await fixture.ResetDatabaseAsync();
+        var catalog = TestData.CreateVisibleCatalog();
+        var parent = new WorkspaceEcommerce.Domain.Modules.Catalog.Category(Guid.NewGuid(), null,
+            WorkspaceEcommerce.Domain.Common.LocalizedText.Of("Furniture"), "furniture", 0, true);
+        catalog.Category.MoveToParent(parent.Id);
+        var premium = new WorkspaceEcommerce.Domain.Modules.Catalog.ProductVariant(Guid.NewGuid(), catalog.Product.Id,
+            "PREMIUM", "Premium", null, null, 8_000_000m, 12_000_000m, 2, false, true);
+        await fixture.SeedAsync(db => { db.AddRange(parent, catalog.Category, catalog.Product, catalog.Variant, premium); return Task.CompletedTask; });
+        using var client = fixture.CreateClient();
+        using var response = await client.GetAsync("/api/products?search=Standing%20Desk&categorySlug=furniture&sortBy=created-desc");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var data = (await response.ReadJsonAsync())["data"]!;
+        var item = Assert.Single(data["items"]!.AsArray());
+        Assert.Equal(3_200_000m, item!["minPrice"]!.GetValue<decimal>());
+        Assert.Equal(3_900_000m, item["compareAtPrice"]!.GetValue<decimal>());
+        Assert.Equal(2, item["variantCount"]!.GetValue<int>());
+        using var wildcard = await client.GetAsync("/api/products?search=%25");
+        Assert.Equal(0, (await wildcard.ReadJsonAsync())["data"]!["totalCount"]!.GetValue<int>());
+    }
+
+    [Fact]
     public async Task DeleteCategory_EmptyCategory_RemovesCategory()
     {
         await fixture.ResetDatabaseAsync();

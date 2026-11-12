@@ -1,8 +1,9 @@
+import { formatOrderStatus } from "../../i18n-formatters";
 import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { formatOrderStatus } from "@workspace-ecommerce/shared-utils";
+
 import type { OrderStatus } from "@workspace-ecommerce/api-types";
 import { useCustomerAuth } from "../../features/customer-auth/useCustomerAuth";
 import { getNotificationHubUrl } from "../../services/api/storefrontApi";
@@ -56,7 +57,7 @@ export function CustomerOrderNotifications() {
             View order
           </NavLink>
         </div>
-        <button type="button" className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-lg text-slate-500 hover:bg-slate-100" aria-label="Dismiss notification" onClick={() => setNotification(null)}>×</button>
+        <button type="button" className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-lg text-slate-600 hover:bg-slate-100" aria-label="Dismiss notification" onClick={() => setNotification(null)}>×</button>
       </div>
     </aside>
   );

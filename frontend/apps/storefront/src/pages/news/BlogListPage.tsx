@@ -17,7 +17,7 @@ export function BlogListPage() {
         <h1 className="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">
           {t("blog.title")}
         </h1>
-        <p className="mt-4 text-base font-semibold text-slate-500 sm:text-lg">
+        <p className="mt-4 text-base font-semibold text-slate-600 sm:text-lg">
           {t("blog.description")}
         </p>
       </div>
@@ -56,7 +56,7 @@ export function BlogListPage() {
                     loading="lazy"
                   />
                 ) : (
-                  <div className="grid h-full w-full place-items-center bg-gradient-to-br from-slate-100 to-slate-200 text-slate-400 font-extrabold text-lg select-none">
+                  <div className="grid h-full w-full place-items-center bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600 font-extrabold text-lg select-none">
                     Workspace Ecom
                   </div>
                 )}
@@ -64,7 +64,7 @@ export function BlogListPage() {
               <div className="flex flex-1 flex-col p-6">
                 <time
                   dateTime={post.publishedAt}
-                  className="text-xs font-bold text-slate-400"
+                  className="text-xs font-bold text-slate-600"
                 >
                   {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString(i18n.resolvedLanguage === "vi" ? "vi-VN" : "en-US") : ""}
                 </time>
@@ -90,7 +90,7 @@ export function BlogListPage() {
       ) : (
         <div className="rounded-3xl border border-dashed border-slate-200 p-20 text-center">
           <p className="text-lg font-bold text-slate-800">{t("blog.empty")}</p>
-          <p className="mt-1 text-sm font-semibold text-slate-500">{t("blog.emptyHint")}</p>
+          <p className="mt-1 text-sm font-semibold text-slate-600">{t("blog.emptyHint")}</p>
         </div>
       )}
     </div>

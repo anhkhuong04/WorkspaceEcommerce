@@ -21,11 +21,11 @@ public interface IAdminOrderService
     Task<Result<AdminOrderImportPreviewDto>> PreviewImportAsync(
         Stream content,
         string fileName,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default, string source = "manual");
 
     Task<Result<AdminOrderImportCommitResultDto>> CommitImportAsync(
         Stream content,
         string fileName,
         string? changedBy,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default, string source = "manual");
 }

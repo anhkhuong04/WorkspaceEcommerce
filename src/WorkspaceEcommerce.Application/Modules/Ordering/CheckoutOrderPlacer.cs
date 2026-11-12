@@ -15,11 +15,11 @@ namespace WorkspaceEcommerce.Application.Modules.Ordering;
 internal sealed class CheckoutOrderPlacer(
     ICheckoutStore checkoutStore,
     ICurrentCustomerContext currentCustomer,
-    ICurrentLanguageProvider languageProvider)
+    ICurrentLanguageProvider languageProvider, OrderExpiryOptions? expiryOptions = null)
 {
     private readonly CheckoutCartBuilder cartBuilder = new(checkoutStore, languageProvider);
     private readonly CheckoutCouponApplier couponApplier = new(checkoutStore, currentCustomer);
-    private readonly CheckoutOrderFactory orderFactory = new(checkoutStore);
+    private readonly CheckoutOrderFactory orderFactory = new(checkoutStore, expiryOptions);
 
     public async Task<Result<CheckoutPlacement>> PlaceAsync(
         CartAggregate cart,

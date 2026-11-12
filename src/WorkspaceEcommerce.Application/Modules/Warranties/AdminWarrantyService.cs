@@ -409,6 +409,7 @@ internal sealed class AdminWarrantyService(
         cancellationToken.ThrowIfCancellationRequested();
         var normalizedSearch = NormalizeOptional(request.Search)?.ToUpperInvariant();
         var query = dbContext.SerializedProductUnits.AsNoTrackingIfEf();
+        if (request.ProductVariantId.HasValue) query = query.Where(unit => unit.ProductVariantId == request.ProductVariantId);
         if (request.Status.HasValue)
         {
             query = query.Where(unit => unit.Status == request.Status.Value);
@@ -446,6 +447,17 @@ internal sealed class AdminWarrantyService(
             request.NormalizedPageNumber,
             request.NormalizedPageSize,
             totalCount));
+    }
+
+    public async Task<Result<PagedResult<AdminWarrantyUnitDto>>> GetReplacementUnitsAsync(Guid id, AdminWarrantyUnitListRequest request, CancellationToken ct = default)
+    {
+        if (!IsAdminEnabled()) return Result<PagedResult<AdminWarrantyUnitDto>>.NotFound("Warranty administration is unavailable.");
+        var variantId = await (from entitlement in dbContext.WarrantyEntitlements.AsNoTrackingIfEf()
+            join unit in dbContext.SerializedProductUnits.AsNoTrackingIfEf() on entitlement.SerializedProductUnitId equals unit.Id
+            where entitlement.Id == id && entitlement.Status == WarrantyEntitlementStatus.Active
+            select (Guid?)unit.ProductVariantId).FirstOrDefaultAsyncSafe(ct);
+        return variantId is null ? Result<PagedResult<AdminWarrantyUnitDto>>.NotFound("Active warranty was not found.")
+            : await GetUnitsAsync(request with { ProductVariantId = variantId, Status = SerializedProductUnitStatus.Available }, ct);
     }
 
     public async Task<Result<AdminWarrantyEntitlementDto>> AssignUnitAsync(
@@ -654,7 +666,11 @@ internal sealed class AdminWarrantyService(
     public Task<Result<AdminWarrantyEntitlementDto>> ActivateAsync(Guid id, string actorId, CancellationToken cancellationToken = default) =>
         ActivateCoreAsync(id, actorId, cancellationToken);
 
-    public async Task<Result<AdminWarrantyEntitlementDto>> VoidAsync(
+    public Task<Result<AdminWarrantyEntitlementDto>> VoidAsync(Guid id, AdminWarrantyReasonRequest request, string actorId, CancellationToken cancellationToken = default) =>
+        MutateWarrantyAsync(id, null,
+            () => VoidAsyncCore(id, request, actorId, cancellationToken), cancellationToken);
+
+    private async Task<Result<AdminWarrantyEntitlementDto>> VoidAsyncCore(
         Guid id,
         AdminWarrantyReasonRequest request,
         string actorId,
@@ -683,13 +699,13 @@ internal sealed class AdminWarrantyService(
             return Result<AdminWarrantyEntitlementDto>.NotFound("Warranty unit was not found.");
         }
 
+        if (entitlement.Status == WarrantyEntitlementStatus.Voided)
+            return Result<AdminWarrantyEntitlementDto>.Success(await ToAdminEntitlementDtoAsync(entitlement, cancellationToken));
         var now = timeProvider.GetUtcNow();
         try
         {
             entitlement.Void(now);
             unit.Void(now);
-            dbContext.Update(entitlement);
-            dbContext.Update(unit);
             AddAudit(entitlement.Id, unit.Id, WarrantyAuditAction.Voided, "Admin", actorId, request.Reason, now);
             await dbContext.SaveChangesAsync(cancellationToken);
             return Result<AdminWarrantyEntitlementDto>.Success(await ToAdminEntitlementDtoAsync(entitlement, cancellationToken));
@@ -700,7 +716,11 @@ internal sealed class AdminWarrantyService(
         }
     }
 
-    public async Task<Result<AdminWarrantyEntitlementDto>> ReplaceAsync(
+    public Task<Result<AdminWarrantyEntitlementDto>> ReplaceAsync(Guid id, ReplaceWarrantyRequest request, string actorId, CancellationToken cancellationToken = default) =>
+        MutateWarrantyAsync(id, request.ReplacementSerializedProductUnitId,
+            () => ReplaceAsyncCore(id, request, actorId, cancellationToken), cancellationToken);
+
+    private async Task<Result<AdminWarrantyEntitlementDto>> ReplaceAsyncCore(
         Guid id,
         ReplaceWarrantyRequest request,
         string actorId,
@@ -723,20 +743,23 @@ internal sealed class AdminWarrantyService(
             return Result<AdminWarrantyEntitlementDto>.NotFound("Warranty entitlement was not found.");
         }
 
+        var oldUnit = await dbContext.SerializedProductUnits.Where(u => u.Id == oldEntitlement.SerializedProductUnitId).FirstOrDefaultAsyncSafe(cancellationToken);
+        var replacementUnit = await dbContext.SerializedProductUnits.Where(u => u.Id == request.ReplacementSerializedProductUnitId).FirstOrDefaultAsyncSafe(cancellationToken);
+        if (oldEntitlement.Status == WarrantyEntitlementStatus.Replaced && oldEntitlement.ReplacementSerializedProductUnitId == request.ReplacementSerializedProductUnitId)
+            return Result<AdminWarrantyEntitlementDto>.Success(await ToAdminEntitlementDtoAsync(oldEntitlement, cancellationToken));
+        var order = await dbContext.FindOrderForUpdateAsync(oldEntitlement.OrderId, cancellationToken);
+        if (oldUnit is null || replacementUnit is null || oldUnit.Id == replacementUnit.Id ||
+            oldUnit.ProductVariantId != replacementUnit.ProductVariantId || oldUnit.Status != SerializedProductUnitStatus.Activated || order?.Status != OrderStatus.Completed ||
+            oldEntitlement.Status != WarrantyEntitlementStatus.Active || oldEntitlement.PurchasedAt is null ||
+            oldEntitlement.EligibleAt is null || oldEntitlement.ActivationDeadline is null || oldEntitlement.ActivatedAt is null ||
+            oldEntitlement.AcceptedTermsVersion is null)
+            return Result<AdminWarrantyEntitlementDto>.Conflict("Select an available unit of the same SKU for an active warranty on a completed order.");
         var replacementEntitlement = await dbContext.WarrantyEntitlements
-            .Where(candidate => candidate.SerializedProductUnitId == request.ReplacementSerializedProductUnitId)
-            .FirstOrDefaultAsyncSafe(cancellationToken);
-        var oldUnit = await dbContext.SerializedProductUnits.Where(candidate => candidate.Id == oldEntitlement.SerializedProductUnitId).FirstOrDefaultAsyncSafe(cancellationToken);
-        var replacementUnit = await dbContext.SerializedProductUnits.Where(candidate => candidate.Id == request.ReplacementSerializedProductUnitId).FirstOrDefaultAsyncSafe(cancellationToken);
-        if (replacementEntitlement is null || oldUnit is null || replacementUnit is null ||
-            replacementEntitlement.Status != WarrantyEntitlementStatus.PendingActivation ||
-            replacementEntitlement.OrderId != oldEntitlement.OrderId ||
-            oldEntitlement.Status != WarrantyEntitlementStatus.Active ||
-            oldEntitlement.PurchasedAt is null || oldEntitlement.EligibleAt is null || oldEntitlement.ActivationDeadline is null ||
-            oldEntitlement.ActivatedAt is null || oldEntitlement.AcceptedTermsVersion is null)
-        {
-            return Result<AdminWarrantyEntitlementDto>.Validation(["Replacement must be a pending unit assigned to the same order as an active warranty."]);
-        }
+            .Where(e => e.SerializedProductUnitId == replacementUnit.Id).FirstOrDefaultAsyncSafe(cancellationToken);
+        var allocate = replacementEntitlement is null && replacementUnit.Status == SerializedProductUnitStatus.Available && replacementUnit.OrderItemId is null;
+        if (!allocate && (replacementEntitlement?.Status != WarrantyEntitlementStatus.PendingActivation ||
+            replacementEntitlement.OrderItemId != oldEntitlement.OrderItemId || replacementUnit.Status != SerializedProductUnitStatus.Assigned))
+            return Result<AdminWarrantyEntitlementDto>.Conflict("Replacement unit is no longer available for this order item.");
 
         var oldSnapshots = await dbContext.WarrantyCoverageSnapshots
             .AsNoTrackingIfEf()
@@ -750,33 +773,43 @@ internal sealed class AdminWarrantyService(
         }
 
         var now = timeProvider.GetUtcNow();
+        if (oldSnapshots.All(snapshot => snapshot.EndsAt < now))
+            return Result<AdminWarrantyEntitlementDto>.Conflict("All coverage has expired; this warranty cannot issue a replacement.");
         try
         {
+            if (allocate)
+            {
+                var variant = await dbContext.FindVariantForUpdateAsync(replacementUnit.ProductVariantId, cancellationToken);
+                if (variant is null || variant.StockQuantity < 1) return Result<AdminWarrantyEntitlementDto>.Conflict("Replacement SKU has no available stock.");
+                variant.DecreaseStock(1);
+                replacementUnit.AssignToOrderItem(oldEntitlement.OrderItemId, now);
+                replacementEntitlement = new WarrantyEntitlement(Guid.NewGuid(), replacementUnit.Id, oldEntitlement.WarrantyPlanId,
+                    oldEntitlement.OrderId, oldEntitlement.OrderItemId, oldEntitlement.CustomerId, now);
+                dbContext.Add(replacementEntitlement);
+                AddAudit(replacementEntitlement.Id, replacementUnit.Id, WarrantyAuditAction.UnitAssigned, "Admin", actorId, request.Reason, now);
+            }
+            var target = replacementEntitlement!;
             var snapshots = oldSnapshots.Select(snapshot => new WarrantyCoverageSnapshot(
-                Guid.NewGuid(), replacementEntitlement.Id, snapshot.ComponentCode, snapshot.DisplayName,
+                Guid.NewGuid(), target.Id, snapshot.ComponentCode, snapshot.DisplayName,
                 snapshot.DurationMonths, snapshot.StartsAt, snapshot.EndsAt, snapshot.SortOrder)).ToArray();
-            replacementEntitlement.Activate(
+            target.Activate(
                 oldEntitlement.PurchasedAt.Value,
                 oldEntitlement.EligibleAt.Value,
                 oldEntitlement.ActivationDeadline.Value,
                 oldEntitlement.ActivatedAt.Value,
                 WarrantyActivationSource.Admin,
                 oldEntitlement.AcceptedTermsVersion,
-                snapshots);
+                snapshots, recordedAt: now);
             oldEntitlement.MarkReplaced(replacementUnit.Id, now);
             oldUnit.MarkReplaced(now);
             replacementUnit.Activate(now);
-            dbContext.Update(oldEntitlement);
-            dbContext.Update(oldUnit);
-            dbContext.Update(replacementEntitlement);
-            dbContext.Update(replacementUnit);
             foreach (var snapshot in snapshots)
             {
                 dbContext.Add(snapshot);
             }
 
             AddAudit(oldEntitlement.Id, oldUnit.Id, WarrantyAuditAction.Replaced, "Admin", actorId, request.Reason, now);
-            AddAudit(replacementEntitlement.Id, replacementUnit.Id, WarrantyAuditAction.Activated, "Admin", actorId, "Replacement coverage carried forward.", now);
+            AddAudit(target.Id, replacementUnit.Id, WarrantyAuditAction.Activated, "Admin", actorId, "Replacement coverage carried forward.", now);
             await dbContext.SaveChangesAsync(cancellationToken);
             return Result<AdminWarrantyEntitlementDto>.Success(await ToAdminEntitlementDtoAsync(oldEntitlement, cancellationToken));
         }
@@ -784,6 +817,28 @@ internal sealed class AdminWarrantyService(
         {
             return Result<AdminWarrantyEntitlementDto>.Validation([exception.Message]);
         }
+    }
+
+    private async Task<Result<AdminWarrantyEntitlementDto>> MutateWarrantyAsync(Guid id, Guid? replacementUnitId,
+        Func<Task<Result<AdminWarrantyEntitlementDto>>> operation, CancellationToken ct)
+    {
+        if (!IsAdminEnabled()) return Result<AdminWarrantyEntitlementDto>.NotFound("Warranty administration is unavailable.");
+        Result<AdminWarrantyEntitlementDto>? result = null;
+        try
+        {
+            await dbContext.ExecuteInTransactionAsync(async token =>
+            {
+                var unitId = await dbContext.WarrantyEntitlements.AsNoTrackingIfEf().Where(e => e.Id == id)
+                    .Select(e => (Guid?)e.SerializedProductUnitId).FirstOrDefaultAsyncSafe(token);
+                if (unitId is null) { result = Result<AdminWarrantyEntitlementDto>.NotFound("Warranty entitlement was not found."); return; }
+                var ids = new[] { unitId.Value, replacementUnitId ?? unitId.Value }.Distinct().OrderBy(value => value).ToArray();
+                foreach (var value in ids) await dbContext.FindSerializedProductUnitByIdForUpdateAsync(value, token);
+                foreach (var value in ids) await dbContext.FindWarrantyEntitlementByUnitIdForUpdateAsync(value, token);
+                result = await operation();
+            }, ct);
+        }
+        catch (PersistenceConcurrencyException) { return Result<AdminWarrantyEntitlementDto>.Conflict("Warranty changed concurrently. Reload before retrying."); }
+        return result!;
     }
 
     private async Task<Result<AdminWarrantyEntitlementDto>> ActivateCoreAsync(

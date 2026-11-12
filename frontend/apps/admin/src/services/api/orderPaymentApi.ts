@@ -11,7 +11,8 @@ const client = new ApiClient({
 export type PaymentConfirmationAction =
   | "confirm-transfer"
   | "collect-cod"
-  | "remit-cod";
+  | "remit-cod"
+  | "confirm-full-refund";
 export const orderPaymentApi = {
   summary: (id: string) =>
     client.get<OrderPaymentSummaryDto>(`/api/admin/orders/${id}/payment`),

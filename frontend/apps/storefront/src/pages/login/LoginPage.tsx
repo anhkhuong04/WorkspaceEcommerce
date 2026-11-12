@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import storefrontI18n from "../../i18n";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { GoogleLogin } from "@react-oauth/google";
 import { useState, type FormEvent } from "react";
@@ -11,29 +13,29 @@ import { storefrontApi } from "../../services/api/storefrontApi";
 
 type AuthMode = "login" | "register";
 
-const authSchema = z
+const authSchema = () => z
   .object({
     fullName: z.string().optional(),
     phoneNumber: z.string().optional(),
-    email: z.string().email("Enter a valid email.").max(250, "Email is too long."),
-    password: z.string().min(8, "Password must be at least 8 characters.").max(100, "Password is too long."),
+    email: z.string().email(storefrontI18n.t("uiCopy.enter_a_valid_email")).max(250, storefrontI18n.t("uiCopy.email_is_too_long")),
+    password: z.string().min(8, storefrontI18n.t("uiCopy.password_must_be_at_least_8_characters")).max(100, storefrontI18n.t("uiCopy.password_is_too_long")),
     confirmPassword: z.string().optional()
   })
   .superRefine((value, context) => {
     if (value.fullName !== undefined && value.fullName.trim().length === 0) {
-      context.addIssue({ code: "custom", path: ["fullName"], message: "Full name is required." });
+      context.addIssue({ code: "custom", path: ["fullName"], message: storefrontI18n.t("uiCopy.full_name_is_required") });
     }
 
     if (value.phoneNumber !== undefined && value.phoneNumber.trim().length < 8) {
-      context.addIssue({ code: "custom", path: ["phoneNumber"], message: "Phone number is invalid." });
+      context.addIssue({ code: "custom", path: ["phoneNumber"], message: storefrontI18n.t("uiCopy.phone_number_is_invalid") });
     }
 
     if (value.confirmPassword !== undefined && value.password !== value.confirmPassword) {
-      context.addIssue({ code: "custom", path: ["confirmPassword"], message: "Passwords do not match." });
+      context.addIssue({ code: "custom", path: ["confirmPassword"], message: storefrontI18n.t("uiCopy.passwords_do_not_match") });
     }
   });
 
-type AuthFormValues = z.infer<typeof authSchema>;
+type AuthFormValues = z.infer<ReturnType<typeof authSchema>>;
 
 function MailIcon() {
   return (
@@ -98,22 +100,24 @@ function TextField({ label, type, placeholder, autoComplete, icon, error, showPa
   return (
     <label className="block">
       <span className="mb-1.5 block text-sm font-semibold">{label}</span>
-      <span className={`flex h-12 items-center gap-3 rounded-md border px-4 text-slate-400 transition focus-within:ring-1 ${error ? "border-red-400 bg-red-50 focus-within:ring-red-300" : "border-slate-300 focus-within:border-slate-950 focus-within:ring-slate-950"}`}>
+      <span className={`flex h-12 items-center gap-3 rounded-md border px-4 text-slate-600 transition focus-within:ring-1 ${error ? "border-red-400 bg-red-50 focus-within:ring-red-300" : "border-slate-300 focus-within:border-slate-950 focus-within:ring-slate-950"}`}>
         {icon === "user" ? <UserIcon /> : icon === "mail" ? <MailIcon /> : icon === "phone" ? <PhoneIcon /> : <LockIcon />}
         <input
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `auth-${registration.name}-error` : undefined}
           type={resolvedType}
           autoComplete={autoComplete}
           placeholder={placeholder}
-          className="min-w-0 flex-1 bg-transparent text-sm text-slate-950 outline-none placeholder:text-slate-400"
+          className="min-w-0 flex-1 bg-transparent text-sm text-slate-950 outline-none placeholder:text-slate-600"
           {...registration}
         />
         {type === "password" && onTogglePassword ? (
-          <button type="button" onClick={onTogglePassword} className="grid h-8 w-8 place-items-center rounded-full transition hover:bg-slate-100" aria-label={showPassword ? "Hide password" : "Show password"}>
+          <button type="button" onClick={onTogglePassword} className="grid h-8 w-8 place-items-center rounded-full transition hover:bg-slate-100" aria-label={showPassword ? storefrontI18n.t("uiCopy.hide_password") : storefrontI18n.t("uiCopy.show_password")}>
             <EyeIcon hidden={Boolean(showPassword)} />
           </button>
         ) : null}
       </span>
-      {error ? <span className="mt-1.5 block text-xs font-medium text-red-600">{error}</span> : null}
+      {error ? <span id={`auth-${registration.name}-error`} role="alert" className="mt-1.5 block text-xs font-medium text-red-700">{error}</span> : null}
     </label>
   );
 }
@@ -127,6 +131,7 @@ function getRedirectPath(state: unknown): string {
 }
 
 export function LoginPage() {
+  useTranslation();
   const [mode, setMode] = useState<AuthMode>("login");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -148,7 +153,7 @@ export function LoginPage() {
     reset,
     formState: { errors, isSubmitting }
   } = useForm<AuthFormValues>({
-    resolver: zodResolver(authSchema),
+    resolver: zodResolver(authSchema()),
     defaultValues: {
       fullName: undefined,
       phoneNumber: undefined,
@@ -219,7 +224,7 @@ export function LoginPage() {
     }
 
     if (!response.accessToken || !response.expiresAt) {
-      setApiError("Authentication could not be completed. Please try again.");
+      setApiError(storefrontI18n.t("uiCopy.authentication_could_not_be_completed_please_try_again"));
       return;
     }
 
@@ -267,15 +272,15 @@ export function LoginPage() {
         <div className="w-full max-w-[500px]">
           <div className="rounded-2xl border border-white/30 bg-white/95 px-6 py-6 shadow-2xl backdrop-blur-sm sm:px-9 lg:px-10 lg:py-7">
             <div>
-              <h1 className="text-2xl font-bold sm:text-3xl">{isRegister ? "Create your account" : "Sign in"}</h1>
-              <p className="mt-1.5 text-sm text-slate-500">{isRegister ? "Save your details and track every order from one place." : "View your orders and continue checkout faster."}</p>
+              <h1 className="text-2xl font-bold sm:text-3xl">{isRegister ? storefrontI18n.t("uiCopy.create_your_account") : storefrontI18n.t("uiCopy.sign_in")}</h1>
+              <p className="mt-1.5 text-sm text-slate-600">{isRegister ? storefrontI18n.t("uiCopy.save_your_details_and_track_every_order_from_one_place") : storefrontI18n.t("uiCopy.view_your_orders_and_continue_checkout_faster")}</p>
             </div>
 
             {twoFactorChallengeToken ? (
               <form className="mt-5" onSubmit={submitTwoFactor}>
-                <p className="text-sm text-slate-500">Enter the code from your authenticator app, or use one of your saved recovery codes.</p>
+                <p className="text-sm text-slate-600">{storefrontI18n.t("uiCopy.enter_the_code_from_your_authenticator_app_or_use_one_of_your_saved_recovery_codes")}</p>
                 <label className="mt-4 block">
-                  <span className="mb-1.5 block text-sm font-semibold">{useRecoveryCode ? "Recovery code" : "Authentication code"}</span>
+                  <span className="mb-1.5 block text-sm font-semibold">{useRecoveryCode ? storefrontI18n.t("uiCopy.recovery_code") : storefrontI18n.t("uiCopy.authentication_code")}</span>
                   <input
                     value={twoFactorCode}
                     onChange={(event) => setTwoFactorCode(event.target.value)}
@@ -287,10 +292,10 @@ export function LoginPage() {
                 </label>
                 {apiError ? <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{apiError}</div> : null}
                 <button type="submit" disabled={isCompletingTwoFactor} className="mt-5 h-12 w-full rounded-md bg-[#111111] text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
-                  {isCompletingTwoFactor ? "Verifying..." : "Complete sign in"}
+                  {isCompletingTwoFactor ? "Verifying..." : storefrontI18n.t("uiCopy.complete_sign_in")}
                 </button>
                 <button type="button" onClick={() => { setUseRecoveryCode((value) => !value); setTwoFactorCode(""); setApiError(null); }} className="mt-4 w-full text-sm font-semibold text-slate-700 underline underline-offset-4">
-                  {useRecoveryCode ? "Use authenticator code" : "Use a recovery code"}
+                  {useRecoveryCode ? storefrontI18n.t("uiCopy.use_authenticator_code") : storefrontI18n.t("uiCopy.use_a_recovery_code")}
                 </button>
               </form>
             ) : (
@@ -299,28 +304,26 @@ export function LoginPage() {
                   <div className="grid gap-3.5">
                     {isRegister ? (
                       <>
-                        <TextField label="Full name" type="text" placeholder="Enter your full name" autoComplete="name" icon="user" error={errors.fullName?.message} registration={register("fullName")} />
-                        <TextField label="Phone number" type="tel" placeholder="Enter your phone number" autoComplete="tel" icon="phone" error={errors.phoneNumber?.message} registration={register("phoneNumber")} />
+                        <TextField label={storefrontI18n.t("uiCopy.full_name")} type="text" placeholder={storefrontI18n.t("uiCopy.enter_your_full_name")} autoComplete="name" icon="user" error={errors.fullName?.message} registration={register("fullName")} />
+                        <TextField label={storefrontI18n.t("uiCopy.phone_number")} type="tel" placeholder={storefrontI18n.t("uiCopy.enter_your_phone_number")} autoComplete="tel" icon="phone" error={errors.phoneNumber?.message} registration={register("phoneNumber")} />
                       </>
                     ) : null}
-                    <TextField label="Email" type="email" placeholder="Enter your email" autoComplete="email" icon="mail" error={errors.email?.message} registration={register("email")} />
+                    <TextField label={storefrontI18n.t("uiCopy.email")} type="email" placeholder={storefrontI18n.t("uiCopy.enter_your_email")} autoComplete="email" icon="mail" error={errors.email?.message} registration={register("email")} />
                     <div>
-                      <TextField label="Password" type="password" placeholder="Enter your password" autoComplete={isRegister ? "new-password" : "current-password"} icon="lock" error={errors.password?.message} showPassword={showPassword} onTogglePassword={() => setShowPassword((visible) => !visible)} registration={register("password")} />
+                      <TextField label={storefrontI18n.t("uiCopy.password")} type="password" placeholder={storefrontI18n.t("uiCopy.enter_your_password")} autoComplete={isRegister ? "new-password" : "current-password"} icon="lock" error={errors.password?.message} showPassword={showPassword} onTogglePassword={() => setShowPassword((visible) => !visible)} registration={register("password")} />
                       {!isRegister ? (
-                        <Link to="/reset-password" className="mt-2 block text-left text-xs font-semibold text-slate-600 underline underline-offset-4 hover:text-slate-900">
-                          Forgot your password?
-                        </Link>
+                        <Link to="/reset-password" className="mt-2 block text-left text-xs font-semibold text-slate-600 underline underline-offset-4 hover:text-slate-900">{storefrontI18n.t("uiCopy.forgot_your_password")}</Link>
                       ) : null}
                     </div>
                     {isRegister ? (
-                      <TextField label="Confirm password" type="password" placeholder="Confirm your password" autoComplete="new-password" icon="lock" error={errors.confirmPassword?.message} showPassword={showConfirmPassword} onTogglePassword={() => setShowConfirmPassword((visible) => !visible)} registration={register("confirmPassword")} />
+                      <TextField label={storefrontI18n.t("uiCopy.confirm_password")} type="password" placeholder={storefrontI18n.t("uiCopy.confirm_your_password")} autoComplete="new-password" icon="lock" error={errors.confirmPassword?.message} showPassword={showConfirmPassword} onTogglePassword={() => setShowConfirmPassword((visible) => !visible)} registration={register("confirmPassword")} />
                     ) : null}
                   </div>
 
                   {apiError ? <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{apiError}</div> : null}
 
                   <button type="submit" disabled={isSubmitting} className="mt-5 h-12 w-full rounded-md bg-[#111111] text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
-                    {isSubmitting ? "Please wait..." : isRegister ? "Create account" : "Sign in"}
+                    {isSubmitting ? storefrontI18n.t("uiCopy.please_wait") : isRegister ? storefrontI18n.t("uiCopy.create_account") : storefrontI18n.t("uiCopy.sign_in")}
                   </button>
                 </form>
 
@@ -328,7 +331,7 @@ export function LoginPage() {
                   <>
                     <div className="my-5 flex items-center gap-3">
                       <div className="h-px flex-1 bg-slate-200" />
-                      <span className="text-xs font-medium text-slate-400">or continue with</span>
+                      <span className="text-xs font-medium text-slate-600">{storefrontI18n.t("uiCopy.or_continue_with")}</span>
                       <div className="h-px flex-1 bg-slate-200" />
                     </div>
 
@@ -337,7 +340,7 @@ export function LoginPage() {
                         onSuccess={(response) => {
                           if (response.credential) void handleGoogleSuccess(response.credential);
                         }}
-                        onError={() => setApiError("Google sign-in failed. Please try again.")}
+                        onError={() => setApiError(storefrontI18n.t("uiCopy.google_sign_in_failed_please_try_again"))}
                         text={isRegister ? "signup_with" : "signin_with"}
                         shape="rectangular"
                         theme="outline"
@@ -348,19 +351,19 @@ export function LoginPage() {
                   </>
                 ) : null}
 
-                <p className="mt-5 text-center text-xs text-slate-500">
-                  {isRegister ? "Already have an account?" : "Do not have an account?"}{" "}
+                <p className="mt-5 text-center text-xs text-slate-600">
+                  {isRegister ? storefrontI18n.t("uiCopy.already_have_an_account") : storefrontI18n.t("uiCopy.do_not_have_an_account")}{" "}
                   <button type="button" onClick={() => switchMode(isRegister ? "login" : "register")} className="font-semibold text-slate-950 underline underline-offset-4">
-                    {isRegister ? "Sign in" : "Create an account"}
+                    {isRegister ? storefrontI18n.t("uiCopy.sign_in") : storefrontI18n.t("uiCopy.create_an_account")}
                   </button>
                 </p>
               </>
             )}
 
-            <p className="mt-5 text-center text-[11px] text-slate-400">&copy; 2026 WorkspaceEcom. All rights reserved.</p>
+            <p className="mt-5 text-center text-[11px] text-slate-600">&copy; 2026 WorkspaceEcom. All rights reserved.</p>
           </div>
 
-          <Link to="/" className="mx-auto mt-6 block w-fit text-sm font-medium text-white/80 transition hover:text-white drop-shadow-md">Back to storefront</Link>
+          <Link to="/" className="mx-auto mt-6 block w-fit text-sm font-medium text-white/80 transition hover:text-white drop-shadow-md">{storefrontI18n.t("uiCopy.back_to_storefront")}</Link>
         </div>
       </div>
     </section>

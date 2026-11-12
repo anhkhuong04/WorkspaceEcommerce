@@ -1,7 +1,13 @@
-﻿namespace WorkspaceEcommerce.Application.Modules.Catalog.Products;
+namespace WorkspaceEcommerce.Application.Modules.Catalog.Products;
 
 public sealed record CreateProductVariantRequest
 {
+
+    public decimal? WeightKg { get; init; }
+    public decimal? LengthCm { get; init; }
+    public decimal? WidthCm { get; init; }
+    public decimal? HeightCm { get; init; }
+
     public string Sku { get; init; } = string.Empty;
 
     public string Name { get; init; } = string.Empty;

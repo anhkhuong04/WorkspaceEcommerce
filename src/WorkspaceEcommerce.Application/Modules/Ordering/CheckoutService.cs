@@ -19,11 +19,11 @@ internal sealed class CheckoutService(
     ILogger<CheckoutService> logger,
     IValidator<CheckoutRequest> validator,
     IValidator<ValidateCheckoutCouponRequest> couponValidator,
-    IQuotedCheckoutService? quotedCheckout = null) : ICheckoutService
+    IQuotedCheckoutService? quotedCheckout = null, Microsoft.Extensions.Options.IOptions<OrderExpiryOptions>? expiryOptions = null) : ICheckoutService
 {
     private readonly CheckoutCartBuilder cartBuilder = new(checkoutStore, languageProvider);
     private readonly CheckoutCouponApplier couponApplier = new(checkoutStore, currentCustomer);
-    private readonly CheckoutOrderPlacer orderPlacer = new(checkoutStore, currentCustomer, languageProvider);
+    private readonly CheckoutOrderPlacer orderPlacer = new(checkoutStore, currentCustomer, languageProvider, expiryOptions?.Value);
     private readonly CheckoutShippingCoordinator shippingCoordinator = new(shipmentService, checkoutStore, logger);
 
     public async Task<Result<GetShippingQuoteResponse>> GetShippingQuoteAsync(

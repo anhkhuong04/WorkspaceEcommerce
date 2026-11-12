@@ -6,14 +6,14 @@ public sealed class Banner : Entity
 {
     public Banner(
         Guid id,
-        string title,
+        string? title,
         string imageUrl,
         string? linkUrl,
         int sortOrder,
         bool isActive = true)
         : base(id)
     {
-        Title = Guard.Required(title, nameof(Title));
+        Title = Guard.Optional(title) ?? string.Empty;
         ImageUrl = Guard.Required(imageUrl, nameof(ImageUrl));
         LinkUrl = Guard.Optional(linkUrl);
         SortOrder = sortOrder;
@@ -36,9 +36,9 @@ public sealed class Banner : Entity
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    public void UpdateDetails(string title, string imageUrl, string? linkUrl, int sortOrder)
+    public void UpdateDetails(string? title, string imageUrl, string? linkUrl, int sortOrder)
     {
-        Title = Guard.Required(title, nameof(Title));
+        Title = Guard.Optional(title) ?? string.Empty;
         ImageUrl = Guard.Required(imageUrl, nameof(ImageUrl));
         LinkUrl = Guard.Optional(linkUrl);
         SortOrder = sortOrder;

@@ -11,7 +11,10 @@ public sealed record LoyaltyAccountDto(
     decimal DiscountPercent,
     bool FreeShippingEnabled,
     LoyaltyTierType? NextTier,
-    int? PointsToNextTier);
+    int? PointsToNextTier)
+{
+    public int PointsDebt { get; init; }
+}
 
 public sealed record LoyaltyTransactionDto(
     Guid Id,

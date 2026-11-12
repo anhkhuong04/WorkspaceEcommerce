@@ -18,6 +18,15 @@ namespace WorkspaceEcommerce.Api.Controllers.Admin;
 [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
 public sealed class BlogsController(IAdminBlogService blogService) : ControllerBase
 {
+    [HttpGet("api/admin/blog-posts/page")]
+    [ProducesResponseType(typeof(ApiResponse<WorkspaceEcommerce.Application.Common.Models.PagedResult<AdminBlogPostDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> PostsPage([FromQuery] AdminBlogListRequest request, CancellationToken cancellationToken) =>
+        this.ToApiResponse(await blogService.GetBlogPostsPageAsync(request, cancellationToken));
+
+    [HttpGet("api/admin/blog-comments/page")]
+    [ProducesResponseType(typeof(ApiResponse<WorkspaceEcommerce.Application.Common.Models.PagedResult<BlogCommentDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CommentsPage([FromQuery] AdminCommentListRequest request, CancellationToken cancellationToken) =>
+        this.ToApiResponse(await blogService.GetCommentsPageAsync(request, cancellationToken));
     [HttpGet("api/admin/blog-posts")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyCollection<AdminBlogPostDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]

@@ -18,8 +18,14 @@ namespace WorkspaceEcommerce.Api.Controllers.Admin;
 [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
 [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
 [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-public sealed class OrderPaymentsController(IOrderPaymentService service) : ControllerBase
+public sealed class OrderPaymentsController(IOrderPaymentService service, IOrderPaymentExceptionService exceptions) : ControllerBase
 {
+    [HttpGet("exceptions")]
+    public async Task<IActionResult> Exceptions(Guid id, [FromQuery] int pageNumber = 1, CancellationToken ct = default) => this.ToApiResponse(await exceptions.GetAsync(id, pageNumber, ct));
+    [HttpPost("exceptions")]
+    public async Task<IActionResult> RecordException(Guid id, RecordPaymentExceptionRequest request, CancellationToken ct) => this.ToApiResponse(await exceptions.RecordAsync(id, request, Actor(), ct));
+    [HttpPost("exceptions/{exceptionId:guid}/resolve")]
+    public async Task<IActionResult> ResolveException(Guid id, Guid exceptionId, ResolvePaymentExceptionRequest request, CancellationToken ct) => this.ToApiResponse(await exceptions.ResolveAsync(id, exceptionId, request, Actor(), ct));
     [HttpGet]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct) => this.ToApiResponse(await service.GetAsync(id, ct));
     [HttpPost("confirm-transfer")]
@@ -28,9 +34,12 @@ public sealed class OrderPaymentsController(IOrderPaymentService service) : Cont
     public Task<IActionResult> Collect(Guid id, ConfirmOrderPaymentRequest request, CancellationToken ct) => Confirm(id, OrderPaymentReceiptKind.CodCollected, request, ct);
     [HttpPost("remit-cod")]
     public Task<IActionResult> Remit(Guid id, ConfirmOrderPaymentRequest request, CancellationToken ct) => Confirm(id, OrderPaymentReceiptKind.CodRemitted, request, ct);
+    [HttpPost("confirm-full-refund")]
+    public Task<IActionResult> Refund(Guid id, ConfirmOrderPaymentRequest request, CancellationToken ct) => Confirm(id, OrderPaymentReceiptKind.FullRefund, request, ct);
     private async Task<IActionResult> Confirm(Guid id, OrderPaymentReceiptKind kind, ConfirmOrderPaymentRequest request, CancellationToken ct)
     {
         var jti = User.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
         return this.ToApiResponse(await service.ConfirmAsync(id, kind, request, string.IsNullOrWhiteSpace(jti) ? "" : $"admin-session:{jti}", ct));
     }
+    private string Actor() { var jti = User.FindFirst(JwtRegisteredClaimNames.Jti)?.Value; return string.IsNullOrWhiteSpace(jti) ? "" : $"admin-session:{jti}"; }
 }

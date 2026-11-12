@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using WorkspaceEcommerce.Application.Abstractions.Persistence;
 using WorkspaceEcommerce.Domain.Modules.Blogs;
 using WorkspaceEcommerce.Domain.Modules.Cart;
@@ -80,6 +81,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<LoyaltyTransaction> LoyaltyTransactions => Set<LoyaltyTransaction>();
 
     public DbSet<LoyaltyTier> LoyaltyTiers => Set<LoyaltyTier>();
+    public DbSet<OrderPaymentException> OrderPaymentExceptions => Set<OrderPaymentException>();
+    public DbSet<StockAdjustment> StockAdjustments => Set<StockAdjustment>();
+    IQueryable<StockAdjustment> ICatalogReadStore.StockAdjustments => StockAdjustments;
+    IQueryable<OrderPaymentException> IAppDbContext.OrderPaymentExceptions => OrderPaymentExceptions;
+    public DbSet<OrderReturnCase> OrderReturns => Set<OrderReturnCase>();
+    public DbSet<OrderReturnLine> OrderReturnLines => Set<OrderReturnLine>();
+    public DbSet<OrderReturnAudit> OrderReturnAudits => Set<OrderReturnAudit>();
+    IQueryable<OrderReturnCase> IAppDbContext.OrderReturns => OrderReturns;
+    IQueryable<OrderReturnLine> IAppDbContext.OrderReturnLines => OrderReturnLines;
+    IQueryable<OrderReturnAudit> IAppDbContext.OrderReturnAudits => OrderReturnAudits;
+    Task<OrderReturnCase?> IAppDbContext.FindReturnForUpdateAsync(Guid id, CancellationToken ct) =>
+        ReloadLockedAsync(OrderReturns.FromSqlInterpolated($"SELECT * FROM ordering.order_returns WHERE id = {id} FOR UPDATE"), ct);
+    Task<CustomerLoyaltyAccount?> IAppDbContext.FindLoyaltyAccountForUpdateAsync(Guid customerId, CancellationToken ct) =>
+        ReloadLockedAsync(CustomerLoyaltyAccounts.FromSqlInterpolated($"SELECT *, xmin FROM loyalty.customer_loyalty_accounts WHERE customer_id = {customerId} FOR UPDATE"), ct);
 
     public DbSet<BlogPost> BlogPosts => Set<BlogPost>();
 
@@ -111,9 +126,62 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     IQueryable<Category> ICatalogReadStore.Categories => Categories;
 
+    async Task IAppDbContext.LockOrderImportAsync(string source, CancellationToken ct) =>
+        await Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({"admin-order-import:" + source}, 0))", ct);
+
+    IQueryable<Category> ICatalogReadStore.SearchCategories(string search)
+    {
+        var pattern = "%" + search.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
+        return Categories.FromSqlInterpolated($"""
+            SELECT c.* FROM catalog.categories AS c
+            WHERE c.slug ILIKE {pattern} ESCAPE '\'
+               OR EXISTS (SELECT 1 FROM jsonb_each_text(c.name) AS n(language, value)
+                          WHERE n.value ILIKE {pattern} ESCAPE '\')
+            """);
+    }
+
     IQueryable<Product> ICatalogReadStore.Products => Products;
 
+    IQueryable<Product> ICatalogReadStore.SearchProducts(string search)
+    {
+        var pattern = "%" + search.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
+        return Products.FromSqlInterpolated($"""
+            SELECT p.* FROM catalog.products AS p
+            WHERE p.slug ILIKE {pattern} ESCAPE '\'
+               OR EXISTS (SELECT 1 FROM jsonb_each_text(p.name) AS n(language, value)
+                          WHERE n.value ILIKE {pattern} ESCAPE '\')
+            """);
+    }
+
     IQueryable<ProductVariant> ICatalogReadStore.ProductVariants => ProductVariants;
+
+    async Task<ProductVariant?> ICatalogReadStore.FindVariantForUpdateAsync(Guid id, CancellationToken ct)
+    {
+        var variant = await ProductVariants.FromSqlInterpolated($"SELECT * FROM catalog.product_variants WHERE id = {id} FOR UPDATE").SingleOrDefaultAsync(ct);
+        if (variant is not null) await Entry(variant).ReloadAsync(ct);
+        return variant;
+    }
+
+    async Task<Product?> IAppDbContext.FindProductForUpdateAsync(Guid id, CancellationToken ct)
+    {
+        var product = await Products.FromSqlInterpolated($"SELECT * FROM catalog.products WHERE id = {id} FOR UPDATE").SingleOrDefaultAsync(ct);
+        if (product is not null) await Entry(product).ReloadAsync(ct);
+        return product;
+    }
+
+    async Task<Order?> IAppDbContext.ReloadOrderForUpdateAsync(Guid id, CancellationToken ct)
+    {
+        var order = await ((IAppDbContext)this).FindOrderForUpdateAsync(id, ct);
+        if (order is not null) await Entry(order).ReloadAsync(ct);
+        return order;
+    }
+
+    async Task<OrderShipment?> IAppDbContext.ReloadShipmentForUpdateAsync(Guid id, CancellationToken ct)
+    {
+        var shipment = await ((IAppDbContext)this).FindOrderShipmentForUpdateAsync(id, ct);
+        if (shipment is not null) await Entry(shipment).ReloadAsync(ct);
+        return shipment;
+    }
 
     IQueryable<ProductImage> ICatalogReadStore.ProductImages => ProductImages;
 
@@ -140,6 +208,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     IQueryable<CustomerEmailOutboxMessage> IAppDbContext.CustomerEmailOutboxMessages => CustomerEmailOutboxMessages;
 
     IQueryable<Coupon> IAppDbContext.Coupons => Coupons;
+
+    async Task<Coupon?> IAppDbContext.FindCouponForUpdateAsync(Guid id, CancellationToken ct)
+    {
+        var coupon = await Coupons.FromSqlInterpolated($"SELECT * FROM promotions.coupons WHERE id = {id} FOR UPDATE").SingleOrDefaultAsync(ct);
+        if (coupon is not null) await Entry(coupon).ReloadAsync(ct);
+        return coupon;
+    }
 
     IQueryable<CouponProductTarget> IAppDbContext.CouponProductTargets => CouponProductTargets;
 
@@ -261,19 +336,31 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             .SingleAsync(cancellationToken);
     }
 
-    Task<ProductVariant[]> IAppDbContext.FindProductVariantsForUpdateAsync(
-        Guid[] variantIds,
-        CancellationToken cancellationToken) =>
-        ProductVariants
-            .FromSqlInterpolated($"SELECT * FROM catalog.product_variants WHERE id = ANY ({variantIds}) ORDER BY id FOR UPDATE")
-            .ToArrayAsync(cancellationToken);
+    Task<ProductVariant[]> IAppDbContext.FindProductVariantsForUpdateAsync(Guid[] variantIds, CancellationToken cancellationToken) =>
+        LoadCurrentVariantsForUpdateAsync(variantIds, cancellationToken);
+
+    private async Task<ProductVariant[]> LoadCurrentVariantsForUpdateAsync(Guid[] ids, CancellationToken ct)
+    {
+        var fresh = await ProductVariants.FromSqlInterpolated($"SELECT * FROM catalog.product_variants WHERE id = ANY ({ids}) ORDER BY id FOR UPDATE")
+            .AsNoTracking().ToArrayAsync(ct);
+        return fresh.Select(row =>
+        {
+            var tracked = ProductVariants.Local.FirstOrDefault(variant => variant.Id == row.Id);
+            if (tracked is null) { ProductVariants.Attach(row); return row; }
+            // Identity resolution otherwise returns the pre-provider-call stock snapshot.
+            Entry(tracked).CurrentValues.SetValues(row);
+            Entry(tracked).OriginalValues.SetValues(row);
+            Entry(tracked).State = EntityState.Unchanged;
+            return tracked;
+        }).ToArray();
+    }
 
     Task<SerializedProductUnit?> IAppDbContext.FindSerializedProductUnitForUpdateAsync(
         WarrantyIdentifierType identifierType,
         int identifierKeyVersion,
         string identifierFingerprint,
         CancellationToken cancellationToken) =>
-        SerializedProductUnits
+        ReloadLockedAsync(SerializedProductUnits
             .FromSqlInterpolated($"""
                 SELECT *
                 FROM warranty.serialized_product_units
@@ -282,19 +369,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                   AND identifier_fingerprint = {identifierFingerprint}
                 FOR UPDATE
                 """)
-            .FirstOrDefaultAsync(cancellationToken);
+            , cancellationToken);
 
     Task<SerializedProductUnit?> IAppDbContext.FindSerializedProductUnitByIdForUpdateAsync(
         Guid unitId,
         CancellationToken cancellationToken) =>
-        SerializedProductUnits
+        ReloadLockedAsync(SerializedProductUnits
             .FromSqlInterpolated($"SELECT * FROM warranty.serialized_product_units WHERE id = {unitId} FOR UPDATE")
-            .FirstOrDefaultAsync(cancellationToken);
+            , cancellationToken);
 
     Task<SerializedProductUnit?> IAppDbContext.FindSerializedProductUnitByEntitlementIdForUpdateAsync(
         Guid entitlementId,
         CancellationToken cancellationToken) =>
-        SerializedProductUnits
+        ReloadLockedAsync(SerializedProductUnits
             .FromSqlInterpolated($"""
                 SELECT unit.*
                 FROM warranty.serialized_product_units AS unit
@@ -303,19 +390,26 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 WHERE entitlement.id = {entitlementId}
                 FOR UPDATE OF unit
                 """)
-            .FirstOrDefaultAsync(cancellationToken);
+            , cancellationToken);
 
     Task<WarrantyEntitlement?> IAppDbContext.FindWarrantyEntitlementByUnitIdForUpdateAsync(
         Guid unitId,
         CancellationToken cancellationToken) =>
-        WarrantyEntitlements
+        ReloadLockedAsync(WarrantyEntitlements
             .FromSqlInterpolated($"""
                 SELECT *
                 FROM warranty.warranty_entitlements
                 WHERE serialized_product_unit_id = {unitId}
                 FOR UPDATE
                 """)
-            .FirstOrDefaultAsync(cancellationToken);
+            , cancellationToken);
+
+    private async Task<TEntity?> ReloadLockedAsync<TEntity>(IQueryable<TEntity> query, CancellationToken ct) where TEntity : class
+    {
+        var entity = await query.FirstOrDefaultAsync(ct);
+        if (entity is not null) await Entry(entity).ReloadAsync(ct);
+        return entity;
+    }
 
     async Task<ShipmentCommandOutbox[]> IAppDbContext.ClaimDueShipmentCommandsAsync(
         string leaseOwner,
@@ -458,6 +552,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             throw new PersistenceConcurrencyException("A concurrency conflict occurred while saving changes.", exception);
         }
+        catch (DbUpdateException exception) when (
+            exception.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.ForeignKeyViolation,
+                ConstraintName: "FK_cart_items_product_variants_product_variant_id"
+            } && ChangeTracker.Entries<ProductVariant>().Any(entry => entry.State == EntityState.Deleted))
+        {
+            throw new PersistenceReferenceConflictException(
+                "Product is in a shopping cart and cannot be deleted. Deactivate it instead.", exception);
+        }
     }
 
     public async Task<bool> TryEnqueueShipmentCommandAsync(
@@ -553,12 +657,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             .Where(variant => ids.Contains(variant.Id))
             .ToArrayAsync(cancellationToken);
 
-    Task<ProductVariant[]> ICheckoutStore.FindProductVariantsForUpdateAsync(
-        Guid[] ids,
-        CancellationToken cancellationToken) =>
-        ProductVariants
-            .FromSqlInterpolated($"SELECT * FROM catalog.product_variants WHERE id = ANY ({ids}) ORDER BY id FOR UPDATE")
-            .ToArrayAsync(cancellationToken);
+    Task<ProductVariant[]> ICheckoutStore.FindProductVariantsForUpdateAsync(Guid[] ids, CancellationToken cancellationToken) =>
+        LoadCurrentVariantsForUpdateAsync(ids, cancellationToken);
 
     Task<Product[]> ICheckoutStore.FindProductsByIdsAsync(
         Guid[] ids,
@@ -587,9 +687,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         string code,
         CancellationToken cancellationToken)
     {
-        return await Coupons
+        var coupon = await Coupons
             .FromSqlInterpolated($"SELECT * FROM promotions.coupons WHERE code = {code} FOR UPDATE")
             .FirstOrDefaultAsync(cancellationToken);
+        if (coupon is not null) await Entry(coupon).ReloadAsync(cancellationToken);
+        return coupon;
     }
 
     async Task<IReadOnlyCollection<Guid>> ICheckoutStore.FindCouponProductTargetIdsAsync(

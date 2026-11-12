@@ -1,5 +1,5 @@
 export type PaymentMethod = 0 | 1 | 2;
-export type PaymentStatus = 0 | 1 | 2 | 3 | 4 | 5;
+export type PaymentStatus = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type OrderStatus = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export interface CheckoutRequest {
@@ -70,6 +70,7 @@ export interface OrderItemDto {
 }
 
 export interface OrderDto {
+  paymentDueAt?: string | null;
   shipping?: import("./shipping").OrderShippingDetailsDto | null;
   id: string;
   orderCode: string;

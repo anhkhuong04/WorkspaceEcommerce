@@ -7,7 +7,6 @@ public sealed class CreateBannerRequestValidator : AbstractValidator<CreateBanne
     public CreateBannerRequestValidator()
     {
         RuleFor(request => request.Title)
-            .NotEmpty()
             .MaximumLength(250);
 
         RuleFor(request => request.ImageUrl)

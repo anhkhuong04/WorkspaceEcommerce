@@ -23,12 +23,15 @@ import { BlogListPage } from "../pages/news/BlogListPage";
 import { BlogDetailPage } from "../pages/news/BlogDetailPage";
 import { SupportPage } from "../pages/support/SupportPages";
 import { WarrantyPage } from "../pages/warranty/WarrantyPage";
+import { StorefrontErrorPage } from "../pages/StorefrontErrorPage";
 
 export const router = createBrowserRouter([
   {
     path: "/",
     element: <StorefrontLayout />,
+    errorElement: <StorefrontErrorPage />,
     children: [
+      { path: "*", element: <StorefrontErrorPage notFound /> },
       { index: true, element: <HomePage /> },
       { path: "products", element: <ProductListPage /> },
       { path: "products/:slug", element: <ProductDetailPage /> },

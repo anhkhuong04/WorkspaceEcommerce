@@ -9,6 +9,8 @@ namespace WorkspaceEcommerce.Application.Modules.Blogs;
 
 public interface IAdminBlogService
 {
+    Task<Result<PagedResult<AdminBlogPostDto>>> GetBlogPostsPageAsync(AdminBlogListRequest request, CancellationToken cancellationToken = default);
+    Task<Result<PagedResult<BlogCommentDto>>> GetCommentsPageAsync(AdminCommentListRequest request, CancellationToken cancellationToken = default);
     Task<Result<IReadOnlyCollection<AdminBlogPostDto>>> GetBlogPostsAsync(CancellationToken cancellationToken = default);
 
     Task<Result<AdminBlogPostDto>> GetBlogPostByIdAsync(Guid id, CancellationToken cancellationToken = default);

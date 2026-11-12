@@ -11,4 +11,7 @@ public sealed record StorefrontProductListItemDto(
     decimal? MinPrice,
     decimal? CompareAtPrice,
     bool IsInStock,
-    string? ImageUrl);
+    string? ImageUrl)
+{
+    public int VariantCount { get; init; }
+}

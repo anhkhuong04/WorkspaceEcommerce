@@ -201,9 +201,9 @@ function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLo
                     <div className="min-w-0 py-0.5 sm:py-3">
                       <p className="line-clamp-2 text-sm font-medium text-slate-600">{item.productName}</p>
                       <h3 className="mt-1 break-words text-base font-semibold text-slate-950">{item.variantName}</h3>
-                      <p className="mt-2 text-sm font-medium text-slate-500 sm:text-base">{formatCartMoney(item.unitPriceSnapshot, false)}</p>
+                      <p className="mt-2 text-sm font-medium text-slate-600 sm:text-base">{formatCartMoney(item.unitPriceSnapshot, false)}</p>
                       {formatVariantOptions(item) ? (
-                        <p className="mt-1 truncate text-sm font-medium text-slate-500 sm:text-base">{formatVariantOptions(item)}</p>
+                        <p className="mt-1 truncate text-sm font-medium text-slate-600 sm:text-base">{formatVariantOptions(item)}</p>
                       ) : null}
                     </div>
                     <div className="grid content-start justify-items-end gap-2 py-0.5 sm:py-5">
@@ -220,7 +220,7 @@ function ShoppingCartDrawer({ cart, cartError, cartQueryKey, cartSessionId, isLo
                             updateItemMutation.mutate({ itemId: item.id, quantity });
                           }
                         }}
-                        className="h-10 w-14 rounded-lg border border-slate-200 bg-white text-center text-sm font-medium text-slate-500 outline-none transition focus:border-slate-400 disabled:bg-slate-100 sm:h-12 sm:w-16 sm:text-base"
+                        className="h-10 w-14 rounded-lg border border-slate-200 bg-white text-center text-sm font-medium text-slate-600 outline-none transition focus:border-slate-400 disabled:bg-slate-100 sm:h-12 sm:w-16 sm:text-base"
                       />
                       <button
                         type="button"
@@ -356,7 +356,7 @@ function CartItemImage({ item }: { item: CartItemDto }) {
       {item.imageUrl ? (
         <img src={item.imageUrl} alt={item.productName} className="h-full w-full object-contain p-3" />
       ) : (
-        <svg className="h-10 w-10 text-slate-400" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <svg className="h-10 w-10 text-slate-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M4 8h16v11H4z" stroke="currentColor" strokeWidth="1.7" />
           <path d="M8 8a4 4 0 0 1 8 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
         </svg>
@@ -382,7 +382,7 @@ function CartDrawerFooter({
         <p className="min-w-0 break-words text-right text-xl font-semibold text-slate-950">{formatCartMoney(totalAmount)}</p>
       </div>
 
-      <div className="mt-6 flex h-12 items-center rounded-full border border-slate-200 bg-white pl-5 pr-1.5 text-slate-400">
+      <div className="mt-6 flex h-12 items-center rounded-full border border-slate-200 bg-white pl-5 pr-1.5 text-slate-600">
         <span className="min-w-0 flex-1 truncate text-sm font-medium sm:text-base">{t("cart.discountCode")}</span>
         <button type="button" className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-white" aria-label={t("cart.applyDiscount")} disabled>
           <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -423,7 +423,7 @@ function LoginRequiredDialog({ onCancel, onLogin }: { onCancel: () => void; onLo
           </svg>
         </div>
         <h2 id="login-required-title" className="mt-5 text-2xl font-bold tracking-tight text-slate-950">{t("cart.loginRequired")}</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-500">{t("cart.loginRequiredDescription")}</p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">{t("cart.loginRequiredDescription")}</p>
         <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
@@ -446,7 +446,7 @@ function LoginRequiredDialog({ onCancel, onLogin }: { onCancel: () => void; onLo
 
 function CartDrawerMessage({ children, tone = "info" }: { children: ReactNode; tone?: "info" | "error" }) {
   return (
-    <div role={tone === "error" ? "alert" : "status"} className={`mb-4 rounded-lg px-5 py-4 text-sm font-semibold ${tone === "error" ? "bg-red-50 text-red-700" : "bg-slate-50 text-slate-500"}`}>
+    <div role={tone === "error" ? "alert" : "status"} className={`mb-4 rounded-lg px-5 py-4 text-sm font-semibold ${tone === "error" ? "bg-red-50 text-red-700" : "bg-slate-50 text-slate-600"}`}>
       {children}
     </div>
   );

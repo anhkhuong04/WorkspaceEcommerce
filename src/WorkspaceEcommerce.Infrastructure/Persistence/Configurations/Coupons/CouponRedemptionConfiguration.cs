@@ -11,6 +11,7 @@ internal sealed class CouponRedemptionConfiguration : IEntityTypeConfiguration<C
     public void Configure(EntityTypeBuilder<CouponRedemption> builder)
     {
         builder.ToTable("coupon_redemptions", "promotions");
+        builder.Property(redemption => redemption.ReleasedAt).HasColumnName("released_at");
 
         builder.HasKey(redemption => redemption.Id);
 

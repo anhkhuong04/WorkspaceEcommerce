@@ -6,18 +6,24 @@ public sealed record AdminOrderImportPreviewDto(
     int ErrorRows,
     IReadOnlyCollection<AdminOrderImportRowResultDto> Rows)
 {
-    public string ShippingSemantics => "LegacyImport";
+    public string ShippingSemantics => "ManualFulfillment";
 }
 
 public sealed record AdminOrderImportCommitResultDto(
     int CreatedOrders,
     IReadOnlyCollection<AdminOrderImportCreatedOrderDto> Orders,
-    AdminOrderImportPreviewDto Preview);
+    AdminOrderImportPreviewDto Preview)
+{
+    public int SkippedOrders { get; init; }
+}
 
 public sealed record AdminOrderImportCreatedOrderDto(
     Guid Id,
     string OrderCode,
-    string ExternalOrderCode);
+    string ExternalOrderCode)
+{
+    public bool AlreadyImported { get; init; }
+}
 
 public sealed record AdminOrderImportRowResultDto(
     int RowNumber,
@@ -25,7 +31,10 @@ public sealed record AdminOrderImportRowResultDto(
     string Sku,
     int? Quantity,
     bool IsValid,
-    IReadOnlyCollection<string> Errors);
+    IReadOnlyCollection<string> Errors)
+{
+    public bool AlreadyImported { get; init; }
+}
 
 internal sealed record AdminOrderImportFileRow(
     int RowNumber,

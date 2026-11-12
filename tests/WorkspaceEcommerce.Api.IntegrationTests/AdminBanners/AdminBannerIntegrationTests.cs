@@ -9,6 +9,41 @@ namespace WorkspaceEcommerce.Api.IntegrationTests.AdminBanners;
 public sealed class AdminBannerIntegrationTests(ApiIntegrationTestFixture fixture)
 {
     [Fact]
+    public async Task BannerEndpoints_OmittedOrNullTitle_RoundTripImageOnlyBanner()
+    {
+        await fixture.ResetDatabaseAsync();
+        using var client = fixture.CreateClient();
+        client.UseBearerToken(await client.LoginAsAdminAsync());
+        using var created = await client.PostAsJsonAsync("/api/admin/banners", new
+        {
+            imageUrl = "https://example.test/artwork.jpg",
+            linkUrl = "/products",
+            sortOrder = 0,
+            isActive = true
+        });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var createdJson = await created.ReadJsonAsync();
+        var id = createdJson["data"]!["id"]!.GetValue<Guid>();
+        Assert.Equal(string.Empty, createdJson["data"]!["title"]!.GetValue<string>());
+
+        using var updated = await client.PutAsJsonAsync($"/api/admin/banners/{id}", new
+        {
+            title = (string?)null,
+            imageUrl = "https://example.test/updated-artwork.jpg",
+            linkUrl = "/products",
+            sortOrder = 0,
+            isActive = true
+        });
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        using var storefront = await client.GetAsync("/api/banners");
+        var json = await storefront.ReadJsonAsync();
+        var banner = Assert.Single(json["data"]!.AsArray());
+        Assert.Equal(string.Empty, banner!["title"]!.GetValue<string>());
+        Assert.Equal("https://example.test/updated-artwork.jpg", banner["imageUrl"]!.GetValue<string>());
+        Assert.Equal("/products", banner["linkUrl"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task DeleteBanner_ExistingBanner_RemovesBanner()
     {
         await fixture.ResetDatabaseAsync();

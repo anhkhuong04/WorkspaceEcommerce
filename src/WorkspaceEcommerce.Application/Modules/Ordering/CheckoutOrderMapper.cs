@@ -30,7 +30,7 @@ internal static class CheckoutOrderMapper
             order.UpdatedAt,
             order.TrackingCode,
             order.ShipmentId,
-            order.Items.Select(ToDto).ToArray());
+            order.Items.Select(ToDto).ToArray()) { PaymentDueAt = order.PaymentDueAt };
     }
 
     private static OrderItemDto ToDto(OrderItem item)

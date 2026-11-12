@@ -140,7 +140,7 @@ export function ProductDetailPage() {
 
   return (
     <div className="grid gap-8">
-      <nav className="ui-caption flex min-w-0 flex-wrap items-center gap-2 text-slate-500" aria-label={t("productDetail.breadcrumb")}>
+      <nav className="ui-caption flex min-w-0 flex-wrap items-center gap-2 text-slate-600" aria-label={t("productDetail.breadcrumb")}>
         <Link to="/" className="font-semibold transition hover:text-slate-950">
           {t("productDetail.home")}
         </Link>
@@ -168,7 +168,7 @@ export function ProductDetailPage() {
                 className="aspect-square w-full object-contain p-4 sm:p-8"
               />
             ) : (
-              <div className="grid aspect-square place-items-center bg-slate-100 p-8 text-center text-sm font-semibold text-slate-500">
+              <div className="grid aspect-square place-items-center bg-slate-100 p-8 text-center text-sm font-semibold text-slate-600">
                 {t("productDetail.noImage")}
               </div>
             )}
@@ -208,7 +208,7 @@ export function ProductDetailPage() {
           <form onSubmit={addToCart} aria-busy={addToCartMutation.isPending} className="min-w-0 rounded-[var(--radius-panel)] border border-slate-200 bg-white p-5 md:p-7">
             <Link
               to={categorySlug ? `/products?categorySlug=${encodeURIComponent(categorySlug)}` : "/products"}
-              className="ui-caption font-bold uppercase tracking-[0.16em] text-slate-500 transition hover:text-slate-950"
+              className="ui-caption font-bold uppercase tracking-[0.16em] text-slate-600 transition hover:text-slate-950"
             >
               {product.categoryName}
             </Link>
@@ -225,7 +225,7 @@ export function ProductDetailPage() {
                   <div className="flex flex-wrap items-baseline gap-3">
                     <p className="text-[28px] font-black leading-none text-slate-950">{formatMoney(selectedVariant.price)}</p>
                     {hasDiscount ? (
-                      <p className="text-base font-bold text-slate-400 line-through">{formatMoney(selectedVariant.compareAtPrice!)}</p>
+                      <p className="text-base font-bold text-slate-600 line-through">{formatMoney(selectedVariant.compareAtPrice!)}</p>
                     ) : null}
                   </div>
                 ) : (
@@ -234,7 +234,7 @@ export function ProductDetailPage() {
               </div>
               <span
                 className={`rounded-full px-3 py-1 text-xs font-black ${
-                  isOutOfStock ? "bg-slate-100 text-slate-500" : "bg-emerald-50 text-emerald-700"
+                  isOutOfStock ? "bg-slate-100 text-slate-600" : "bg-emerald-50 text-emerald-700"
                 }`}
               >
                 {isOutOfStock ? t("product.outOfStock") : t("productDetail.inStock", { count: selectedVariant.stockQuantity })}
@@ -244,7 +244,7 @@ export function ProductDetailPage() {
             <div className="mt-6 grid gap-3">
               <div className="flex items-center justify-between gap-4">
                 <h2 className="ui-h3 text-slate-950">{t("productDetail.configuration")}</h2>
-                {selectedVariant ? <p className="ui-caption text-slate-500">SKU {selectedVariant.sku}</p> : null}
+                {selectedVariant ? <p className="ui-caption text-slate-600">SKU {selectedVariant.sku}</p> : null}
               </div>
 
               <div className="grid max-h-[320px] gap-3 overflow-y-auto p-1" onKeyDown={(event) => {
@@ -277,7 +277,7 @@ export function ProductDetailPage() {
                     >
                       <span className="min-w-0">
                         <span className="block break-words text-sm font-semibold text-slate-950">{variant.name}</span>
-                        <span className="mt-1 block text-xs font-semibold text-slate-500">
+                        <span className="mt-1 block text-xs font-semibold text-slate-600">
                           {variant.color ?? t("productDetail.default")}
                           {variant.size ? ` / ${variant.size}` : ""} / {variant.stockQuantity > 0 ? t("productDetail.leftInStock", { count: variant.stockQuantity }) : t("product.soldOut")}
                         </span>
@@ -285,7 +285,7 @@ export function ProductDetailPage() {
                       <span className="shrink-0 text-right">
                         <span className="block text-sm font-black text-slate-950">{formatMoney(variant.price)}</span>
                         {variantHasDiscount ? (
-                          <span className="block text-xs font-semibold text-slate-400 line-through">{formatMoney(variant.compareAtPrice!)}</span>
+                          <span className="block text-xs font-semibold text-slate-600 line-through">{formatMoney(variant.compareAtPrice!)}</span>
                         ) : null}
                       </span>
                     </button>
@@ -296,7 +296,7 @@ export function ProductDetailPage() {
 
             <div className="mt-6 grid gap-4 sm:grid-cols-[150px_1fr]">
               <label className="grid gap-2">
-                <span className="ui-caption font-bold uppercase tracking-[0.16em] text-slate-500">{t("cart.quantity")}</span>
+                <span className="ui-caption font-bold uppercase tracking-[0.16em] text-slate-600">{t("cart.quantity")}</span>
                 <span className="grid h-12 grid-cols-[40px_1fr_40px] overflow-hidden rounded-[var(--radius-control)] border border-slate-200">
                   <button
                     type="button"
@@ -376,12 +376,12 @@ export function ProductDetailPage() {
         <div className="min-w-0">
           <h2 className="ui-h2 text-slate-950">{t("productDetail.specifications")}</h2>
           {product.specifications.length === 0 ? (
-            <p className="mt-4 text-sm leading-7 text-slate-500">{t("productDetail.noSpecifications")}</p>
+            <p className="mt-4 text-sm leading-7 text-slate-600">{t("productDetail.noSpecifications")}</p>
           ) : (
             <div className="mt-4 divide-y divide-slate-100 border-y border-slate-100">
               {product.specifications.map((specification) => (
                 <div key={specification.id} className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-5 py-4">
-                  <p className="text-sm font-bold text-slate-500">{specification.name}</p>
+                  <p className="text-sm font-bold text-slate-600">{specification.name}</p>
                   <p className="text-right text-sm font-semibold text-slate-950">{specification.value}</p>
                 </div>
               ))}

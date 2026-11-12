@@ -23,6 +23,11 @@ coherent across use cases.
 
 - A cart belongs to either a customer or an anonymous session. A variant occurs
   at most once per cart/order; adding it again increases quantity.
+- Products referenced by shopping carts or order history cannot be deleted;
+  deactivate them instead. Admin product deletion returns `409 Conflict` for
+  these references and preserves the product, variants, and cart/order data.
+  Cart references are enforced by the database foreign key, including references
+  added concurrently with deletion.
 - Checkout revalidates active variants and stock, locks variant and coupon rows
   before mutation, decrements stock, reserves coupon usage, creates the
   order/payment record, removes the cart, and enqueues applicable shipment work
@@ -127,3 +132,15 @@ Related decisions: [ADR 002](../adr/002-customer-totp-authentication.md),
 ## WorkspaceEC quoted delivery
 
 New shipping selections freeze the customer charge and parcel/rate snapshot. Local delivery requires confirmed order and Paid for prepaid methods; new COD completes only after full audited collection. Legacy/import orders retain their existing fees and workflow. See [shipping rules and consistency](../architecture/shipping.md) and [operations](../../services/runbooks/workspace-shipping.md).
+## Storefront remediation — 2026-11-11
+
+The following rules extend the current implementation; historical order totals and snapshots stay unchanged.
+
+- A customer return request is an audited request, not receipt of goods. It is accepted within seven days of the original completion timestamp, once per order, and leaves the order Completed. A direct admin status edit cannot declare Returned while item inspection, inventory disposition, loyalty and warranty reversal are unimplemented.
+- Full manual refunds are audited outgoing-money facts (`OrderPaymentReceiptKind.FullRefund`), with exact frozen amount/currency, reference, reason, actor and timestamp. Only closed RefundPending orders qualify. Recording a completed refund sets `PaymentStatus.Refunded = 6`; this endpoint does not initiate a bank/provider transfer. Partial refunds need the item-allocation workflow.
+- New prepaid checkout orders freeze a payment deadline: VNPay 30 minutes, manual transfer 1440 minutes by default, configurable through `OrderExpiry`. The expiry worker cancels eligible unpaid Pending/Confirmed orders once. COD and legacy orders without a deadline are excluded. A verified late VNPay capture is retained as Success/RefundPending without reopening fulfillment.
+- Pre-handover cancellation/expiry restores sellable quantity and releases the coupon use once, retaining redemption release audit and order discount snapshots. A loyalty voucher can be reused if still valid; points are not credited again. Cancellation after failed delivery does not prove physical return and never automatically restores sellable stock.
+- Verified COD collection and remittance remain distinct facts; remittance can be recorded after the commerce order closes. New collection on a closed order is rejected.
+- Storefront catalogue search includes localized names and slugs; category filtering includes active descendants. New-arrival sorting uses CreatedAt rather than UpdatedAt. Compare-at and minimum prices come from the same representative SKU.
+
+See [implementation report](../../../task/implementation_storefront_remediation_2026-11-11.md) for validation and remaining return-processing scope.

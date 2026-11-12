@@ -14,6 +14,7 @@ internal sealed class StorefrontBannerService(IAppDbContext dbContext) : IStoref
             .Where(banner => banner.IsActive)
             .OrderBy(banner => banner.SortOrder)
             .ThenBy(banner => banner.Title)
+            .ThenBy(banner => banner.Id)
             .Select(banner => new StorefrontBannerDto(
                 banner.Id,
                 banner.Title,

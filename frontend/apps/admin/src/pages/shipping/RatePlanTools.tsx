@@ -14,10 +14,14 @@ export function RatePlanPreview({
   plan,
   catalog,
   onPreview,
+  onInvalidate,
+  busy = false,
 }: {
   plan: ShippingRatePlan;
   catalog: ShippingCatalogSummary;
   onPreview: (value: ShippingRatePreview) => void;
+  onInvalidate: () => void;
+  busy?: boolean;
 }) {
   const [province, setProvince] = useState("");
   const [ward, setWard] = useState("");
@@ -38,8 +42,10 @@ export function RatePlanPreview({
       }),
     onSuccess: onPreview,
   });
+  function resetPreview() { preview.reset(); onInvalidate(); }
   return (
     <section className="admin-panel grid gap-3">
+      <fieldset disabled={busy || preview.isPending} className="grid min-w-0 gap-3 border-0 p-0">
       <h2>Test persisted revision {plan.revision}</h2>
       <p>
         Simulation only; no customer quote is issued. Draft prices are not
@@ -54,7 +60,7 @@ export function RatePlanPreview({
             setProvince(e.target.value);
             setWard("");
             setPage(1);
-            preview.reset();
+            resetPreview();
           }}
         >
           <option value="">Choose province</option>
@@ -72,7 +78,7 @@ export function RatePlanPreview({
           value={ward}
           onChange={(e) => {
             setWard(e.target.value);
-            preview.reset();
+            resetPreview();
           }}
           disabled={wards.isFetching}
         >
@@ -94,6 +100,7 @@ export function RatePlanPreview({
             onClick={() => {
               setPage(page - 1);
               setWard("");
+              resetPreview();
             }}
           >
             Previous wards
@@ -104,6 +111,7 @@ export function RatePlanPreview({
             onClick={() => {
               setPage(page + 1);
               setWard("");
+              resetPreview();
             }}
           >
             Next wards
@@ -120,12 +128,12 @@ export function RatePlanPreview({
           value={weight}
           onChange={(e) => {
             setWeight(e.target.value);
-            preview.reset();
+            resetPreview();
           }}
         />
       </label>
       <Button
-        disabled={!ward || Number(weight) <= 0 || preview.isPending}
+        disabled={!ward || !Number.isFinite(Number(weight)) || Number(weight) <= 0 || preview.isPending || busy}
         onClick={() => preview.mutate()}
       >
         Preview price
@@ -140,6 +148,7 @@ export function RatePlanPreview({
           {preview.data.zoneCode}
         </p>
       )}
+      </fieldset>
     </section>
   );
 }

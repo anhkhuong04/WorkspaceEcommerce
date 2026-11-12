@@ -34,7 +34,11 @@ internal sealed class AdminDashboardService(IAdminDashboardQuery dashboardQuery)
             LowStockThreshold,
             lowStockVariants,
             orderStatusSummary,
-            recentOrders);
+            recentOrders)
+        {
+            NetCollectedRevenue = await dashboardQuery.GetNetCollectedRevenueAsync(cancellationToken),
+            Operations = await dashboardQuery.GetOperationsAsync(cancellationToken)
+        };
 
         return Result<AdminDashboardDto>.Success(dashboard);
     }

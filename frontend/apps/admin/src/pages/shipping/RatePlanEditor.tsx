@@ -88,13 +88,14 @@ export function RatePlanEditor({
     <form
       className="grid gap-4"
       onSubmit={handleSubmit((values) =>
-        onSave({
+        !busy && onSave({
           ...values,
           catalogVersion: catalog.version,
           expectedRevision: plan?.revision ?? 0,
         }),
       )}
     >
+      <fieldset disabled={busy} className="grid min-w-0 gap-4 border-0 p-0">
       <p>
         Draft edits affect no active price. Save changes before previewing the
         persisted revision.
@@ -245,6 +246,7 @@ export function RatePlanEditor({
       <Button type="submit" variant="primary" disabled={busy}>
         {busy ? "Saving..." : "Save draft"}
       </Button>
+      </fieldset>
     </form>
   );
 }

@@ -9,6 +9,11 @@ import type {
   AdminCouponListRequest,
   AdminCouponUpsertRequest,
   AdminDashboardDto,
+  AdminSearchDto,
+  AdminProductListRequest,
+  AdminBlogListRequest,
+  AdminCommentListRequest,
+  OrderReturnSummaryDto, CreateOrderReturnRequest, ReceiveOrderReturnRequest, RejectOrderReturnRequest, RefundOrderReturnRequest,
   AdminLoginRequest,
   AdminLoginResponse,
   MediaUploadResult,
@@ -214,6 +219,17 @@ export function createStorefrontApi(client: ApiClient) {
 
 export function createAdminApi(client: ApiClient) {
   return {
+    getOrderReturns: (orderId: string, pageNumber = 1) => client.get<OrderReturnSummaryDto>(`/api/admin/orders/${orderId}/returns${buildQuery({ pageNumber })}`),
+    createOrderReturn: (orderId: string, body: CreateOrderReturnRequest) => client.post<OrderReturnSummaryDto, CreateOrderReturnRequest>(`/api/admin/orders/${orderId}/returns`, body),
+    receiveOrderReturn: (orderId: string, id: string, body: ReceiveOrderReturnRequest) => client.post<OrderReturnSummaryDto, ReceiveOrderReturnRequest>(`/api/admin/orders/${orderId}/returns/${id}/receive`, body),
+    rejectOrderReturn: (orderId: string, id: string, body: RejectOrderReturnRequest) => client.post<OrderReturnSummaryDto, RejectOrderReturnRequest>(`/api/admin/orders/${orderId}/returns/${id}/reject`, body),
+    refundOrderReturn: (orderId: string, id: string, body: RefundOrderReturnRequest) => client.post<OrderReturnSummaryDto, RefundOrderReturnRequest>(`/api/admin/orders/${orderId}/returns/${id}/refund`, body),
+    rejectOrderReturnRequest: (orderId: string, reason: string) => client.post<OrderReturnSummaryDto, { reason: string }>(`/api/admin/orders/${orderId}/returns/reject-request`, { reason }),
+    getBlogPostsPage: (request: AdminBlogListRequest = {}) => client.get<PagedResult<AdminBlogPostDto>>(`/api/admin/blog-posts/page${buildQuery(request)}`),
+    getBlogCommentsPage: (request: AdminCommentListRequest = {}) => client.get<PagedResult<BlogCommentDto>>(`/api/admin/blog-comments/page${buildQuery(request)}`),
+    getWarrantyReplacementUnits: (id: string, request: AdminWarrantyUnitListRequest = {}) =>
+      client.get<PagedResult<AdminWarrantyUnitDto>>(`/api/admin/warranties/${id}/replacement-units${buildQuery(request)}`),
+    search: (search: string) => client.get<AdminSearchDto>(`/api/admin/dashboard/search${buildQuery({ search })}`),
     login: (request: AdminLoginRequest) => client.post<AdminLoginResponse, AdminLoginRequest>("/api/admin/auth/login", request),
     uploadMedia: (file: File, folder: string) => {
       const formData = new FormData();
@@ -227,7 +243,7 @@ export function createAdminApi(client: ApiClient) {
     updateCategory: (id: string, request: AdminCategoryUpsertRequest) =>
       client.put<AdminCategoryDto, AdminCategoryUpsertRequest>(`/api/admin/categories/${id}`, request),
     deleteCategory: (id: string) => client.delete<AdminCategoryDto>(`/api/admin/categories/${id}`),
-    getProducts: (request: PaginationRequest = {}) =>
+    getProducts: (request: AdminProductListRequest = {}) =>
       client.get<PagedResult<AdminProductDto>>(`/api/admin/products${buildQuery(request)}`),
     createProduct: (request: AdminProductUpsertRequest) =>
       client.post<AdminProductDto, AdminProductUpsertRequest>("/api/admin/products", request),
@@ -259,14 +275,16 @@ export function createAdminApi(client: ApiClient) {
     retryOrderShipment: (id: string) => client.post<ShipmentTrackingDto, void>(`/api/admin/orders/${id}/shipment/retry`, undefined),
     cancelOrderShipment: (id: string, reason: string) =>
       client.post<ShipmentTrackingDto, { reason: string }>(`/api/admin/orders/${id}/shipment/cancel`, { reason }),
-    previewOrderImport: (file: File) => {
+    previewOrderImport: (file: File, source = "manual") => {
       const formData = new FormData();
       formData.set("file", file);
+      formData.set("source", source);
       return client.postForm<AdminOrderImportPreviewDto>("/api/admin/orders/import/preview", formData);
     },
-    commitOrderImport: (file: File) => {
+    commitOrderImport: (file: File, source = "manual") => {
       const formData = new FormData();
       formData.set("file", file);
+      formData.set("source", source);
       return client.postForm<AdminOrderImportCommitResultDto>("/api/admin/orders/import/commit", formData);
     },
     getCoupons: (request: AdminCouponListRequest = {}) =>

@@ -137,6 +137,38 @@ public sealed class CustomerOrderServiceTests
         Assert.Null(history.CustomerMessage);
     }
 
+    [Fact]
+    public async Task ReturnRequest_IsAuditedOnceAndDoesNotChangeCommerceOrPaymentStatus()
+    {
+        var customerId = Guid.NewGuid();
+        var order = CreateOrder(Guid.NewGuid(), "RETURN-REQUEST", customerId);
+        foreach (var status in new[] { OrderStatus.Confirmed, OrderStatus.Processing, OrderStatus.Shipping, OrderStatus.Completed })
+            order.ChangeStatus(Guid.NewGuid(), status, "Seed lifecycle", "test");
+        order.MarkPaymentPaid(DateTimeOffset.UtcNow);
+        var db = new FakeAppDbContext(); db.Seed(order);
+        var service = CreateService(db, customerId);
+        var first = await service.RequestReturnAsync(order.Id, "Damaged package");
+        var repeated = await service.RequestReturnAsync(order.Id, "Damaged package");
+        Assert.True(first.IsSuccess); Assert.True(repeated.IsSuccess);
+        Assert.Equal(OrderStatus.Completed, order.Status);
+        Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
+        Assert.NotNull(first.Value!.ReturnRequestedAt);
+        Assert.Single(db.OrderStatusHistories.Where(history => history.CustomerMessage == "Return requested: Damaged package"));
+        Assert.Equal(1, db.SaveChangesCallCount);
+        Assert.Equal(ResultStatus.NotFound, (await CreateService(db, Guid.NewGuid()).RequestReturnAsync(order.Id, "Other owner")).Status);
+    }
+
+    [Fact]
+    public void ReturnRequest_OutsideWindowOrMissingCompletion_IsRejected()
+    {
+        var order = CreateOrder(Guid.NewGuid(), "RETURN-WINDOW", Guid.NewGuid());
+        Assert.Throws<WorkspaceEcommerce.Domain.Common.DomainException>(() => order.RequestReturn("Reason", DateTimeOffset.UtcNow));
+        foreach (var status in new[] { OrderStatus.Confirmed, OrderStatus.Processing, OrderStatus.Shipping, OrderStatus.Completed })
+            order.ChangeStatus(Guid.NewGuid(), status, "Seed", "test");
+        Assert.Throws<WorkspaceEcommerce.Domain.Common.DomainException>(() => order.RequestReturn("Reason", order.CompletedAt!.Value.AddDays(7).AddTicks(1)));
+        Assert.Throws<WorkspaceEcommerce.Domain.Common.DomainException>(() => order.RequestReturn(" ", order.CompletedAt!.Value));
+    }
+
     private static CustomerOrderService CreateService(FakeAppDbContext dbContext, Guid? customerId)
     {
         return new CustomerOrderService(

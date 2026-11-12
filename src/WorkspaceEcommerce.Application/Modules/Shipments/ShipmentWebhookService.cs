@@ -39,10 +39,14 @@ internal sealed class ShipmentWebhookService(
         var now = timeProvider.GetUtcNow();
         Result<ShipmentWebhookResult>? transactionResult = null;
 
+        var orderId = await dbContext.Orders.AsNoTrackingIfEf().Where(order => order.OrderCode == orderCode)
+            .Select(order => (Guid?)order.Id).FirstOrDefaultAsyncSafe(cancellationToken);
+        if (!orderId.HasValue) return Result<ShipmentWebhookResult>.NotFound("Order was not found for shipment webhook.");
         try
         {
             await dbContext.ExecuteInTransactionAsync(async transactionToken =>
             {
+                var pendingPayments = await dbContext.FindPendingPaymentTransactionsForOrderForUpdateAsync(orderId.Value, transactionToken);
                 // Lock order first and shipment second for every webhook. This
                 // serializes all provider events for one order and makes the
                 // entity state below authoritative for this transaction.
@@ -153,6 +157,7 @@ internal sealed class ShipmentWebhookService(
                         now));
                 }
 
+                var previousStatus = order.Status;
                 var targetStatus = ShipmentProviderContract.MapOrderStatus(payload.Status);
                 if (fulfillment is not null) targetStatus = await fulfillment.ProviderTargetAsync(order, targetStatus, transactionToken);
                 if (shipmentUpdated && targetStatus.HasValue)
@@ -163,6 +168,10 @@ internal sealed class ShipmentWebhookService(
                         payload.Status,
                         dbContext);
                 }
+
+                if (orderUpdated && order.Status == OrderStatus.Cancelled)
+                    await WorkspaceEcommerce.Application.Modules.Ordering.OrderCancellationEffects.ApplyAsync(dbContext, order, previousStatus,
+                        pendingPayments, "Shipment provider cancellation.", now, transactionToken);
 
                 await dbContext.SaveChangesAsync(transactionToken);
 

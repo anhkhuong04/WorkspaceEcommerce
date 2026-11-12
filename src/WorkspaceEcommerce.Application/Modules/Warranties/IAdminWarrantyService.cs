@@ -4,6 +4,7 @@ namespace WorkspaceEcommerce.Application.Modules.Warranties;
 
 public interface IAdminWarrantyService
 {
+    Task<Result<PagedResult<AdminWarrantyUnitDto>>> GetReplacementUnitsAsync(Guid id, AdminWarrantyUnitListRequest request, CancellationToken cancellationToken = default);
     Task<Result<PagedResult<AdminWarrantyPlanDto>>> GetPlansAsync(AdminWarrantyPlanListRequest request, CancellationToken cancellationToken = default);
     Task<Result<AdminWarrantyPlanDto>> CreatePlanAsync(CreateWarrantyPlanRequest request, string actorId, CancellationToken cancellationToken = default);
     Task<Result<AdminWarrantyPlanDto>> RetirePlanAsync(Guid id, string actorId, CancellationToken cancellationToken = default);

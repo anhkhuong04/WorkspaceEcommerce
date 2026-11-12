@@ -6,6 +6,8 @@ Tài liệu sở hữu định hướng hình ảnh và tiêu chí review UI/UX 
 
 Khảo sát ngày **14/10/2026**: HTML/CSS công khai của Hyperwork, cấu trúc trang và ảnh hero. Trình duyệt tương tác không khả dụng trong lần khảo sát này; chưa kiểm chứng giao diện render, thao tác touch, animation, checkout có hàng hay hiệu năng thực tế. Các mục sau phần khảo sát là đề xuất riêng cho WorkspaceEcommerce, không phải thông số đo của Hyperwork.
 
+Bổ sung ngày **15/10/2026**: đã chụp giao diện banner Hyperwork bằng Chromium ở desktop/mobile và triển khai [banner nhiều tầng](banner-layout.md). Tài liệu banner sở hữu ảnh khảo sát, quy tắc bố trí và title tùy chọn; không lặp các chi tiết đó tại đây.
+
 | Nguồn | Điều kiểm chứng được |
 | --- | --- |
 | [Trang chủ](https://hyperwork.vn/) | Điều hướng theo nhóm, danh mục, sản phẩm mới, blog và nội dung hỗ trợ. CSS khai báo nền trắng, chữ `#333333`, CTA chính `#1a1a1a`, CTA phụ `#d44c00`, container tối đa 1300px và button radius 60px. Font mặc định Manrope được inline CSS override thành Google Sans; chưa xác nhận font render. |
@@ -17,6 +19,8 @@ Khảo sát ngày **14/10/2026**: HTML/CSS công khai của Hyperwork, cấu tr�
 Từ các bằng chứng này, định hướng phù hợp là **tối giản, đặt sản phẩm ở trung tâm, có chất liệu lifestyle và thông tin mua hàng rõ ràng**. Học cách tổ chức thị giác; dùng ảnh, nội dung và nhận diện riêng của WorkspaceEcommerce.
 
 ## Nguyên tắc hình ảnh
+
+Quy ước, đánh giá và implementation riêng cho dashboard nằm tại [Dashboard và UI/UX quản trị](admin-ui-ux.md). Các thông số storefront bên dưới không áp dụng nguyên trạng cho admin.
 
 - **Ảnh dẫn dắt:** hero kể một bối cảnh sử dụng; ảnh catalog làm rõ hình dáng sản phẩm; gallery bổ sung góc chụp, kích thước và chi tiết. Tránh nhúng tên/giá/CTA quan trọng vào ảnh vì khó responsive và dịch.
 - **Nền nhẹ, điểm nhấn có mục đích:** trắng/xám cho canvas, chữ tối cho nội dung, màu accent cho promotion có dữ liệu thật. Dùng màu semantic và nhãn cho lỗi/thành công; không dùng màu trang trí thay thế trạng thái.
@@ -60,7 +64,7 @@ Quick-buy có chọn biến thể là hạng mục đề xuất riêng: hook hi�
 | Điểm đọc | Implementation hiện tại |
 | --- | --- |
 | [ProductCard](../../frontend/apps/storefront/src/components/ui/ProductCard.tsx) | Home/catalog dùng chung card: ảnh vuông/contain, tên hai dòng, giá wrap, image fallback và lỗi mutation có `role=alert`. CTA hiện trên touch; desktop hỗ trợ hover/focus-within. |
-| [BannerCarousel](../../frontend/apps/storefront/src/components/ui/BannerCarousel.tsx) | Hero dùng chiều cao responsive 340–620px, điều khiển 44px, pause/resume, dừng khi tương tác và không auto-advance khi reduced motion. Slide không active dùng `inert` để loại CTA khỏi keyboard navigation. |
+| [HomeBanners](../../frontend/apps/storefront/src/components/ui/HomeBanners.tsx), [BannerCarousel](../../frontend/apps/storefront/src/components/ui/BannerCarousel.tsx) | Hero → tối đa hai thẻ phụ → slideshow điểm nhấn theo [quy tắc banner](banner-layout.md). Giữ tỷ lệ/màu artwork, caption tùy chọn dưới ảnh; controls 44px, pause/reduced motion và `inert` cho slide không active. |
 | [HomePage](../../frontend/apps/storefront/src/pages/home/HomePage.tsx), [StorefrontLayout](../../frontend/apps/storefront/src/components/layout/StorefrontLayout.tsx) | Header/content dùng container 1440px với gutter responsive. Header sáng, sticky, có disclosure menu desktop, navigation dialog mobile và skip link. Caption 13px; body/input 16px trong storefront stylesheet. |
 | [useModalDialog](../../frontend/apps/storefront/src/hooks/useModalDialog.ts) | Search, cart, mobile filters/navigation và login prompt dùng native dialog, vòng Tab, Escape, backdrop dismissal, body scroll lock và trả focus. Cart nhớ nút Add ngay cả khi nó tạm disabled trong mutation. |
 | [ProductDetailPage](../../frontend/apps/storefront/src/pages/product-detail/ProductDetailPage.tsx) | Gallery/summary 55/45 trên desktop; ảnh có kích thước ổn định, thumbnail có selected state, variant hỗ trợ Arrow/Home/End, CTA pill và live error/success feedback. |

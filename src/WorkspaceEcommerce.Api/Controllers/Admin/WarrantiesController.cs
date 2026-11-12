@@ -16,6 +16,9 @@ namespace WorkspaceEcommerce.Api.Controllers.Admin;
 [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
 public sealed class WarrantiesController(IAdminWarrantyService warrantyService) : ControllerBase
 {
+    [HttpGet("warranties/{id:guid}/replacement-units")]
+    public async Task<IActionResult> ReplacementUnits(Guid id, [FromQuery] AdminWarrantyUnitListRequest request, CancellationToken cancellationToken) =>
+        this.ToApiResponse(await warrantyService.GetReplacementUnitsAsync(id, request, cancellationToken));
     [HttpGet("warranty-plans")]
     public async Task<IActionResult> GetPlans([FromQuery] AdminWarrantyPlanListRequest request, CancellationToken cancellationToken) =>
         this.ToApiResponse(await warrantyService.GetPlansAsync(request, cancellationToken));

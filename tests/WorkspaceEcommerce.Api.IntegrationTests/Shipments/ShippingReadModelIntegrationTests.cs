@@ -75,7 +75,7 @@ public sealed partial class ShippingCheckoutIntegrationTests
         Assert.Equal(singleLine, counter.SelectCount);
     }
     [Fact]
-    public async Task ImportExplicitShippingSelectionIsRejectedAndLegacyPreviewIsLabelled()
+    public async Task ImportExplicitShippingSelectionIsRejectedAndManualFulfillmentIsLabelled()
     {
         await fixture.ResetDatabaseAsync(); using var client = fixture.CreateClient(); client.UseBearerToken(await client.LoginAsAdminAsync());
         using var file = new MultipartFormDataContent(); file.Add(new ByteArrayContent(Encoding.UTF8.GetBytes("externalOrderCode,shippingMethod,sku,quantity\nIMPORT,WorkspaceEC,SYNTHETIC,1")), "file", "shipping.csv");
@@ -84,7 +84,7 @@ public sealed partial class ShippingCheckoutIntegrationTests
         legacy.Add(new ByteArrayContent(Encoding.UTF8.GetBytes("externalOrderCode,customerName,customerPhone,shippingAddress,paymentMethod,sku,quantity,shippingFee\nIMPORT,Synthetic Buyer,0900000000,Synthetic Street,Cod,SYNTHETIC,1,12345")), "file", "legacy.csv");
         using var preview = await client.PostAsync("/api/admin/orders/import/preview", legacy);
         Assert.True(preview.IsSuccessStatusCode);
-        Assert.Equal("LegacyImport", (await preview.ReadJsonAsync())["data"]!["shippingSemantics"]!.GetValue<string>());
+        Assert.Equal("ManualFulfillment", (await preview.ReadJsonAsync())["data"]!["shippingSemantics"]!.GetValue<string>());
         Assert.Equal(0, await fixture.ExecuteDbAsync(db => db.Orders.CountAsync())); Assert.Equal(0, await fixture.ExecuteDbAsync(db => db.ShipmentCommandOutbox.CountAsync()));
     }
 }

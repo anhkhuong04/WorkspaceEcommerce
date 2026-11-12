@@ -79,6 +79,11 @@ public static class DependencyInjection
         services.AddScoped<IShippingRateStore, EfShippingRateStore>();
         services.AddScoped<IShippingCheckoutStore, EfShippingCheckoutStore>();
         services.AddHostedService<ShippingQuoteCleanupWorker>();
+        services.AddHostedService<OrderExpiryWorker>();
+        services.AddOptions<WorkspaceEcommerce.Application.Modules.Ordering.OrderExpiryOptions>()
+            .Bind(configuration.GetSection("OrderExpiry"))
+            .Validate(options => options.VNPayMinutes is >= 1 and <= 1440 && options.ManualTransferMinutes is >= 1 and <= 10080,
+                "Payment deadlines must be within the supported minute range.").ValidateOnStart();
         services.AddOptions<WorkspaceEcommerce.Application.Modules.Shipments.ShippingCheckoutOptions>()
             .Bind(configuration.GetSection("ShippingCheckout"))
             .Validate(x => x.QuoteLifetimeMinutes is >= 1 and <= 60 && x.UnusedQuoteRetentionDays is >= 1 and <= 365

@@ -7,13 +7,15 @@ import { useCustomerAuth } from "../../features/customer-auth/useCustomerAuth";
 import { getApiErrorMessage } from "../../services/api/errors";
 import { storefrontApi } from "../../services/api/storefrontApi";
 
-function StarIcon({ filled, onClick, className = "" }: { filled: boolean; onClick?: () => void; className?: string }) {
+function StarIcon({ filled, className = "" }: { filled: boolean; className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      onClick={onClick}
-      className={`h-5 w-5 ${onClick ? "cursor-pointer transition-transform hover:scale-110" : ""} ${
-        filled ? "fill-amber-400 text-amber-400" : "fill-slate-200 text-slate-200"
+      aria-hidden="true"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      className={`h-5 w-5 ${
+        filled ? "fill-amber-700 text-amber-700" : "fill-slate-100 text-slate-600"
       } ${className}`}
       xmlns="http://www.w3.org/2000/svg"
     >
@@ -77,7 +79,7 @@ export function ProductReviews({ slug }: { slug: string }) {
                     <StarIcon key={star} filled={star <= Math.round(reviewsData.averageRating)} />
                   ))}
                 </div>
-                <span className="mt-1 block text-sm font-semibold text-slate-500">
+                <span className="mt-1 block text-sm font-semibold text-slate-600">
                   {t("reviews.basedOn", { count: reviewsData.reviewCount })}
                 </span>
               </div>
@@ -92,33 +94,32 @@ export function ProductReviews({ slug }: { slug: string }) {
           {isAuthenticated ? (
             <form onSubmit={handleSubmit} className="mt-5 grid gap-5">
               {formError && (
-                <div className="rounded-[var(--radius-control)] bg-red-50 p-4 text-sm font-semibold text-red-700">
+                <div role="alert" className="rounded-[var(--radius-control)] bg-red-50 p-4 text-sm font-semibold text-red-700">
                   {formError}
                 </div>
               )}
               {formSuccess && (
-                <div className="rounded-[var(--radius-control)] bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">
+                <div role="status" className="rounded-[var(--radius-control)] bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">
                   {t("reviews.success")}
                 </div>
               )}
               
-              <div>
-                <label className="mb-2 block text-sm font-bold text-slate-700">{t("reviews.yourRating")}</label>
+              <fieldset disabled={submitReviewMutation.isPending}>
+                <legend className="mb-2 block text-sm font-bold text-slate-700">{t("reviews.yourRating")}</legend>
                 <div className="flex gap-1">
                   {[1, 2, 3, 4, 5].map((star) => (
-                    <StarIcon
-                      key={star}
-                      filled={star <= rating}
-                      onClick={() => setRating(star)}
-                      className="h-8 w-8"
-                    />
+                    <label key={star} className="relative grid h-11 w-11 cursor-pointer place-items-center rounded-md has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-slate-950">
+                      <input type="radio" name="review-rating" value={star} checked={rating === star} onChange={() => setRating(star)} className="sr-only" />
+                      <span className="sr-only">{t("reviews.starRating", { count: star })}</span>
+                      <StarIcon filled={star <= rating} className="h-8 w-8" />
+                    </label>
                   ))}
                 </div>
-              </div>
+              </fieldset>
               
               <div>
                 <label htmlFor="review-comment" className="mb-2 block text-sm font-bold text-slate-700">
-                  {t("reviews.yourReview")} <span className="text-slate-400 font-normal">({t("reviews.optional")})</span>
+                  {t("reviews.yourReview")} <span className="text-slate-600 font-normal">({t("reviews.optional")})</span>
                 </label>
                 <textarea
                   id="review-comment"
@@ -154,6 +155,7 @@ export function ProductReviews({ slug }: { slug: string }) {
       </div>
 
       <div className="min-w-0">
+        {reviewsQuery.isError && <div role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">{getApiErrorMessage(reviewsQuery.error)} <button type="button" onClick={() => void reviewsQuery.refetch()} className="min-h-11 underline">{t("common.retry")}</button></div>}
         {reviewsQuery.isLoading && (
           <div className="grid gap-6">
             {[1, 2, 3].map((i) => (
@@ -165,7 +167,7 @@ export function ProductReviews({ slug }: { slug: string }) {
         {reviewsData && reviewsData.reviews.length === 0 && (
           <div className="rounded-[var(--radius-card)] border border-dashed border-slate-200 bg-white p-12 text-center">
             <h3 className="text-lg font-black text-slate-900">{t("reviews.empty")}</h3>
-            <p className="mt-2 text-sm text-slate-500">{t("reviews.emptyHint")}</p>
+            <p className="mt-2 text-sm text-slate-600">{t("reviews.emptyHint")}</p>
           </div>
         )}
 
@@ -182,7 +184,7 @@ export function ProductReviews({ slug }: { slug: string }) {
                           <StarIcon key={star} filled={star <= review.rating} className="h-4 w-4" />
                         ))}
                       </div>
-                      <time dateTime={review.createdAt} className="text-xs font-semibold text-slate-500">
+                      <time dateTime={review.createdAt} className="text-xs font-semibold text-slate-600">
                         {new Date(review.createdAt).toLocaleDateString(i18n.resolvedLanguage === "vi" ? "vi-VN" : "en-US", { year: "numeric", month: "long", day: "numeric" })}
                       </time>
                     </div>

@@ -1,6 +1,8 @@
-﻿import { zodResolver } from "@hookform/resolvers/zod";
+import { formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "../../i18n-formatters";
+import storefrontI18n from "../../i18n";
+import { zodResolver } from "@hookform/resolvers/zod";
 import type { OrderDto, PaymentStatus, ShipmentTrackingDto } from "@workspace-ecommerce/api-types";
-import { downloadBlob, formatDate, formatMoney, formatOrderStatus, formatPaymentMethod, formatPaymentStatus } from "@workspace-ecommerce/shared-utils";
+import { downloadBlob, formatDate, formatMoney } from "@workspace-ecommerce/shared-utils";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
@@ -15,7 +17,7 @@ import { OrderShippingDetails } from "../../components/shipment/OrderShippingDet
 
 const lookupSchema = z.object({
   orderCode: z.string().min(1, "Order code is required."),
-  phone: z.string().min(8, "Phone number is invalid.")
+  phone: z.string().min(8, storefrontI18n.t("uiCopy.phone_number_is_invalid"))
 });
 
 type LookupFormValues = z.infer<typeof lookupSchema>;
@@ -36,10 +38,13 @@ const paymentStatusStyles: Record<PaymentStatus, string> = {
   2: "bg-emerald-100 text-emerald-800",
   3: "bg-red-100 text-red-800",
   4: "bg-slate-100 text-slate-700",
-  5: "bg-amber-100 text-amber-800"
+  5: "bg-amber-100 text-amber-800",
+  6: "bg-emerald-100 text-emerald-800",
+  7: "bg-amber-100 text-amber-800"
 };
 
 export function OrderLookupPage() {
+  useTranslation();
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const [result, setResult] = useState<OrderDto | null>(null);
@@ -102,7 +107,7 @@ export function OrderLookupPage() {
     <div className="grid gap-6">
       <PageHeader
         eyebrow="Order lookup"
-        title="Check your order status"
+        title={storefrontI18n.t("uiCopy.check_your_order_status")}
         description="Enter your order code and phone number to view the latest order details."
       />
 
@@ -142,7 +147,7 @@ export function OrderLookupPage() {
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-5">
             <div>
               <p className="font-mono text-2xl font-black text-slate-950">{result.orderCode}</p>
-              <p className="ui-body mt-1 text-slate-500">Created on {formatDate(result.createdAt)}</p>
+              <p className="ui-body mt-1 text-slate-600">Created on {formatDate(result.createdAt)}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -162,7 +167,7 @@ export function OrderLookupPage() {
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+                    <tr className="border-b border-slate-100 text-left text-xs font-bold uppercase tracking-[0.14em] text-slate-600">
                       <th className="pb-2 pr-4">Product</th>
                       <th className="pb-2 pr-4 text-center">Qty</th>
                       <th className="pb-2 pr-4 text-right">Unit price</th>
@@ -174,7 +179,7 @@ export function OrderLookupPage() {
                       <tr key={item.id}>
                         <td className="py-3 pr-4">
                           <p className="font-bold text-slate-950">{item.productNameSnapshot}</p>
-                          <p className="mt-0.5 font-mono text-xs text-slate-400">{item.skuSnapshot}</p>
+                          <p className="mt-0.5 font-mono text-xs text-slate-600">{item.skuSnapshot}</p>
                           {item.requiresInstallation && <span className="ui-caption mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">Installation required</span>}
                         </td>
                         <td className="py-3 pr-4 text-center font-bold text-slate-700">{item.quantity}</td>
@@ -187,8 +192,8 @@ export function OrderLookupPage() {
               </div>
 
               <div className="mt-4 grid gap-2 border-t border-slate-200 pt-4">
-                <div className="flex justify-between text-sm font-bold text-slate-500"><span>Subtotal</span><span>{formatMoney(result.subtotal)}</span></div>
-                {result.shippingFee > 0 && <div className="flex justify-between text-sm font-bold text-slate-500"><span>Shipping fee</span><span>{formatMoney(result.shippingFee)}</span></div>}
+                <div className="flex justify-between text-sm font-bold text-slate-600"><span>Subtotal</span><span>{formatMoney(result.subtotal)}</span></div>
+                {result.shippingFee > 0 && <div className="flex justify-between text-sm font-bold text-slate-600"><span>Shipping fee</span><span>{formatMoney(result.shippingFee)}</span></div>}
                 {result.discountAmount > 0 && <div className="flex justify-between text-sm font-bold text-emerald-600"><span>{formatDiscountLabel(result)}</span><span>-{formatMoney(result.discountAmount)}</span></div>}
                 <div className="flex justify-between text-xl font-black text-slate-950"><span>Total</span><span className="text-[var(--brand)]">{formatMoney(result.totalAmount)}</span></div>
               </div>
@@ -206,7 +211,7 @@ export function OrderLookupPage() {
               <div className="mt-2 grid gap-3 border-t border-slate-200 pt-3">
                 <SideInfoRow label="Payment" value={formatPaymentMethod(result.paymentMethod)} />
                 <div className="grid gap-0.5">
-                  <span className="ui-caption uppercase tracking-[0.14em] text-slate-400">Payment status</span>
+                  <span className="ui-caption uppercase tracking-[0.14em] text-slate-600">Payment status</span>
                   <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-black ${paymentStatusStyles[result.paymentStatus]}`}>
                     {formatPaymentStatus(result.paymentStatus)}
                   </span>
@@ -242,7 +247,7 @@ export function OrderLookupPage() {
 function SideInfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid gap-0.5">
-      <span className="ui-caption uppercase tracking-[0.14em] text-slate-400">{label}</span>
+      <span className="ui-caption uppercase tracking-[0.14em] text-slate-600">{label}</span>
       <span className="text-sm font-bold text-slate-800">{value}</span>
     </div>
   );

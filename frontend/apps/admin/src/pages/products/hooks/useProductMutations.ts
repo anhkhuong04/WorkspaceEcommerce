@@ -32,7 +32,7 @@ export function useProductMutations({
 
   const productSaveMutation = useMutation({
     mutationFn: (values: ProductFormValues) => {
-      const request = toProductRequest(values);
+      const request = toProductRequest(values, editingProduct);
       return editingProduct ? adminApi.updateProduct(editingProduct.id, request) : adminApi.createProduct(request);
     },
     onSuccess: async () => {
@@ -49,7 +49,7 @@ export function useProductMutations({
   });
 
   const productToggleMutation = useMutation({
-    mutationFn: (product: AdminProductDto) => adminApi.updateProduct(product.id, { ...toProductRequest(toProductFormValues(product)), isActive: !product.isActive }),
+    mutationFn: (product: AdminProductDto) => adminApi.updateProduct(product.id, { ...toProductRequest(toProductFormValues(product), product), isActive: !product.isActive }),
     onSuccess: async () => {
       await refreshProducts();
       setNotice({ type: "success", message: "Product status updated." });

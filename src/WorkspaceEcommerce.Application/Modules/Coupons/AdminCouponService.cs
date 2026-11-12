@@ -163,7 +163,14 @@ internal sealed class AdminCouponService(
         }
     }
 
-    public async Task<Result<AdminCouponDto>> UpdateCouponAsync(
+    public async Task<Result<AdminCouponDto>> UpdateCouponAsync(Guid id, UpdateCouponRequest request, CancellationToken cancellationToken = default)
+    {
+        Result<AdminCouponDto>? result = null;
+        await dbContext.ExecuteInTransactionAsync(async ct => { result = await UpdateCouponAsyncCore(id, request, ct); }, cancellationToken);
+        return result!;
+    }
+
+    private async Task<Result<AdminCouponDto>> UpdateCouponAsyncCore(
         Guid id,
         UpdateCouponRequest request,
         CancellationToken cancellationToken = default)
@@ -174,9 +181,7 @@ internal sealed class AdminCouponService(
             return Result<AdminCouponDto>.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
-        var coupon = await dbContext.Coupons
-            .Where(existing => existing.Id == id)
-            .FirstOrDefaultAsyncSafe(cancellationToken);
+        var coupon = await dbContext.FindCouponForUpdateAsync(id, cancellationToken);
         if (coupon is null)
         {
             return Result<AdminCouponDto>.NotFound("Coupon was not found.");
@@ -218,7 +223,6 @@ internal sealed class AdminCouponService(
             }
 
             await ReplaceProductTargetsAsync(coupon.Id, request.ProductTargetIds, cancellationToken);
-            dbContext.Update(coupon);
             await dbContext.SaveChangesAsync(cancellationToken);
 
             return Result<AdminCouponDto>.Success(ToDto(
@@ -232,7 +236,14 @@ internal sealed class AdminCouponService(
         }
     }
 
-    public async Task<Result<AdminCouponDto>> UpdateStatusAsync(
+    public async Task<Result<AdminCouponDto>> UpdateStatusAsync(Guid id, UpdateCouponStatusRequest request, CancellationToken cancellationToken = default)
+    {
+        Result<AdminCouponDto>? result = null;
+        await dbContext.ExecuteInTransactionAsync(async ct => { result = await UpdateStatusAsyncCore(id, request, ct); }, cancellationToken);
+        return result!;
+    }
+
+    private async Task<Result<AdminCouponDto>> UpdateStatusAsyncCore(
         Guid id,
         UpdateCouponStatusRequest request,
         CancellationToken cancellationToken = default)
@@ -243,9 +254,7 @@ internal sealed class AdminCouponService(
             return Result<AdminCouponDto>.Validation(validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
-        var coupon = await dbContext.Coupons
-            .Where(existing => existing.Id == id)
-            .FirstOrDefaultAsyncSafe(cancellationToken);
+        var coupon = await dbContext.FindCouponForUpdateAsync(id, cancellationToken);
         if (coupon is null)
         {
             return Result<AdminCouponDto>.NotFound("Coupon was not found.");
@@ -260,7 +269,6 @@ internal sealed class AdminCouponService(
             coupon.Deactivate();
         }
 
-        dbContext.Update(coupon);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result<AdminCouponDto>.Success(ToDto(
@@ -269,13 +277,18 @@ internal sealed class AdminCouponService(
             await GetRedemptionCountAsync(coupon.Id, cancellationToken)));
     }
 
-    public async Task<Result<AdminCouponDto>> DeleteCouponAsync(
+    public async Task<Result<AdminCouponDto>> DeleteCouponAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        Result<AdminCouponDto>? result = null;
+        await dbContext.ExecuteInTransactionAsync(async ct => { result = await DeleteCouponAsyncCore(id, ct); }, cancellationToken);
+        return result!;
+    }
+
+    private async Task<Result<AdminCouponDto>> DeleteCouponAsyncCore(
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var coupon = await dbContext.Coupons
-            .Where(existing => existing.Id == id)
-            .FirstOrDefaultAsyncSafe(cancellationToken);
+        var coupon = await dbContext.FindCouponForUpdateAsync(id, cancellationToken);
         if (coupon is null)
         {
             return Result<AdminCouponDto>.NotFound("Coupon was not found.");
@@ -289,7 +302,6 @@ internal sealed class AdminCouponService(
         if (hasUsageHistory)
         {
             coupon.Deactivate();
-            dbContext.Update(coupon);
             await dbContext.SaveChangesAsync(cancellationToken);
 
             return Result<AdminCouponDto>.Success(ToDto(coupon, productTargets, redemptionCount));

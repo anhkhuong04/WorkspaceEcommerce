@@ -4,6 +4,7 @@ namespace WorkspaceEcommerce.Application.Modules.Catalog.Products;
 
 public interface IAdminProductService
 {
+    Task<Result<PagedResult<AdminProductDto>>> GetProductsAsync(AdminProductListRequest request, CancellationToken cancellationToken = default);
     Task<Result<PagedResult<AdminProductDto>>> GetProductsAsync(
         PaginationRequest request,
         CancellationToken cancellationToken = default);

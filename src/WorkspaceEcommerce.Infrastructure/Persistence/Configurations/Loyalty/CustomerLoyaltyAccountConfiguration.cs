@@ -24,6 +24,7 @@ internal sealed class CustomerLoyaltyAccountConfiguration : IEntityTypeConfigura
         builder.Property(account => account.CurrentPoints)
             .HasColumnName("current_points")
             .IsRequired();
+        builder.Property(account => account.PointsDebt).HasColumnName("points_debt").HasDefaultValue(0);
 
         builder.Property(account => account.TotalPointsEarned)
             .HasColumnName("total_points_earned")

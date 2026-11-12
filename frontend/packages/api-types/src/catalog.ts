@@ -8,6 +8,7 @@ export interface StorefrontCategoryDto {
 }
 
 export interface StorefrontProductListItemDto {
+  variantCount?: number;
   id: string;
   categoryId: string;
   categoryName: string;

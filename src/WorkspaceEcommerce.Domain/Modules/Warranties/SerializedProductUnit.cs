@@ -110,9 +110,9 @@ public sealed class SerializedProductUnit : Entity
 
     public void MarkReturned(DateTimeOffset at)
     {
-        if (Status is SerializedProductUnitStatus.Voided or SerializedProductUnitStatus.Replaced)
+        if (Status is SerializedProductUnitStatus.Available or SerializedProductUnitStatus.Replaced)
         {
-            throw new DomainException("A voided or replaced product unit cannot be returned.");
+            throw new DomainException("An available or replaced product unit cannot be returned.");
         }
 
         Status = SerializedProductUnitStatus.Returned;

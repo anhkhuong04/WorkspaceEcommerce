@@ -30,7 +30,15 @@ public sealed class ShippingFoundationMigrationTests
         await using (var context = new AppDbContext(options))
         {
             await context.GetService<IMigrator>().MigrateAsync("20260924001622_EnforceWarrantyCoverageSnapshotIdentity");
-            context.Add(order);
+            // Seed the historical schema explicitly; today's EF model contains additive columns.
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO ordering.orders
+                (id, order_code, customer_name, customer_phone, shipping_address, payment_method, payment_status,
+                 status, currency_code, exchange_rate, subtotal, shipping_fee, discount_amount, total_amount,
+                 paid_at, created_at, updated_at, tracking_code, shipment_id)
+                VALUES ({order.Id}, {order.OrderCode}, {order.CustomerName}, {order.CustomerPhone}, {order.ShippingAddress},
+                        'VNPay', 'Paid', 'Pending', 'VND', 1, 0, 12345, 0, 12345, {now}, {now}, {now}, 'LEGACY-TRACKING', {providerId})
+                """);
             var payment = new PaymentTransaction(Guid.NewGuid(), order.Id, PaymentProvider.VNPay, 12345, "VND", "LEGACY-TXN");
             payment.MarkSuccess("synthetic", "00", "success", null, null, now);
             context.Add(payment);

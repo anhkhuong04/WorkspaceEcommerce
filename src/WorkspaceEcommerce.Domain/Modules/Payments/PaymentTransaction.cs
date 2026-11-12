@@ -101,6 +101,16 @@ public sealed class PaymentTransaction : Entity
         Status = PaymentTransactionStatus.Failed;
     }
 
+    public void RecordCaptureAfterOrderCancellation(string? gatewayTransactionNo, string? responseCode,
+        string? secureHash, string rawResponse, DateTimeOffset processedAt)
+    {
+        if (Status != PaymentTransactionStatus.Cancelled || GatewayResponseCode != "ORDER_CANCELLED")
+            throw new DomainException("Only a locally cancelled payment can record a late capture.");
+        RecordGatewayResult(gatewayTransactionNo, responseCode,
+            "Payment captured after order cancellation. Refund reconciliation is required.", secureHash, rawResponse, processedAt);
+        Status = PaymentTransactionStatus.Success;
+    }
+
     public void MarkCancelled(
         string? gatewayTransactionNo,
         string? gatewayResponseCode,

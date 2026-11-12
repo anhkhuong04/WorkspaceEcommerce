@@ -20,6 +20,40 @@ public sealed class ShipmentWebhookIntegrationTests(ApiIntegrationTestFixture fi
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
+    public async Task ProviderCancellation_RestoresUnshippedStockAndCancelsPayment_ExactlyOnce()
+    {
+        var catalog = TestData.CreateVisibleCatalog(); catalog.Variant.DecreaseStock(2);
+        var order = CreateOrder(); order.AddItem(Guid.NewGuid(), catalog.Variant.Id, "Desk", catalog.Variant.Sku, 100_000m, 2, false);
+        var shipment = CreateShipment(order);
+        await fixture.SeedAsync(db => { db.AddRange(catalog.Category, catalog.Product, catalog.Variant, order, shipment); return Task.CompletedTask; });
+        var payload = new ShipmentWebhookPayload(Guid.NewGuid(), ShipmentProviderContract.ShipmentStatusChangedEvent,
+            shipment.TrackingCode, order.OrderCode, "Cancelled", DateTimeOffset.UtcNow);
+        using var client = fixture.CreateClient();
+        using var first = await SendWebhookAsync(client, payload, DateTimeOffset.UtcNow, true);
+        using var repeated = await SendWebhookAsync(client, payload, DateTimeOffset.UtcNow, true);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode); Assert.Equal(HttpStatusCode.OK, repeated.StatusCode);
+        Assert.Equal(10, await fixture.ExecuteDbAsync(db => Task.FromResult(db.ProductVariants.Single().StockQuantity)));
+        var saved = await fixture.ExecuteDbAsync(db => Task.FromResult(db.Orders.Single()));
+        Assert.Equal(OrderStatus.Cancelled, saved.Status); Assert.Equal(PaymentStatus.Cancelled, saved.PaymentStatus);
+    }
+
+    [Fact]
+    public async Task Redelivery_CanCompleteAfterFailure_AndRepeatedDeliveryDoesNotRepeatSideEffects()
+    {
+        var order = CreateOrder(); var shipment = CreateShipment(order);
+        foreach (var status in new[] { OrderStatus.Confirmed, OrderStatus.Processing, OrderStatus.Shipping, OrderStatus.FailedDelivery })
+            order.ChangeStatus(Guid.NewGuid(), status, "Test failed delivery", "test");
+        await fixture.SeedAsync(db => { db.AddRange(order, shipment); return Task.CompletedTask; });
+        using var client = fixture.CreateClient();
+        var payload = new ShipmentWebhookPayload(Guid.NewGuid(), ShipmentProviderContract.ShipmentStatusChangedEvent,
+            shipment.TrackingCode, order.OrderCode, "Delivered", DateTimeOffset.UtcNow);
+        using var first = await SendWebhookAsync(client, payload, DateTimeOffset.UtcNow, true);
+        using var repeated = await SendWebhookAsync(client, payload, DateTimeOffset.UtcNow, true);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode); Assert.Equal(HttpStatusCode.OK, repeated.StatusCode);
+        Assert.Equal(OrderStatus.Completed, await fixture.ExecuteDbAsync(db => Task.FromResult(db.Orders.Single().Status)));
+    }
+
+    [Fact]
     public async Task Webhook_ValidSignature_UpdatesLocalShipmentAndOrder()
     {
         var order = CreateOrder();

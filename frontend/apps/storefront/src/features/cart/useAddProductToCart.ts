@@ -1,14 +1,20 @@
 import { useMutation } from "@tanstack/react-query";
 import type { RefObject } from "react";
+import { useNavigate } from "react-router-dom";
 import { storefrontApi } from "../../services/api/storefrontApi";
 import { useStorefrontCart } from "./StorefrontCartContext";
 
 export function useAddProductToCart(returnFocusRef?: RefObject<HTMLElement | null>) {
   const { cartSessionId, openCartDrawer } = useStorefrontCart();
+  const navigate = useNavigate();
 
   return useMutation({
     mutationFn: async (productSlug: string) => {
       const product = await storefrontApi.getProduct(productSlug);
+      if (product.variants.length !== 1) {
+        navigate(`/products/${encodeURIComponent(productSlug)}`);
+        return null;
+      }
       const variant = product.variants.find((item) => item.stockQuantity > 0);
 
       if (!variant) {
@@ -22,7 +28,7 @@ export function useAddProductToCart(returnFocusRef?: RefObject<HTMLElement | nul
       });
     },
     onSuccess: (nextCart) => {
-      openCartDrawer(nextCart, returnFocusRef?.current ?? undefined);
+      if (nextCart) openCartDrawer(nextCart, returnFocusRef?.current ?? undefined);
     }
   });
 }

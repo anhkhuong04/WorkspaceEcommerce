@@ -38,7 +38,7 @@ public sealed partial class ShippingCheckoutIntegrationTests(ApiIntegrationTestF
     {
         services.RemoveAll<IShipmentService>(); services.AddSingleton<IShipmentService>(carrier);
         foreach (var worker in services.Where(x => x.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)
-            && x.ImplementationType?.Name == "ShipmentCommandWorker").ToArray()) services.Remove(worker);
+            && x.ImplementationType?.Name is "ShipmentCommandWorker" or "OrderExpiryWorker").ToArray()) services.Remove(worker);
     }));
 
     [Fact]
@@ -128,6 +128,7 @@ public sealed partial class ShippingCheckoutIntegrationTests(ApiIntegrationTestF
         public decimal Charge = 33000;
         public CreateShipmentRequest? LastCreate;
         public Func<Task>? BeforeCreate;
+        public Func<Task<TrackingResponse>>? Tracking;
         public Task<ShippingQuoteResponse> GetShippingQuoteAsync(ShippingQuoteRequest request, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref Calls);
@@ -140,7 +141,7 @@ public sealed partial class ShippingCheckoutIntegrationTests(ApiIntegrationTestF
             if (BeforeCreate is not null) await BeforeCreate();
             return new CreateShipmentResponse { ShipmentId = Guid.NewGuid(), ExternalOrderId = request.ExternalOrderId, TrackingCode = "SYNTHETIC-TRACKING", Status = "Draft", ShippingFeeAmount = Charge, Currency = "VND" };
         }
-        public Task<TrackingResponse> GetTrackingAsync(string trackingCode, CancellationToken cancellationToken = default) => Fail<TrackingResponse>();
+        public Task<TrackingResponse> GetTrackingAsync(string trackingCode, CancellationToken cancellationToken = default) => Tracking is null ? Fail<TrackingResponse>() : Tracking();
         public Task<TrackingResponse> CancelShipmentAsync(string trackingCode, string reason, CancellationToken cancellationToken = default) => Fail<TrackingResponse>();
         private Task<T> Fail<T>() { Interlocked.Increment(ref Calls); return Task.FromException<T>(new HttpRequestException("Synthetic outage")); }
     }

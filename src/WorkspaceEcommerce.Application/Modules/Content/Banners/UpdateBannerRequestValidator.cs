@@ -7,7 +7,6 @@ public sealed class UpdateBannerRequestValidator : AbstractValidator<UpdateBanne
     public UpdateBannerRequestValidator()
     {
         RuleFor(request => request.Title)
-            .NotEmpty()
             .MaximumLength(250);
 
         RuleFor(request => request.ImageUrl)

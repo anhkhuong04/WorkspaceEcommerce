@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using WorkspaceEcommerce.Api.Common;
 using WorkspaceEcommerce.Api.Extensions;
 using WorkspaceEcommerce.Application.Common.Models;
@@ -21,7 +22,7 @@ public sealed class ProductsController(
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetProducts(
-        [FromQuery] PaginationRequest request,
+        [FromQuery] AdminProductListRequest request,
         CancellationToken cancellationToken)
     {
         var result = await productService.GetProductsAsync(request, cancellationToken);
@@ -103,10 +104,14 @@ public sealed class ProductsController(
         [FromBody] UpdateProductVariantRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await variantService.UpdateVariantAsync(id, request, cancellationToken);
+        var result = await variantService.UpdateVariantAsync(id, request, cancellationToken, User.FindFirstValue(ClaimTypes.Name) ?? User.Identity?.Name ?? "Admin");
 
         return this.ToApiResponse(result);
     }
+
+    [HttpGet("api/admin/product-variants/{id:guid}/stock-history")]
+    public async Task<IActionResult> StockHistory(Guid id, [FromQuery] int pageNumber = 1, CancellationToken cancellationToken = default) =>
+        this.ToApiResponse(await variantService.GetStockHistoryAsync(id, pageNumber, cancellationToken));
 
     [HttpPost("api/admin/products/{id:guid}/images")]
     [ProducesResponseType(typeof(ApiResponse<AdminProductImageDto>), StatusCodes.Status201Created)]

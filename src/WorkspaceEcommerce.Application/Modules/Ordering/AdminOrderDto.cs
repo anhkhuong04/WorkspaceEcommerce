@@ -29,5 +29,10 @@ public sealed record AdminOrderDto(
     IReadOnlyCollection<OrderItemDto> Items,
     IReadOnlyCollection<AdminOrderStatusHistoryDto> StatusHistory)
 {
+    public string? ImportSource { get; init; }
+    public decimal RefundedAmount { get; init; }
+    public DateTimeOffset? PaymentDueAt { get; init; }
     public Shipments.OrderShippingDetailsDto? Shipping { get; init; }
+    public DateTimeOffset? ReturnRequestedAt { get; init; }
+    public string? ReturnReason { get; init; }
 }

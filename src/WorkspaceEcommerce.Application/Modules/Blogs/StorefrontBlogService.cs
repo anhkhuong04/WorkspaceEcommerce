@@ -42,7 +42,7 @@ internal sealed class StorefrontBlogService(
                 p.ImageUrl,
                 p.PublishedAt,
                 Array.Empty<StorefrontProductListItemDto>(),
-                Array.Empty<BlogCommentDto>()))
+                Array.Empty<PublicBlogCommentDto>()))
             .ToArrayAsyncSafe(cancellationToken);
 
         return Result<IReadOnlyCollection<StorefrontBlogPostDto>>.Success(dtos);
@@ -73,7 +73,7 @@ internal sealed class StorefrontBlogService(
             .OrderByDescending(c => c.CreatedAt)
             .ThenByDescending(c => c.Id)
             .Take(MaxBlogComments)
-            .Select(c => ToCommentDto(c))
+            .Select(c => new PublicBlogCommentDto(c.Id, c.AuthorName, c.Content, c.CreatedAt))
             .ToArrayAsyncSafe(cancellationToken);
 
         var dto = new StorefrontBlogPostDto(
@@ -177,7 +177,7 @@ internal sealed class StorefrontBlogService(
 
             var activeVariants = variants[product.Id].ToArray();
             decimal? minPrice = activeVariants.Length == 0 ? null : activeVariants.Min(v => v.Price);
-            decimal? compareAtPrice = activeVariants.Length == 0 ? null : activeVariants.Where(v => v.CompareAtPrice != null).Max(v => v.CompareAtPrice);
+            decimal? compareAtPrice = activeVariants.OrderBy(v => v.Price).ThenBy(v => v.Sku).FirstOrDefault()?.CompareAtPrice;
 
             var primaryImage = images[product.Id]
                 .OrderBy(img => img.SortOrder)
@@ -195,23 +195,10 @@ internal sealed class StorefrontBlogService(
                 minPrice,
                 compareAtPrice,
                 activeVariants.Any(v => v.StockQuantity > 0),
-                primaryImage?.ImageUrl));
+                primaryImage?.ImageUrl) { VariantCount = activeVariants.Length });
         }
 
         return list;
     }
 
-    private static BlogCommentDto ToCommentDto(BlogComment comment)
-    {
-        return new BlogCommentDto(
-            comment.Id,
-            comment.BlogPostId,
-            comment.AuthorName,
-            comment.AuthorEmail,
-            comment.Content,
-            comment.ModerationStatus,
-            comment.CreatedAt,
-            comment.ModeratedAt,
-            comment.ModeratedBy);
-    }
 }

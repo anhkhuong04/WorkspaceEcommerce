@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useBeforeUnload, useBlocker } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   SaveShippingRatePlanRequest,
@@ -29,6 +30,8 @@ export function ShippingRatesPage() {
   const [action, setAction] = useState<"publish" | "retire" | null>(null);
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [pendingSelection, setPendingSelection] = useState<{ id: string | null } | null>(null);
+  const [editorVersion, setEditorVersion] = useState(0);
   const catalog = useShippingCatalog();
   const plans = useShippingRates(page);
   const active = useQuery({
@@ -80,7 +83,8 @@ export function ShippingRatesPage() {
     },
     onSuccess: refresh,
   });
-  function select(value: string | null) {
+  function applySelection(value: string | null) {
+    setEditorVersion(version => version + 1);
     setId(value);
     setCreating(value === null);
     setPreview(null);
@@ -90,20 +94,28 @@ export function ShippingRatesPage() {
     lifecycle.reset();
   }
   const busy = save.isPending || lifecycle.isPending;
+  const blocker = useBlocker(dirty || busy);
+  useEffect(() => { if (!dirty && !busy && blocker.state === "blocked") blocker.proceed(); }, [dirty, busy, blocker]);
+  useBeforeUnload(useCallback(event => {
+    if (dirty || busy) { event.preventDefault(); event.returnValue = ""; }
+  }, [dirty, busy]));
+  function select(value: string | null) {
+    if (busy) return;
+    if (dirty) setPendingSelection({ id: value }); else applySelection(value);
+  }
   const error = save.error ?? lifecycle.error;
   return (
     <div className="admin-page-grid">
       <AdminPageHeader
-        title="Vận chuyển / Shipping rates"
+        title="Shipping rates"
         description="WorkspaceEC zones, versioned rates and readiness. Prices use whole VND; weights use grams."
-        actions={<Button onClick={() => select(null)}>New rate plan</Button>}
+        actions={<Button disabled={busy} onClick={() => select(null)}>New rate plan</Button>}
       />
       {saved && <Notice type="success" title="Shipping configuration saved" />}
       {error && (
         <Notice type="error" title={getApiErrorMessage(error)}>
           <p>
-            For a version conflict, reload the latest revision and review your
-            changes before retrying.
+            Reloading replaces the unsaved draft with the latest revision. Review and reapply your changes before retrying.
           </p>
           <Button
             onClick={() => {
@@ -139,6 +151,7 @@ export function ShippingRatesPage() {
         {plans.data?.items.map((p) => (
           <Button
             key={p.id}
+            disabled={busy}
             onClick={() => select(p.id)}
             aria-pressed={p.id === id}
           >
@@ -190,7 +203,7 @@ export function ShippingRatesPage() {
           )}
           {creating || plan?.status === 0 ? (
             <RatePlanEditor
-              key={creating ? "new" : `${plan!.id}:${plan!.revision}`}
+              key={`${creating ? "new" : `${plan!.id}:${plan!.revision}`}:${editorVersion}`}
               plan={creating ? null : plan!}
               catalog={catalog.data}
               busy={busy}
@@ -267,6 +280,8 @@ export function ShippingRatesPage() {
             plan={plan}
             catalog={catalog.data}
             onPreview={setPreview}
+            onInvalidate={() => setPreview(null)}
+            busy={busy}
           />
           <RatePlanHistory key={plan.id} id={plan.id} />
         </>
@@ -298,6 +313,16 @@ export function ShippingRatesPage() {
           </Button>
         </div>
       </section>
+      <ConfirmDialog
+        open={pendingSelection !== null || blocker.state === "blocked"}
+        title={busy ? "Saving shipping changes" : "Discard unsaved changes?"}
+        message={busy ? "Wait for the current operation to finish before leaving this page." : "Your draft edits have not been saved. Discard them and continue?"}
+        confirmLabel="Discard and continue" busy={busy}
+        onCancel={() => { setPendingSelection(null); if (blocker.state === "blocked") blocker.reset(); }}
+        onConfirm={() => {
+          if (pendingSelection) { applySelection(pendingSelection.id); setPendingSelection(null); }
+          if (blocker.state === "blocked") blocker.proceed();
+        }} />
       <ConfirmDialog
         open={action !== null}
         title={

@@ -526,6 +526,47 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                     b.ToTable("product_variants", "catalog");
                 });
 
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Catalog.StockAdjustment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("actor");
+
+                    b.Property<int>("AfterQuantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("after_quantity");
+
+                    b.Property<int>("BeforeQuantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("before_quantity");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("ProductVariantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_variant_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductVariantId", "OccurredAt");
+
+                    b.ToTable("stock_adjustments", "catalog");
+                });
+
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Content.Banner", b =>
                 {
                     b.Property<Guid>("Id")
@@ -755,6 +796,10 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("RedeemedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("redeemed_at");
+
+                    b.Property<DateTimeOffset?>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("released_at");
 
                     b.HasKey("Id");
 
@@ -1282,6 +1327,12 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("customer_id");
 
+                    b.Property<int>("PointsDebt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("points_debt");
+
                     b.Property<DateTimeOffset>("TierUpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("tier_updated_at");
@@ -1640,6 +1691,21 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,6)")
                         .HasColumnName("exchange_rate");
 
+                    b.Property<string>("ExternalOrderCode")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("external_order_code");
+
+                    b.Property<string>("ImportFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("import_fingerprint");
+
+                    b.Property<string>("ImportSource")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("import_source");
+
                     b.Property<string>("Note")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
@@ -1655,6 +1721,10 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("paid_at");
 
+                    b.Property<DateTimeOffset?>("PaymentDueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("payment_due_at");
+
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -1666,6 +1736,36 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("payment_status");
+
+                    b.Property<decimal>("RefundedAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("refunded_amount");
+
+                    b.Property<string>("ReturnDecision")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("return_decision");
+
+                    b.Property<string>("ReturnDecisionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("return_decision_reason");
+
+                    b.Property<string>("ReturnReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("return_reason");
+
+                    b.Property<DateTimeOffset?>("ReturnRequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("return_requested_at");
+
+                    b.Property<DateTimeOffset?>("ReturnReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("return_reviewed_at");
 
                     b.Property<Guid?>("ShipmentId")
                         .HasColumnType("uuid")
@@ -1751,6 +1851,14 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ux_orders_tracking_code")
                         .HasFilter("tracking_code IS NOT NULL");
 
+                    b.HasIndex("ImportSource", "ExternalOrderCode")
+                        .IsUnique()
+                        .HasDatabaseName("ux_orders_import_identity")
+                        .HasFilter("import_source IS NOT NULL AND external_order_code IS NOT NULL");
+
+                    b.HasIndex("PaymentDueAt", "Status")
+                        .HasFilter("payment_due_at IS NOT NULL");
+
                     b.HasIndex("CustomerId", "CreatedAt", "OrderCode")
                         .HasDatabaseName("ix_orders_customer_created_order_code");
 
@@ -1818,6 +1926,199 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                     b.ToTable("order_items", "ordering");
                 });
 
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.OrderReturnAudit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("actor");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("ReturnCaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("return_case_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReturnCaseId", "OccurredAt");
+
+                    b.ToTable("order_return_audits", "ordering");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.OrderReturnCase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<decimal>("MerchandiseRefund")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("merchandise_refund");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("ReceiptFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("receipt_fingerprint");
+
+                    b.Property<DateTimeOffset?>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<string>("RefundActor")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("refund_actor");
+
+                    b.Property<string>("RefundReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("refund_reason");
+
+                    b.Property<string>("RefundReference")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("refund_reference");
+
+                    b.Property<DateTimeOffset?>("RefundedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("refunded_at");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<string>("RequestFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("request_fingerprint");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<decimal>("ShippingRefund")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("shipping_refund");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId", "RefundReference")
+                        .IsUnique()
+                        .HasFilter("refund_reference IS NOT NULL");
+
+                    b.HasIndex("OrderId", "RequestId")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("order_returns", "ordering");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.OrderReturnLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Inspection")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("inspection");
+
+                    b.Property<Guid>("OrderItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_item_id");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<int>("ReceivedQuantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("received_quantity");
+
+                    b.Property<decimal>("RefundAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("refund_amount");
+
+                    b.Property<int>("RestockQuantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("restock_quantity");
+
+                    b.Property<Guid>("ReturnCaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("return_case_id");
+
+                    b.PrimitiveCollection<Guid[]>("SerializedUnitIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("serialized_unit_ids");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderItemId");
+
+                    b.HasIndex("ReturnCaseId", "OrderItemId")
+                        .IsUnique();
+
+                    b.ToTable("order_return_lines", "ordering");
+                });
+
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.OrderStatusHistory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1872,6 +2173,94 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_order_status_history_order_id");
 
                     b.ToTable("order_status_history", "ordering");
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Payments.OrderPaymentException", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("actor");
+
+                    b.Property<decimal>("ActualAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("actual_amount");
+
+                    b.Property<decimal>("ExpectedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("expected_amount");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("reference");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<DateTimeOffset?>("SettledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("settled_at");
+
+                    b.Property<string>("SettledBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("settled_by");
+
+                    b.Property<string>("Settlement")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("settlement");
+
+                    b.Property<decimal?>("SettlementAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("settlement_amount");
+
+                    b.Property<string>("SettlementReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("settlement_reason");
+
+                    b.Property<string>("SettlementReference")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("settlement_reference");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SettledAt");
+
+                    b.HasIndex("OrderId", "Reference")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId", "RequestId")
+                        .IsUnique();
+
+                    b.ToTable("order_payment_exceptions", "payments");
                 });
 
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Payments.OrderPaymentReceipt", b =>
@@ -1935,7 +2324,7 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_order_payment_receipt_amount", "amount >= 0 AND currency = 'VND'");
 
-                            t.HasCheckConstraint("ck_order_payment_receipt_kind", "kind IN ('ManualTransfer', 'CodCollected', 'CodRemitted')");
+                            t.HasCheckConstraint("ck_order_payment_receipt_kind", "kind IN ('ManualTransfer', 'CodCollected', 'CodRemitted', 'FullRefund')");
                         });
                 });
 
@@ -3352,6 +3741,15 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Catalog.StockAdjustment", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Catalog.ProductVariant", null)
+                        .WithMany()
+                        .HasForeignKey("ProductVariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Coupons.Coupon", b =>
                 {
                     b.HasOne("WorkspaceEcommerce.Domain.Modules.Customers.Customer", null)
@@ -3487,12 +3885,54 @@ namespace WorkspaceEcommerce.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.OrderReturnAudit", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Ordering.OrderReturnCase", null)
+                        .WithMany()
+                        .HasForeignKey("ReturnCaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.OrderReturnCase", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Ordering.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.OrderReturnLine", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Ordering.OrderItem", null)
+                        .WithMany()
+                        .HasForeignKey("OrderItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Ordering.OrderReturnCase", null)
+                        .WithMany()
+                        .HasForeignKey("ReturnCaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Ordering.OrderStatusHistory", b =>
                 {
                     b.HasOne("WorkspaceEcommerce.Domain.Modules.Ordering.Order", null)
                         .WithMany("StatusHistory")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WorkspaceEcommerce.Domain.Modules.Payments.OrderPaymentException", b =>
+                {
+                    b.HasOne("WorkspaceEcommerce.Domain.Modules.Ordering.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

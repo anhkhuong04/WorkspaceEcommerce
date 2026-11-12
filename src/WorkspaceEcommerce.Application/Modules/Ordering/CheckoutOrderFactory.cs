@@ -5,7 +5,7 @@ using WorkspaceEcommerce.Domain.Modules.Ordering;
 namespace WorkspaceEcommerce.Application.Modules.Ordering;
 
 internal sealed class CheckoutOrderFactory(
-    ICheckoutStore checkoutStore)
+    ICheckoutStore checkoutStore, OrderExpiryOptions? expiryOptions = null)
 {
     public async Task<Order> CreateAsync(
         CheckoutRequest request,
@@ -29,6 +29,11 @@ internal sealed class CheckoutOrderFactory(
             request.PaymentMethod,
             CommerceCurrency.Code,
             CommerceCurrency.BaseExchangeRate);
+        if (order.PaymentMethod != PaymentMethod.Cod)
+        {
+            var deadlines = expiryOptions ?? new OrderExpiryOptions();
+            order.SetPaymentDeadline(order.CreatedAt.AddMinutes(order.PaymentMethod == PaymentMethod.VNPay ? deadlines.VNPayMinutes : deadlines.ManualTransferMinutes));
+        }
         order.SetShippingAddressDetails(
             request.ShippingStreet,
             request.ShippingWard,

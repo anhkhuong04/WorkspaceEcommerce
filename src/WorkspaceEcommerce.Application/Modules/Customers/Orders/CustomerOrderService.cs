@@ -18,7 +18,7 @@ internal sealed class CustomerOrderService(
     INotificationService notificationService,
     IValidator<CustomerOrderListRequest> listValidator,
     IOrderShipmentService? shipmentService = null,
-    IFulfillmentCoordinator? fulfillment = null, IOrderShippingReader? shippingReader = null) : ICustomerOrderService
+    IFulfillmentCoordinator? fulfillment = null, IOrderShippingReader? shippingReader = null, TimeProvider? clock = null) : ICustomerOrderService
 {
     public async Task<Result<PagedResult<CustomerOrderListItemDto>>> GetOrdersAsync(
         CustomerOrderListRequest request,
@@ -152,6 +152,7 @@ internal sealed class CustomerOrderService(
                     return;
                 }
 
+                var previousStatus = order.Status;
                 var history = order.ChangeStatus(
                     Guid.NewGuid(),
                     OrderStatus.Cancelled,
@@ -161,8 +162,8 @@ internal sealed class CustomerOrderService(
                     changedBy: "Customer");
                 dbContext.Add(history);
 
-                await RestoreInventoryAsync(order.Id, transactionCancellationToken);
-                CancelOrOpenRefundWorkflow(order, pendingPaymentTransactions, cancellationReason);
+                await OrderCancellationEffects.ApplyAsync(dbContext, order, previousStatus, pendingPaymentTransactions,
+                    cancellationReason, DateTimeOffset.UtcNow, transactionCancellationToken);
                 if (fulfillment is not null && await fulfillment.MethodAsync(order.Id, transactionCancellationToken) is not null)
                     await fulfillment.CancelAsync(order, cancellationReason, transactionCancellationToken, $"customer:{customerId.Value}");
                 await dbContext.SaveChangesAsync(transactionCancellationToken);
@@ -205,52 +206,6 @@ internal sealed class CustomerOrderService(
         return Result<CustomerOrderDto>.Success(await ToDetailDtoAsync(order, customerId.Value, cancellationToken));
     }
 
-    private async Task RestoreInventoryAsync(Guid orderId, CancellationToken cancellationToken)
-    {
-        var orderItems = await dbContext.OrderItems
-            .Where(item => item.OrderId == orderId)
-            .ToArrayAsyncSafe(cancellationToken);
-        var variantIds = orderItems.Select(item => item.ProductVariantId).Distinct().ToArray();
-        var variantsById = (await dbContext.FindProductVariantsForUpdateAsync(variantIds, cancellationToken))
-            .ToDictionary(variant => variant.Id);
-
-        foreach (var orderItem in orderItems)
-        {
-            if (variantsById.TryGetValue(orderItem.ProductVariantId, out var variant))
-            {
-                variant.RestoreStock(orderItem.Quantity);
-            }
-        }
-    }
-
-    private static void CancelOrOpenRefundWorkflow(
-        Order order,
-        IReadOnlyCollection<PaymentTransaction> pendingPaymentTransactions,
-        string cancellationReason)
-    {
-        if (order.PaymentStatus == PaymentStatus.Paid)
-        {
-            order.MarkPaymentRefundPending();
-            return;
-        }
-
-        foreach (var transaction in pendingPaymentTransactions)
-        {
-            transaction.MarkCancelled(
-                gatewayTransactionNo: null,
-                gatewayResponseCode: "ORDER_CANCELLED",
-                gatewayResponseMessage: cancellationReason,
-                secureHash: null,
-                rawResponse: null,
-                processedAt: DateTimeOffset.UtcNow);
-        }
-
-        if (order.PaymentStatus != PaymentStatus.Cancelled)
-        {
-            order.MarkPaymentCancelled();
-        }
-    }
-
     public async Task<Result<CustomerOrderDto>> RequestReturnAsync(
         Guid id,
         string reason,
@@ -264,38 +219,24 @@ internal sealed class CustomerOrderService(
             return Result<CustomerOrderDto>.Unauthorized("Customer authentication is required.");
         }
 
-        var order = await dbContext.Orders
-            .Where(existing => existing.Id == id && existing.CustomerId == customerId.Value)
-            .FirstOrDefaultAsyncSafe(cancellationToken);
-        if (order is null)
+        Order? order = null;
+        try
         {
-            return Result<CustomerOrderDto>.NotFound("Order was not found.");
+            await dbContext.ExecuteInTransactionAsync(async ct =>
+            {
+                order = await dbContext.FindOrderForUpdateAsync(id, ct);
+                if (order is null || order.CustomerId != customerId) { order = null; return; }
+                if (order.RequestReturn(reason, (clock ?? TimeProvider.System).GetUtcNow()))
+                {
+                    dbContext.Add(new OrderStatusHistory(Guid.NewGuid(), order.Id, order.Status, order.Status,
+                        internalNote: "Return request awaiting staff review; goods and money have not been returned.",
+                        cancellationReason: null, customerMessage: "Return requested: " + order.ReturnReason, changedBy: "Customer"));
+                    await dbContext.SaveChangesAsync(ct);
+                }
+            }, cancellationToken);
         }
-
-        if (order.Status != OrderStatus.Completed)
-        {
-            return Result<CustomerOrderDto>.Failure("Only completed orders can be returned.");
-        }
-
-        var returnNote = string.IsNullOrWhiteSpace(reason)
-            ? "Return requested by customer."
-            : $"Return requested: {reason.Trim()}";
-
-        order.ChangeStatus(
-            Guid.NewGuid(),
-            OrderStatus.Returned,
-            internalNote: null,
-            cancellationReason: null,
-            customerMessage: returnNote,
-            changedBy: "Customer");
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        await notificationService.NotifyCustomerAsync(
-            customerId.Value,
-            "order_status_changed",
-            new { orderId = order.Id, orderCode = order.OrderCode, newStatus = (int)order.Status },
-            cancellationToken);
+        catch (DomainException exception) { return Result<CustomerOrderDto>.Conflict(exception.Message); }
+        if (order is null) return Result<CustomerOrderDto>.NotFound("Order was not found.");
 
         return Result<CustomerOrderDto>.Success(await ToDetailDtoAsync(order, customerId.Value, cancellationToken));
     }
@@ -345,7 +286,7 @@ internal sealed class CustomerOrderService(
             order.TrackingCode,
             order.ShipmentId,
             items,
-            statusHistory) { Shipping = shippingReader is null ? null : await shippingReader.GetAsync(order.Id, cancellationToken) };
+            statusHistory) { PaymentDueAt = order.PaymentDueAt, CanRequestReturn = order.Status == OrderStatus.Completed && order.ReturnRequestedAt is null && order.CompletedAt.HasValue && order.CompletedAt.Value.AddDays(7) >= (clock ?? TimeProvider.System).GetUtcNow(), ReturnRequestedAt = order.ReturnRequestedAt, ReturnReviewedAt = order.ReturnReviewedAt, ReturnDecision = order.ReturnDecision, ReturnDecisionReason = order.ReturnDecisionReason, RefundedAmount = order.RefundedAmount, ReturnReason = order.ReturnReason, ReturnRequestDeadline = order.CompletedAt?.AddDays(7), Shipping = shippingReader is null ? null : await shippingReader.GetAsync(order.Id, cancellationToken) };
     }
 
     private static OrderItemDto ToItemDto(OrderItem item)

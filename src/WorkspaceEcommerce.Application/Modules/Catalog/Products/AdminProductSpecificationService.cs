@@ -40,7 +40,6 @@ internal sealed class AdminProductSpecificationService(
                 request.Value,
                 request.SortOrder);
 
-            writeStore.Update(product);
             writeStore.Add(specification);
             await writeStore.SaveChangesAsync(cancellationToken);
 

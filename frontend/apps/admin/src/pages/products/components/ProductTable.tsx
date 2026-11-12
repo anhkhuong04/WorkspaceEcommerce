@@ -1,7 +1,32 @@
-import type { AdminProductDto, AdminProductImageDto, AdminProductSpecificationDto, AdminProductVariantDto } from "@workspace-ecommerce/api-types";
+import type {
+  AdminProductDto,
+  AdminProductImageDto,
+  AdminProductSpecificationDto,
+  AdminProductVariantDto,
+} from "@workspace-ecommerce/api-types";
 import { formatMoney } from "@workspace-ecommerce/shared-utils";
-import { Fragment } from "react";
-import { Button, EmptyState, Pill, Toggle } from "../../../components/ui/AdminUi";
+import {
+  ChevronDown,
+  ChevronRight,
+  ImagePlus,
+  ListPlus,
+  PackagePlus,
+  Pencil,
+  Plus,
+  Star,
+  Trash2,
+} from "lucide-react";
+import { Fragment, useEffect, useState } from "react";
+import {
+  AdminTabs,
+  Button,
+  EmptyState,
+  IconButton,
+  Pill,
+  RowActions,
+  TableViewport,
+  Toggle,
+} from "../../../components/ui/AdminUi";
 import { cx } from "../../../components/ui/cx";
 import { formatLocalizedText } from "../../../utils/localizedText";
 
@@ -15,240 +40,595 @@ interface ProductTableProps {
   productDeletePending: boolean;
   imageDeletePending: boolean;
   specificationDeletePending: boolean;
-  isProductExpanded: (productId: string) => boolean;
-  onToggleExpanded: (productId: string) => void;
+  isProductExpanded: (id: string) => boolean;
+  onToggleExpanded: (id: string) => void;
   onToggleProductStatus: (product: AdminProductDto) => void;
   onToggleVariantStatus: (variant: AdminProductVariantDto) => void;
   onEditProduct: (product: AdminProductDto) => void;
   onCreateVariant: (product: AdminProductDto) => void;
-  onEditVariant: (product: AdminProductDto, variant: AdminProductVariantDto) => void;
+  onEditVariant: (
+    product: AdminProductDto,
+    variant: AdminProductVariantDto,
+  ) => void;
   onCreateImage: (product: AdminProductDto) => void;
   onEditImage: (product: AdminProductDto, image: AdminProductImageDto) => void;
   onCreateSpecification: (product: AdminProductDto) => void;
-  onEditSpecification: (product: AdminProductDto, specification: AdminProductSpecificationDto) => void;
+  onEditSpecification: (
+    product: AdminProductDto,
+    spec: AdminProductSpecificationDto,
+  ) => void;
   onDeleteProduct: (product: AdminProductDto) => void;
   onDeleteImage: (image: AdminProductImageDto) => void;
-  onDeleteSpecification: (specification: AdminProductSpecificationDto) => void;
+  onDeleteSpecification: (spec: AdminProductSpecificationDto) => void;
 }
 
-export function ProductTable({
-  products,
-  isLoading,
-  targetProduct,
-  targetVariantId,
-  productTogglePending,
-  variantTogglePending,
-  productDeletePending,
-  imageDeletePending,
-  specificationDeletePending,
-  isProductExpanded,
-  onToggleExpanded,
-  onToggleProductStatus,
-  onToggleVariantStatus,
-  onEditProduct,
-  onCreateVariant,
-  onEditVariant,
-  onCreateImage,
-  onEditImage,
-  onCreateSpecification,
-  onEditSpecification,
-  onDeleteProduct,
-  onDeleteImage,
-  onDeleteSpecification
-}: ProductTableProps) {
+export function ProductTable(props: ProductTableProps) {
+  const { products, isLoading } = props;
+  const [mobile, setMobile] = useState(
+    () => window.matchMedia("(max-width: 639px)").matches,
+  );
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 639px)");
+    const update = () => setMobile(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="admin-panel !p-0 overflow-hidden">
       {isLoading ? (
-        <div className="grid gap-3">{[0, 1, 2].map((item) => <div key={item} className="h-16 animate-pulse rounded-2xl bg-slate-100" />)}</div>
+        <div
+          className="grid gap-3 p-5"
+          role="status"
+          aria-label="Loading products"
+        >
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-16 animate-pulse rounded-lg bg-slate-100"
+            />
+          ))}
+        </div>
+      ) : products.length && mobile ? (
+        <div>
+          {products.map((p) => {
+            const name = formatLocalizedText(p.name);
+            const expanded = props.isProductExpanded(p.id);
+            const primary = [...p.images].sort(
+              (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id),
+            )[0];
+            const units = p.variants.reduce(
+              (total, variant) => total + variant.stockQuantity,
+              0,
+            );
+            return (
+              <article
+                key={p.id}
+                id={`product-${p.id}`}
+                aria-labelledby={`product-name-${p.id}`}
+                className={cx(
+                  "min-w-0 border-b border-slate-200 p-4 last:border-0",
+                  props.targetProduct?.id === p.id && "bg-teal-50/50",
+                )}
+              >
+                <div className="flex min-w-0 items-start gap-3">
+                  {primary ? (
+                    <img
+                      src={primary.imageUrl}
+                      alt=""
+                      width={56}
+                      height={56}
+                      loading="lazy"
+                      className="h-14 w-14 shrink-0 rounded-lg border border-slate-100 bg-slate-50 object-contain"
+                    />
+                  ) : (
+                    <span className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
+                      <PackagePlus size={22} aria-hidden="true" />
+                    </span>
+                  )}
+                  <div className="min-w-0">
+                    <h2
+                      id={`product-name-${p.id}`}
+                      className="break-words text-sm font-medium leading-5"
+                    >
+                      {name}
+                    </h2>
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      {p.categoryName ?? "Uncategorized"}
+                      {p.isFeatured ? (
+                        <Star
+                          size={13}
+                          className="ml-2 inline text-amber-700"
+                          aria-label="Featured product"
+                        />
+                      ) : null}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm font-medium tabular-nums">
+                    <ProductPrice product={p} />
+                  </p>
+                  <p className="text-xs text-[var(--muted)]">
+                    {units} units · {p.variants.length} variants
+                  </p>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Toggle
+                      label={`Visibility of ${name}`}
+                      checked={p.isActive}
+                      disabled={props.productTogglePending}
+                      onChange={() => props.onToggleProductStatus(p)}
+                    />
+                    <span className="text-xs text-[var(--muted-strong)]">
+                      {p.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+                  <ProductActions {...props} product={p} />
+                </div>
+                <Button
+                  className="mt-3 w-full"
+                  aria-label={`${expanded ? "Collapse" : "Expand"} ${name}`}
+                  aria-expanded={expanded}
+                  aria-controls={
+                    expanded ? `product-details-${p.id}` : undefined
+                  }
+                  onClick={() => props.onToggleExpanded(p.id)}
+                >
+                  {expanded ? (
+                    <ChevronDown size={17} aria-hidden="true" />
+                  ) : (
+                    <ChevronRight size={17} aria-hidden="true" />
+                  )}
+                  {expanded
+                    ? "Hide details"
+                    : "Variants, images & specifications"}
+                </Button>
+                {expanded ? (
+                  <div
+                    id={`product-details-${p.id}`}
+                    className="mt-4 border-t border-slate-200 pt-4"
+                  >
+                    <ProductDetails
+                      key={props.targetVariantId ?? p.id}
+                      {...props}
+                      product={p}
+                    />
+                  </div>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
       ) : products.length ? (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1120px] text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
-              <tr className="border-b border-slate-100">
-                <th className="py-3 pr-4">Product</th>
-                <th className="py-3 pr-4">Category</th>
-                <th className="py-3 pr-4">Variants</th>
-                <th className="py-3 pr-4">Assets</th>
-                <th className="py-3 pr-4">Featured</th>
-                <th className="py-3 pr-4">Status</th>
-                <th className="py-3 pr-4">Actions</th>
+        <TableViewport label="Products">
+          <table className="w-full min-w-[800px]">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Price</th>
+                <th>Inventory</th>
+                <th>Visibility</th>
+                <th>
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {products.map((product) => (
-                <Fragment key={product.id}>
-                  <tr id={`product-${product.id}`} className={cx("border-b border-slate-100 transition-colors", targetProduct?.id === product.id && "bg-slate-50")}>
-                    <td className="py-3 pr-4">
-                      <button type="button" className="mr-2 rounded font-black text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-600 focus-visible:ring-offset-2" onClick={() => onToggleExpanded(product.id)} aria-label={`${isProductExpanded(product.id) ? "Collapse" : "Expand"} ${formatLocalizedText(product.name)}`}>
-                        {isProductExpanded(product.id) ? "-" : "+"}
-                      </button>
-                      <span className="inline-flex min-w-0 items-center gap-3 align-middle">
-                        <ProductThumbnail image={primaryProductImage(product)} name={formatLocalizedText(product.name)} />
-                        <span className="min-w-0">
-                          <span className="block truncate font-bold text-slate-900">{formatLocalizedText(product.name)}</span>
-                          <span className="mt-0.5 block text-xs text-slate-500">{product.slug}</span>
-                        </span>
-                      </span>
-                    </td>
-                    <td className="py-3 pr-4 text-slate-600">{product.categoryName ?? "-"}</td>
-                    <td className="py-3 pr-4 text-slate-600">{product.variants.length}</td>
-                    <td className="py-3 pr-4 text-slate-600">{product.images.length} images / {product.specifications.length} specs</td>
-                    <td className="py-3 pr-4"><Pill tone={product.isFeatured ? "blue" : "slate"}>{product.isFeatured ? "Featured" : "Standard"}</Pill></td>
-                    <td className="py-3 pr-4">
-                      <div className="flex items-center gap-3">
-                        <Toggle checked={product.isActive} disabled={productTogglePending} onChange={() => onToggleProductStatus(product)} />
-                        <Pill tone={product.isActive ? "green" : "slate"}>{product.isActive ? "Active" : "Inactive"}</Pill>
-                      </div>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <div className="flex flex-wrap gap-2">
-                        <Button type="button" onClick={() => onEditProduct(product)}>Edit</Button>
-                        <Button type="button" onClick={() => onCreateVariant(product)}>Add SKU</Button>
-                        <Button type="button" onClick={() => onCreateImage(product)}>Add image</Button>
-                        <Button type="button" onClick={() => onCreateSpecification(product)}>Add spec</Button>
-                        <Button type="button" variant="danger" disabled={productDeletePending} onClick={() => onDeleteProduct(product)}>Delete</Button>
-                      </div>
-                    </td>
-                  </tr>
-                  {isProductExpanded(product.id) ? (
-                    <tr className="border-b border-slate-100 bg-slate-50/70">
-                      <td colSpan={7} className="p-4">
-                        <div className="grid gap-5">
-                          <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                            <div className="mb-3 flex items-center justify-between gap-3">
-                              <h3 className="text-sm font-black text-slate-900">Variants</h3>
-                              <Button type="button" onClick={() => onCreateVariant(product)}>Add SKU</Button>
-                            </div>
-                            {product.variants.length ? (
-                              <div className="overflow-x-auto">
-                                <table className="w-full min-w-[920px] text-left text-xs">
-                                  <thead className="uppercase tracking-wide text-slate-500">
-                                    <tr>
-                                      <th className="py-2 pr-3">SKU</th>
-                                      <th className="py-2 pr-3">Variant</th>
-                                      <th className="py-2 pr-3">Color</th>
-                                      <th className="py-2 pr-3">Size</th>
-                                      <th className="py-2 pr-3">Price</th>
-                                      <th className="py-2 pr-3">Compare at</th>
-                                      <th className="py-2 pr-3">Stock</th>
-                                      <th className="py-2 pr-3">Install</th>
-                                      <th className="py-2 pr-3">Active</th>
-                                      <th className="py-2 pr-3">Actions</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {product.variants.map((variant) => (
-                                      <tr id={`variant-${variant.id}`} key={variant.id} className={cx("border-t border-slate-200 transition-colors", targetVariantId === variant.id && "bg-amber-100/80 outline outline-2 outline-amber-300 outline-offset-[-2px]")}>
-                                        <td className="py-2 pr-3 font-bold">{variant.sku}</td>
-                                        <td className="py-2 pr-3">{variant.name}</td>
-                                        <td className="py-2 pr-3">{variant.color || "-"}</td>
-                                        <td className="py-2 pr-3">{variant.size || "-"}</td>
-                                        <td className="py-2 pr-3">{formatMoney(variant.price)}</td>
-                                        <td className="py-2 pr-3">{variant.compareAtPrice === null ? "-" : formatMoney(variant.compareAtPrice)}</td>
-                                        <td className="py-2 pr-3"><Pill tone={variant.stockQuantity <= 5 ? "red" : variant.stockQuantity <= 10 ? "orange" : "green"}>{variant.stockQuantity}</Pill></td>
-                                        <td className="py-2 pr-3"><Pill tone={variant.requiresInstallation ? "blue" : "slate"}>{variant.requiresInstallation ? "Required" : "None"}</Pill></td>
-                                        <td className="py-2 pr-3"><Toggle checked={variant.isActive} disabled={variantTogglePending} onChange={() => onToggleVariantStatus(variant)} /></td>
-                                        <td className="py-2 pr-3"><Button type="button" onClick={() => onEditVariant(product, variant)}>Edit</Button></td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : <EmptyState>No variants for this product</EmptyState>}
-                          </section>
-
-                          <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                            <div className="mb-3 flex items-center justify-between gap-3">
-                              <h3 className="text-sm font-black text-slate-900">Product images</h3>
-                              <Button type="button" onClick={() => onCreateImage(product)}>Add image</Button>
-                            </div>
-                            {product.images.length ? (
-                              <div className="grid gap-3 md:grid-cols-2">
-                                {product.images.map((image) => (
-                                  <div key={image.id} className="rounded-2xl border border-slate-200 p-4">
-                                    <div className="flex items-start gap-3">
-                                      <img src={image.imageUrl} alt={image.altText || ""} className="h-20 w-20 shrink-0 rounded-xl bg-slate-100 object-cover ring-1 ring-slate-200" />
-                                      <div className="min-w-0">
-                                        <p className="truncate text-sm font-black text-slate-900">{image.imageUrl}</p>
-                                        <p className="mt-1 text-xs text-slate-500">Alt: {image.altText || "-"}</p>
-                                        <p className="mt-1 text-xs text-slate-500">Sort order: {image.sortOrder}</p>
-                                      </div>
-                                      <Pill tone="slate">Image</Pill>
-                                    </div>
-                                    <div className="mt-3 flex gap-2">
-                                      <Button type="button" onClick={() => onEditImage(product, image)}>Edit</Button>
-                                      <Button type="button" variant="danger" disabled={imageDeletePending} onClick={() => onDeleteImage(image)}>Delete</Button>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : <EmptyState>No images for this product</EmptyState>}
-                          </section>
-
-                          <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                            <div className="mb-3 flex items-center justify-between gap-3">
-                              <h3 className="text-sm font-black text-slate-900">Specifications</h3>
-                              <Button type="button" onClick={() => onCreateSpecification(product)}>Add spec</Button>
-                            </div>
-                            {product.specifications.length ? (
-                              <div className="overflow-x-auto">
-                                <table className="w-full min-w-[720px] text-left text-xs">
-                                  <thead className="uppercase tracking-wide text-slate-500">
-                                    <tr>
-                                      <th className="py-2 pr-3">Name</th>
-                                      <th className="py-2 pr-3">Value</th>
-                                      <th className="py-2 pr-3">Sort</th>
-                                      <th className="py-2 pr-3">Actions</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {product.specifications.map((specification) => (
-                                      <tr key={specification.id} className="border-t border-slate-200">
-                                        <td className="py-2 pr-3 font-bold text-slate-900">{specification.name}</td>
-                                        <td className="py-2 pr-3 text-slate-600">{specification.value}</td>
-                                        <td className="py-2 pr-3 text-slate-600">{specification.sortOrder}</td>
-                                        <td className="py-2 pr-3">
-                                          <div className="flex gap-2">
-                                            <Button type="button" onClick={() => onEditSpecification(product, specification)}>Edit</Button>
-                                            <Button type="button" variant="danger" disabled={specificationDeletePending} onClick={() => onDeleteSpecification(specification)}>Delete</Button>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : <EmptyState>No specifications for this product</EmptyState>}
-                          </section>
+              {products.map((p) => {
+                const name = formatLocalizedText(p.name);
+                const expanded = props.isProductExpanded(p.id);
+                const units = p.variants.reduce(
+                  (n, v) => n + v.stockQuantity,
+                  0,
+                );
+                const primary = [...p.images].sort(
+                  (a, b) =>
+                    a.sortOrder - b.sortOrder || a.id.localeCompare(b.id),
+                )[0];
+                return (
+                  <Fragment key={p.id}>
+                    <tr
+                      id={`product-${p.id}`}
+                      className={cx(
+                        "border-b border-slate-100",
+                        props.targetProduct?.id === p.id && "bg-teal-50/50",
+                      )}
+                    >
+                      <td className="w-[45%]">
+                        <div className="flex items-center gap-2">
+                          <IconButton
+                            label={`${expanded ? "Collapse" : "Expand"} ${name}`}
+                            aria-expanded={expanded}
+                            aria-controls={
+                              expanded ? `product-details-${p.id}` : undefined
+                            }
+                            onClick={() => props.onToggleExpanded(p.id)}
+                          >
+                            {expanded ? (
+                              <ChevronDown size={17} aria-hidden="true" />
+                            ) : (
+                              <ChevronRight size={17} aria-hidden="true" />
+                            )}
+                          </IconButton>
+                          {primary ? (
+                            <img
+                              src={primary.imageUrl}
+                              alt=""
+                              width={48}
+                              height={48}
+                              loading="lazy"
+                              className="h-12 w-12 shrink-0 rounded-lg border border-slate-100 bg-slate-50 object-contain"
+                            />
+                          ) : (
+                            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
+                              <PackagePlus size={20} aria-hidden="true" />
+                            </span>
+                          )}
+                          <div className="min-w-0">
+                            <p
+                              className="line-clamp-2 font-medium"
+                              title={name}
+                            >
+                              {name}
+                            </p>
+                            <p className="mt-1 text-xs text-[var(--muted)]">
+                              {p.categoryName ?? "Uncategorized"}
+                              {p.isFeatured ? (
+                                <Star
+                                  size={13}
+                                  className="ml-2 inline text-amber-700"
+                                  aria-label="Featured product"
+                                />
+                              ) : null}
+                            </p>
+                          </div>
                         </div>
                       </td>
+                      <td className="whitespace-nowrap font-medium tabular-nums">
+                        <ProductPrice product={p} />
+                      </td>
+                      <td className="whitespace-nowrap tabular-nums">
+                        <p className="font-medium">{units} units</p>
+                        <p className="mt-1 text-xs text-[var(--muted)]">
+                          {p.variants.length} variants
+                        </p>
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-2">
+                          <Toggle
+                            label={`Visibility of ${name}`}
+                            checked={p.isActive}
+                            disabled={props.productTogglePending}
+                            onChange={() => props.onToggleProductStatus(p)}
+                          />
+                          <span className="text-xs text-[var(--muted-strong)]">
+                            {p.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <ProductActions {...props} product={p} />
+                      </td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              ))}
+                    {expanded ? (
+                      <tr>
+                        <td colSpan={5} className="!p-5 bg-slate-50/60">
+                          <div id={`product-details-${p.id}`}>
+                            <ProductDetails
+                              key={props.targetVariantId ?? p.id}
+                              {...props}
+                              product={p}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
-        </div>
-      ) : <EmptyState>No products yet</EmptyState>}
+        </TableViewport>
+      ) : (
+        <EmptyState>
+          No products yet. Add your first product to start building the catalog.
+        </EmptyState>
+      )}
     </section>
   );
 }
 
-function primaryProductImage(product: AdminProductDto): AdminProductImageDto | null {
-  return product.images.reduce<AdminProductImageDto | null>(
-    (primary, image) => (
-      primary === null || image.sortOrder < primary.sortOrder || (image.sortOrder === primary.sortOrder && image.id < primary.id)
-        ? image
-        : primary
-    ),
-    null
+function ProductPrice({ product }: { product: AdminProductDto }) {
+  const prices = product.variants.map((variant) => variant.price);
+  if (!prices.length)
+    return <span className="text-[var(--muted)]">No price</span>;
+  return (
+    <>
+      {Math.min(...prices) !== Math.max(...prices) ? (
+        <span className="mr-1 text-xs font-normal text-[var(--muted)]">
+          From
+        </span>
+      ) : null}
+      {formatMoney(Math.min(...prices))}
+    </>
   );
 }
 
-function ProductThumbnail({ image, name }: { image: AdminProductImageDto | null; name: string }) {
-  if (!image) {
-    return <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-slate-100 text-xs font-black text-slate-400 ring-1 ring-slate-200" aria-label="No product image">No image</span>;
-  }
+function ProductActions(
+  props: ProductTableProps & { product: AdminProductDto },
+) {
+  const p = props.product;
+  const name = formatLocalizedText(p.name);
+  return (
+    <div className="flex items-center gap-1">
+      <IconButton label={`Edit ${name}`} onClick={() => props.onEditProduct(p)}>
+        <Pencil size={17} aria-hidden="true" />
+      </IconButton>
+      <RowActions
+        label={`More actions for ${name}`}
+        actions={[
+          {
+            label: "Add variant",
+            icon: PackagePlus,
+            onSelect: () => props.onCreateVariant(p),
+          },
+          {
+            label: "Add image",
+            icon: ImagePlus,
+            onSelect: () => props.onCreateImage(p),
+          },
+          {
+            label: "Add specification",
+            icon: ListPlus,
+            onSelect: () => props.onCreateSpecification(p),
+          },
+          {
+            label: "Delete product",
+            icon: Trash2,
+            danger: true,
+            disabled: props.productDeletePending,
+            onSelect: () => props.onDeleteProduct(p),
+          },
+        ]}
+      />
+    </div>
+  );
+}
 
-  return <img src={image.imageUrl} alt={image.altText || name} className="h-12 w-12 shrink-0 rounded-xl bg-slate-100 object-cover ring-1 ring-slate-200" />;
+function ProductDetails(
+  props: ProductTableProps & { product: AdminProductDto },
+) {
+  const { product: p } = props;
+  return (
+    <AdminTabs
+      label={`Manage ${formatLocalizedText(p.name)}`}
+      tabs={[
+        {
+          value: "variants",
+          label: `Variants (${p.variants.length})`,
+          content: (
+            <div>
+              <div className="mb-3 flex justify-end">
+                <Button onClick={() => props.onCreateVariant(p)}>
+                  <Plus size={16} aria-hidden="true" />
+                  Add variant
+                </Button>
+              </div>
+              {p.variants.length ? (
+                <TableViewport
+                  label={`Variants of ${formatLocalizedText(p.name)}`}
+                  className="max-h-[420px]"
+                >
+                  <table className="w-full min-w-[780px]">
+                    <thead className="sticky top-0">
+                      <tr>
+                        <th>Variant / SKU</th>
+                        <th>Price</th>
+                        <th>Stock</th>
+                        <th>Installation</th>
+                        <th>Visibility</th>
+                        <th>
+                          <span className="sr-only">Actions</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {p.variants.map((v) => (
+                        <tr
+                          id={`variant-${v.id}`}
+                          key={v.id}
+                          className={cx(
+                            "border-b border-slate-200",
+                            props.targetVariantId === v.id &&
+                              "bg-amber-50 outline outline-2 outline-amber-300 outline-offset-[-2px]",
+                          )}
+                        >
+                          <td className="max-w-[320px]">
+                            <p className="font-medium">{v.name}</p>
+                            <p className="mt-1 font-mono text-xs text-[var(--muted)]">
+                              {v.sku}
+                            </p>
+                            {v.color || v.size ? (
+                              <p className="mt-1 text-xs text-[var(--muted)]">
+                                {[v.color, v.size].filter(Boolean).join(" / ")}
+                              </p>
+                            ) : null}
+                          </td>
+                          <td className="whitespace-nowrap tabular-nums">
+                            <p className="font-medium">
+                              {formatMoney(v.price)}
+                            </p>
+                            {v.compareAtPrice !== null ? (
+                              <p className="mt-1 text-xs text-[var(--muted)] line-through">
+                                {formatMoney(v.compareAtPrice)}
+                              </p>
+                            ) : null}
+                          </td>
+                          <td>
+                            <Pill
+                              tone={
+                                v.stockQuantity === 0
+                                  ? "red"
+                                  : v.stockQuantity <= 10
+                                    ? "orange"
+                                    : "green"
+                              }
+                            >
+                              {v.stockQuantity}
+                            </Pill>
+                          </td>
+                          <td className="text-xs text-[var(--muted-strong)]">
+                            {v.requiresInstallation ? "Required" : "None"}
+                          </td>
+                          <td>
+                            <Toggle
+                              label={`Visibility of ${v.sku}`}
+                              checked={v.isActive}
+                              disabled={props.variantTogglePending}
+                              onChange={() => props.onToggleVariantStatus(v)}
+                            />
+                          </td>
+                          <td>
+                            <IconButton
+                              label={`Edit variant ${v.sku}`}
+                              onClick={() => props.onEditVariant(p, v)}
+                            >
+                              <Pencil size={17} aria-hidden="true" />
+                            </IconButton>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </TableViewport>
+              ) : (
+                <EmptyState>No variants yet</EmptyState>
+              )}
+            </div>
+          ),
+        },
+        {
+          value: "images",
+          label: `Images (${p.images.length})`,
+          content: (
+            <div>
+              <div className="mb-3 flex justify-end">
+                <Button onClick={() => props.onCreateImage(p)}>
+                  <ImagePlus size={16} aria-hidden="true" />
+                  Add image
+                </Button>
+              </div>
+              {p.images.length ? (
+                <div className="grid max-h-[500px] gap-3 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
+                  {p.images.map((image, i) => (
+                    <article
+                      key={image.id}
+                      className="overflow-hidden rounded-lg border border-slate-200 bg-white"
+                    >
+                      <img
+                        src={image.imageUrl}
+                        alt={image.altText || ""}
+                        width={240}
+                        height={160}
+                        loading="lazy"
+                        className="h-40 w-full bg-slate-50 object-contain"
+                      />
+                      <div className="p-3">
+                        <p className="line-clamp-2 text-sm font-medium">
+                          {image.altText || `Product image ${i + 1}`}
+                        </p>
+                        <div className="mt-2 flex items-center justify-between">
+                          <span className="text-xs text-[var(--muted)]">
+                            Position {image.sortOrder}
+                          </span>
+                          <div className="flex gap-1">
+                            <IconButton
+                              label={`Edit image ${i + 1}`}
+                              onClick={() => props.onEditImage(p, image)}
+                            >
+                              <Pencil size={16} aria-hidden="true" />
+                            </IconButton>
+                            <IconButton
+                              label={`Delete image ${i + 1}`}
+                              variant="danger"
+                              disabled={props.imageDeletePending}
+                              onClick={() => props.onDeleteImage(image)}
+                            >
+                              <Trash2 size={16} aria-hidden="true" />
+                            </IconButton>
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState>No images yet</EmptyState>
+              )}
+            </div>
+          ),
+        },
+        {
+          value: "specifications",
+          label: `Specifications (${p.specifications.length})`,
+          content: (
+            <div>
+              <div className="mb-3 flex justify-end">
+                <Button onClick={() => props.onCreateSpecification(p)}>
+                  <ListPlus size={16} aria-hidden="true" />
+                  Add specification
+                </Button>
+              </div>
+              {p.specifications.length ? (
+                <TableViewport label="Product specifications">
+                  <table className="w-full min-w-[540px]">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Value</th>
+                        <th>Position</th>
+                        <th>
+                          <span className="sr-only">Actions</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {p.specifications.map((s) => (
+                        <tr key={s.id} className="border-b border-slate-200">
+                          <td className="font-medium">{s.name}</td>
+                          <td>{s.value}</td>
+                          <td>{s.sortOrder}</td>
+                          <td>
+                            <div className="flex gap-1">
+                              <IconButton
+                                label={`Edit specification ${s.name}`}
+                                onClick={() => props.onEditSpecification(p, s)}
+                              >
+                                <Pencil size={16} aria-hidden="true" />
+                              </IconButton>
+                              <IconButton
+                                label={`Delete specification ${s.name}`}
+                                variant="danger"
+                                disabled={props.specificationDeletePending}
+                                onClick={() => props.onDeleteSpecification(s)}
+                              >
+                                <Trash2 size={16} aria-hidden="true" />
+                              </IconButton>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </TableViewport>
+              ) : (
+                <EmptyState>No specifications yet</EmptyState>
+              )}
+            </div>
+          ),
+        },
+      ]}
+    />
+  );
 }

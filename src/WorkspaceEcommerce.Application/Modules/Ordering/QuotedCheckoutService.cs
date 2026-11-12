@@ -25,11 +25,11 @@ public interface IQuotedCheckoutService
 internal sealed class QuotedCheckoutService(ICheckoutStore checkout, IShippingCheckoutStore shipping,
     IAppDbContext db, ICurrentCustomerContext customer, ICurrentLanguageProvider language,
     IShippingAdministrativeCatalog catalog, IVNPayPaymentService vnPay, TimeProvider clock,
-    IValidator<CheckoutRequest> validator, IFulfillmentCoordinator fulfillment, IOrderShippingReader shippingReader) : IQuotedCheckoutService
+    IValidator<CheckoutRequest> validator, IFulfillmentCoordinator fulfillment, IOrderShippingReader shippingReader, Microsoft.Extensions.Options.IOptions<OrderExpiryOptions>? expiryOptions = null) : IQuotedCheckoutService
 {
     private readonly CheckoutCartBuilder builder = new(checkout, language);
     private readonly CheckoutCouponApplier coupons = new(checkout, customer);
-    private readonly CheckoutOrderFactory factory = new(checkout);
+    private readonly CheckoutOrderFactory factory = new(checkout, expiryOptions?.Value);
 
     public async Task<Result<CheckoutResponse>> CheckoutAsync(CheckoutRequest request, CancellationToken cancellationToken)
     {

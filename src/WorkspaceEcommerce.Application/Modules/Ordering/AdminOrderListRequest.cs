@@ -15,6 +15,8 @@ public sealed record AdminOrderListRequest
     public OrderStatus? Status { get; init; }
 
     public string? Search { get; init; }
+    public PaymentStatus? PaymentStatus { get; init; }
+    public string? Queue { get; init; }
 
     public int Skip => (NormalizedPageNumber - 1) * NormalizedPageSize;
 

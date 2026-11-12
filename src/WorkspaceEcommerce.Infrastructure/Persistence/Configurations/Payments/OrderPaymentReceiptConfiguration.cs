@@ -12,7 +12,7 @@ internal sealed class OrderPaymentReceiptConfiguration : IEntityTypeConfiguratio
         builder.ToTable("order_payment_receipts", "payments", table =>
         {
             table.HasCheckConstraint("ck_order_payment_receipt_amount", "amount >= 0 AND currency = 'VND'");
-            table.HasCheckConstraint("ck_order_payment_receipt_kind", "kind IN ('ManualTransfer', 'CodCollected', 'CodRemitted')");
+            table.HasCheckConstraint("ck_order_payment_receipt_kind", "kind IN ('ManualTransfer', 'CodCollected', 'CodRemitted', 'FullRefund')");
         });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();

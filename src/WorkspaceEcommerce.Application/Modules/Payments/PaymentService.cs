@@ -18,7 +18,8 @@ internal sealed class PaymentService(
     IVNPayPaymentService vnPayPaymentService,
     ICurrentCustomerContext currentCustomerContext,
     IPaymentResultAccessTokenService paymentResultAccessTokenService,
-    IFulfillmentCoordinator? fulfillment = null, IOrderShippingReader? shippingReader = null) : IPaymentService
+    IFulfillmentCoordinator? fulfillment = null, IOrderShippingReader? shippingReader = null,
+    TimeProvider? clock = null) : IPaymentService
 {
     public async Task<Result<PaymentResultDto>> HandleVNPayReturnAsync(
         VNPayCallbackRequest request,
@@ -183,9 +184,21 @@ internal sealed class PaymentService(
                     return;
                 }
 
+                var outcome = vnPayPaymentService.GetPaymentOutcome(verification.ResponseCode, verification.TransactionStatus);
+                var processedAt = (clock ?? TimeProvider.System).GetUtcNow();
+                if (outcome == VNPayPaymentOutcome.Success && transaction.Status == PaymentTransactionStatus.Cancelled &&
+                    transaction.GatewayResponseCode == "ORDER_CANCELLED")
+                {
+                    transaction.RecordCaptureAfterOrderCancellation(verification.GatewayTransactionNo, verification.ResponseCode,
+                        verification.SecureHash, SerializeParameters(verification.Parameters), processedAt);
+                    order.MarkPaymentPaid(processedAt);
+                    order.MarkPaymentRefundPending();
+                    await dbContext.SaveChangesAsync(transactionCancellationToken);
+                }
                 if (transaction.IsTerminal)
                 {
-                    if (transaction.Status == PaymentTransactionStatus.Success && !order.ShipmentId.HasValue)
+                    if (transaction.Status == PaymentTransactionStatus.Success && order.PaymentStatus == PaymentStatus.Paid &&
+                        order.Status is not (OrderStatus.Cancelled or OrderStatus.Returned) && !order.ShipmentId.HasValue)
                     {
                         await EnqueueShipmentCreateAsync(order.Id, transactionCancellationToken);
                     }
@@ -198,10 +211,6 @@ internal sealed class PaymentService(
                     return;
                 }
 
-                var processedAt = DateTimeOffset.UtcNow;
-                var outcome = vnPayPaymentService.GetPaymentOutcome(
-                    verification.ResponseCode,
-                    verification.TransactionStatus);
                 var gatewayMessage = BuildGatewayMessage(verification.ResponseCode, outcome);
                 var rawResponse = SerializeParameters(verification.Parameters);
 
@@ -216,6 +225,7 @@ internal sealed class PaymentService(
                             rawResponse,
                             processedAt);
                         order.MarkPaymentPaid(processedAt);
+                        if (order.Status is OrderStatus.Cancelled or OrderStatus.Returned) order.MarkPaymentRefundPending();
                         break;
                     case VNPayPaymentOutcome.Cancelled:
                         transaction.MarkCancelled(
@@ -243,7 +253,8 @@ internal sealed class PaymentService(
                 dbContext.Update(order);
                 await dbContext.SaveChangesAsync(transactionCancellationToken);
 
-                if (outcome == VNPayPaymentOutcome.Success)
+                if (outcome == VNPayPaymentOutcome.Success && order.PaymentStatus == PaymentStatus.Paid &&
+                    order.Status is not (OrderStatus.Cancelled or OrderStatus.Returned))
                 {
                     // The shipment worker is the only code path that calls the
                     // provider. Keeping this insert in the same database
@@ -340,6 +351,9 @@ internal sealed class PaymentService(
             PaymentStatus.Paid => "Payment completed.",
             PaymentStatus.Cancelled => "Payment cancelled.",
             PaymentStatus.Failed => "Payment failed.",
+            PaymentStatus.RefundPending => "Payment received. Refund reconciliation is pending.",
+            PaymentStatus.Refunded => "Full refund recorded.",
+            PaymentStatus.PartiallyRefunded => "Partial refund recorded.",
             _ => "Payment is being processed."
         };
     }

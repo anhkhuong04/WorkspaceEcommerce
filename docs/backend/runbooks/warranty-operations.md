@@ -15,6 +15,21 @@
 - Imports are idempotent by a safe checksum derived from identifier fingerprints. Do not retry by changing only whitespace or case; review the preview instead.
 - Never correct a unit or entitlement by editing PostgreSQL. Void/replacement actions must include an operational reason and generate an audit event.
 
+## Replacement and customer returns
+
+- Admin now looks up the SKU, order item and spare through searched/paged
+  controls. Coverage components use separate code/name/month fields.
+- Replacement accepts an available same-SKU spare directly, including a sale of
+  quantity one. It locks both units/entitlements and the order, consumes one
+  sellable stock unit, creates the replacement entitlement and keeps the original
+  coverage dates. The operation timestamp remains the actual replacement time.
+- Replacing again uses the currently active replacement entitlement. Retrying the
+  same old-entitlement/spare pair does not consume stock or add coverage again.
+  A competing void/replacement produces one terminal decision.
+- The defective old unit stays outside sellable stock. Serialized units physically
+  received through [RMA](../api/order-returns.md) enter quarantine and lose their
+  entitlement. They cannot be selected for another return or warranty replacement.
+
 ## Incident and recovery
 
 - On suspected identifier-key exposure, immediately disable public lookup and activation flags. Deploy a new `IdentifierKeyVersion` and `IdentifierHmacKey`, retain the previous key as `Warranty:IdentifierHmacKeys:{oldVersion}` for dual-read, re-fingerprint/reconcile every unit, then remove the old key only after a sampled lookup smoke and backup verification. Do not overwrite a key in place.

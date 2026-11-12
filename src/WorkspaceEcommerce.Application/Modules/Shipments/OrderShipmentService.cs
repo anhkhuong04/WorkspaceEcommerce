@@ -502,7 +502,28 @@ internal sealed class OrderShipmentService(
         }
     }
 
-    private async Task<Result> ApplyTrackingAsync(
+    private async Task<Result> ApplyTrackingAsync(Order order, OrderShipment shipment, TrackingResponse tracking,
+        ShipmentTimelineSource source, CancellationToken cancellationToken)
+    {
+        Result? result = null;
+        try
+        {
+        await dbContext.ExecuteInTransactionAsync(async ct =>
+        {
+            await dbContext.FindPendingPaymentTransactionsForOrderForUpdateAsync(order.Id, ct);
+            var lockedOrder = await dbContext.ReloadOrderForUpdateAsync(order.Id, ct);
+            var lockedShipment = await dbContext.ReloadShipmentForUpdateAsync(order.Id, ct);
+            result = lockedOrder is null || lockedShipment is null
+                ? Result.Conflict("Shipment changed while refreshing. Reload the order.")
+                : await ApplyTrackingLockedAsync(lockedOrder, lockedShipment, tracking, source, ct);
+            if (result.IsFailure) throw new WorkspaceEcommerce.Domain.Common.DomainException(result.FirstError ?? "Tracking could not be applied.");
+        }, cancellationToken);
+        }
+        catch (WorkspaceEcommerce.Domain.Common.DomainException exception) { return Result.Conflict(exception.Message); }
+        return result!;
+    }
+
+    private async Task<Result> ApplyTrackingLockedAsync(
         Order order,
         OrderShipment shipment,
         TrackingResponse tracking,
@@ -555,8 +576,15 @@ internal sealed class OrderShipmentService(
 
         var targetStatus = ShipmentProviderContract.MapOrderStatus(tracking.Status);
         if (fulfillment is not null) targetStatus = await fulfillment.ProviderTargetAsync(order, targetStatus, cancellationToken);
+        var previousStatus = order.Status;
         var orderUpdated = stateApplied && targetStatus.HasValue &&
             ShipmentOrderStatusTransitioner.TryTransition(order, targetStatus.Value, tracking.Status, dbContext);
+        if (orderUpdated && order.Status == OrderStatus.Cancelled)
+        {
+            var pending = await dbContext.PaymentTransactions.Where(payment => payment.OrderId == order.Id && payment.Status == WorkspaceEcommerce.Domain.Modules.Payments.PaymentTransactionStatus.Pending).ToArrayAsyncSafe(cancellationToken);
+            await WorkspaceEcommerce.Application.Modules.Ordering.OrderCancellationEffects.ApplyAsync(dbContext, order, previousStatus, pending,
+                "Shipment provider cancellation.", now, cancellationToken);
+        }
         await dbContext.SaveChangesAsync(cancellationToken);
 
         if (orderUpdated && order.Status == OrderStatus.Completed)

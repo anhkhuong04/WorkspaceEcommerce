@@ -16,7 +16,14 @@ internal sealed class ReviewService(
 {
     private const int MaxProductReviews = 100;
 
-    public async Task<Result<ReviewDto>> CreateReviewAsync(
+    public async Task<Result<ReviewDto>> CreateReviewAsync(CreateReviewRequest request, CancellationToken cancellationToken = default)
+    {
+        Result<ReviewDto>? result = null;
+        await db.ExecuteInTransactionAsync(async ct => { result = await CreateReviewAsyncCore(request, ct); }, cancellationToken);
+        return result!;
+    }
+
+    private async Task<Result<ReviewDto>> CreateReviewAsyncCore(
         CreateReviewRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -44,6 +51,9 @@ internal sealed class ReviewService(
         {
             return Result<ReviewDto>.NotFound("Product was not found.");
         }
+
+        product = await db.FindProductForUpdateAsync(product.Id, cancellationToken);
+        if (product is null || !product.IsActive) return Result<ReviewDto>.NotFound("Product was not found.");
 
         // Verify customer has purchased this product via a completed/shipping order
         var hasPurchased = await db.OrderItems
@@ -92,7 +102,6 @@ internal sealed class ReviewService(
         var newCount = (ratingSummary?.Count ?? 0) + 1;
         var newAverage = ((ratingSummary?.Total ?? 0) + request.Rating) / (double)newCount;
         product.UpdateRatingStats(newAverage, newCount);
-        db.Update(product);
 
         await db.SaveChangesAsync(cancellationToken);
 

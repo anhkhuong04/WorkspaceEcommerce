@@ -329,7 +329,7 @@ internal sealed class LoyaltyService(
             nextTier?.Type,
             nextTier is null
                 ? null
-                : Math.Max(0, nextTier.MinTotalPointsEarned - account.TotalPointsEarned));
+                : Math.Max(0, nextTier.MinTotalPointsEarned - account.TotalPointsEarned)) { PointsDebt = account.PointsDebt };
     }
 
     private static LoyaltyTier? GetNextTier(

@@ -10,8 +10,13 @@ namespace WorkspaceEcommerce.Api.Controllers.Admin;
 [Authorize(Roles = "Admin")]
 [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
 [Route("api/admin/dashboard")]
-public sealed class DashboardController(IAdminDashboardService dashboardService) : ControllerBase
+public sealed class DashboardController(IAdminDashboardService dashboardService, IAdminSearchService searchService) : ControllerBase
 {
+    [HttpGet("search")]
+    [ProducesResponseType(typeof(ApiResponse<AdminSearchDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Search([FromQuery] string? search, CancellationToken cancellationToken) =>
+        this.ToApiResponse(await searchService.SearchAsync(search, cancellationToken));
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<AdminDashboardDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]

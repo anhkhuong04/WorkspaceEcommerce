@@ -124,6 +124,15 @@ export interface CustomerOrderStatusHistoryDto {
 }
 
 export interface CustomerOrderDto {
+  paymentDueAt?: string | null;
+  canRequestReturn?: boolean;
+  returnRequestedAt?: string | null;
+  returnReviewedAt?: string | null;
+  returnDecision?: string | null;
+  returnDecisionReason?: string | null;
+  refundedAmount?: number;
+  returnReason?: string | null;
+  returnRequestDeadline?: string | null;
   shipping?: import("./shipping").OrderShippingDetailsDto | null;
   id: string;
   orderCode: string;

@@ -1,100 +1,231 @@
 import { useQueryClient } from "@tanstack/react-query";
-import type { ReactNode } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import * as Dialog from "@radix-ui/react-dialog";
+import {
+  Boxes,
+  ChevronRight,
+  FileText,
+  FolderTree,
+  Image,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  ShieldCheck,
+  ShoppingBag,
+  Star,
+  TicketPercent,
+  Truck,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  NavLink,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useNavigation,
+} from "react-router-dom";
 import { useAdminAuth } from "../../features/auth/useAdminAuth";
-import { Button } from "../ui/AdminUi";
+import { IconButton } from "../ui/AdminUi";
+import { AdminBrand } from "../ui/AdminBrand";
 import { cx } from "../ui/cx";
+import { AdminSearch } from "./AdminSearch";
 
-type AdminNavIconName = "dashboard" | "categories" | "products" | "coupons" | "orders" | "warranties" | "banners" | "blogs" | "reviews";
-
-const menuItems: { to: string; label: string; icon: AdminNavIconName }[] = [
-  { to: "/", label: "Dashboard", icon: "dashboard" },
-  { to: "/categories", label: "Categories", icon: "categories" },
-  { to: "/products", label: "Products", icon: "products" },
-  { to: "/coupons", label: "Coupons", icon: "coupons" },
-  { to: "/orders", label: "Orders", icon: "orders" },
-  { to: "/shipping", label: "Shipping", icon: "orders" },
-  { to: "/warranties", label: "Warranties", icon: "warranties" },
-  { to: "/banners", label: "Banners", icon: "banners" },
-  { to: "/blogs", label: "News/Blogs", icon: "blogs" },
-  { to: "/reviews", label: "Reviews", icon: "reviews" }
+const groups: {
+  label: string;
+  items: { to: string; label: string; icon: LucideIcon }[];
+}[] = [
+  {
+    label: "Overview",
+    items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard }],
+  },
+  {
+    label: "Commerce",
+    items: [
+      { to: "/orders", label: "Orders", icon: ShoppingBag },
+      { to: "/shipping", label: "Shipping rates", icon: Truck },
+      { to: "/products", label: "Products", icon: Boxes },
+      { to: "/categories", label: "Categories", icon: FolderTree },
+      { to: "/coupons", label: "Coupons", icon: TicketPercent },
+    ],
+  },
+  {
+    label: "Content",
+    items: [
+      { to: "/banners", label: "Banners", icon: Image },
+      { to: "/blogs", label: "Articles", icon: FileText },
+      { to: "/reviews", label: "Reviews", icon: Star },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [{ to: "/operations", label: "Operations", icon: ShieldCheck }, { to: "/warranties", label: "Warranties", icon: ShieldCheck }],
+  },
 ];
-
 export function AdminLayout() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const closeOnDesktop = () => {
+      if (desktop.matches) setMobileOpen(false);
+    };
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => desktop.removeEventListener("change", closeOnDesktop);
+  }, []);
+  const location = useLocation();
+  const navigation = useNavigation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { session, signOut } = useAdminAuth();
-
+  const group =
+    groups.find((g) => g.items.some((item) => item.to === location.pathname)) ??
+    groups[0];
+  const current = group.items.find((item) => item.to === location.pathname);
   function handleLogout() {
     signOut();
     queryClient.clear();
     navigate("/login", { replace: true });
   }
-
+  const nav = (
+    <nav
+      className="flex-1 overflow-y-auto px-3 py-4"
+      aria-label="Admin navigation"
+    >
+      {groups.map((g) => (
+        <div key={g.label} className="mb-5 last:mb-0">
+          <p className="mb-2 px-3 text-xs font-medium text-[var(--muted)]">
+            {g.label}
+          </p>
+          <div className="grid gap-1">
+            {g.items.map(({ icon: Icon, ...item }) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/"}
+                onClick={() => setMobileOpen(false)}
+                className={({ isActive }) =>
+                  cx(
+                    "flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-[var(--brand-soft)] text-[var(--brand)]"
+                      : "text-[var(--muted-strong)] hover:bg-slate-50",
+                  )
+                }
+              >
+                <Icon size={19} strokeWidth={1.8} aria-hidden="true" />
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+        </div>
+      ))}
+    </nav>
+  );
+  const footer = (
+    <div className="border-t border-[var(--border)] p-4">
+      <div className="mb-3 flex min-w-0 items-center gap-3">
+        <span
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 font-medium text-slate-600"
+          aria-hidden="true"
+        >
+          A
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-medium">Administrator</p>
+          <p
+            className="truncate text-xs text-[var(--muted)]"
+            title={session?.email}
+          >
+            {session?.email}
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={handleLogout}
+        className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm text-[var(--muted-strong)] hover:bg-slate-50"
+      >
+        <LogOut size={17} aria-hidden="true" />
+        Sign out
+      </button>
+    </div>
+  );
   return (
-    <div className="min-h-screen bg-[var(--surface-soft)] text-[var(--ink)] lg:grid lg:grid-cols-[264px_minmax(0,1fr)] lg:items-start">
-      <aside className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-4 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:self-start lg:border-b-0 lg:border-r lg:py-5">
-        <div className="flex h-12 items-center gap-3 px-2">
-          <img src="/demo/logo.svg" alt="WorkspaceEcom" className="h-auto w-[164px]" />
+    <div className="min-h-screen text-[var(--ink)] lg:grid lg:grid-cols-[232px_minmax(0,1fr)]">
+      <a
+        href="#admin-main"
+        className="sr-only fixed left-4 top-4 z-[100] rounded-lg bg-white p-3 text-[var(--brand)] focus:not-sr-only"
+      >
+        Skip to content
+      </a>
+      <aside className="sticky top-0 hidden h-dvh flex-col border-r border-[var(--border)] bg-white lg:flex">
+        <div className="border-b border-[var(--border)] px-6 py-4">
+          <AdminBrand />
         </div>
-        <nav className="mt-5 flex gap-2 overflow-x-auto lg:flex-col lg:overflow-y-auto" aria-label="Admin navigation">
-          {menuItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/"}
-              className={({ isActive }) => cx(
-                "flex min-w-fit items-center gap-3 rounded-[var(--radius-panel)] px-3 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] focus-visible:ring-offset-2",
-                isActive
-                  ? "bg-[var(--brand-soft)] text-[var(--brand)] shadow-sm ring-1 ring-[var(--border)]"
-                  : "text-[var(--muted-strong)] hover:bg-[var(--brand-soft)] hover:text-[var(--brand)]"
-              )}
-            >
-              {({ isActive }) => (
-                <>
-                  <span className={cx(
-                    "grid h-8 w-8 place-items-center rounded-[var(--radius-card)] ring-1 transition",
-                    isActive ? "bg-[var(--brand)] text-[var(--brand-contrast)] ring-[var(--brand)]" : "bg-[var(--surface)] text-[var(--muted)] ring-[var(--border)]"
-                  )}>
-                    <AdminNavIcon name={item.icon} />
-                  </span>
-                  {item.label}
-                </>
-              )}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="mt-5 flex items-center justify-between gap-3 border-t border-[var(--border)] px-2 pt-4 lg:mt-auto lg:block">
-          <span className="truncate text-xs font-semibold text-[var(--muted)] lg:mb-3 lg:block" title={session?.email}>{session?.email}</span>
-          <Button onClick={handleLogout} className="shrink-0 lg:w-full">Logout</Button>
-        </div>
+        {nav}
+        {footer}
       </aside>
-
       <div className="min-w-0">
-        <main className="p-4 lg:p-6">
+        <header className="sticky top-0 z-30 flex h-[69px] items-center justify-between gap-3 border-b border-[var(--border)] bg-white/95 px-4 backdrop-blur-sm lg:px-7">
+          <div className="flex min-w-0 items-center gap-3">
+            <Dialog.Root open={mobileOpen} onOpenChange={setMobileOpen}>
+              <Dialog.Trigger asChild>
+                <IconButton label="Open navigation" className="lg:hidden">
+                  <Menu size={22} aria-hidden="true" />
+                </IconButton>
+              </Dialog.Trigger>
+              <Dialog.Portal>
+                <Dialog.Overlay className="admin-overlay lg:hidden" />
+                <Dialog.Content
+                  aria-describedby={undefined}
+                  className="fixed inset-y-0 left-0 z-[61] flex w-[min(300px,calc(100vw-32px))] flex-col border-r border-[var(--border)] bg-white shadow-xl lg:hidden"
+                >
+                  <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
+                    <Dialog.Title asChild>
+                      <div>
+                        <AdminBrand />
+                      </div>
+                    </Dialog.Title>
+                    <Dialog.Close asChild>
+                      <IconButton label="Close navigation">
+                        <X size={20} aria-hidden="true" />
+                      </IconButton>
+                    </Dialog.Close>
+                  </div>
+                  {nav}
+                  {footer}
+                </Dialog.Content>
+              </Dialog.Portal>
+            </Dialog.Root>
+            <p className="flex min-w-0 items-center gap-2 text-sm">
+              <span className="hidden text-[var(--muted)] sm:inline">
+                {group.label}
+              </span>
+              <ChevronRight
+                size={14}
+                className="hidden text-slate-500 sm:inline"
+                aria-hidden="true"
+              />
+              <span className="truncate font-medium">
+                {current?.label ?? "Admin"}
+              </span>
+            </p>
+          </div>
+          <AdminSearch />
+          {navigation.state !== "idle" ? (
+            <p role="status" className="shrink-0 text-xs text-[var(--muted)]">
+              Loading page...
+            </p>
+          ) : null}
+        </header>
+        <main
+          id="admin-main"
+          tabIndex={-1}
+          className="min-w-0 p-4 outline-none sm:p-6 lg:p-7"
+        >
           <Outlet />
         </main>
       </div>
     </div>
-  );
-}
-
-function AdminNavIcon({ name }: { name: AdminNavIconName }) {
-  const paths: Record<AdminNavIconName, ReactNode> = {
-    dashboard: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
-    categories: <><path d="M4 7h6l2 2h8v10H4z" /><path d="M4 7V5h6l2 2" /></>,
-    products: <><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z" /><path d="m4 7.5 8 4.5 8-4.5M12 12v9" /></>,
-    coupons: <><path d="M4 7a3 3 0 0 1 3-3h3l10 10-6 6L4 10z" /><path d="M8 8h.01" /><path d="M13 9l2 2M9 13l2 2" /></>,
-    orders: <><path d="M6 3h12v18H6z" /><path d="M9 8h6M9 12h6M9 16h4" /></>,
-    warranties: <><path d="M12 3 20 6v5c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-3Z" /><path d="m8.5 12 2.2 2.2 4.8-5" /></>,
-    banners: <><path d="M4 5h16v14H4z" /><path d="m4 15 4-4 3 3 3-3 6 6" /><circle cx="15.5" cy="8.5" r="1.5" /></>,
-    blogs: <><path d="M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10l5 5v11a2 2 0 0 1-2 2z" /><path d="M14 3v6h6M16 13H8M16 17H8M10 9H8" /></>,
-    reviews: <><path d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5z" /></>
-  };
-
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {paths[name]}
-    </svg>
   );
 }

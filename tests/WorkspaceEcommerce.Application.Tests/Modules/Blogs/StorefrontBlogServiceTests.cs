@@ -66,7 +66,7 @@ public sealed class StorefrontBlogServiceTests
         Assert.True(result.IsSuccess);
         var comment = Assert.Single(result.Value!.Comments);
         Assert.Equal(approved.Id, comment.Id);
-        Assert.Equal(BlogCommentModerationStatus.Approved, comment.ModerationStatus);
+        Assert.Equal(approved.AuthorName, comment.AuthorName);
     }
 
     [Fact]

@@ -10,7 +10,20 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 {
     public void Configure(EntityTypeBuilder<Order> builder)
     {
+        builder.Property(order => order.ReturnRequestedAt).HasColumnName("return_requested_at");
+        builder.Property(order => order.ReturnReason).HasColumnName("return_reason").HasMaxLength(500);
+        builder.Property(order => order.ReturnReviewedAt).HasColumnName("return_reviewed_at");
+        builder.Property(order => order.ReturnDecision).HasColumnName("return_decision").HasMaxLength(20);
+        builder.Property(order => order.ReturnDecisionReason).HasColumnName("return_decision_reason").HasMaxLength(500);
+        builder.Property(order => order.RefundedAmount).HasColumnName("refunded_amount").HasPrecision(18, 2).HasDefaultValue(0m);
+        builder.Property(order => order.PaymentDueAt).HasColumnName("payment_due_at");
+        builder.HasIndex(order => new { order.PaymentDueAt, order.Status }).HasFilter("payment_due_at IS NOT NULL");
         builder.ToTable("orders", "ordering");
+        builder.Property(order => order.ImportSource).HasColumnName("import_source").HasMaxLength(80);
+        builder.Property(order => order.ExternalOrderCode).HasColumnName("external_order_code").HasMaxLength(200);
+        builder.Property(order => order.ImportFingerprint).HasColumnName("import_fingerprint").HasMaxLength(64);
+        builder.HasIndex(order => new { order.ImportSource, order.ExternalOrderCode }).IsUnique()
+            .HasFilter("import_source IS NOT NULL AND external_order_code IS NOT NULL").HasDatabaseName("ux_orders_import_identity");
 
         builder.HasKey(order => order.Id);
 

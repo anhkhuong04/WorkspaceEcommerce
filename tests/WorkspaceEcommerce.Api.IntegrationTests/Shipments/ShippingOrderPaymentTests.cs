@@ -15,6 +15,90 @@ namespace WorkspaceEcommerce.Api.IntegrationTests.Shipments;
 public sealed partial class ShippingCheckoutIntegrationTests
 {
     [Fact]
+    public async Task LiveRefreshReturningAfterCancellation_CannotOverwriteTheCancelledOrder()
+    {
+        await SeedAsync(); var carrier = new CountingCarrier { Available = true };
+        await using var factory = Factory(carrier); using var client = factory.CreateClient();
+        var quote = await QuoteAsync(client, Input() with { Method = ShippingMethod.MiniLogistics });
+        using var placed = await client.PostAsJsonAsync("/api/checkout", Accept(quote));
+        var order = (await DataAsync<CheckoutResponse>(placed)).Order;
+        using (var scope = factory.Services.CreateScope()) await scope.ServiceProvider.GetRequiredService<IOrderShipmentService>().ProcessDueCommandsAsync(10);
+        var shipment = await fixture.ExecuteDbAsync(db => db.OrderShipments.SingleAsync());
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        carrier.Tracking = async () =>
+        {
+            started.SetResult(); await release.Task;
+            return new WorkspaceEcommerce.Application.Abstractions.Shipment.TrackingResponse
+            { TrackingCode = shipment.TrackingCode, ExternalOrderId = order.OrderCode, Status = "InTransit", ShippingFeeAmount = shipment.ShippingFeeAmount,
+              Currency = "VND", Timeline = [new() { Status = "InTransit", ChangedAtUtc = DateTimeOffset.UtcNow }] };
+        };
+        using var refreshScope = factory.Services.CreateScope();
+        var refreshing = refreshScope.ServiceProvider.GetRequiredService<IOrderShipmentService>().RefreshAsync(order.Id);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        client.UseBearerToken(await client.LoginAsAdminAsync());
+        using var cancelled = await client.PutAsJsonAsync($"/api/admin/orders/{order.Id}/status", new { status = (int)OrderStatus.Cancelled, cancellationReason = "Concurrent cancellation" });
+        Assert.True(cancelled.IsSuccessStatusCode);
+        release.SetResult(); Assert.True((await refreshing).IsSuccess);
+        var persisted = await fixture.ExecuteDbAsync(db => db.Orders.SingleAsync());
+        Assert.Equal(OrderStatus.Cancelled, persisted.Status); Assert.Equal(PaymentStatus.Cancelled, persisted.PaymentStatus);
+        Assert.Equal(10, await fixture.ExecuteDbAsync(db => db.ProductVariants.Select(row => row.StockQuantity).SingleAsync()));
+    }
+
+    [Fact]
+    public async Task Expiry_ReleasesStockAndCouponOnceAcrossConcurrentWorkers_WithoutChangingOrderSnapshots()
+    {
+        await SeedAsync(); await using var factory = Factory(new CountingCarrier());
+        using var client = factory.CreateClient();
+        var coupon = new WorkspaceEcommerce.Domain.Modules.Coupons.Coupon(Guid.NewGuid(), "EXPIRY-COUPON", "Expiry test", null,
+            WorkspaceEcommerce.Domain.Modules.Coupons.CouponDiscountType.FixedAmount, 1000m, null, null, null, null, 1);
+        await fixture.SeedAsync(db => { db.Add(coupon); return Task.CompletedTask; });
+        var quote = await QuoteAsync(client, Input() with { PaymentMethod = PaymentMethod.ManualBankTransfer, CouponCode = coupon.Code });
+        var checkoutBody = System.Text.Json.JsonSerializer.SerializeToNode(Accept(quote, payment: PaymentMethod.ManualBankTransfer), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+        checkoutBody["couponCode"] = coupon.Code;
+        using var placed = await client.PostAsJsonAsync("/api/checkout", checkoutBody);
+        var order = (await DataAsync<CheckoutResponse>(placed)).Order;
+        Assert.NotNull(order.PaymentDueAt);
+        await fixture.ExecuteDbAsync(async db => { await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE ordering.orders SET payment_due_at = {DateTimeOffset.UtcNow.AddMinutes(-1)} WHERE id = {order.Id}"); return true; });
+        async Task<int> Sweep() { using var scope = factory.Services.CreateScope(); return await scope.ServiceProvider.GetRequiredService<IOrderExpiryService>().ExpireDueAsync(10, default); }
+        Assert.Equal(1, (await Task.WhenAll(Sweep(), Sweep())).Sum());
+        Assert.Equal(0, await Sweep());
+        var persisted = await fixture.ExecuteDbAsync(db => db.Orders.SingleAsync());
+        Assert.Equal(OrderStatus.Cancelled, persisted.Status); Assert.Equal(order.TotalAmount, persisted.TotalAmount);
+        Assert.Equal(order.DiscountAmount, persisted.DiscountAmount);
+        Assert.Equal(10, await fixture.ExecuteDbAsync(db => db.ProductVariants.Select(row => row.StockQuantity).SingleAsync()));
+        Assert.Equal(0, await fixture.ExecuteDbAsync(db => db.Coupons.Select(row => row.UsedCount).SingleAsync()));
+        Assert.NotNull(await fixture.ExecuteDbAsync(db => db.CouponRedemptions.Select(row => row.ReleasedAt).SingleAsync()));
+    }
+
+    [Fact]
+    public async Task FullRefund_IsExactAuditedAndIdempotent_AndDoesNotTriggerProviderTransfer()
+    {
+        await SeedAsync(); await using var factory = Factory(new CountingCarrier());
+        using var client = factory.CreateClient();
+        var quote = await QuoteAsync(client, Input() with { PaymentMethod = PaymentMethod.ManualBankTransfer });
+        using var placed = await client.PostAsJsonAsync("/api/checkout", Accept(quote, payment: PaymentMethod.ManualBankTransfer));
+        var order = (await DataAsync<CheckoutResponse>(placed)).Order;
+        client.UseBearerToken(await client.LoginAsAdminAsync());
+        var root = $"/api/admin/orders/{order.Id}";
+        using var transfer = await client.PostAsJsonAsync($"{root}/payment/confirm-transfer", new ConfirmOrderPaymentRequest(order.TotalAmount, "VND", "REFUND-CAPTURE", "Statement verified"));
+        Assert.True(transfer.IsSuccessStatusCode);
+        using var cancelled = await client.PutAsJsonAsync($"{root}/status", new { status = (int)OrderStatus.Cancelled, cancellationReason = "Customer cancellation" });
+        Assert.True(cancelled.IsSuccessStatusCode);
+        var request = new ConfirmOrderPaymentRequest(order.TotalAmount, "VND", "REFUND-PAID-001", "Outgoing bank transfer verified");
+        using var partial = await client.PostAsJsonAsync($"{root}/payment/confirm-full-refund", request with { Amount = order.TotalAmount - 1 });
+        Assert.Equal(HttpStatusCode.Conflict, partial.StatusCode);
+        using var refunded = await client.PostAsJsonAsync($"{root}/payment/confirm-full-refund", request);
+        Assert.Equal(PaymentStatus.Refunded, (await DataAsync<OrderPaymentSummaryDto>(refunded)).PaymentStatus);
+        using var repeated = await client.PostAsJsonAsync($"{root}/payment/confirm-full-refund", request);
+        Assert.True(repeated.IsSuccessStatusCode);
+        using var conflicting = await client.PostAsJsonAsync($"{root}/payment/confirm-full-refund", request with { Reference = "OTHER" });
+        Assert.Equal(HttpStatusCode.Conflict, conflicting.StatusCode);
+        Assert.Equal(1, await fixture.ExecuteDbAsync(db => db.Set<OrderPaymentReceipt>().CountAsync(receipt => receipt.Kind == OrderPaymentReceiptKind.FullRefund)));
+        Assert.Equal(OrderStatus.Cancelled, await fixture.ExecuteDbAsync(db => db.Orders.Select(row => row.Status).SingleAsync()));
+    }
+
+    [Fact]
     public async Task TransferConfirmation_IsAdminOnlyExactAuditedAndConcurrentIdempotent()
     {
         await SeedAsync();
@@ -86,11 +170,13 @@ public sealed partial class ShippingCheckoutIntegrationTests
         Assert.Equal(PaymentStatus.Paid, collection.PaymentStatus);
         Assert.Single(collection.Receipts); Assert.True(collection.CanRemitCod);
         using var duplicate = await client.PostAsJsonAsync($"{root}/collect-cod", receipt); Assert.True(duplicate.IsSuccessStatusCode);
+        await fixture.SeedAsync(async db => { var row = await db.Orders.SingleAsync(); row.ChangeStatus(Guid.NewGuid(), OrderStatus.FailedDelivery, "Test failed delivery", "test"); row.ChangeStatus(Guid.NewGuid(), OrderStatus.Cancelled, "Test closed order", "test"); });
+        using var summary = await client.GetAsync(root); Assert.True((await DataAsync<OrderPaymentSummaryDto>(summary)).CanRemitCod);
         using var remitted = await client.PostAsJsonAsync($"{root}/remit-cod", receipt with { Reference = "SYNTHETIC-REMIT" });
         var remittance = await DataAsync<OrderPaymentSummaryDto>(remitted);
         Assert.Equal(2, remittance.Receipts.Count); Assert.False(remittance.CanRemitCod);
         Assert.Equal(order.TotalAmount, remittance.TotalAmount);
-        Assert.Equal(OrderStatus.Shipping, await fixture.ExecuteDbAsync(db => db.Orders.Select(x => x.Status).SingleAsync()));
+        Assert.Equal(OrderStatus.Cancelled, await fixture.ExecuteDbAsync(db => db.Orders.Select(x => x.Status).SingleAsync()));
     }
 
     [Fact]

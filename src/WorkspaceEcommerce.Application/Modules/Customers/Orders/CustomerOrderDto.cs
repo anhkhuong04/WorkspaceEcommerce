@@ -30,5 +30,14 @@ public sealed record CustomerOrderDto(
     IReadOnlyCollection<OrderItemDto> Items,
     IReadOnlyCollection<CustomerOrderStatusHistoryDto> StatusHistory)
 {
+    public DateTimeOffset? PaymentDueAt { get; init; }
     public Shipments.OrderShippingDetailsDto? Shipping { get; init; }
+    public DateTimeOffset? ReturnRequestedAt { get; init; }
+    public DateTimeOffset? ReturnReviewedAt { get; init; }
+    public string? ReturnDecision { get; init; }
+    public string? ReturnDecisionReason { get; init; }
+    public decimal RefundedAmount { get; init; }
+    public string? ReturnReason { get; init; }
+    public DateTimeOffset? ReturnRequestDeadline { get; init; }
+    public bool CanRequestReturn { get; init; }
 }

@@ -51,6 +51,7 @@ internal sealed class EfShippingCheckoutStore(AppDbContext context) : IShippingC
     }
     public async Task<T> TransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
     {
+        if (context.Database.CurrentTransaction is not null) return await operation(cancellationToken);
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         var result = await operation(cancellationToken);
         await transaction.CommitAsync(cancellationToken);

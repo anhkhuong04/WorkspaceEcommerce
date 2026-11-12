@@ -14,6 +14,13 @@ namespace WorkspaceEcommerce.Application.Abstractions.Persistence;
 
 public interface IAppDbContext : ICatalogReadStore, IOrderReadStore, ILoyaltyReadStore, IAppWriteStore
 {
+    IQueryable<OrderPaymentException> OrderPaymentExceptions => Array.Empty<OrderPaymentException>().AsQueryable();
+    Task LockOrderImportAsync(string source, CancellationToken cancellationToken) => Task.CompletedTask;
+    IQueryable<OrderReturnCase> OrderReturns => Array.Empty<OrderReturnCase>().AsQueryable();
+    IQueryable<OrderReturnLine> OrderReturnLines => Array.Empty<OrderReturnLine>().AsQueryable();
+    IQueryable<OrderReturnAudit> OrderReturnAudits => Array.Empty<OrderReturnAudit>().AsQueryable();
+    Task<OrderReturnCase?> FindReturnForUpdateAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(OrderReturns.FirstOrDefault(x => x.Id == id));
+    Task<CustomerLoyaltyAccount?> FindLoyaltyAccountForUpdateAsync(Guid customerId, CancellationToken cancellationToken) => Task.FromResult(CustomerLoyaltyAccounts.FirstOrDefault(x => x.CustomerId == customerId));
     IQueryable<Banner> Banners { get; }
 
     IQueryable<Customer> Customers { get; }
@@ -79,6 +86,13 @@ public interface IAppDbContext : ICatalogReadStore, IOrderReadStore, ILoyaltyRea
         Guid[] variantIds,
         CancellationToken cancellationToken = default);
 
+    Task<Product?> FindProductForUpdateAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(Products.FirstOrDefault(product => product.Id == id));
+
+    Task<Order?> ReloadOrderForUpdateAsync(Guid id, CancellationToken cancellationToken) => FindOrderForUpdateAsync(id, cancellationToken);
+
+    Task<OrderShipment?> ReloadShipmentForUpdateAsync(Guid orderId, CancellationToken cancellationToken) => FindOrderShipmentForUpdateAsync(orderId, cancellationToken);
+
     /// <summary>
     /// Holds the serialized-unit row lock during activation so retried or
     /// concurrent requests for the same identifier become deterministic.
@@ -130,6 +144,9 @@ public interface IAppDbContext : ICatalogReadStore, IOrderReadStore, ILoyaltyRea
         CancellationToken cancellationToken = default);
 
     IQueryable<Coupon> Coupons { get; }
+
+    Task<Coupon?> FindCouponForUpdateAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(Coupons.FirstOrDefault(coupon => coupon.Id == id));
 
     IQueryable<CouponProductTarget> CouponProductTargets { get; }
 

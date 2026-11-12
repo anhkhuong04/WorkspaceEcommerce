@@ -1,22 +1,24 @@
 import type { ReactNode } from "react";
-
-interface AdminPageHeaderProps {
+export function AdminPageHeader({
+  title,
+  description,
+  actions,
+}: {
   title: string;
   description: string;
   actions?: ReactNode;
-}
-
-export function AdminPageHeader({ title, description, actions }: AdminPageHeaderProps) {
+}) {
   return (
-    <div className="flex flex-col gap-5 rounded-[var(--radius-shell)] border border-[var(--border)] bg-[var(--surface-card)] p-6 shadow-[var(--shadow-card)] lg:flex-row lg:items-end lg:justify-between">
-      <div>
-        <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--muted)]">WorkspaceEcom Admin</p>
-        <h1 className="mt-1 text-3xl font-black text-[var(--ink)]">{title}</h1>
+    <header className="admin-page-heading">
+      <div className="min-w-0">
+        <h1 className="text-2xl font-semibold tracking-tight text-[var(--ink)]">
+          {title}
+        </h1>
+        <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+          {description}
+        </p>
       </div>
-      <div className="flex flex-col gap-4 lg:items-end">
-        <p className="max-w-xl text-sm leading-6 text-[var(--muted)]">{description}</p>
-        {actions}
-      </div>
-    </div>
+      {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+    </header>
   );
 }

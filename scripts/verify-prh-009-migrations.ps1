@@ -10,7 +10,10 @@ $username = 'workspace_ecommerce'
 $password = 'workspace_ecommerce_prh009'
 $connectionString = "Host=localhost;Port=$PostgresPort;Database=$database;Username=$username;Password=$password"
 $shipmentMigration = '20260802034719_AddShipmentIntegration'
-$latestMigration = '20261101113222_AddWorkspaceDeliveryOperations'
+$latestMigration = (Get-ChildItem -LiteralPath 'src/WorkspaceEcommerce.Infrastructure/Persistence/Migrations' -File |
+    Where-Object { $_.Name -match '^\d{14}_.+\.cs$' -and $_.Name -notlike '*.Designer.cs' } |
+    Sort-Object Name | Select-Object -Last 1).BaseName
+if ([string]::IsNullOrWhiteSpace($latestMigration)) { throw 'No versioned migrations found.' }
 
 function Wait-ForPostgres {
     for ($attempt = 0; $attempt -lt 30; $attempt++) {

@@ -18,6 +18,7 @@ const actions = {
   "confirm-transfer": "Confirm bank transfer",
   "collect-cod": "Confirm full COD collection",
   "remit-cod": "Confirm COD remittance",
+  "confirm-full-refund": "Record completed full refund",
 };
 export function OrderPaymentPanel({ orderId }: { orderId: string }) {
   const cache = useQueryClient();
@@ -76,7 +77,8 @@ export function OrderPaymentPanel({ orderId }: { orderId: string }) {
         Exact frozen amount: {data.totalAmount.toLocaleString("vi-VN")}{" "}
         {data.currency}. Collection and remittance are separate events.
       </p>
-      {data.shippingMethod === null && (
+      {data.importSource && <p>Imported from {data.importSource}: manual delivery and audited payment confirmations.</p>}
+      {data.shippingMethod === null && !data.importSource && (
         <p>Legacy order: existing payment workflow applies.</p>
       )}
       {mutation.isSuccess && (
@@ -86,13 +88,13 @@ export function OrderPaymentPanel({ orderId }: { orderId: string }) {
         <Notice type="error" title={getApiErrorMessage(mutation.error)} />
       )}
       <div className="flex flex-wrap gap-2">
-        {(["confirm-transfer", "collect-cod", "remit-cod"] as const)
+        {(["confirm-transfer", "collect-cod", "remit-cod", "confirm-full-refund"] as const)
           .filter((a) =>
             a === "confirm-transfer"
               ? data.canConfirmTransfer
               : a === "collect-cod"
                 ? data.canCollectCod
-                : data.canRemitCod,
+                : a === "remit-cod" ? data.canRemitCod : data.canConfirmFullRefund,
           )
           .map((a) => (
             <Button
@@ -149,7 +151,7 @@ export function OrderPaymentPanel({ orderId }: { orderId: string }) {
       {data.receipts.map((r) => (
         <details key={r.id}>
           <summary>
-            {["Bank transfer", "COD collected", "COD remitted"][r.kind]} ·{" "}
+            {["Bank transfer", "COD collected", "COD remitted", "Full refund"][r.kind]} ·{" "}
             {r.amount.toLocaleString("vi-VN")} {r.currency}
           </summary>
           <p>
@@ -164,7 +166,8 @@ export function OrderPaymentPanel({ orderId }: { orderId: string }) {
         open={confirming}
         title={action ? actions[action] : "Payment confirmation"}
         message={<>
-          {`Record ${data.totalAmount.toLocaleString("vi-VN")} ${data.currency} for this order? Only confirm money actually received. Partial or excess amounts require exception handling. This audited fact cannot be edited here.`}
+          {action === "confirm-full-refund" ? "Record only a full refund already sent and verified against bank/provider evidence. This does not initiate a bank transfer." : null}
+          {`Record ${data.totalAmount.toLocaleString("vi-VN")} ${data.currency} for this order? Confirm only a verified movement of money. Partial or excess amounts require exception handling. This audited fact cannot be edited here.`}
           {mutation.isError && <p role="alert">{getApiErrorMessage(mutation.error)}</p>}
         </>}
         confirmLabel="Record payment fact"

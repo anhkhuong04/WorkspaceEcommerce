@@ -7,4 +7,10 @@ public sealed record AdminDashboardDto(
     int LowStockThreshold,
     IReadOnlyCollection<LowStockProductVariantDto> LowStockVariants,
     IReadOnlyCollection<AdminOrderStatusSummaryDto> OrderStatusSummary,
-    IReadOnlyCollection<RecentAdminOrderDto> RecentOrders);
+    IReadOnlyCollection<RecentAdminOrderDto> RecentOrders)
+{
+    public decimal NetCollectedRevenue { get; init; }
+    public IReadOnlyCollection<AdminOperationalQueueDto> Operations { get; init; } = [];
+}
+
+public sealed record AdminOperationalQueueDto(string Key, string Label, int Count, string Url);

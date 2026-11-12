@@ -62,7 +62,7 @@ Role và ownership là hai bước kiểm tra riêng. API cho phép guest checko
 4. [PaymentService](../../src/WorkspaceEcommerce.Application/Modules/Payments/PaymentService.cs) xử lý callback VNPay, chốt kết quả idempotently và enqueue shipment khi thanh toán thành công.
 5. [ShipmentCommandWorker](../../src/WorkspaceEcommerce.Infrastructure/Shipment/ShipmentCommandWorker.cs) gọi provider để tạo/hủy shipment từ outbox. Webhook/refresh cập nhật shipment và tiến trạng thái order hợp lệ; đơn hoàn tất kích hoạt cộng điểm loyalty.
 
-Hợp đồng tích hợp nằm tại [Services](../services/README.md). Chuyển khoản chưa có luồng xác nhận thanh toán; lỗi quote sau commit có thể để lại phí vận chuyển ban đầu bằng 0. Các giới hạn này được quản lý tại [Known limitations](development/known-limitations.md).
+Hợp đồng tích hợp nằm tại [Services](../services/README.md). Đơn mới có shipping selection hoặc nguồn import đã có [xác nhận thanh toán/đối soát chênh lệch](api/order-payment-confirmations.md); [trả hàng theo item](api/order-returns.md) xử lý kiểm hàng, tiền hoàn đã đối chiếu, điểm và bảo hành. Luồng checkout legacy còn các giới hạn tại [Known limitations](development/known-limitations.md).
 
 ### Account, bảo hành và tác vụ nền
 

@@ -1,3 +1,4 @@
+import storefrontI18n from "../../i18n";
 import { useQuery } from "@tanstack/react-query";
 import type { StorefrontCategoryDto } from "@workspace-ecommerce/api-types";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -31,6 +32,7 @@ interface FilterPanelProps {
 }
 
 export function ProductListPage() {
+  useTranslation();
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -232,7 +234,7 @@ export function ProductListPage() {
                   </span>
                 )}
               </button>
-              <p className="text-sm font-medium text-slate-500">{formatResultSummary(productsQuery.data, t)}</p>
+              <p className="text-sm font-medium text-slate-600">{formatResultSummary(productsQuery.data, t)}</p>
             </div>
 
             <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -257,7 +259,7 @@ export function ProductListPage() {
           {productsQuery.data && productsQuery.data.items.length === 0 && (
             <div className="rounded-lg border border-slate-200 bg-white p-8 text-center">
               <h2 className="text-lg font-bold text-slate-950">{t("catalog.notFound")}</h2>
-              <p className="mt-2 text-sm text-slate-500">{t("catalog.notFoundHint")}</p>
+              <p className="mt-2 text-sm text-slate-600">{t("catalog.notFoundHint")}</p>
               <button
                 type="button"
                 onClick={clearFilters}
@@ -286,7 +288,7 @@ export function ProductListPage() {
               >
                 {t("common.previous")}
               </button>
-              <p className="text-sm font-semibold text-slate-500">
+              <p className="text-sm font-semibold text-slate-600">
                 {t("common.pageOf", { page: productsQuery.data.pageNumber, total: productsQuery.data.totalPages })}
               </p>
               <button
@@ -372,7 +374,7 @@ function FilterPanel({
             <FilterIcon />
             {t("catalog.filters")}
           </div>
-          <button type="button" onClick={onClear} className="text-xs font-bold text-slate-500 transition hover:text-slate-950">
+          <button type="button" onClick={onClear} className="text-xs font-bold text-slate-600 transition hover:text-slate-950">
             {t("common.reset")}
           </button>
         </div>
@@ -380,7 +382,7 @@ function FilterPanel({
 
       {!showHeader && (
         <div className="flex justify-end">
-          <button type="button" onClick={onClear} className="text-xs font-bold text-slate-500 transition hover:text-slate-950">
+          <button type="button" onClick={onClear} className="text-xs font-bold text-slate-600 transition hover:text-slate-950">
             {t("common.reset")}
           </button>
         </div>
@@ -394,7 +396,7 @@ function FilterPanel({
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder={t("catalog.searchPlaceholder")}
-            className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-950 outline-none placeholder:text-slate-400"
+            className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-950 outline-none placeholder:text-slate-600"
           />
         </span>
       </label>
@@ -457,7 +459,7 @@ function CategoryButton({
 
 function ProductGridSkeleton() {
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 xl:grid-cols-4 xl:gap-x-5" aria-label="Loading products">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 xl:grid-cols-4 xl:gap-x-5" aria-label={storefrontI18n.t("uiCopy.loading_products")}>
       {Array.from({ length: 8 }).map((_, index) => (
         <div key={index} className="animate-pulse">
           <div className="aspect-square rounded-lg bg-slate-100" />
@@ -590,7 +592,7 @@ function FilterIcon() {
 
 function SearchIcon() {
   return (
-    <svg className="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+    <svg className="h-4 w-4 shrink-0 text-slate-600" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
       <circle cx="9" cy="9" r="5" />
       <path d="m13 13 4 4" />
     </svg>

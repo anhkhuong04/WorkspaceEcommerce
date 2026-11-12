@@ -2,7 +2,7 @@ using WorkspaceEcommerce.Domain.Common;
 
 namespace WorkspaceEcommerce.Domain.Modules.Payments;
 
-public enum OrderPaymentReceiptKind { ManualTransfer = 0, CodCollected = 1, CodRemitted = 2 }
+public enum OrderPaymentReceiptKind { ManualTransfer = 0, CodCollected = 1, CodRemitted = 2, FullRefund = 3 }
 
 /// <summary>Exact-amount operational confirmation; collection and remittance are distinct facts.</summary>
 public sealed class OrderPaymentReceipt : Entity

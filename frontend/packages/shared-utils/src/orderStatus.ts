@@ -23,7 +23,9 @@ const paymentStatusLabels: Record<PaymentStatus, string> = {
   2: "Paid",
   3: "Failed",
   4: "Cancelled",
-  5: "Refund pending"
+  5: "Refund pending",
+  6: "Refunded",
+  7: "Partially refunded"
 };
 
 export function formatOrderStatus(status: OrderStatus): string {

@@ -65,6 +65,7 @@ internal static class ShipmentOrderStatusTransitioner
             OrderStatus.Processing => OrderStatus.Shipping,
             OrderStatus.Shipping when target == OrderStatus.FailedDelivery => OrderStatus.FailedDelivery,
             OrderStatus.Shipping when target == OrderStatus.Completed => OrderStatus.Completed,
+            OrderStatus.FailedDelivery when target is OrderStatus.Shipping or OrderStatus.Completed => OrderStatus.Shipping,
             _ => null
         };
     }

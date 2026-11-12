@@ -71,7 +71,7 @@ internal sealed class StorefrontOrderLookupService(
             order.UpdatedAt,
             order.TrackingCode,
             order.ShipmentId,
-            items.Select(ToDto).ToArray());
+            items.Select(ToDto).ToArray()) { PaymentDueAt = order.PaymentDueAt };
     }
 
     private static OrderItemDto ToDto(OrderItem item)

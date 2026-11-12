@@ -40,7 +40,6 @@ internal sealed class AdminProductImageService(
                 request.AltText,
                 request.SortOrder);
 
-            writeStore.Update(product);
             writeStore.Add(image);
             await writeStore.SaveChangesAsync(cancellationToken);
 

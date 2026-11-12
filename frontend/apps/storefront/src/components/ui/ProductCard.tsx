@@ -38,7 +38,11 @@ export function ProductCard({ product }: ProductCardProps) {
             <span className="rounded-full bg-[var(--ink)] px-2.5 py-1 text-xs font-semibold text-white">{t("product.featured")}</span>
           ) : null}
         </div>
-        {canAdd && (
+        {canAdd && product.variantCount !== 1 ? (
+          <Link to={`/products/${product.slug}`} className="product-card-action absolute bottom-3 right-3 inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--ink)] px-4 text-sm font-semibold text-white hover:bg-slate-800">
+            {t("product.chooseOptions")}
+          </Link>
+        ) : canAdd && (
           <button ref={addButtonRef} type="button" disabled={addProductMutation.isPending}
             onClick={() => addProductMutation.mutate(product.slug)}
             className="product-card-action absolute bottom-3 right-3 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full bg-[var(--ink)] px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-wait disabled:opacity-70"

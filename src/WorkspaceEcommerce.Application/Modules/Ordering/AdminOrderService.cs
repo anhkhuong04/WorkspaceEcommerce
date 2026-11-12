@@ -1,3 +1,7 @@
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
 using WorkspaceEcommerce.Application.Abstractions.Notifications;
@@ -24,7 +28,7 @@ internal sealed class AdminOrderService(
     IOrderShipmentService? shipmentService = null,
     INotificationService? notificationService = null,
     ICustomerEmailOutbox? customerEmailOutbox = null,
-    IFulfillmentCoordinator? fulfillment = null, IOrderShippingReader? shippingReader = null) : IAdminOrderService
+    IFulfillmentCoordinator? fulfillment = null, IOrderShippingReader? shippingReader = null, Microsoft.Extensions.Options.IOptions<OrderExpiryOptions>? expiryOptions = null, IShippingCheckoutStore? shippingStore = null) : IAdminOrderService
 {
     public async Task<Result<PagedResult<AdminOrderListItemDto>>> GetOrdersAsync(
         AdminOrderListRequest request,
@@ -43,7 +47,8 @@ internal sealed class AdminOrderService(
         var status = request.Status;
         var query = dbContext.Orders
             .AsNoTrackingIfEf()
-            .Where(order => !status.HasValue || order.Status == status.Value);
+            .Where(order => (!status.HasValue || order.Status == status.Value) && (!request.PaymentStatus.HasValue || order.PaymentStatus == request.PaymentStatus));
+        query = AdminOrderQueues.Filter(dbContext, query, request.Queue, shippingStore);
         if (normalizedSearch is not null)
         {
             query = query.Where(order =>
@@ -145,7 +150,10 @@ internal sealed class AdminOrderService(
                     if (request.Status != OrderStatus.Cancelled || local?.Provider != "WorkspaceEC" || local.Revision != request.ExpectedShipmentRevision)
                         throw new DomainException("Shipment revision changed or this command is not a local cancellation. Reload before retrying.");
                 }
+                if (request.Status == OrderStatus.Returned)
+                    throw new DomainException("Returns require a received/inspected item workflow. A status edit cannot confirm receipt, refund, loyalty or warranty reversal.");
                 if (fulfillment is not null) await fulfillment.GuardStatusAsync(order, request.Status, transactionCancellationToken);
+                var previousStatus = order.Status;
                 var history = order.ChangeStatus(
                     Guid.NewGuid(),
                     request.Status,
@@ -157,8 +165,8 @@ internal sealed class AdminOrderService(
 
                 if (request.Status == OrderStatus.Cancelled)
                 {
-                    await RestoreInventoryAsync(order.Id, transactionCancellationToken);
-                    CancelOrOpenRefundWorkflow(order, pendingPaymentTransactions, request.CancellationReason!);
+                    await OrderCancellationEffects.ApplyAsync(dbContext, order, previousStatus, pendingPaymentTransactions,
+                        request.CancellationReason!, DateTimeOffset.UtcNow, transactionCancellationToken);
                     EnqueueCancellationEmail(order, request.CancellationReason!, request.CustomerMessage);
                     if (fulfillment is not null && await fulfillment.MethodAsync(order.Id, transactionCancellationToken) is not null)
                         await fulfillment.CancelAsync(order, request.CancellationReason!, transactionCancellationToken, changedBy ?? "Admin order cancellation");
@@ -194,52 +202,6 @@ internal sealed class AdminOrderService(
         catch (DomainException exception)
         {
             return Result<AdminOrderDto>.Conflict(exception.Message);
-        }
-    }
-
-    private async Task RestoreInventoryAsync(Guid orderId, CancellationToken cancellationToken)
-    {
-        var orderItems = await dbContext.OrderItems
-            .Where(item => item.OrderId == orderId)
-            .ToArrayAsyncSafe(cancellationToken);
-        var variantIds = orderItems.Select(item => item.ProductVariantId).Distinct().ToArray();
-        var variantsById = (await dbContext.FindProductVariantsForUpdateAsync(variantIds, cancellationToken))
-            .ToDictionary(variant => variant.Id);
-
-        foreach (var item in orderItems)
-        {
-            if (variantsById.TryGetValue(item.ProductVariantId, out var variant))
-            {
-                variant.RestoreStock(item.Quantity);
-            }
-        }
-    }
-
-    private static void CancelOrOpenRefundWorkflow(
-        Order order,
-        IReadOnlyCollection<PaymentTransaction> pendingPaymentTransactions,
-        string cancellationReason)
-    {
-        if (order.PaymentStatus == PaymentStatus.Paid)
-        {
-            order.MarkPaymentRefundPending();
-            return;
-        }
-
-        foreach (var transaction in pendingPaymentTransactions)
-        {
-            transaction.MarkCancelled(
-                gatewayTransactionNo: null,
-                gatewayResponseCode: "ORDER_CANCELLED",
-                gatewayResponseMessage: cancellationReason,
-                secureHash: null,
-                rawResponse: null,
-                processedAt: DateTimeOffset.UtcNow);
-        }
-
-        if (order.PaymentStatus != PaymentStatus.Cancelled)
-        {
-            order.MarkPaymentCancelled();
         }
     }
 
@@ -294,101 +256,76 @@ internal sealed class AdminOrderService(
         }
     }
 
-    public async Task<Result<AdminOrderImportPreviewDto>> PreviewImportAsync(
-        Stream content,
-        string fileName,
-        CancellationToken cancellationToken = default)
+    public async Task<Result<AdminOrderImportPreviewDto>> PreviewImportAsync(Stream content, string fileName,
+        CancellationToken cancellationToken = default, string source = "manual")
     {
-        var planResult = await BuildImportPlanAsync(content, fileName, cancellationToken);
-        return planResult.IsFailure
-            ? Result<AdminOrderImportPreviewDto>.Validation(planResult.Errors)
-            : Result<AdminOrderImportPreviewDto>.Success(planResult.Value!.Preview);
+        var plan = await BuildImportPlanAsync(content, fileName, cancellationToken, source);
+        return plan.IsFailure ? Result<AdminOrderImportPreviewDto>.Validation(plan.Errors)
+            : Result<AdminOrderImportPreviewDto>.Success(plan.Value!.Preview);
     }
 
-    public async Task<Result<AdminOrderImportCommitResultDto>> CommitImportAsync(
-        Stream content,
-        string fileName,
-        string? changedBy,
-        CancellationToken cancellationToken = default)
+    public async Task<Result<AdminOrderImportCommitResultDto>> CommitImportAsync(Stream content, string fileName,
+        string? changedBy, CancellationToken cancellationToken = default, string source = "manual")
     {
-        var planResult = await BuildImportPlanAsync(content, fileName, cancellationToken);
-        if (planResult.IsFailure)
-        {
-            return Result<AdminOrderImportCommitResultDto>.Validation(planResult.Errors);
-        }
-
-        var plan = planResult.Value!;
-        if (plan.Preview.ErrorRows > 0)
-        {
-            return Result<AdminOrderImportCommitResultDto>.Success(new AdminOrderImportCommitResultDto(
-                0,
-                Array.Empty<AdminOrderImportCreatedOrderDto>(),
-                plan.Preview));
-        }
-
-        if (plan.Orders.Count == 0)
-        {
-            return Result<AdminOrderImportCommitResultDto>.Validation(["Import file does not contain valid orders."]);
-        }
-
-        var createdOrders = new List<AdminOrderImportCreatedOrderDto>();
+        source = source.Trim().ToLowerInvariant();
+        if (!ValidImportSource(source)) return Result<AdminOrderImportCommitResultDto>.Validation(["Import source must use 1-80 letters, digits, dots, underscores or hyphens."]);
+        Result<AdminOrderImportCommitResultDto>? result = null;
         try
         {
-            await dbContext.ExecuteInTransactionAsync(async transactionCancellationToken =>
+            await dbContext.ExecuteInTransactionAsync(async ct =>
             {
-                foreach (var orderPlan in plan.Orders)
+                await dbContext.LockOrderImportAsync(source, ct);
+                var planResult = await BuildImportPlanAsync(content, fileName, ct, source);
+                if (planResult.IsFailure) { result = Result<AdminOrderImportCommitResultDto>.Validation(planResult.Errors); return; }
+                var plan = planResult.Value!;
+                if (plan.Preview.ErrorRows > 0) { result = Result<AdminOrderImportCommitResultDto>.Success(new(0, [], plan.Preview)); return; }
+                var created = new List<AdminOrderImportCreatedOrderDto>();
+                var variantIds = plan.Orders.SelectMany(o => o.Items).Select(i => i.Variant.Id).Distinct().ToArray();
+                var locked = (await dbContext.FindProductVariantsForUpdateAsync(variantIds, ct)).ToDictionary(v => v.Id);
+                foreach (var header in plan.Orders)
                 {
-                    var order = new Order(
-                        Guid.NewGuid(),
-                        await GenerateOrderCodeAsync(transactionCancellationToken),
-                        customerId: null,
-                        orderPlan.CustomerName,
-                        orderPlan.CustomerPhone,
-                        orderPlan.CustomerEmail,
-                        orderPlan.ShippingAddress,
-                        orderPlan.Note,
-                        orderPlan.PaymentMethod,
-                        GetCurrencyCode(),
-                        GetExchangeRate());
-
-                    order.SetShippingAddressDetails(
-                        orderPlan.ShippingStreet,
-                        orderPlan.ShippingWard,
-                        orderPlan.ShippingProvince);
-                    order.SetShippingFee(orderPlan.ShippingFee);
-
-                    foreach (var item in orderPlan.Items)
+                    var order = new Order(Guid.NewGuid(), await GenerateOrderCodeAsync(ct), null,
+                        header.CustomerName, header.CustomerPhone, header.CustomerEmail, header.ShippingAddress,
+                        header.Note, header.PaymentMethod, GetCurrencyCode(), GetExchangeRate());
+                    order.SetImportIdentity(source, header.ExternalOrderCode, ImportFingerprint(header.Items.Select(i => i.Row)));
+                    if (order.PaymentMethod != PaymentMethod.Cod)
+                        order.SetPaymentDeadline(order.CreatedAt.AddMinutes((expiryOptions?.Value ?? new OrderExpiryOptions()).ManualTransferMinutes));
+                    order.SetShippingAddressDetails(header.ShippingStreet, header.ShippingWard, header.ShippingProvince);
+                    order.SetShippingFee(header.ShippingFee);
+                    foreach (var item in header.Items)
                     {
-                        item.Variant.DecreaseStock(item.Quantity);
-                        dbContext.Update(item.Variant);
-                        order.AddItem(
-                            Guid.NewGuid(),
-                            item.Variant.Id,
-                            item.ProductNameSnapshot,
-                            item.Variant.Sku,
-                            item.UnitPrice,
-                            item.Quantity,
-                            item.Variant.RequiresInstallation,
-                            item.ProductImageUrlSnapshot);
+                        if (!locked.TryGetValue(item.Variant.Id, out var variant) || !variant.IsActive)
+                            throw new DomainException("An imported SKU is no longer available. Preview the file again.");
+                        variant.DecreaseStock(item.Quantity);
+                        order.AddItem(Guid.NewGuid(), variant.Id, item.ProductNameSnapshot, variant.Sku, item.UnitPrice,
+                            item.Quantity, variant.RequiresInstallation, item.ProductImageUrlSnapshot);
                     }
-
-                    order.RecordCreated(Guid.NewGuid(), $"Created by admin import ({orderPlan.ExternalOrderCode}).", NormalizeOptional(changedBy));
+                    order.RecordCreated(Guid.NewGuid(), $"New manual order imported from {source} ({header.ExternalOrderCode}).", NormalizeOptional(changedBy));
                     dbContext.Add(order);
-                    createdOrders.Add(new AdminOrderImportCreatedOrderDto(order.Id, order.OrderCode, orderPlan.ExternalOrderCode));
+                    created.Add(new(order.Id, order.OrderCode, header.ExternalOrderCode));
                 }
-
-                await dbContext.SaveChangesAsync(transactionCancellationToken);
+                await dbContext.SaveChangesAsync(ct);
+                result = Result<AdminOrderImportCommitResultDto>.Success(new(created.Count, created.Concat(plan.ExistingOrders).ToArray(), plan.Preview) { SkippedOrders = plan.ExistingOrders.Count });
             }, cancellationToken);
         }
-        catch (DomainException exception)
-        {
-            return Result<AdminOrderImportCommitResultDto>.Conflict(exception.Message);
-        }
+        catch (DomainException e) { return Result<AdminOrderImportCommitResultDto>.Conflict(e.Message); }
+        catch (PersistenceConcurrencyException) { return Result<AdminOrderImportCommitResultDto>.Conflict("Import changed concurrently. Retry with the same source and file."); }
+        return result!;
+    }
 
-        return Result<AdminOrderImportCommitResultDto>.Success(new AdminOrderImportCommitResultDto(
-            createdOrders.Count,
-            createdOrders,
-            plan.Preview));
+    private static bool ValidImportSource(string source) => source.Length is >= 1 and <= 80 &&
+        source.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.');
+
+    private static string ImportFingerprint(IEnumerable<AdminOrderImportFileRow> rows)
+    {
+        var canonical = rows.OrderBy(r => r.Sku.Trim().ToUpperInvariant(), StringComparer.Ordinal).Select(r => new {
+            Code = r.ExternalOrderCode.Trim().ToUpperInvariant(), r.CustomerName, r.CustomerPhone, r.CustomerEmail,
+            r.ShippingStreet, r.ShippingWard, r.ShippingProvince, r.Note,
+            Method = ParsePaymentMethod(r.PaymentMethod), Sku = r.Sku.Trim().ToUpperInvariant(), Quantity = TryParsePositiveInt(r.Quantity),
+            UnitPrice = string.IsNullOrWhiteSpace(r.UnitPrice) ? "catalog" : TryParseOptionalMoney(r.UnitPrice)?.ToString(CultureInfo.InvariantCulture),
+            ShippingFee = TryParseOptionalMoney(r.ShippingFee) ?? 0m
+        });
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(canonical))));
     }
 
     private async Task TryEarnLoyaltyPointsAsync(Guid orderId, CancellationToken cancellationToken)
@@ -413,8 +350,10 @@ internal sealed class AdminOrderService(
     private async Task<Result<AdminOrderImportPlan>> BuildImportPlanAsync(
         Stream content,
         string fileName,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string source = "manual")
     {
+        source = source.Trim().ToLowerInvariant();
+        if (!ValidImportSource(source)) return Result<AdminOrderImportPlan>.Validation(["Import source must use 1-80 letters, digits, dots, underscores or hyphens."]);
         var parseResult = await OrderImportFileParser.ParseAsync(content, fileName, cancellationToken);
         if (parseResult.IsFailure)
         {
@@ -427,17 +366,24 @@ internal sealed class AdminOrderService(
             return Result<AdminOrderImportPlan>.Validation(["Import file does not contain any order rows."]);
         }
 
+        if (fileRows.Length > 1000) return Result<AdminOrderImportPlan>.Validation(["Import at most 1000 rows per file."]);
+        var externalCodes = fileRows.Select(r => r.ExternalOrderCode.Trim().ToUpperInvariant()).Distinct().ToArray();
+        var existing = (await dbContext.Orders.AsNoTrackingIfEf().Where(o => o.ImportSource == source && externalCodes.Contains(o.ExternalOrderCode!))
+            .ToArrayAsyncSafe(cancellationToken)).ToDictionary(o => o.ExternalOrderCode!, StringComparer.OrdinalIgnoreCase);
+        var fingerprints = fileRows.GroupBy(r => r.ExternalOrderCode, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => ImportFingerprint(g), StringComparer.OrdinalIgnoreCase);
         var errorsByRow = fileRows.ToDictionary(row => row.RowNumber, _ => new List<string>());
         var quantitiesByRow = new Dictionary<int, int?>();
         var draftItems = new List<AdminOrderImportItemPlan>();
-        var variantsBySku = dbContext.ProductVariants
-            .ToArray()
+        var requestedSkus = fileRows.Where(r => !existing.ContainsKey(r.ExternalOrderCode)).Select(r => r.Sku.ToUpperInvariant()).Distinct().ToArray();
+        var variantsBySku = (await dbContext.ProductVariants.Where(v => requestedSkus.Contains(v.Sku)).ToArrayAsyncSafe(cancellationToken))
             .GroupBy(variant => variant.Sku, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
-        var productsById = dbContext.Products.ToDictionary(product => product.Id);
-        var categoriesById = dbContext.Categories.ToDictionary(category => category.Id);
-        var primaryImageUrlByProductId = dbContext.ProductImages
-            .ToArray()
+        var productIds = variantsBySku.Values.Select(v => v.ProductId).Distinct().ToArray();
+        var productsById = (await dbContext.Products.Where(p => productIds.Contains(p.Id)).ToArrayAsyncSafe(cancellationToken)).ToDictionary(p => p.Id);
+        var categoryIds = productsById.Values.Select(p => p.CategoryId).Distinct().ToArray();
+        var categoriesById = (await dbContext.Categories.Where(c => categoryIds.Contains(c.Id)).ToArrayAsyncSafe(cancellationToken)).ToDictionary(c => c.Id);
+        var primaryImageUrlByProductId = (await dbContext.ProductImages.Where(i => productIds.Contains(i.ProductId)).ToArrayAsyncSafe(cancellationToken))
             .GroupBy(image => image.ProductId)
             .ToDictionary(
                 group => group.Key,
@@ -445,31 +391,37 @@ internal sealed class AdminOrderService(
 
         foreach (var row in fileRows)
         {
+            if (existing.TryGetValue(row.ExternalOrderCode, out var prior))
+            {
+                quantitiesByRow[row.RowNumber] = TryParsePositiveInt(row.Quantity);
+                if (prior.ImportFingerprint != fingerprints[row.ExternalOrderCode]) errorsByRow[row.RowNumber].Add("This source/external order code was already imported with different data.");
+                continue;
+            }
             ValidateRequired(row, errorsByRow[row.RowNumber]);
 
             var quantity = TryParsePositiveInt(row.Quantity);
             quantitiesByRow[row.RowNumber] = quantity;
-            if (quantity is null)
+            if (quantity is null or > 10000)
             {
-                errorsByRow[row.RowNumber].Add("Quantity must be a positive integer.");
+                errorsByRow[row.RowNumber].Add("Quantity must be an integer between 1 and 10000.");
             }
 
             var unitPrice = TryParseOptionalMoney(row.UnitPrice);
             if (!string.IsNullOrWhiteSpace(row.UnitPrice) && unitPrice is null)
             {
-                errorsByRow[row.RowNumber].Add("Unit price must be a non-negative number.");
+                errorsByRow[row.RowNumber].Add("Unit price must be a non-negative whole VND amount.");
             }
 
             var shippingFee = TryParseOptionalMoney(row.ShippingFee);
             if (!string.IsNullOrWhiteSpace(row.ShippingFee) && shippingFee is null)
             {
-                errorsByRow[row.RowNumber].Add("Shipping fee must be a non-negative number.");
+                errorsByRow[row.RowNumber].Add("Shipping fee must be a non-negative whole VND amount.");
             }
 
             var paymentMethod = ParsePaymentMethod(row.PaymentMethod);
-            if (paymentMethod is null)
+            if (paymentMethod is null || paymentMethod == PaymentMethod.VNPay)
             {
-                errorsByRow[row.RowNumber].Add("Payment method must be COD, ManualBankTransfer, or VNPay.");
+                errorsByRow[row.RowNumber].Add("Import supports COD or ManualBankTransfer. Use storefront checkout for VNPay gateway orders.");
             }
 
             if (!variantsBySku.TryGetValue(row.Sku, out var variant))
@@ -518,7 +470,7 @@ internal sealed class AdminOrderService(
                 row.Sku,
                 quantitiesByRow.GetValueOrDefault(row.RowNumber),
                 errorsByRow[row.RowNumber].Count == 0,
-                errorsByRow[row.RowNumber].Distinct(StringComparer.Ordinal).ToArray()))
+                errorsByRow[row.RowNumber].Distinct(StringComparer.Ordinal).ToArray()) { AlreadyImported = existing.ContainsKey(row.ExternalOrderCode) })
             .ToArray();
 
         var validRowNumbers = rowResults
@@ -538,11 +490,22 @@ internal sealed class AdminOrderService(
             rowResults.Count(row => !row.IsValid),
             rowResults);
 
-        return Result<AdminOrderImportPlan>.Success(new AdminOrderImportPlan(preview, orders));
+        return Result<AdminOrderImportPlan>.Success(new AdminOrderImportPlan(preview, orders) {
+            ExistingOrders = existing.Values.Where(o => o.ImportFingerprint == fingerprints[o.ExternalOrderCode!])
+                .Select(o => new AdminOrderImportCreatedOrderDto(o.Id, o.OrderCode, o.ExternalOrderCode!) { AlreadyImported = true }).ToArray()
+        });
     }
 
     private static void ValidateRequired(AdminOrderImportFileRow row, ICollection<string> errors)
     {
+        if (row.ExternalOrderCode.Length > 200 || row.CustomerName.Length > 250 || row.CustomerPhone.Length > 50 ||
+            row.CustomerEmail?.Length > 250 || row.ShippingStreet.Length > 500 || row.ShippingWard.Length > 250 ||
+            row.ShippingProvince.Length > 250 || row.Note?.Length > 1000)
+            errors.Add("An import value exceeds the allowed field length.");
+        if (!string.IsNullOrWhiteSpace(row.CustomerEmail) &&
+            (!System.Net.Mail.MailAddress.TryCreate(row.CustomerEmail, out var email) || email.Address != row.CustomerEmail))
+            errors.Add("Customer email is invalid.");
+
         if (string.IsNullOrWhiteSpace(row.ExternalOrderCode))
         {
             errors.Add("External order code is required.");
@@ -586,6 +549,8 @@ internal sealed class AdminOrderService(
         foreach (var group in draftItems.GroupBy(item => item.Row.ExternalOrderCode, StringComparer.OrdinalIgnoreCase))
         {
             var first = group.First();
+            if (group.Sum(item => item.UnitPrice * item.Quantity) + first.ShippingFee > 99999999999999m)
+                foreach (var item in group) errorsByRow[item.Row.RowNumber].Add("Order amount exceeds the supported VND range.");
             foreach (var item in group)
             {
                 if (!SameOrderHeader(first, item))
@@ -610,7 +575,7 @@ internal sealed class AdminOrderService(
     {
         foreach (var group in draftItems.GroupBy(item => item.Variant.Id))
         {
-            var requestedQuantity = group.Sum(item => item.Quantity);
+            var requestedQuantity = group.Sum(item => (long)item.Quantity);
             var variant = group.First().Variant;
             if (requestedQuantity <= variant.StockQuantity)
             {
@@ -688,12 +653,12 @@ internal sealed class AdminOrderService(
 
     private static int? TryParsePositiveInt(string value)
     {
-        if (int.TryParse(value, out var integer) && integer > 0)
+        if (int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var integer) && integer > 0)
         {
             return integer;
         }
 
-        if (decimal.TryParse(value, out var number) &&
+        if (decimal.TryParse(value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var number) &&
             number > 0 &&
             decimal.Truncate(number) == number &&
             number <= int.MaxValue)
@@ -711,7 +676,7 @@ internal sealed class AdminOrderService(
             return null;
         }
 
-        return decimal.TryParse(value, out var amount) && amount >= 0m
+        return decimal.TryParse(value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var amount) && amount >= 0m && amount == decimal.Truncate(amount) && amount <= 999999999999m
             ? amount
             : null;
     }
@@ -781,7 +746,7 @@ internal sealed class AdminOrderService(
             order.TrackingCode,
             order.ShipmentId,
             items,
-            statusHistory) { Shipping = shippingReader is null ? null : await shippingReader.GetAsync(order.Id, cancellationToken) };
+            statusHistory) { RefundedAmount = order.RefundedAmount, ImportSource = order.ImportSource, PaymentDueAt = order.PaymentDueAt, ReturnRequestedAt = order.ReturnRequestedAt, ReturnReason = order.ReturnReason, Shipping = shippingReader is null ? null : await shippingReader.GetAsync(order.Id, cancellationToken) };
     }
 
     private static AdminOrderListItemDto ToListItemDto(Order order, int itemCount, string? shipmentStatus = null)
@@ -840,7 +805,10 @@ internal sealed class AdminOrderService(
 
 internal sealed record AdminOrderImportPlan(
     AdminOrderImportPreviewDto Preview,
-    IReadOnlyCollection<AdminOrderImportOrderPlan> Orders);
+    IReadOnlyCollection<AdminOrderImportOrderPlan> Orders)
+{
+    public IReadOnlyCollection<AdminOrderImportCreatedOrderDto> ExistingOrders { get; init; } = [];
+}
 
 internal sealed record AdminOrderImportOrderPlan(
     string ExternalOrderCode,

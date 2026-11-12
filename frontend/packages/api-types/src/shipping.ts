@@ -54,7 +54,7 @@ export interface ShippingQuoteDto {
   expiresAtUtc: string;
   ratePlanId: string | null;
 }
-export type OrderPaymentReceiptKind = 0 | 1 | 2;
+export type OrderPaymentReceiptKind = 0 | 1 | 2 | 3;
 export interface ConfirmOrderPaymentRequest {
   amount: number;
   currency: string;
@@ -72,6 +72,7 @@ export interface OrderPaymentReceiptDto {
   occurredAtUtc: string;
 }
 export interface OrderPaymentSummaryDto {
+  importSource?: string | null;
   orderId: string;
   paymentMethod: number;
   paymentStatus: number;
@@ -81,6 +82,7 @@ export interface OrderPaymentSummaryDto {
   canConfirmTransfer: boolean;
   canCollectCod: boolean;
   canRemitCod: boolean;
+  canConfirmFullRefund?: boolean;
   receipts: OrderPaymentReceiptDto[];
 }
 export interface ShippingWard {

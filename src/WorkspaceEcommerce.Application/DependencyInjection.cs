@@ -17,6 +17,7 @@ using WorkspaceEcommerce.Application.Modules.Customers.TwoFactor;
 using WorkspaceEcommerce.Application.Modules.Loyalty;
 using WorkspaceEcommerce.Application.Modules.Ordering;
 using WorkspaceEcommerce.Application.Modules.Ordering.Receipts;
+using WorkspaceEcommerce.Application.Modules.Ordering.Returns;
 using WorkspaceEcommerce.Application.Modules.Operations;
 using WorkspaceEcommerce.Application.Modules.Payments;
 using WorkspaceEcommerce.Application.Modules.Reviews;
@@ -33,6 +34,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
         services.AddScoped<IAdminAuthService, AdminAuthService>();
         services.AddScoped<IAdminDashboardService, AdminDashboardService>();
+        services.AddScoped<IAdminSearchService, AdminSearchService>();
         services.AddScoped<IAdminCategoryService, AdminCategoryService>();
         services.AddScoped<IAdminProductService, AdminProductService>();
         services.AddScoped<IAdminProductVariantService, AdminProductVariantService>();
@@ -52,6 +54,9 @@ public static class DependencyInjection
         services.AddScoped<ICheckoutService, CheckoutService>();
         services.AddScoped<IStorefrontOrderLookupService, StorefrontOrderLookupService>();
         services.AddScoped<IAdminOrderService, AdminOrderService>();
+        services.AddScoped<IOrderReturnService, OrderReturnService>();
+        services.AddScoped<IOrderPaymentExceptionService, OrderPaymentExceptionService>();
+        services.AddScoped<IOrderExpiryService, OrderExpiryService>();
         services.AddScoped<IOrderReceiptService, OrderReceiptService>();
         services.AddScoped<IAdminCouponService, AdminCouponService>();
         services.AddScoped<ILoyaltyService, LoyaltyService>();

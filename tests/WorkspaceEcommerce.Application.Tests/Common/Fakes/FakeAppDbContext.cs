@@ -583,9 +583,13 @@ internal sealed class FakeAppDbContext : IAppDbContext
         return Task.FromResult(true);
     }
 
+    private readonly List<StockAdjustment> _stockAdjustments = [];
+    public IQueryable<StockAdjustment> StockAdjustments => _stockAdjustments.AsQueryable();
+
     private List<TEntity> GetSet<TEntity>()
         where TEntity : class
     {
+        if (typeof(TEntity) == typeof(StockAdjustment)) return (List<TEntity>)(object)_stockAdjustments;
         if (typeof(TEntity) == typeof(Category))
         {
             return (List<TEntity>)(object)_categories;

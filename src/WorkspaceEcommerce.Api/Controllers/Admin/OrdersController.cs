@@ -123,7 +123,7 @@ public sealed class OrdersController(
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> PreviewImport(
         [FromForm] IFormFile? file,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, [FromForm] string source = "manual")
     {
         if (file is null)
         {
@@ -132,7 +132,7 @@ public sealed class OrdersController(
         }
 
         await using var stream = file.OpenReadStream();
-        var result = await orderService.PreviewImportAsync(stream, file.FileName, cancellationToken);
+        var result = await orderService.PreviewImportAsync(stream, file.FileName, cancellationToken, source);
 
         return this.ToApiResponse(result);
     }
@@ -147,7 +147,7 @@ public sealed class OrdersController(
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> CommitImport(
         [FromForm] IFormFile? file,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, [FromForm] string source = "manual")
     {
         if (file is null)
         {
@@ -160,7 +160,7 @@ public sealed class OrdersController(
             User.FindFirstValue(ClaimTypes.Email) ??
             User.Identity?.Name;
         await using var stream = file.OpenReadStream();
-        var result = await orderService.CommitImportAsync(stream, file.FileName, changedBy, cancellationToken);
+        var result = await orderService.CommitImportAsync(stream, file.FileName, changedBy, cancellationToken, source);
 
         return this.ToApiResponse(result, StatusCodes.Status201Created);
     }

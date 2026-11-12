@@ -19,6 +19,33 @@ internal sealed class AdminBlogService(
     private const int MaxBlogPosts = 100;
     private const int MaxComments = 100;
 
+    public async Task<Result<PagedResult<AdminBlogPostDto>>> GetBlogPostsPageAsync(AdminBlogListRequest request, CancellationToken ct = default)
+    {
+        var validation = await new AdminBlogListRequestValidator().ValidateAsync(request, ct);
+        if (!validation.IsValid) return Result<PagedResult<AdminBlogPostDto>>.Validation(validation.Errors.Select(e => e.ErrorMessage));
+        var query = dbContext.BlogPosts.AsNoTrackingIfEf();
+        if (request.PostId.HasValue) query = query.Where(p => p.Id == request.PostId);
+        if (request.IsPublished.HasValue) query = query.Where(p => p.IsPublished == request.IsPublished);
+        if (!string.IsNullOrWhiteSpace(request.Search)) { var term = request.Search.Trim().ToLowerInvariant(); query = query.Where(p => p.Title.ToLower().Contains(term) || p.Slug.Contains(term)); }
+        var count = await query.CountAsyncSafe(ct);
+        var posts = await query.OrderByDescending(p => p.CreatedAt).ThenBy(p => p.Id).Skip((request.PageNumber - 1) * request.PageSize).Take(request.PageSize).ToArrayAsyncSafe(ct);
+        var ids = posts.Select(p => p.Id).ToArray();
+        var related = (await dbContext.BlogPostRelatedProducts.AsNoTrackingIfEf().Where(r => ids.Contains(r.BlogPostId)).ToArrayAsyncSafe(ct)).ToLookup(r => r.BlogPostId, r => r.ProductId);
+        return Result<PagedResult<AdminBlogPostDto>>.Success(new(posts.Select(p => ToDto(p, related[p.Id].ToArray())).ToArray(), request.PageNumber, request.PageSize, count));
+    }
+
+    public async Task<Result<PagedResult<BlogCommentDto>>> GetCommentsPageAsync(AdminCommentListRequest request, CancellationToken ct = default)
+    {
+        var validation = await new AdminCommentListRequestValidator().ValidateAsync(request, ct);
+        if (!validation.IsValid) return Result<PagedResult<BlogCommentDto>>.Validation(validation.Errors.Select(e => e.ErrorMessage));
+        var query = dbContext.BlogComments.AsNoTrackingIfEf();
+        if (request.PostId.HasValue) query = query.Where(c => c.BlogPostId == request.PostId);
+        if (request.Status.HasValue) query = query.Where(c => c.ModerationStatus == request.Status);
+        var count = await query.CountAsyncSafe(ct);
+        var comments = await query.OrderByDescending(c => c.CreatedAt).ThenBy(c => c.Id).Skip((request.PageNumber - 1) * request.PageSize).Take(request.PageSize).ToArrayAsyncSafe(ct);
+        return Result<PagedResult<BlogCommentDto>>.Success(new(comments.Select(ToCommentDto).ToArray(), request.PageNumber, request.PageSize, count));
+    }
+
     public async Task<Result<IReadOnlyCollection<AdminBlogPostDto>>> GetBlogPostsAsync(
         CancellationToken cancellationToken = default)
     {

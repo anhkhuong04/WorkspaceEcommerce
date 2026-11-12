@@ -26,8 +26,15 @@
   "revision": "Phiên bản bảng phí",
   "total": "Tổng tiền",
   "statuses": {
-    "AwaitingRelease": "Chờ đủ điều kiện giao", "Ready": "Sẵn sàng giao", "Assigned": "Đã phân công",
-    "OutForDelivery": "Đang giao hàng", "Delivered": "Đã giao", "FailedDelivery": "Giao thất bại",
-    "Cancelled": "Đã hủy", "Draft": "Đang chuẩn bị vận đơn"
-  }
+    "AwaitingRelease": "Chờ đủ điều kiện giao",
+    "Ready": "Sẵn sàng giao",
+    "Assigned": "Đã phân công",
+    "OutForDelivery": "Đang giao hàng",
+    "Delivered": "Đã giao",
+    "FailedDelivery": "Giao thất bại",
+    "Cancelled": "Đã hủy",
+    "Draft": "Đang chuẩn bị vận đơn"
+  },
+  "capabilitiesError": "Không tải được cấu hình giao hàng. Vui lòng thử lại.",
+  "couponCode": "Mã ưu đãi"
 }
